@@ -1,0 +1,14 @@
+- id: true_killer
+  text: 真凶是林侄女。
+  blocked_terms:
+    - 真凶是林侄女
+    - 林侄女杀了他
+    - niece is the killer
+  reveal_phase: reveal
+
+- id: swapped_will
+  text: 遗嘱被调换过。
+  blocked_terms:
+    - 遗嘱被调换
+    - 调换遗嘱
+  reveal_phase: reveal

@@ -1,0 +1,27 @@
+- id: scratched_drawer
+  title: 抽屉划痕
+  description: 书桌抽屉锁孔旁有新鲜划痕，像是被细金属工具撬开过。
+  truth_status: "true"
+  related_characters:
+    - butler
+  related_events:
+    - desk_opened
+  key: true
+
+- id: torn_note
+  title: 被撕碎的便签
+  description: 便签只剩半截，上面写着“今晚十点，书房见”。
+  truth_status: "unknown"
+  related_characters:
+    - niece
+  related_events:
+    - secret_meeting
+  key: true
+
+- id: dustless_frame
+  title: 无尘画框印
+  description: 肖像画背后的墙面有一圈无尘痕迹，说明它最近被移动过。
+  truth_status: "true"
+  related_characters: []
+  related_events: []
+  key: false

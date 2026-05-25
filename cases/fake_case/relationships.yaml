@@ -1,0 +1,15 @@
+- source: butler
+  target: player
+  trust: 0
+  suspicion: 0
+  fear: 1
+  intimacy: 0
+  hostility: 0
+
+- source: niece
+  target: player
+  trust: -1
+  suspicion: 1
+  fear: 0
+  intimacy: 0
+  hostility: 0

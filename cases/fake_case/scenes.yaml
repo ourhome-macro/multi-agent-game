@@ -1,0 +1,21 @@
+- id: study
+  name: 书房
+  description: 死者最后被看见的房间。书桌上有未干的墨迹，地毯边缘翘起。
+  characters:
+    - butler
+    - niece
+  hotspots:
+    - id: desk
+      name: 书桌
+      description: 一张厚重的胡桃木书桌，抽屉边缘有细小划痕。
+      discover_clues:
+        - scratched_drawer
+    - id: carpet
+      name: 地毯
+      description: 地毯下似乎压着什么东西。
+      discover_clues:
+        - torn_note
+    - id: portrait
+      name: 旧肖像画
+      description: 墙上的旧肖像画略微倾斜。
+      discover_clues: []

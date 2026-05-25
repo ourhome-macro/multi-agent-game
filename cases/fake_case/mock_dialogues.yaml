@@ -1,0 +1,14 @@
+- character_id: butler
+  default_speech: 我整晚都在整理餐具。至于书房，我只是在门口看了一眼。
+  default_intent: conceal
+  forbidden_test_speech: 真凶是林侄女，我亲眼知道这一点。
+  relationship_delta_on_talk:
+    suspicion: 1
+    fear: 1
+
+- character_id: niece
+  default_speech: 我不知道你想证明什么。那张便签不能说明我做了什么。
+  default_intent: answer
+  forbidden_test_speech: 林侄女杀了他，这句话不该由我说出口。
+  relationship_delta_on_talk:
+    suspicion: 1
