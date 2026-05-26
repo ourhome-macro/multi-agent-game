@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -90,10 +91,13 @@ def test_inspect_desk_discovers_scratched_drawer(client: TestClient) -> None:
     assert response.status_code == 200
     payload = response.json()
     clue_ids = {clue["id"] for clue in payload["state"]["discovered_clues"]}
+    knowledge_ids = {item["knowledge_id"] for item in payload["state"]["player_knowledge"]}
     event_types = {event["type"] for event in payload["new_events"]}
     assert "scratched_drawer" in clue_ids
+    assert "player_knowledge.scratched_drawer" in knowledge_ids
     assert "player.inspected" in event_types
     assert "clue.discovered" in event_types
+    assert "player_knowledge.updated" in event_types
 
 
 def test_clue_discovered_completes_beat_and_advances_phase(client: TestClient) -> None:
@@ -110,6 +114,8 @@ def test_clue_discovered_completes_beat_and_advances_phase(client: TestClient) -
     assert event_types == [
         "player.inspected",
         "clue.discovered",
+        "player_knowledge.updated",
+        "memory_candidate.created",
         "narrative.beat.completed",
         "narrative.phase.changed",
     ]
@@ -218,6 +224,13 @@ def test_talk_butler_generates_mock_dialogue(client: TestClient) -> None:
     )
     assert relationship_event["payload"]["source_id"] == "butler"
     assert relationship_event["payload"]["target_id"] == "player"
+    threshold_event = next(
+        event
+        for event in payload["new_events"]
+        if event["type"] == "relationship.threshold.crossed"
+    )
+    assert threshold_event["payload"]["metric"] == "suspicion"
+    assert threshold_event["payload"]["state"] == "guarded"
 
 
 def test_director_blocks_forbidden_fact(client: TestClient) -> None:
@@ -286,13 +299,15 @@ def test_state_summary_does_not_leak_secret_fields(client: TestClient) -> None:
 
     assert response.status_code == 200
     serialized = response.text
-    assert "secrets" not in serialized
-    assert "goals" not in serialized
-    assert "knowledge" not in serialized
-    assert "truth_status" not in serialized
-    assert "forbidden_facts" not in serialized
+    assert '"secrets":' not in serialized
+    assert '"goals":' not in serialized
+    assert '"knowledge":' not in serialized
+    assert '"truth_status":' not in serialized
+    assert '"forbidden_facts":' not in serialized
     assert "遗嘱被调换过" not in serialized
     assert "真凶是林侄女" not in serialized
+    payload = response.json()
+    assert payload["player_knowledge"] == []
 
 
 def test_player_action_rejects_generic_target_field(client: TestClient) -> None:
@@ -360,6 +375,48 @@ def test_rule_engine_rejects_unknown_agent_clue_without_state_pollution() -> Non
     assert events[0].type == EventType.RULE_REJECTED
     assert events[0].payload["reason"] == "clue_id is not defined by the case package"
     assert "not_defined_by_case" not in session.discovered_clues
+
+
+def test_relationship_metrics_are_clamped_and_threshold_only_fires_once() -> None:
+    case = CaseLoader().load(FAKE_CASE_001_DIR)
+    recorder = EventRecorder()
+    session = InMemorySessionStore(recorder).create(case)
+    intent = AgentIntent(
+        speech="我在重复提高信任。",
+        intent=AgentIntentType.ANSWER,
+        proposed_actions=[
+            RelationshipChangeAction(
+                type=ProposedActionType.RELATIONSHIP_CHANGE,
+                source_id="butler",
+                target_id="player",
+                deltas={"trust": 0.5},
+            )
+        ],
+    )
+
+    for _ in range(3):
+        RuleEngine(recorder).apply_agent_intent(
+            case=case,
+            session=session,
+            intent=intent,
+            caused_by_event_id=session.events[-1].id,
+        )
+
+    relationship = session.relationships["butler->player"]
+    threshold_events = [
+        event
+        for event in session.events
+        if event.type == EventType.RELATIONSHIP_THRESHOLD_CROSSED
+        and event.payload["metric"] == "trust"
+    ]
+    relationship_events = [
+        event for event in session.events if event.type == EventType.RELATIONSHIP_CHANGED
+    ]
+
+    assert relationship.trust == 1.0
+    assert relationship_events[-1].payload["current"]["trust"] == 1.0
+    assert len(threshold_events) == 1
+    assert threshold_events[0].payload["state"] == "cooperative"
 
 
 def test_rule_engine_rejects_unknown_relationship_endpoint() -> None:
@@ -447,13 +504,18 @@ def test_events_order_is_stable_for_mixed_action_sequence(client: TestClient) ->
         "session.created",
         "player.inspected",
         "clue.discovered",
+        "player_knowledge.updated",
+        "memory_candidate.created",
         "narrative.beat.completed",
         "narrative.phase.changed",
         "player.talked",
         "npc.replied",
         "relationship.changed",
+        "relationship.threshold.crossed",
+        "memory_candidate.created",
         "player.talked",
         "director.blocked",
+        "memory_candidate.created",
     ]
 
 
@@ -532,6 +594,7 @@ def test_state_summary_snapshots_do_not_leak_internal_fields(client: TestClient)
             "phase": opening["narrative_phase"],
             "completed_beats": opening["completed_beats"],
             "discovered": [clue["id"] for clue in opening["discovered_clues"]],
+            "player_knowledge": [item["knowledge_id"] for item in opening["player_knowledge"]],
             "event_count": opening["event_count"],
         },
         "fake_case_001_after_investigation": {
@@ -539,6 +602,9 @@ def test_state_summary_snapshots_do_not_leak_internal_fields(client: TestClient)
             "phase": investigation["narrative_phase"],
             "completed_beats": investigation["completed_beats"],
             "discovered": [clue["id"] for clue in investigation["discovered_clues"]],
+            "player_knowledge": [
+                item["knowledge_id"] for item in investigation["player_knowledge"]
+            ],
             "event_count": investigation["event_count"],
         },
         "fake_case_002_after_first_talk": {
@@ -546,6 +612,9 @@ def test_state_summary_snapshots_do_not_leak_internal_fields(client: TestClient)
             "phase": second_case_talk["narrative_phase"],
             "completed_beats": second_case_talk["completed_beats"],
             "discovered": [clue["id"] for clue in second_case_talk["discovered_clues"]],
+            "player_knowledge": [
+                item["knowledge_id"] for item in second_case_talk["player_knowledge"]
+            ],
             "event_count": second_case_talk["event_count"],
         },
     }
@@ -556,6 +625,7 @@ def test_state_summary_snapshots_do_not_leak_internal_fields(client: TestClient)
             "phase": "opening",
             "completed_beats": [],
             "discovered": [],
+            "player_knowledge": [],
             "event_count": 1,
         },
         "fake_case_001_after_investigation": {
@@ -563,22 +633,24 @@ def test_state_summary_snapshots_do_not_leak_internal_fields(client: TestClient)
             "phase": "investigation",
             "completed_beats": ["drawer_found"],
             "discovered": ["scratched_drawer"],
-            "event_count": 5,
+            "player_knowledge": ["player_knowledge.scratched_drawer"],
+            "event_count": 7,
         },
         "fake_case_002_after_first_talk": {
             "case_id": "fake_case_002",
             "phase": "opening",
             "completed_beats": [],
             "discovered": [],
+            "player_knowledge": [],
             "event_count": 4,
         },
     }
-    serialized = str([opening, investigation, second_case_talk])
-    assert "secrets" not in serialized
-    assert "goals" not in serialized
-    assert "knowledge" not in serialized
-    assert "truth_status" not in serialized
-    assert "forbidden_facts" not in serialized
+    serialized = json.dumps([opening, investigation, second_case_talk], ensure_ascii=False)
+    assert '"secrets":' not in serialized
+    assert '"goals":' not in serialized
+    assert '"knowledge":' not in serialized
+    assert '"truth_status":' not in serialized
+    assert '"forbidden_facts":' not in serialized
 
 
 def test_invalid_case_reference_raises_clear_error(tmp_path: Path) -> None:

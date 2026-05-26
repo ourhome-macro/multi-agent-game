@@ -7,6 +7,8 @@ from uuid import uuid4
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 NonEmptyString = Annotated[str, Field(min_length=1)]
+RELATIONSHIP_MIN = -1.0
+RELATIONSHIP_MAX = 1.0
 
 
 class ActionType(StrEnum):
@@ -32,6 +34,9 @@ class EventType(StrEnum):
     RULE_REJECTED = "rule.rejected"
     CLUE_DISCOVERED = "clue.discovered"
     RELATIONSHIP_CHANGED = "relationship.changed"
+    RELATIONSHIP_THRESHOLD_CROSSED = "relationship.threshold.crossed"
+    PLAYER_KNOWLEDGE_UPDATED = "player_knowledge.updated"
+    MEMORY_CANDIDATE_CREATED = "memory_candidate.created"
     NARRATIVE_BEAT_COMPLETED = "narrative.beat.completed"
     NARRATIVE_PHASE_CHANGED = "narrative.phase.changed"
 
@@ -106,11 +111,16 @@ class ClueConfig(APIModel):
 class RelationshipConfig(APIModel):
     source_id: NonEmptyString
     target_id: NonEmptyString
-    trust: int = 0
-    suspicion: int = 0
-    fear: int = 0
-    intimacy: int = 0
-    hostility: int = 0
+    trust: float = 0.0
+    suspicion: float = 0.0
+    fear: float = 0.0
+    intimacy: float = 0.0
+    hostility: float = 0.0
+
+    @field_validator("trust", "suspicion", "fear", "intimacy", "hostility", mode="before")
+    @classmethod
+    def clamp_relationship_metric(cls, value: object) -> float:
+        return clamp_relationship_metric(value)
 
 
 class ForbiddenFactConfig(APIModel):
@@ -129,7 +139,7 @@ class RelationshipChangeAction(APIModel):
     type: Literal[ProposedActionType.RELATIONSHIP_CHANGE]
     source_id: NonEmptyString
     target_id: NonEmptyString
-    deltas: dict[str, int]
+    deltas: dict[str, float]
 
 
 class NarrativePhaseChangeAction(APIModel):
@@ -144,11 +154,11 @@ class MockReplyConfig(APIModel):
     phase: NonEmptyString | None = None
     requires_discovered: list[NonEmptyString] = Field(default_factory=list)
     missing_discovered: list[NonEmptyString] = Field(default_factory=list)
-    min_relationship: dict[str, int] = Field(default_factory=dict)
-    max_relationship: dict[str, int] = Field(default_factory=dict)
+    min_relationship: dict[str, float] = Field(default_factory=dict)
+    max_relationship: dict[str, float] = Field(default_factory=dict)
     speech: NonEmptyString
     intent: AgentIntentType = AgentIntentType.ANSWER
-    emotional_shift: dict[str, int] = Field(default_factory=dict)
+    emotional_shift: dict[str, float] = Field(default_factory=dict)
     proposed_actions: list[ProposedAction] = Field(default_factory=list)
     memory_refs: list[str] = Field(default_factory=list)
 
@@ -158,7 +168,7 @@ class MockDialogueConfig(APIModel):
     default_speech: NonEmptyString
     default_intent: AgentIntentType = AgentIntentType.ANSWER
     forbidden_test_speech: str | None = None
-    relationship_delta_on_talk: dict[str, int] = Field(default_factory=dict)
+    relationship_delta_on_talk: dict[str, float] = Field(default_factory=dict)
     replies: list[MockReplyConfig] = Field(default_factory=list)
 
 
@@ -203,7 +213,7 @@ class PlayerAction(APIModel):
 class AgentIntent(APIModel):
     speech: NonEmptyString
     intent: AgentIntentType
-    emotional_shift: dict[str, int] = Field(default_factory=dict)
+    emotional_shift: dict[str, float] = Field(default_factory=dict)
     proposed_actions: list[ProposedAction] = Field(default_factory=list)
     memory_refs: list[str] = Field(default_factory=list)
 
@@ -235,11 +245,33 @@ class DirectorDecision(APIModel):
 class RelationshipState(APIModel):
     source_id: NonEmptyString
     target_id: NonEmptyString
-    trust: int = 0
-    suspicion: int = 0
-    fear: int = 0
-    intimacy: int = 0
-    hostility: int = 0
+    trust: float = 0.0
+    suspicion: float = 0.0
+    fear: float = 0.0
+    intimacy: float = 0.0
+    hostility: float = 0.0
+
+    @field_validator("trust", "suspicion", "fear", "intimacy", "hostility", mode="before")
+    @classmethod
+    def clamp_state_relationship_metric(cls, value: object) -> float:
+        return clamp_relationship_metric(value)
+
+
+class PlayerKnowledgeState(APIModel):
+    knowledge_id: NonEmptyString
+    clue_id: NonEmptyString
+    title: NonEmptyString
+    summary: str
+    source_event_id: NonEmptyString
+
+
+class MemoryCandidateState(APIModel):
+    memory_id: NonEmptyString
+    subject_id: NonEmptyString
+    content: NonEmptyString
+    source_event_id: NonEmptyString
+    visibility: list[NonEmptyString] = Field(default_factory=list)
+    salience: float = Field(default=0.0, ge=0.0, le=1.0)
 
 
 class NarrativeState(APIModel):
@@ -264,7 +296,10 @@ class SessionState(APIModel):
     case_id: NonEmptyString
     narrative: NarrativeState
     relationships: dict[str, RelationshipState]
+    relationship_thresholds_crossed: set[str] = Field(default_factory=set)
     discovered_clues: set[str] = Field(default_factory=set)
+    player_knowledge: dict[str, PlayerKnowledgeState] = Field(default_factory=dict)
+    memory_candidates: dict[str, MemoryCandidateState] = Field(default_factory=dict)
     events: list[WorldEvent] = Field(default_factory=list)
 
 
@@ -290,6 +325,13 @@ class ClueSummary(APIModel):
     key: bool
 
 
+class PlayerKnowledgeSummary(APIModel):
+    knowledge_id: NonEmptyString
+    clue_id: NonEmptyString
+    title: NonEmptyString
+    summary: str
+
+
 class StateSummary(APIModel):
     session_id: NonEmptyString
     case_id: NonEmptyString
@@ -298,6 +340,7 @@ class StateSummary(APIModel):
     completed_beats: list[NonEmptyString]
     characters: list[CharacterSummary]
     discovered_clues: list[ClueSummary]
+    player_knowledge: list[PlayerKnowledgeSummary]
     relationships: list[RelationshipState]
     event_count: int
 
@@ -310,3 +353,9 @@ class ActionResponse(APIModel):
     director_reason: str | None = None
     new_events: list[WorldEvent]
     state: StateSummary
+
+
+def clamp_relationship_metric(value: object) -> float:
+    numeric_value = float(value)
+    clamped = min(max(numeric_value, RELATIONSHIP_MIN), RELATIONSHIP_MAX)
+    return round(clamped, 4)

@@ -3,12 +3,14 @@ from __future__ import annotations
 from app.domain.models import (
     CasePackage,
     EventType,
+    MemoryCandidateState,
     NarrativeState,
+    PlayerKnowledgeState,
     RelationshipState,
     SessionState,
     WorldEvent,
 )
-from app.rules.engine import relationship_key
+from app.rules.engine import relationship_key, relationship_threshold_key
 
 
 def replay_events(case: CasePackage, events: list[WorldEvent]) -> SessionState:
@@ -46,6 +48,40 @@ def _apply_event(session: SessionState, event: WorldEvent) -> None:
             session.relationships[
                 relationship_key(relationship.source_id, relationship.target_id)
             ] = relationship
+        return
+
+    if event.type == EventType.RELATIONSHIP_THRESHOLD_CROSSED:
+        session.relationship_thresholds_crossed.add(
+            relationship_threshold_key(
+                str(event.payload["source_id"]),
+                str(event.payload["target_id"]),
+                str(event.payload["metric"]),
+                str(event.payload["state"]),
+            )
+        )
+        return
+
+    if event.type == EventType.PLAYER_KNOWLEDGE_UPDATED:
+        knowledge = PlayerKnowledgeState(
+            knowledge_id=str(event.payload["knowledge_id"]),
+            clue_id=str(event.payload["clue_id"]),
+            title=str(event.payload["title"]),
+            summary=str(event.payload["summary"]),
+            source_event_id=str(event.payload["source_event_id"]),
+        )
+        session.player_knowledge[knowledge.knowledge_id] = knowledge
+        return
+
+    if event.type == EventType.MEMORY_CANDIDATE_CREATED:
+        memory = MemoryCandidateState(
+            memory_id=str(event.payload["memory_id"]),
+            subject_id=str(event.payload["subject_id"]),
+            content=str(event.payload["content"]),
+            source_event_id=str(event.payload["source_event_id"]),
+            visibility=[str(item) for item in event.payload["visibility"]],
+            salience=float(event.payload["salience"]),
+        )
+        session.memory_candidates[memory.memory_id] = memory
         return
 
     if event.type == EventType.NARRATIVE_BEAT_COMPLETED:

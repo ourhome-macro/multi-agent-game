@@ -15,6 +15,7 @@ from app.domain.models import (
 )
 from app.rules.engine import RuleEngine
 from app.rules.triggers import RuleTriggerSystem
+from app.runtime.derivations import DerivedEventSystem
 from app.runtime.errors import ActionValidationError
 from app.runtime.events import EventRecorder
 from app.storage.memory import InMemoryCaseStore, InMemorySessionStore, build_state_summary
@@ -25,6 +26,7 @@ class RuntimeContainer:
     case_store: InMemoryCaseStore
     session_store: InMemorySessionStore
     action_service: ActionService
+    rule_engine: RuleEngine
 
 
 class ActionService:
@@ -37,6 +39,7 @@ class ActionService:
         director: NarrativeDirector,
         rule_engine: RuleEngine,
         trigger_system: RuleTriggerSystem,
+        derived_event_system: DerivedEventSystem,
     ) -> None:
         self._case_store = case_store
         self._recorder = recorder
@@ -44,6 +47,7 @@ class ActionService:
         self._director = director
         self._rule_engine = rule_engine
         self._trigger_system = trigger_system
+        self._derived_event_system = derived_event_system
 
     def handle(self, *, session: SessionState, action: PlayerAction) -> ActionResponse:
         case = self._case_store.get(session.case_id)
@@ -66,7 +70,9 @@ class ActionService:
                     caused_by_event_id=player_event.id,
                 )
             )
-            new_events.extend(self._evaluate_triggers(case, session, new_events[-1].id))
+            trigger_source_event_id = new_events[-1].id
+            new_events.extend(self._derive_events(case, session, new_events))
+            new_events.extend(self._evaluate_triggers(case, session, trigger_source_event_id))
             return ActionResponse(
                 session_id=session.id,
                 accepted=True,
@@ -128,7 +134,9 @@ class ActionService:
                 )
                 new_events.append(blocked_event)
 
-            new_events.extend(self._evaluate_triggers(case, session, new_events[-1].id))
+            trigger_source_event_id = new_events[-1].id
+            new_events.extend(self._derive_events(case, session, new_events))
+            new_events.extend(self._evaluate_triggers(case, session, trigger_source_event_id))
 
             return ActionResponse(
                 session_id=session.id,
@@ -167,6 +175,18 @@ class ActionService:
             caused_by_event_id=caused_by_event_id,
         )
 
+    def _derive_events(
+        self,
+        case: CasePackage,
+        session: SessionState,
+        source_events: list[WorldEvent],
+    ) -> list[WorldEvent]:
+        return self._derived_event_system.derive(
+            case=case,
+            session=session,
+            source_events=source_events,
+        )
+
 
 def create_runtime(case_packages: list[CasePackage]) -> RuntimeContainer:
     recorder = EventRecorder()
@@ -174,16 +194,19 @@ def create_runtime(case_packages: list[CasePackage]) -> RuntimeContainer:
     for package in case_packages:
         case_store.add(package)
     session_store = InMemorySessionStore(recorder)
+    rule_engine = RuleEngine(recorder)
     action_service = ActionService(
         case_store=case_store,
         recorder=recorder,
         mock_agent=MockAgent(),
         director=NarrativeDirector(),
-        rule_engine=RuleEngine(recorder),
+        rule_engine=rule_engine,
         trigger_system=RuleTriggerSystem(recorder),
+        derived_event_system=DerivedEventSystem(recorder),
     )
     return RuntimeContainer(
         case_store=case_store,
         session_store=session_store,
         action_service=action_service,
+        rule_engine=rule_engine,
     )

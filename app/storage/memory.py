@@ -8,6 +8,7 @@ from app.domain.models import (
     ClueSummary,
     EventType,
     NarrativeState,
+    PlayerKnowledgeSummary,
     RelationshipState,
     SessionState,
     StateSummary,
@@ -95,6 +96,18 @@ def build_state_summary(package: CasePackage, session: SessionState) -> StateSum
             for character in package.characters
         ],
         discovered_clues=discovered_clues,
+        player_knowledge=[
+            PlayerKnowledgeSummary(
+                knowledge_id=item.knowledge_id,
+                clue_id=item.clue_id,
+                title=item.title,
+                summary=item.summary,
+            )
+            for item in sorted(
+                session.player_knowledge.values(),
+                key=lambda value: value.knowledge_id,
+            )
+        ],
         relationships=list(session.relationships.values()),
         event_count=len(session.events),
     )

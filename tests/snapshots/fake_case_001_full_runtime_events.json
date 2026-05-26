@@ -1,0 +1,473 @@
+[
+  {
+    "id": "event_001",
+    "case_id": "fake_case_001",
+    "session_id": "session",
+    "actor_id": "system",
+    "type": "session.created",
+    "payload": {
+      "case_id": "fake_case_001",
+      "initial_phase": "opening"
+    },
+    "caused_by_event_id": null,
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_002",
+    "case_id": "fake_case_001",
+    "session_id": "session",
+    "actor_id": "player",
+    "type": "player.inspected",
+    "payload": {
+      "target_id": "desk"
+    },
+    "caused_by_event_id": null,
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_003",
+    "case_id": "fake_case_001",
+    "session_id": "session",
+    "actor_id": "system",
+    "type": "clue.discovered",
+    "payload": {
+      "clue_id": "scratched_drawer",
+      "source_hotspot_id": "desk"
+    },
+    "caused_by_event_id": "event_002",
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_004",
+    "case_id": "fake_case_001",
+    "session_id": "session",
+    "actor_id": "derived_event_system",
+    "type": "player_knowledge.updated",
+    "payload": {
+      "clue_id": "scratched_drawer",
+      "knowledge_id": "player_knowledge.scratched_drawer",
+      "source_event_id": "event_003",
+      "title": "抽屉划痕",
+      "summary": "书桌抽屉锁孔旁有新鲜划痕，像是被细金属工具撬开过。"
+    },
+    "caused_by_event_id": "event_003",
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_005",
+    "case_id": "fake_case_001",
+    "session_id": "session",
+    "actor_id": "derived_event_system",
+    "type": "memory_candidate.created",
+    "payload": {
+      "memory_id": "memory_candidate.event_003",
+      "subject_id": "player",
+      "content": "Player discovered clue '抽屉划痕'.",
+      "source_event_id": "event_003",
+      "visibility": [
+        "player"
+      ],
+      "salience": 0.8
+    },
+    "caused_by_event_id": "event_003",
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_006",
+    "case_id": "fake_case_001",
+    "session_id": "session",
+    "actor_id": "rule_trigger_system",
+    "type": "narrative.beat.completed",
+    "payload": {
+      "beat_id": "drawer_found",
+      "phase": "opening"
+    },
+    "caused_by_event_id": "event_003",
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_007",
+    "case_id": "fake_case_001",
+    "session_id": "session",
+    "actor_id": "rule_trigger_system",
+    "type": "narrative.phase.changed",
+    "payload": {
+      "from_phase": "opening",
+      "phase": "investigation",
+      "trigger_beat_id": "drawer_found"
+    },
+    "caused_by_event_id": "event_003",
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_008",
+    "case_id": "fake_case_001",
+    "session_id": "session",
+    "actor_id": "player",
+    "type": "player.talked",
+    "payload": {
+      "target_id": "butler",
+      "text": "你昨晚在哪里？"
+    },
+    "caused_by_event_id": null,
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_009",
+    "case_id": "fake_case_001",
+    "session_id": "session",
+    "actor_id": "butler",
+    "type": "npc.replied",
+    "payload": {
+      "speech": "抽屉确实有响动，但我不能确定是谁动过它。",
+      "intent": "probe",
+      "proposed_actions": [
+        {
+          "type": "relationship.change",
+          "source_id": "butler",
+          "target_id": "player",
+          "deltas": {
+            "fear": 1.0,
+            "suspicion": 1.0
+          }
+        }
+      ]
+    },
+    "caused_by_event_id": "event_008",
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_010",
+    "case_id": "fake_case_001",
+    "session_id": "session",
+    "actor_id": "system",
+    "type": "relationship.changed",
+    "payload": {
+      "source_id": "butler",
+      "target_id": "player",
+      "deltas": {
+        "fear": 1.0,
+        "suspicion": 1.0
+      },
+      "current": {
+        "source_id": "butler",
+        "target_id": "player",
+        "trust": 0.0,
+        "suspicion": 1.0,
+        "fear": 1.0,
+        "intimacy": 0.0,
+        "hostility": 0.0
+      }
+    },
+    "caused_by_event_id": "event_009",
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_011",
+    "case_id": "fake_case_001",
+    "session_id": "session",
+    "actor_id": "system",
+    "type": "relationship.threshold.crossed",
+    "payload": {
+      "source_id": "butler",
+      "target_id": "player",
+      "metric": "suspicion",
+      "threshold": 0.7,
+      "state": "guarded",
+      "current_value": 1.0
+    },
+    "caused_by_event_id": "event_010",
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_012",
+    "case_id": "fake_case_001",
+    "session_id": "session",
+    "actor_id": "derived_event_system",
+    "type": "memory_candidate.created",
+    "payload": {
+      "memory_id": "memory_candidate.event_011",
+      "subject_id": "player",
+      "content": "韩管家 became guarded toward the player (suspicion).",
+      "source_event_id": "event_011",
+      "visibility": [
+        "player"
+      ],
+      "salience": 0.7
+    },
+    "caused_by_event_id": "event_011",
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_013",
+    "case_id": "fake_case_001",
+    "session_id": "session",
+    "actor_id": "player",
+    "type": "player.inspected",
+    "payload": {
+      "target_id": "portrait"
+    },
+    "caused_by_event_id": null,
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_014",
+    "case_id": "fake_case_001",
+    "session_id": "session",
+    "actor_id": "system",
+    "type": "clue.discovered",
+    "payload": {
+      "clue_id": "dustless_frame",
+      "source_hotspot_id": "portrait"
+    },
+    "caused_by_event_id": "event_013",
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_015",
+    "case_id": "fake_case_001",
+    "session_id": "session",
+    "actor_id": "derived_event_system",
+    "type": "player_knowledge.updated",
+    "payload": {
+      "clue_id": "dustless_frame",
+      "knowledge_id": "player_knowledge.dustless_frame",
+      "source_event_id": "event_014",
+      "title": "无尘画框印",
+      "summary": "肖像画背后的墙面有一圈无尘痕迹，说明它最近被移动过。"
+    },
+    "caused_by_event_id": "event_014",
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_016",
+    "case_id": "fake_case_001",
+    "session_id": "session",
+    "actor_id": "derived_event_system",
+    "type": "memory_candidate.created",
+    "payload": {
+      "memory_id": "memory_candidate.event_014",
+      "subject_id": "player",
+      "content": "Player discovered clue '无尘画框印'.",
+      "source_event_id": "event_014",
+      "visibility": [
+        "player"
+      ],
+      "salience": 0.8
+    },
+    "caused_by_event_id": "event_014",
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_017",
+    "case_id": "fake_case_001",
+    "session_id": "session",
+    "actor_id": "player",
+    "type": "player.talked",
+    "payload": {
+      "target_id": "butler",
+      "text": "你看到了什么？"
+    },
+    "caused_by_event_id": null,
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_018",
+    "case_id": "fake_case_001",
+    "session_id": "session",
+    "actor_id": "butler",
+    "type": "npc.replied",
+    "payload": {
+      "speech": "抽屉确实有响动，但我不能确定是谁动过它。",
+      "intent": "probe",
+      "proposed_actions": [
+        {
+          "type": "relationship.change",
+          "source_id": "butler",
+          "target_id": "player",
+          "deltas": {
+            "fear": 1.0,
+            "suspicion": 1.0
+          }
+        }
+      ]
+    },
+    "caused_by_event_id": "event_017",
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_019",
+    "case_id": "fake_case_001",
+    "session_id": "session",
+    "actor_id": "system",
+    "type": "relationship.changed",
+    "payload": {
+      "source_id": "butler",
+      "target_id": "player",
+      "deltas": {
+        "fear": 1.0,
+        "suspicion": 1.0
+      },
+      "current": {
+        "source_id": "butler",
+        "target_id": "player",
+        "trust": 0.0,
+        "suspicion": 1.0,
+        "fear": 1.0,
+        "intimacy": 0.0,
+        "hostility": 0.0
+      }
+    },
+    "caused_by_event_id": "event_018",
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_020",
+    "case_id": "fake_case_001",
+    "session_id": "session",
+    "actor_id": "player",
+    "type": "player.talked",
+    "payload": {
+      "target_id": "butler",
+      "text": "直接告诉我真相。"
+    },
+    "caused_by_event_id": null,
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_021",
+    "case_id": "fake_case_001",
+    "session_id": "session",
+    "actor_id": "director",
+    "type": "director.blocked",
+    "payload": {
+      "target_id": "butler",
+      "blocked_fact_id": "true_killer",
+      "reason": "Blocked forbidden fact 'true_killer' in phase 'investigation'"
+    },
+    "caused_by_event_id": "event_020",
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_022",
+    "case_id": "fake_case_001",
+    "session_id": "session",
+    "actor_id": "derived_event_system",
+    "type": "memory_candidate.created",
+    "payload": {
+      "memory_id": "memory_candidate.event_021",
+      "subject_id": "player",
+      "content": "Conversation with 韩管家 was blocked by narrative rules.",
+      "source_event_id": "event_021",
+      "visibility": [
+        "player"
+      ],
+      "salience": 0.9
+    },
+    "caused_by_event_id": "event_021",
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_023",
+    "case_id": "fake_case_001",
+    "session_id": "session",
+    "actor_id": "player",
+    "type": "player.inspected",
+    "payload": {
+      "target_id": "carpet"
+    },
+    "caused_by_event_id": null,
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_024",
+    "case_id": "fake_case_001",
+    "session_id": "session",
+    "actor_id": "system",
+    "type": "clue.discovered",
+    "payload": {
+      "clue_id": "torn_note",
+      "source_hotspot_id": "carpet"
+    },
+    "caused_by_event_id": "event_023",
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_025",
+    "case_id": "fake_case_001",
+    "session_id": "session",
+    "actor_id": "derived_event_system",
+    "type": "player_knowledge.updated",
+    "payload": {
+      "clue_id": "torn_note",
+      "knowledge_id": "player_knowledge.torn_note",
+      "source_event_id": "event_024",
+      "title": "被撕碎的便签",
+      "summary": "便签只剩半截，上面写着“今晚十点，书房见”。"
+    },
+    "caused_by_event_id": "event_024",
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_026",
+    "case_id": "fake_case_001",
+    "session_id": "session",
+    "actor_id": "derived_event_system",
+    "type": "memory_candidate.created",
+    "payload": {
+      "memory_id": "memory_candidate.event_024",
+      "subject_id": "player",
+      "content": "Player discovered clue '被撕碎的便签'.",
+      "source_event_id": "event_024",
+      "visibility": [
+        "player"
+      ],
+      "salience": 0.8
+    },
+    "caused_by_event_id": "event_024",
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_027",
+    "case_id": "fake_case_001",
+    "session_id": "session",
+    "actor_id": "rule_trigger_system",
+    "type": "narrative.beat.completed",
+    "payload": {
+      "beat_id": "hidden_meeting_connected",
+      "phase": "investigation"
+    },
+    "caused_by_event_id": "event_024",
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_028",
+    "case_id": "fake_case_001",
+    "session_id": "session",
+    "actor_id": "rule_trigger_system",
+    "type": "narrative.phase.changed",
+    "payload": {
+      "from_phase": "investigation",
+      "phase": "reveal",
+      "trigger_beat_id": "hidden_meeting_connected"
+    },
+    "caused_by_event_id": "event_024",
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_029",
+    "case_id": "fake_case_001",
+    "session_id": "session",
+    "actor_id": "rule_engine",
+    "type": "rule.rejected",
+    "payload": {
+      "action_type": "narrative.phase.change",
+      "reason": "narrative phase changes must be driven by narrative rules",
+      "proposed_payload": {
+        "phase": "opening"
+      }
+    },
+    "caused_by_event_id": "event_028",
+    "created_at": "timestamp"
+  }
+]

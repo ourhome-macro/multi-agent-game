@@ -11,10 +11,16 @@ from app.domain.models import (
     RelationshipState,
     SessionState,
     WorldEvent,
+    clamp_relationship_metric,
 )
 from app.runtime.events import EventRecorder
 
 RELATIONSHIP_METRICS = {"trust", "suspicion", "fear", "intimacy", "hostility"}
+RELATIONSHIP_THRESHOLDS = {
+    "suspicion": (0.7, "guarded"),
+    "fear": (0.7, "afraid"),
+    "trust": (0.7, "cooperative"),
+}
 
 
 class RuleEngine:
@@ -66,7 +72,7 @@ class RuleEngine:
         events: list[WorldEvent] = []
         for proposed_action in intent.proposed_actions:
             if proposed_action.type == ProposedActionType.RELATIONSHIP_CHANGE:
-                events.append(
+                events.extend(
                     self._apply_relationship_change(
                         case=case,
                         session=session,
@@ -102,35 +108,39 @@ class RuleEngine:
         session: SessionState,
         action: RelationshipChangeAction,
         caused_by_event_id: str,
-    ) -> WorldEvent:
+    ) -> list[WorldEvent]:
         character_ids = {character.id for character in case.characters}
         valid_actor_ids = character_ids | {"player"}
         if action.source_id not in valid_actor_ids or action.target_id not in valid_actor_ids:
-            return self._reject(
-                session=session,
-                action_type=action.type,
-                reason="relationship endpoint is not a known character or player",
-                payload={
-                    "source_id": action.source_id,
-                    "target_id": action.target_id,
-                    "deltas": action.deltas,
-                },
-                caused_by_event_id=caused_by_event_id,
-            )
+            return [
+                self._reject(
+                    session=session,
+                    action_type=action.type,
+                    reason="relationship endpoint is not a known character or player",
+                    payload={
+                        "source_id": action.source_id,
+                        "target_id": action.target_id,
+                        "deltas": action.deltas,
+                    },
+                    caused_by_event_id=caused_by_event_id,
+                )
+            ]
 
         unknown_metrics = set(action.deltas) - RELATIONSHIP_METRICS
         if unknown_metrics:
-            return self._reject(
-                session=session,
-                action_type=action.type,
-                reason=f"unknown relationship metrics: {sorted(unknown_metrics)}",
-                payload={
-                    "source_id": action.source_id,
-                    "target_id": action.target_id,
-                    "deltas": action.deltas,
-                },
-                caused_by_event_id=caused_by_event_id,
-            )
+            return [
+                self._reject(
+                    session=session,
+                    action_type=action.type,
+                    reason=f"unknown relationship metrics: {sorted(unknown_metrics)}",
+                    payload={
+                        "source_id": action.source_id,
+                        "target_id": action.target_id,
+                        "deltas": action.deltas,
+                    },
+                    caused_by_event_id=caused_by_event_id,
+                )
+            ]
 
         key = relationship_key(action.source_id, action.target_id)
         relationship = session.relationships.get(key)
@@ -138,22 +148,34 @@ class RuleEngine:
             relationship = RelationshipState(source_id=action.source_id, target_id=action.target_id)
             session.relationships[key] = relationship
 
+        previous_values = {field: getattr(relationship, field) for field in RELATIONSHIP_METRICS}
         for field, delta in action.deltas.items():
             current_value = getattr(relationship, field)
-            setattr(relationship, field, current_value + delta)
+            setattr(relationship, field, clamp_relationship_metric(current_value + delta))
 
-        return self._recorder.append(
-            session,
-            actor_id="system",
-            event_type=EventType.RELATIONSHIP_CHANGED,
-            payload={
-                "source_id": action.source_id,
-                "target_id": action.target_id,
-                "deltas": action.deltas,
-                "current": relationship.model_dump(),
-            },
-            caused_by_event_id=caused_by_event_id,
+        events = [
+            self._recorder.append(
+                session,
+                actor_id="system",
+                event_type=EventType.RELATIONSHIP_CHANGED,
+                payload={
+                    "source_id": action.source_id,
+                    "target_id": action.target_id,
+                    "deltas": action.deltas,
+                    "current": relationship.model_dump(mode="json"),
+                },
+                caused_by_event_id=caused_by_event_id,
+            )
+        ]
+        events.extend(
+            self._apply_relationship_thresholds(
+                session=session,
+                relationship=relationship,
+                previous_values=previous_values,
+                caused_by_event_id=events[-1].id,
+            )
         )
+        return events
 
     def _apply_discover_clue(
         self,
@@ -205,6 +227,55 @@ class RuleEngine:
             caused_by_event_id=caused_by_event_id,
         )
 
+    def _apply_relationship_thresholds(
+        self,
+        *,
+        session: SessionState,
+        relationship: RelationshipState,
+        previous_values: dict[str, float],
+        caused_by_event_id: str,
+    ) -> list[WorldEvent]:
+        events: list[WorldEvent] = []
+        for metric, (threshold, state_name) in RELATIONSHIP_THRESHOLDS.items():
+            previous_value = previous_values.get(metric, 0.0)
+            current_value = getattr(relationship, metric)
+            threshold_key = relationship_threshold_key(
+                relationship.source_id,
+                relationship.target_id,
+                metric,
+                state_name,
+            )
+            if threshold_key in session.relationship_thresholds_crossed:
+                continue
+            if previous_value < threshold <= current_value:
+                session.relationship_thresholds_crossed.add(threshold_key)
+                events.append(
+                    self._recorder.append(
+                        session,
+                        actor_id="system",
+                        event_type=EventType.RELATIONSHIP_THRESHOLD_CROSSED,
+                        payload={
+                            "source_id": relationship.source_id,
+                            "target_id": relationship.target_id,
+                            "metric": metric,
+                            "threshold": threshold,
+                            "state": state_name,
+                            "current_value": current_value,
+                        },
+                        caused_by_event_id=caused_by_event_id,
+                    )
+                )
+        return events
+
 
 def relationship_key(source_id: str, target_id: str) -> str:
     return f"{source_id}->{target_id}"
+
+
+def relationship_threshold_key(
+    source_id: str,
+    target_id: str,
+    metric: str,
+    state_name: str,
+) -> str:
+    return f"{source_id}->{target_id}:{metric}:{state_name}"
