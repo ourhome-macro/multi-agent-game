@@ -1,4 +1,0 @@
-id: fake_case
-title: 假案件：书房里的裂纹
-description: 用于验证后端运行时骨架的最小案件包。
-initial_phase: opening

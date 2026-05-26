@@ -12,11 +12,11 @@
         - scratched_drawer
     - id: carpet
       name: 地毯
-      description: 地毯下似乎压着什么东西。
+      description: 地毯下压着半截被揉皱的便签。
       discover_clues:
         - torn_note
     - id: portrait
       name: 旧肖像画
-      description: 墙上的旧肖像画略微倾斜。
+      description: 墙上的旧肖像画略微倾斜，画框后有新鲜痕迹。
       discover_clues:
         - dustless_frame

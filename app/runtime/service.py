@@ -14,6 +14,7 @@ from app.domain.models import (
     WorldEvent,
 )
 from app.rules.engine import RuleEngine
+from app.rules.triggers import RuleTriggerSystem
 from app.runtime.errors import ActionValidationError
 from app.runtime.events import EventRecorder
 from app.storage.memory import InMemoryCaseStore, InMemorySessionStore, build_state_summary
@@ -35,12 +36,14 @@ class ActionService:
         mock_agent: MockAgent,
         director: NarrativeDirector,
         rule_engine: RuleEngine,
+        trigger_system: RuleTriggerSystem,
     ) -> None:
         self._case_store = case_store
         self._recorder = recorder
         self._mock_agent = mock_agent
         self._director = director
         self._rule_engine = rule_engine
+        self._trigger_system = trigger_system
 
     def handle(self, *, session: SessionState, action: PlayerAction) -> ActionResponse:
         case = self._case_store.get(session.case_id)
@@ -63,6 +66,7 @@ class ActionService:
                     caused_by_event_id=player_event.id,
                 )
             )
+            new_events.extend(self._evaluate_triggers(case, session, new_events[-1].id))
             return ActionResponse(
                 session_id=session.id,
                 accepted=True,
@@ -79,7 +83,7 @@ class ActionService:
                 payload={"target_id": action.target_id, "text": action.text},
             )
             new_events.append(player_event)
-            intent = self._mock_agent.generate(case, action)
+            intent = self._mock_agent.generate(case, session, action)
             decision = self._director.validate(case, session.narrative, intent)
 
             speech = intent.speech
@@ -124,6 +128,8 @@ class ActionService:
                 )
                 new_events.append(blocked_event)
 
+            new_events.extend(self._evaluate_triggers(case, session, new_events[-1].id))
+
             return ActionResponse(
                 session_id=session.id,
                 accepted=decision.allowed,
@@ -149,6 +155,18 @@ class ActionService:
                 return
         raise ActionValidationError(f"Unknown talk target_id: {target_id}")
 
+    def _evaluate_triggers(
+        self,
+        case: CasePackage,
+        session: SessionState,
+        caused_by_event_id: str,
+    ) -> list[WorldEvent]:
+        return self._trigger_system.evaluate(
+            case=case,
+            session=session,
+            caused_by_event_id=caused_by_event_id,
+        )
+
 
 def create_runtime(case_packages: list[CasePackage]) -> RuntimeContainer:
     recorder = EventRecorder()
@@ -162,6 +180,7 @@ def create_runtime(case_packages: list[CasePackage]) -> RuntimeContainer:
         mock_agent=MockAgent(),
         director=NarrativeDirector(),
         rule_engine=RuleEngine(recorder),
+        trigger_system=RuleTriggerSystem(recorder),
     )
     return RuntimeContainer(
         case_store=case_store,

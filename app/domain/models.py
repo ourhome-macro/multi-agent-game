@@ -17,7 +17,10 @@ class ActionType(StrEnum):
 class AgentIntentType(StrEnum):
     ANSWER = "answer"
     CONCEAL = "conceal"
+    LIE = "lie"
     REFUSE = "refuse"
+    PROBE = "probe"
+    PANIC = "panic"
 
 
 class EventType(StrEnum):
@@ -29,7 +32,8 @@ class EventType(StrEnum):
     RULE_REJECTED = "rule.rejected"
     CLUE_DISCOVERED = "clue.discovered"
     RELATIONSHIP_CHANGED = "relationship.changed"
-    NARRATIVE_PHASE_CHANGED = "narrative.phase_changed"
+    NARRATIVE_BEAT_COMPLETED = "narrative.beat.completed"
+    NARRATIVE_PHASE_CHANGED = "narrative.phase.changed"
 
 
 class ProposedActionType(StrEnum):
@@ -116,31 +120,6 @@ class ForbiddenFactConfig(APIModel):
     reveal_phase: NonEmptyString | None = None
 
 
-class MockDialogueConfig(APIModel):
-    character_id: NonEmptyString
-    default_speech: NonEmptyString
-    default_intent: AgentIntentType = AgentIntentType.ANSWER
-    forbidden_test_speech: str | None = None
-    relationship_delta_on_talk: dict[str, int] = Field(default_factory=dict)
-
-
-class CasePackage(APIModel):
-    meta: CaseMeta
-    characters: list[CharacterConfig]
-    scenes: list[SceneConfig]
-    clues: list[ClueConfig]
-    relationships: list[RelationshipConfig] = Field(default_factory=list)
-    forbidden_facts: list[ForbiddenFactConfig] = Field(default_factory=list)
-    mock_dialogues: list[MockDialogueConfig] = Field(default_factory=list)
-
-
-class PlayerAction(APIModel):
-    type: ActionType
-    target_id: NonEmptyString
-    text: str | None = None
-    force_forbidden: bool = False
-
-
 class DiscoverClueAction(APIModel):
     type: Literal[ProposedActionType.DISCOVER_CLUE]
     clue_id: NonEmptyString
@@ -159,6 +138,66 @@ class NarrativePhaseChangeAction(APIModel):
 
 
 ProposedAction = DiscoverClueAction | RelationshipChangeAction | NarrativePhaseChangeAction
+
+
+class MockReplyConfig(APIModel):
+    phase: NonEmptyString | None = None
+    requires_discovered: list[NonEmptyString] = Field(default_factory=list)
+    missing_discovered: list[NonEmptyString] = Field(default_factory=list)
+    min_relationship: dict[str, int] = Field(default_factory=dict)
+    max_relationship: dict[str, int] = Field(default_factory=dict)
+    speech: NonEmptyString
+    intent: AgentIntentType = AgentIntentType.ANSWER
+    emotional_shift: dict[str, int] = Field(default_factory=dict)
+    proposed_actions: list[ProposedAction] = Field(default_factory=list)
+    memory_refs: list[str] = Field(default_factory=list)
+
+
+class MockDialogueConfig(APIModel):
+    character_id: NonEmptyString
+    default_speech: NonEmptyString
+    default_intent: AgentIntentType = AgentIntentType.ANSWER
+    forbidden_test_speech: str | None = None
+    relationship_delta_on_talk: dict[str, int] = Field(default_factory=dict)
+    replies: list[MockReplyConfig] = Field(default_factory=list)
+
+
+class NarrativePhaseConfig(APIModel):
+    id: NonEmptyString
+    title: str = ""
+
+
+class NarrativeBeatConfig(APIModel):
+    id: NonEmptyString
+    phase: NonEmptyString | None = None
+    description: str = ""
+    all_completed: list[NonEmptyString] = Field(default_factory=list)
+    min_completed: int = Field(default=0, ge=0)
+    all_discovered: list[NonEmptyString] = Field(default_factory=list)
+    next_phase: NonEmptyString | None = None
+
+
+class NarrativeRulesConfig(APIModel):
+    phases: list[NarrativePhaseConfig] = Field(default_factory=list)
+    beats: list[NarrativeBeatConfig] = Field(default_factory=list)
+
+
+class CasePackage(APIModel):
+    meta: CaseMeta
+    characters: list[CharacterConfig]
+    scenes: list[SceneConfig]
+    clues: list[ClueConfig]
+    relationships: list[RelationshipConfig] = Field(default_factory=list)
+    forbidden_facts: list[ForbiddenFactConfig] = Field(default_factory=list)
+    mock_dialogues: list[MockDialogueConfig] = Field(default_factory=list)
+    narrative_rules: NarrativeRulesConfig = Field(default_factory=NarrativeRulesConfig)
+
+
+class PlayerAction(APIModel):
+    type: ActionType
+    target_id: NonEmptyString
+    text: str | None = None
+    force_forbidden: bool = False
 
 
 class AgentIntent(APIModel):
@@ -206,6 +245,7 @@ class RelationshipState(APIModel):
 class NarrativeState(APIModel):
     phase: NonEmptyString
     discovered_clues: set[str] = Field(default_factory=set)
+    completed_beats: set[str] = Field(default_factory=set)
 
 
 class WorldEvent(APIModel):
@@ -255,6 +295,7 @@ class StateSummary(APIModel):
     case_id: NonEmptyString
     case_title: NonEmptyString
     narrative_phase: NonEmptyString
+    completed_beats: list[NonEmptyString]
     characters: list[CharacterSummary]
     discovered_clues: list[ClueSummary]
     relationships: list[RelationshipState]

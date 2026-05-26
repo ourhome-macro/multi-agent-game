@@ -9,15 +9,17 @@ from app.cases.loader import CaseLoader
 from app.runtime.service import RuntimeContainer, create_runtime
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_CASE_DIR = PROJECT_ROOT / "cases" / "fake_case"
+CASES_ROOT = PROJECT_ROOT / "cases"
 
 runtime: RuntimeContainer | None = None
 
 
 def build_runtime() -> RuntimeContainer:
     loader = CaseLoader()
-    fake_case = loader.load(DEFAULT_CASE_DIR)
-    return create_runtime([fake_case])
+    case_dirs = sorted(
+        path for path in CASES_ROOT.iterdir() if path.is_dir() and (path / "case.yaml").exists()
+    )
+    return create_runtime([loader.load(case_dir) for case_dir in case_dirs])
 
 
 def get_runtime() -> RuntimeContainer:

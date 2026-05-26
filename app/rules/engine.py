@@ -84,12 +84,11 @@ class RuleEngine:
                 if event is not None:
                     events.append(event)
             elif proposed_action.type == ProposedActionType.NARRATIVE_PHASE_CHANGE:
-                session.narrative.phase = proposed_action.phase
                 events.append(
-                    self._recorder.append(
-                        session,
-                        actor_id="system",
-                        event_type=EventType.NARRATIVE_PHASE_CHANGED,
+                    self._reject(
+                        session=session,
+                        action_type=proposed_action.type,
+                        reason="narrative phase changes must be driven by narrative rules",
                         payload={"phase": proposed_action.phase},
                         caused_by_event_id=caused_by_event_id,
                     )

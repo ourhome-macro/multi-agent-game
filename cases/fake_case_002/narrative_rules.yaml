@@ -1,0 +1,26 @@
+phases:
+  - id: opening
+    title: 初查
+  - id: pressure
+    title: 施压
+  - id: expose
+    title: 账页暴露
+
+beats:
+  - id: tide_trace_found
+    phase: opening
+    description: 玩家发现夜潮后仓库门被打开。
+    all_discovered:
+      - inward_tide_mark
+    next_phase: pressure
+
+  - id: ledger_pattern_found
+    phase: pressure
+    description: 破灯和账页共同证明午夜后有人进仓。
+    all_completed:
+      - tide_trace_found
+    min_completed: 1
+    all_discovered:
+      - inward_broken_lamp
+      - blue_ledger_page
+    next_phase: expose

@@ -7,7 +7,13 @@ import yaml
 from pydantic import ValidationError
 
 from app.cases.errors import CaseLoadError
-from app.domain.models import CasePackage
+from app.domain.models import (
+    CasePackage,
+    DiscoverClueAction,
+    NarrativePhaseChangeAction,
+    ProposedActionType,
+    RelationshipChangeAction,
+)
 
 RELATIONSHIP_METRICS = {"trust", "suspicion", "fear", "intimacy", "hostility"}
 
@@ -25,6 +31,7 @@ class CaseLoader:
             "relationships": self._read_yaml(case_dir / "relationships.yaml", default=[]),
             "forbidden_facts": self._read_yaml(case_dir / "forbidden_facts.yaml", default=[]),
             "mock_dialogues": self._read_yaml(case_dir / "mock_dialogues.yaml", default=[]),
+            "narrative_rules": self._read_yaml(case_dir / "narrative_rules.yaml"),
         }
 
         try:
@@ -57,6 +64,8 @@ class CaseLoader:
         clue_ids = {clue.id for clue in package.clues}
         scene_ids = {scene.id for scene in package.scenes}
         dialogue_character_ids = {dialogue.character_id for dialogue in package.mock_dialogues}
+        phase_ids = {phase.id for phase in package.narrative_rules.phases}
+        beat_ids = {beat.id for beat in package.narrative_rules.beats}
 
         self._ensure_unique(
             "character",
@@ -65,6 +74,16 @@ class CaseLoader:
         )
         self._ensure_unique("clue", [clue.id for clue in package.clues], case_dir)
         self._ensure_unique("scene", [scene.id for scene in package.scenes], case_dir)
+        self._ensure_unique(
+            "narrative phase",
+            [phase.id for phase in package.narrative_rules.phases],
+            case_dir,
+        )
+        self._ensure_unique(
+            "narrative beat",
+            [beat.id for beat in package.narrative_rules.beats],
+            case_dir,
+        )
         self._ensure_unique(
             "mock dialogue character",
             [dialogue.character_id for dialogue in package.mock_dialogues],
@@ -75,6 +94,11 @@ class CaseLoader:
             raise CaseLoadError(f"Case must define at least one scene: {case_dir}")
         if not character_ids:
             raise CaseLoadError(f"Case must define at least one character: {case_dir}")
+        if package.meta.initial_phase not in phase_ids:
+            raise CaseLoadError(
+                f"Case initial_phase '{package.meta.initial_phase}' is not declared in "
+                "narrative_rules phases"
+            )
 
         for scene in package.scenes:
             for character_id in scene.characters:
@@ -92,6 +116,12 @@ class CaseLoader:
 
         hotspot_ids = [hotspot.id for scene in package.scenes for hotspot in scene.hotspots]
         self._ensure_unique("hotspot", hotspot_ids, case_dir)
+        reachable_clue_ids = {
+            clue_id
+            for scene in package.scenes
+            for hotspot in scene.hotspots
+            for clue_id in hotspot.discover_clues
+        }
 
         for clue in package.clues:
             for character_id in clue.related_characters:
@@ -123,10 +153,126 @@ class CaseLoader:
                     f"Mock dialogue for character '{dialogue.character_id}' references unknown "
                     f"relationship metrics: {sorted(unknown_metrics)}"
                 )
+            for reply in dialogue.replies:
+                if reply.phase is not None and reply.phase not in phase_ids:
+                    raise CaseLoadError(
+                        f"Mock reply for character '{dialogue.character_id}' references unknown "
+                        f"phase '{reply.phase}'"
+                    )
+                self._ensure_known_clues(
+                    clue_ids,
+                    reply.requires_discovered,
+                    f"Mock reply for character '{dialogue.character_id}' requires",
+                )
+                self._ensure_known_clues(
+                    clue_ids,
+                    reply.missing_discovered,
+                    f"Mock reply for character '{dialogue.character_id}' excludes",
+                )
+                unknown_min_metrics = set(reply.min_relationship) - RELATIONSHIP_METRICS
+                unknown_max_metrics = set(reply.max_relationship) - RELATIONSHIP_METRICS
+                if unknown_min_metrics or unknown_max_metrics:
+                    raise CaseLoadError(
+                        f"Mock reply for character '{dialogue.character_id}' references unknown "
+                        "relationship metrics"
+                    )
+                reachable_clue_ids.update(
+                    action.clue_id
+                    for action in reply.proposed_actions
+                    if isinstance(action, DiscoverClueAction)
+                )
+                for action in reply.proposed_actions:
+                    self._validate_proposed_action(
+                        action,
+                        character_ids=character_ids,
+                        clue_ids=clue_ids,
+                        phase_ids=phase_ids,
+                    )
+
+        for fact in package.forbidden_facts:
+            if fact.reveal_phase is not None and fact.reveal_phase not in phase_ids:
+                raise CaseLoadError(
+                    f"Forbidden fact '{fact.id}' references unknown reveal_phase "
+                    f"'{fact.reveal_phase}'"
+                )
+
+        for beat in package.narrative_rules.beats:
+            if beat.phase is not None and beat.phase not in phase_ids:
+                raise CaseLoadError(f"Beat '{beat.id}' references unknown phase '{beat.phase}'")
+            if beat.next_phase is not None and beat.next_phase not in phase_ids:
+                raise CaseLoadError(
+                    f"Beat '{beat.id}' references unknown next_phase '{beat.next_phase}'"
+                )
+            for required_beat_id in beat.all_completed:
+                if required_beat_id not in beat_ids:
+                    raise CaseLoadError(
+                        f"Beat '{beat.id}' references unknown required beat "
+                        f"'{required_beat_id}'"
+                    )
+                if required_beat_id == beat.id:
+                    raise CaseLoadError(f"Beat '{beat.id}' cannot require itself")
+            self._ensure_known_clues(
+                clue_ids,
+                beat.all_discovered,
+                f"Beat '{beat.id}' all_discovered",
+            )
+
+        unreachable_clue_ids = clue_ids - reachable_clue_ids
+        if unreachable_clue_ids:
+            raise CaseLoadError(
+                f"Clues are not reachable by any hotspot or mock proposed action: "
+                f"{sorted(unreachable_clue_ids)}"
+            )
 
     def _ensure_unique(self, label: str, ids: list[str], case_dir: Path) -> None:
         duplicates = sorted({item_id for item_id in ids if ids.count(item_id) > 1})
         if duplicates:
             raise CaseLoadError(
                 f"Duplicate {label} ids in {case_dir}: {', '.join(duplicates)}"
+            )
+
+    def _ensure_known_clues(
+        self,
+        clue_ids: set[str],
+        referenced_ids: list[str],
+        label: str,
+    ) -> None:
+        unknown_ids = sorted(set(referenced_ids) - clue_ids)
+        if unknown_ids:
+            raise CaseLoadError(f"{label} references unknown clues: {unknown_ids}")
+
+    def _validate_proposed_action(
+        self,
+        action: DiscoverClueAction | RelationshipChangeAction | NarrativePhaseChangeAction,
+        *,
+        character_ids: set[str],
+        clue_ids: set[str],
+        phase_ids: set[str],
+    ) -> None:
+        valid_actor_ids = character_ids | {"player"}
+        if action.type == ProposedActionType.DISCOVER_CLUE and action.clue_id not in clue_ids:
+            raise CaseLoadError(f"Mock proposed action references unknown clue '{action.clue_id}'")
+        if action.type == ProposedActionType.RELATIONSHIP_CHANGE:
+            if action.source_id not in valid_actor_ids:
+                raise CaseLoadError(
+                    f"Mock proposed relationship action references unknown source_id "
+                    f"'{action.source_id}'"
+                )
+            if action.target_id not in valid_actor_ids:
+                raise CaseLoadError(
+                    f"Mock proposed relationship action references unknown target_id "
+                    f"'{action.target_id}'"
+                )
+            unknown_metrics = set(action.deltas) - RELATIONSHIP_METRICS
+            if unknown_metrics:
+                raise CaseLoadError(
+                    f"Mock proposed relationship action references unknown metrics: "
+                    f"{sorted(unknown_metrics)}"
+                )
+        if (
+            action.type == ProposedActionType.NARRATIVE_PHASE_CHANGE
+            and action.phase not in phase_ids
+        ):
+            raise CaseLoadError(
+                f"Mock proposed phase action references unknown phase '{action.phase}'"
             )

@@ -1,0 +1,66 @@
+- character_id: butler
+  default_speech: 我整晚都在整理餐具。至于书房，我只是在门口看了一眼。
+  default_intent: conceal
+  forbidden_test_speech: 真凶是林侄女，我亲眼知道这一点。
+  relationship_delta_on_talk:
+    suspicion: 1
+    fear: 1
+  replies:
+    - phase: opening
+      missing_discovered:
+        - scratched_drawer
+      speech: 我整晚都在整理餐具。至于书房，我只是在门口看了一眼。
+      intent: conceal
+    - phase: investigation
+      requires_discovered:
+        - scratched_drawer
+      speech: 抽屉确实有响动，但我不能确定是谁动过它。
+      intent: probe
+      proposed_actions:
+        - type: relationship.change
+          source_id: butler
+          target_id: player
+          deltas:
+            fear: 1
+            suspicion: 1
+    - phase: reveal
+      requires_discovered:
+        - torn_note
+        - dustless_frame
+      speech: 你已经看到画框和便签了，我只能说遗嘱确实被人动过。
+      intent: panic
+      proposed_actions:
+        - type: relationship.change
+          source_id: butler
+          target_id: player
+          deltas:
+            trust: 1
+            fear: 2
+
+- character_id: niece
+  default_speech: 我不知道你想证明什么。那张便签不能说明我做了什么。
+  default_intent: answer
+  forbidden_test_speech: 林侄女杀了他，这句话不该由我说出口。
+  relationship_delta_on_talk:
+    suspicion: 1
+  replies:
+    - phase: opening
+      speech: 我不知道你想证明什么。书房那晚并不只有我能进去。
+      intent: lie
+    - phase: investigation
+      requires_discovered:
+        - torn_note
+      speech: 那张便签是约我去书房的，但我到的时候门已经开着。
+      intent: conceal
+      proposed_actions:
+        - type: relationship.change
+          source_id: niece
+          target_id: player
+          deltas:
+            suspicion: 1
+            hostility: 1
+    - phase: reveal
+      requires_discovered:
+        - dustless_frame
+      speech: 你别再问了，我不会替任何人承认没有证据的事。
+      intent: refuse

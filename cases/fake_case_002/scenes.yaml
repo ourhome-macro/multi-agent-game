@@ -1,0 +1,22 @@
+- id: warehouse
+  name: 码头仓库
+  description: 仓库地面还带着夜潮留下的盐痕，门口的煤油灯碎在木箱旁。
+  characters:
+    - dockmaster
+    - clerk
+  hotspots:
+    - id: tide_mark
+      name: 潮痕
+      description: 盐痕停在仓库内侧，说明夜里有人在涨潮后打开过门。
+      discover_clues:
+        - inward_tide_mark
+    - id: broken_lamp
+      name: 破煤油灯
+      description: 灯罩裂口朝内，玻璃碎片集中在门后。
+      discover_clues:
+        - inward_broken_lamp
+    - id: ledger_box
+      name: 账箱
+      description: 账箱夹层里有一页蓝墨账纸。
+      discover_clues:
+        - blue_ledger_page

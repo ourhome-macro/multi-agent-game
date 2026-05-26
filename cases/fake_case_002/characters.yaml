@@ -1,0 +1,23 @@
+- id: dockmaster
+  name: 赵码头长
+  role: 码头管理员
+  personality: 圆滑、谨慎，习惯把责任推给潮汐和工人。
+  speech_style: 口吻平稳，常用码头行话。
+  secrets:
+    - 知道潮汐记录被人改过。
+  goals:
+    - 避免仓库走私线索被连起来。
+  knowledge:
+    - 破灯不是风吹倒的。
+
+- id: clerk
+  name: 沈账房
+  role: 仓库账房
+  personality: 胆小、记性好，害怕被牵连。
+  speech_style: 断断续续，经常先否认再补充细节。
+  secrets:
+    - 偷藏过缺页账本。
+  goals:
+    - 证明自己只是被迫记录货物。
+  knowledge:
+    - 蓝墨账页对应午夜入库。

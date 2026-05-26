@@ -1,0 +1,7 @@
+- id: ledger_owner
+  text: 蓝墨账页是沈账房亲手藏的。
+  blocked_terms:
+    - 沈账房亲手藏的
+    - 账页是沈账房藏的
+    - clerk hid the ledger
+  reveal_phase: expose

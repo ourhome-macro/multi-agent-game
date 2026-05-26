@@ -1,0 +1,58 @@
+- character_id: dockmaster
+  default_speech: 夜里潮大，仓库门响几声不稀奇。
+  default_intent: conceal
+  forbidden_test_speech: 账页是沈账房亲手藏的，我早就知道。
+  relationship_delta_on_talk:
+    suspicion: 1
+  replies:
+    - phase: opening
+      missing_discovered:
+        - inward_tide_mark
+      speech: 夜里潮大，仓库门响几声不稀奇。
+      intent: conceal
+    - phase: pressure
+      requires_discovered:
+        - inward_tide_mark
+      speech: 潮痕只能说明门开过，不能说明是谁开的。
+      intent: probe
+      proposed_actions:
+        - type: relationship.change
+          source_id: dockmaster
+          target_id: player
+          deltas:
+            suspicion: 1
+            hostility: 1
+    - phase: expose
+      requires_discovered:
+        - inward_broken_lamp
+      speech: 那盏灯不是风吹的。有人进门太急，撞到了门后的箱子。
+      intent: answer
+
+- character_id: clerk
+  default_speech: 账箱一直锁着，我只是照规矩记账。
+  default_intent: lie
+  forbidden_test_speech: 沈账房亲手藏的账页就在箱底。
+  relationship_delta_on_talk:
+    fear: 1
+  replies:
+    - phase: opening
+      speech: 账箱一直锁着，我只是照规矩记账。
+      intent: lie
+    - phase: pressure
+      requires_discovered:
+        - blue_ledger_page
+      speech: 那页蓝墨账不是完整账本，少了签收人的名字。
+      intent: panic
+      proposed_actions:
+        - type: relationship.change
+          source_id: clerk
+          target_id: player
+          deltas:
+            trust: 1
+            fear: 1
+    - phase: expose
+      requires_discovered:
+        - blue_ledger_page
+        - inward_broken_lamp
+      speech: 我只记录货物，不知道谁让箱子午夜后进仓。
+      intent: refuse

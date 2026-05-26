@@ -22,6 +22,9 @@
   title: 无尘画框印
   description: 肖像画背后的墙面有一圈无尘痕迹，说明它最近被移动过。
   truth_status: "true"
-  related_characters: []
-  related_events: []
+  related_characters:
+    - butler
+    - niece
+  related_events:
+    - hidden_will
   key: false
