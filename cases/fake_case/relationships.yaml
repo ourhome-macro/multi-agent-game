@@ -1,13 +1,13 @@
-- source: butler
-  target: player
+- source_id: butler
+  target_id: player
   trust: 0
   suspicion: 0
   fear: 1
   intimacy: 0
   hostility: 0
 
-- source: niece
-  target: player
+- source_id: niece
+  target_id: player
   trust: -1
   suspicion: 1
   fear: 0

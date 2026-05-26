@@ -49,7 +49,9 @@ class InMemorySessionStore:
             case_id=package.meta.id,
             narrative=NarrativeState(phase=package.meta.initial_phase),
             relationships={
-                relationship_key(item.source, item.target): RelationshipState(**item.model_dump())
+                relationship_key(item.source_id, item.target_id): RelationshipState(
+                    **item.model_dump()
+                )
                 for item in package.relationships
             },
         )

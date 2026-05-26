@@ -14,6 +14,7 @@ from app.domain.models import (
     WorldEvent,
 )
 from app.rules.engine import RuleEngine
+from app.runtime.errors import ActionValidationError
 from app.runtime.events import EventRecorder
 from app.storage.memory import InMemoryCaseStore, InMemorySessionStore, build_state_summary
 
@@ -46,6 +47,7 @@ class ActionService:
         new_events: list[WorldEvent] = []
 
         if action.type == ActionType.INSPECT:
+            self._require_hotspot(case, action.target_id)
             player_event = self._recorder.append(
                 session,
                 actor_id="player",
@@ -69,6 +71,7 @@ class ActionService:
             )
 
         if action.type == ActionType.TALK:
+            self._require_character(case, action.target_id)
             player_event = self._recorder.append(
                 session,
                 actor_id="player",
@@ -132,6 +135,19 @@ class ActionService:
             )
 
         raise ValueError(f"Unsupported action type: {action.type}")
+
+    def _require_hotspot(self, case: CasePackage, target_id: str) -> None:
+        for scene in case.scenes:
+            for hotspot in scene.hotspots:
+                if hotspot.id == target_id:
+                    return
+        raise ActionValidationError(f"Unknown inspect target_id: {target_id}")
+
+    def _require_character(self, case: CasePackage, target_id: str) -> None:
+        for character in case.characters:
+            if character.id == target_id:
+                return
+        raise ActionValidationError(f"Unknown talk target_id: {target_id}")
 
 
 def create_runtime(case_packages: list[CasePackage]) -> RuntimeContainer:

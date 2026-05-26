@@ -18,4 +18,5 @@
     - id: portrait
       name: 旧肖像画
       description: 墙上的旧肖像画略微倾斜。
-      discover_clues: []
+      discover_clues:
+        - dustless_frame

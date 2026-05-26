@@ -38,6 +38,9 @@ class ProposedActionType(StrEnum):
     NARRATIVE_PHASE_CHANGE = "narrative.phase.change"
 
 
+ALLOWED_PROPOSED_ACTION_TYPES = frozenset(item.value for item in ProposedActionType)
+
+
 class APIModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -97,8 +100,8 @@ class ClueConfig(APIModel):
 
 
 class RelationshipConfig(APIModel):
-    source: NonEmptyString
-    target: NonEmptyString
+    source_id: NonEmptyString
+    target_id: NonEmptyString
     trust: int = 0
     suspicion: int = 0
     fear: int = 0
@@ -145,8 +148,8 @@ class DiscoverClueAction(APIModel):
 
 class RelationshipChangeAction(APIModel):
     type: Literal[ProposedActionType.RELATIONSHIP_CHANGE]
-    source: NonEmptyString
-    target: NonEmptyString
+    source_id: NonEmptyString
+    target_id: NonEmptyString
     deltas: dict[str, int]
 
 
@@ -165,6 +168,23 @@ class AgentIntent(APIModel):
     proposed_actions: list[ProposedAction] = Field(default_factory=list)
     memory_refs: list[str] = Field(default_factory=list)
 
+    @field_validator("proposed_actions", mode="before")
+    @classmethod
+    def validate_proposed_action_whitelist(cls, value: object) -> object:
+        if value is None:
+            return []
+        if not isinstance(value, list):
+            return value
+        for item in value:
+            if not isinstance(item, dict):
+                continue
+            action_type = item.get("type")
+            if isinstance(action_type, ProposedActionType):
+                action_type = action_type.value
+            if action_type not in ALLOWED_PROPOSED_ACTION_TYPES:
+                raise ValueError(f"Unsupported proposed action type: {action_type}")
+        return value
+
 
 class DirectorDecision(APIModel):
     allowed: bool
@@ -174,8 +194,8 @@ class DirectorDecision(APIModel):
 
 
 class RelationshipState(APIModel):
-    source: NonEmptyString
-    target: NonEmptyString
+    source_id: NonEmptyString
+    target_id: NonEmptyString
     trust: int = 0
     suspicion: int = 0
     fear: int = 0

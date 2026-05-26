@@ -106,14 +106,14 @@ class RuleEngine:
     ) -> WorldEvent:
         character_ids = {character.id for character in case.characters}
         valid_actor_ids = character_ids | {"player"}
-        if action.source not in valid_actor_ids or action.target not in valid_actor_ids:
+        if action.source_id not in valid_actor_ids or action.target_id not in valid_actor_ids:
             return self._reject(
                 session=session,
                 action_type=action.type,
                 reason="relationship endpoint is not a known character or player",
                 payload={
-                    "source": action.source,
-                    "target": action.target,
+                    "source_id": action.source_id,
+                    "target_id": action.target_id,
                     "deltas": action.deltas,
                 },
                 caused_by_event_id=caused_by_event_id,
@@ -126,17 +126,17 @@ class RuleEngine:
                 action_type=action.type,
                 reason=f"unknown relationship metrics: {sorted(unknown_metrics)}",
                 payload={
-                    "source": action.source,
-                    "target": action.target,
+                    "source_id": action.source_id,
+                    "target_id": action.target_id,
                     "deltas": action.deltas,
                 },
                 caused_by_event_id=caused_by_event_id,
             )
 
-        key = relationship_key(action.source, action.target)
+        key = relationship_key(action.source_id, action.target_id)
         relationship = session.relationships.get(key)
         if relationship is None:
-            relationship = RelationshipState(source=action.source, target=action.target)
+            relationship = RelationshipState(source_id=action.source_id, target_id=action.target_id)
             session.relationships[key] = relationship
 
         for field, delta in action.deltas.items():
@@ -148,8 +148,8 @@ class RuleEngine:
             actor_id="system",
             event_type=EventType.RELATIONSHIP_CHANGED,
             payload={
-                "source": action.source,
-                "target": action.target,
+                "source_id": action.source_id,
+                "target_id": action.target_id,
                 "deltas": action.deltas,
                 "current": relationship.model_dump(),
             },
@@ -207,5 +207,5 @@ class RuleEngine:
         )
 
 
-def relationship_key(source: str, target: str) -> str:
-    return f"{source}->{target}"
+def relationship_key(source_id: str, target_id: str) -> str:
+    return f"{source_id}->{target_id}"

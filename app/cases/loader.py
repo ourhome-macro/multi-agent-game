@@ -101,13 +101,13 @@ class CaseLoader:
                     )
 
         for relationship in package.relationships:
-            if relationship.source not in character_ids and relationship.source != "player":
+            if relationship.source_id not in character_ids and relationship.source_id != "player":
                 raise CaseLoadError(
-                    f"Relationship references unknown source '{relationship.source}'"
+                    f"Relationship references unknown source_id '{relationship.source_id}'"
                 )
-            if relationship.target not in character_ids and relationship.target != "player":
+            if relationship.target_id not in character_ids and relationship.target_id != "player":
                 raise CaseLoadError(
-                    f"Relationship references unknown target '{relationship.target}'"
+                    f"Relationship references unknown target_id '{relationship.target_id}'"
                 )
 
         unknown_dialogues = dialogue_character_ids - character_ids

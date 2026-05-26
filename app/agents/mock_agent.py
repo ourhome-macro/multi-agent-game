@@ -43,8 +43,8 @@ class MockAgent:
             proposed_actions.append(
                 RelationshipChangeAction(
                     type=ProposedActionType.RELATIONSHIP_CHANGE,
-                    source=action.target_id,
-                    target="player",
+                    source_id=action.target_id,
+                    target_id="player",
                     deltas=dialogue.relationship_delta_on_talk,
                 )
             )

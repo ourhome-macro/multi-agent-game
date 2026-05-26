@@ -13,6 +13,7 @@ from app.domain.models import (
     StateSummary,
     WorldEvent,
 )
+from app.runtime.errors import ActionValidationError
 from app.runtime.service import RuntimeContainer
 from app.storage.memory import build_state_summary
 
@@ -80,7 +81,13 @@ def create_router(runtime_dependency: Callable[[], RuntimeContainer] = get_runti
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=str(exc),
             ) from exc
-        return runtime.action_service.handle(session=session, action=action)
+        try:
+            return runtime.action_service.handle(session=session, action=action)
+        except ActionValidationError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=exc.message,
+            ) from exc
 
     @router.get("/sessions/{session_id}/events", response_model=list[WorldEvent])
     def get_events(
