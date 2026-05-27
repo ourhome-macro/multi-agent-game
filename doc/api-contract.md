@@ -174,6 +174,9 @@ pollution.
 If validation succeeds, the runtime writes `player.accused`, then
 `accusation.evaluated`. The result comes from case-authored configuration, not
 natural-language reasoning. `accuse` does not directly change narrative phase.
+If `narrative_rules.yaml` defines a matching event-triggered beat, the later
+`RuleTriggerSystem` step may write `narrative.beat.completed` and
+`narrative.phase.changed`.
 
 ## Interaction Pressure
 

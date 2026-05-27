@@ -64,6 +64,8 @@ through events and `RuleTriggerSystem`.
 player-known evidence, writes `player.accused`, then writes
 `accusation.evaluated`. It does not directly mutate narrative phase. Any future
 ending or phase transition must be driven by events through `RuleTriggerSystem`.
+In v0, `accusation.evaluated(result=correct)` can complete a case-resolution beat
+declared in `narrative_rules.yaml`.
 
 ## Core Modules
 
@@ -96,6 +98,8 @@ Narrative phase changes are driven by `narrative_rules.yaml` and
 
 Accusation correctness is authored in `solution_claims.yaml` and evaluated by
 Rule Engine. Agents and LLMs do not decide whether a formal accusation is correct.
+Rule Engine also does not directly set a resolved phase; it only emits
+`accusation.evaluated`, which can be consumed by `RuleTriggerSystem`.
 
 ## Agent Input Safety
 

@@ -16,12 +16,14 @@ from app.domain.models import (
 from app.runtime.replay import replay_events
 from app.runtime.service import create_runtime
 from app.storage.memory import build_state_summary
+from tests.utils.render_player_journey import render_player_journey
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 CASE_DIR = PROJECT_ROOT / "cases" / "fake_case_001"
 SNAPSHOT_PATH = (
     PROJECT_ROOT / "tests" / "snapshots" / "fake_case_001_full_runtime_events.json"
 )
+JOURNEY_PATH = PROJECT_ROOT / "tests" / "snapshots" / "fake_case_001_player_journey.md"
 
 
 def test_fake_case_001_full_runtime_scenario_smoke() -> None:
@@ -113,6 +115,11 @@ def test_fake_case_001_full_runtime_scenario_smoke() -> None:
     )
     assert sorted(replayed.memory_candidates) == sorted(session.memory_candidates)
     assert sorted(replayed.memory_snapshots) == sorted(session.memory_snapshots)
+    assert replayed.narrative.phase == session.narrative.phase
+    assert replayed.narrative.completed_beats == session.narrative.completed_beats
+    assert replayed.discovered_clues == session.discovered_clues
+    assert replayed.player_knowledge == session.player_knowledge
+    assert replayed.relationships == session.relationships
     assert len(replayed.events) == len(session.events)
     assert _summary_does_not_leak(summary.model_dump_json())
 
@@ -120,6 +127,27 @@ def test_fake_case_001_full_runtime_scenario_smoke() -> None:
     assert SNAPSHOT_PATH.exists()
     expected_snapshot = json.loads(SNAPSHOT_PATH.read_text(encoding="utf-8"))
     assert snapshot == expected_snapshot
+
+    journey = render_player_journey(session.events)
+    assert _summary_does_not_leak(journey)
+    for required_text in (
+        "`player.inspected`",
+        "`player.talked`",
+        "`player.asked_about`",
+        "`player.presented_clue`",
+        "`player.accused`",
+        "`accusation.evaluated`",
+        "`case_solved`",
+        "`resolved`",
+    ):
+        assert required_text in journey
+    for fact in case.forbidden_facts:
+        assert fact.id not in journey
+        assert fact.text not in journey
+        for blocked_term in fact.blocked_terms:
+            assert blocked_term not in journey
+    assert JOURNEY_PATH.exists()
+    assert journey == JOURNEY_PATH.read_text(encoding="utf-8")
 
 
 def _summary_key_fields(summary: dict) -> dict:

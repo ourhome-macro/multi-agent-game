@@ -101,11 +101,32 @@ Supported fields:
 - `all_completed`
 - `min_completed`
 - `all_discovered`
+- `trigger_event_type`
+- `trigger_payload`
 - `next_phase`
 
 Only `RuleTriggerSystem` may complete beats or advance phase. Agent proposed
 `narrative.phase.change` actions are accepted by schema for auditability but are
 rejected by Rule Engine.
+
+Event-triggered beats may use `trigger_event_type` and `trigger_payload`.
+Example:
+
+```yaml
+- id: case_solved
+  phase: reveal
+  all_completed:
+    - hidden_meeting_connected
+  trigger_event_type: accusation.evaluated
+  trigger_payload:
+    target_id: butler
+    claim_id: butler_moved_key
+    result: correct
+  next_phase: resolved
+```
+
+The trigger checks the exact event that caused `RuleTriggerSystem.evaluate` to
+run. It does not replay derivations or scan arbitrary future events.
 
 ## solution_claims.yaml
 

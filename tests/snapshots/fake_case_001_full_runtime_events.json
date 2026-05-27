@@ -113,6 +113,7 @@
     "payload": {
       "from_phase": "opening",
       "phase": "investigation",
+      "to_phase": "investigation",
       "trigger_beat_id": "drawer_found"
     },
     "caused_by_event_id": "event_003",
@@ -753,6 +754,7 @@
     "payload": {
       "from_phase": "investigation",
       "phase": "reveal",
+      "to_phase": "reveal",
       "trigger_beat_id": "hidden_meeting_connected"
     },
     "caused_by_event_id": "event_038",
@@ -877,6 +879,34 @@
     "id": "event_050",
     "case_id": "fake_case_001",
     "session_id": "session",
+    "actor_id": "rule_trigger_system",
+    "type": "narrative.beat.completed",
+    "payload": {
+      "beat_id": "case_solved",
+      "phase": "reveal"
+    },
+    "caused_by_event_id": "event_045",
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_051",
+    "case_id": "fake_case_001",
+    "session_id": "session",
+    "actor_id": "rule_trigger_system",
+    "type": "narrative.phase.changed",
+    "payload": {
+      "from_phase": "reveal",
+      "phase": "resolved",
+      "to_phase": "resolved",
+      "trigger_beat_id": "case_solved"
+    },
+    "caused_by_event_id": "event_045",
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_052",
+    "case_id": "fake_case_001",
+    "session_id": "session",
     "actor_id": "rule_engine",
     "type": "rule.rejected",
     "payload": {
@@ -886,7 +916,7 @@
         "phase": "opening"
       }
     },
-    "caused_by_event_id": "event_049",
+    "caused_by_event_id": "event_051",
     "created_at": "timestamp"
   }
 ]

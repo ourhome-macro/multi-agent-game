@@ -1,22 +1,24 @@
 phases:
   - id: opening
-    title: 初查
+    title: Opening
   - id: investigation
-    title: 交叉调查
+    title: Investigation
   - id: reveal
-    title: 真相逼近
+    title: Reveal
+  - id: resolved
+    title: Resolved
 
 beats:
   - id: drawer_found
     phase: opening
-    description: 玩家发现书桌抽屉被撬过。
+    description: Player found that the study drawer was forced.
     all_discovered:
       - scratched_drawer
     next_phase: investigation
 
   - id: hidden_meeting_connected
     phase: investigation
-    description: 便签与画框痕迹形成遗嘱藏匿链路。
+    description: The note and frame marks connect the hidden meeting.
     all_completed:
       - drawer_found
     min_completed: 1
@@ -24,3 +26,15 @@ beats:
       - torn_note
       - dustless_frame
     next_phase: reveal
+
+  - id: case_solved
+    phase: reveal
+    description: Correct formal accusation resolves the case.
+    all_completed:
+      - hidden_meeting_connected
+    trigger_event_type: accusation.evaluated
+    trigger_payload:
+      target_id: butler
+      claim_id: butler_moved_key
+      result: correct
+    next_phase: resolved

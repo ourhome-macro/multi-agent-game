@@ -774,6 +774,8 @@ def test_accuse_correct_claim_succeeds_and_derives_memory() -> None:
         EventType.AGENT_MEMORY_SNAPSHOT_UPDATED,
         EventType.MEMORY_CANDIDATE_CREATED,
         EventType.AGENT_MEMORY_SNAPSHOT_UPDATED,
+        EventType.NARRATIVE_BEAT_COMPLETED,
+        EventType.NARRATIVE_PHASE_CHANGED,
     ]
     evaluated_event = response.new_events[1]
     assert evaluated_event.payload == {
@@ -792,7 +794,37 @@ def test_accuse_correct_claim_succeeds_and_derives_memory() -> None:
         "memory.player.accusation_evaluated.butler.butler_moved_key.correct"
         in session.memory_snapshots
     )
-    assert response.state.narrative_phase == "reveal"
+    beat_event = response.new_events[-2]
+    phase_event = response.new_events[-1]
+    assert beat_event.payload["beat_id"] == "case_solved"
+    assert phase_event.payload["from_phase"] == "reveal"
+    assert phase_event.payload["phase"] == "resolved"
+    assert phase_event.payload["to_phase"] == "resolved"
+    assert response.state.narrative_phase == "resolved"
+
+
+def test_rule_engine_accuse_does_not_directly_change_phase() -> None:
+    case = CaseLoader().load(FAKE_CASE_001_DIR)
+    runtime = create_runtime([case])
+    session = runtime.session_store.create(case)
+    _run_fake_case_001_to_reveal(runtime, session)
+
+    events = runtime.rule_engine.apply_accuse(
+        case=case,
+        session=session,
+        action=PlayerAction(
+            type="accuse",
+            target_id="butler",
+            claim_id="butler_moved_key",
+            evidence_clue_ids=["scratched_drawer", "dustless_frame", "torn_note"],
+        ),
+    )
+
+    assert [event.type for event in events] == [
+        EventType.PLAYER_ACCUSED,
+        EventType.ACCUSATION_EVALUATED,
+    ]
+    assert session.narrative.phase == "reveal"
 
 
 def test_accuse_rejects_when_phase_is_not_allowed() -> None:

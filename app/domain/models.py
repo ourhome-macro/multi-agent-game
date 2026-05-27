@@ -214,6 +214,8 @@ class NarrativeBeatConfig(APIModel):
     all_completed: list[NonEmptyString] = Field(default_factory=list)
     min_completed: int = Field(default=0, ge=0)
     all_discovered: list[NonEmptyString] = Field(default_factory=list)
+    trigger_event_type: EventType | None = None
+    trigger_payload: dict[str, str] = Field(default_factory=dict)
     next_phase: NonEmptyString | None = None
 
 

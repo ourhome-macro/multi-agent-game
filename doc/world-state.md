@@ -83,6 +83,17 @@ change `narrative.phase`.
 `accusation.evaluated` may contain the configured result, but `StateSummary` must
 not expose solution claim configuration or internal truth data.
 
+Narrative resolution v0 is event-driven:
+
+```text
+accusation.evaluated(result=correct)
+  -> narrative.beat.completed(case_solved)
+  -> narrative.phase.changed(reveal -> resolved)
+```
+
+The phase transition is still owned by `RuleTriggerSystem` and
+`narrative_rules.yaml`.
+
 ## Interaction Pressure
 
 `interaction_pressure` is calculated by the backend:

@@ -23,6 +23,8 @@ state, rule execution, event logging, and replay.
   `session.memory_snapshots`.
 - Evaluates structured formal accusations through Rule Engine using
   `solution_claims.yaml`.
+- Resolves `fake_case_001` through a `case_solved` beat when
+  `accusation.evaluated(result=correct)` is observed by `RuleTriggerSystem`.
 - Completes beats and advances phases through `RuleTriggerSystem`.
 - Replays event logs with `replay_events(case, events)`.
 - Returns public `StateSummary`.
@@ -56,6 +58,10 @@ then uses the same AgentGateway path as `talk`.
 and player-known evidence, writes `player.accused` and `accusation.evaluated`,
 then the normal derived-memory and trigger systems run. Accuse v0 does not
 directly advance phase or run an ending system.
+
+Narrative resolution v0 is intentionally small: the resolved phase is reached
+only by a `narrative_rules.yaml` beat reacting to `accusation.evaluated`, not by
+accuse code.
 
 ## Public API
 
@@ -99,6 +105,11 @@ The runtime scenario smoke test records a stable event snapshot and verifies tha
 replaying those events rebuilds equivalent key state. This protects the rule
 chain, derived state, Director blocking, Rule Engine rejection, and phase
 progression from accidental drift.
+
+The same scenario also renders
+`tests/snapshots/fake_case_001_player_journey.md` from the actual `WorldEvent`
+list. The Markdown is for human review and must obey the same public-summary leak
+boundary.
 
 Replay rebuilds `memory_candidates` and `memory_snapshots` from persisted events.
 It does not re-run memory derivation or snapshot aggregation, preserving event

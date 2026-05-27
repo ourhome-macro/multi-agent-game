@@ -257,6 +257,10 @@ class CaseLoader:
                 raise CaseLoadError(
                     f"Beat '{beat.id}' references unknown next_phase '{beat.next_phase}'"
                 )
+            if beat.trigger_payload and beat.trigger_event_type is None:
+                raise CaseLoadError(
+                    f"Beat '{beat.id}' trigger_payload requires trigger_event_type"
+                )
             for required_beat_id in beat.all_completed:
                 if required_beat_id not in beat_ids:
                     raise CaseLoadError(
