@@ -40,10 +40,17 @@ def build_agent_context(
     target_profile = (
         AgentCharacterView(
             id=character.id,
-            name=character.name,
-            role=character.role,
-            personality=character.personality,
-            speech_style=character.speech_style,
+            display_name=character.display_name,
+            public_role=character.public_role,
+            public_description=character.public_description,
+            speech_style=character.speech.style,
+            default_tone=character.speech.default_tone,
+            catchphrases=character.speech.catchphrases,
+            visible_traits=character.personality.traits,
+            defensive_style=character.speech.defensive_style,
+            pressure_response=character.personality.pressure_response,
+            trust_response=character.personality.trust_response,
+            fear_response=character.personality.fear_response,
         )
         if character is not None
         else None

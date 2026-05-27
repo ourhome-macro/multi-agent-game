@@ -1,23 +1,49 @@
 - id: butler
-  name: 韩管家
-  role: 管家
-  personality: 克制、谨慎、习惯回避直接冲突。
-  speech_style: 简短、礼貌，但在压力下会含糊其辞。
-  secrets:
-    - 知道遗嘱被调换过。
-  goals:
-    - 避免玩家过早发现遗嘱真相。
-  knowledge:
-    - 书桌抽屉昨夜被人打开过。
+  display_name: 韩管家
+  public_role: 老宅管家
+  public_description: 在宅邸工作多年的管家，熟悉书房和钥匙管理。
+  speech:
+    style: 克制、谨慎、礼貌
+    default_tone: formal
+    catchphrases: []
+    defensive_style: evasive
+  personality:
+    traits:
+      - cautious
+      - loyal
+      - observant
+    pressure_response: conceal
+    trust_response: cautious_help
+    fear_response: panic_conceal
+  private:
+    goals:
+      - 避免玩家过早发现遗嘱真相。
+    secrets:
+      - 知道遗嘱被调换过。
+    knowledge:
+      - 书桌抽屉昨夜被人打开过。
 
 - id: niece
-  name: 林侄女
-  role: 死者侄女
-  personality: 敏感、急躁，对遗产话题非常防备。
-  speech_style: 语速快，容易反问。
-  secrets:
-    - 曾在案发前进入书房。
-  goals:
-    - 隐瞒自己进入书房的时间。
-  knowledge:
-    - 管家案发当晚在走廊出现过。
+  display_name: 林侄女
+  public_role: 死者侄女
+  public_description: 对遗产话题高度敏感，案发前后行踪解释含糊。
+  speech:
+    style: 语速快，容易反问
+    default_tone: guarded
+    catchphrases: []
+    defensive_style: hostile
+  personality:
+    traits:
+      - sensitive
+      - defensive
+      - impulsive
+    pressure_response: refuse
+    trust_response: cautious_help
+    fear_response: conceal
+  private:
+    goals:
+      - 隐瞒自己进入书房的时间。
+    secrets:
+      - 曾在案发前进入书房。
+    knowledge:
+      - 管家案发当晚在走廊出现过。

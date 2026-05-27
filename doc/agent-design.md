@@ -70,6 +70,21 @@ configuration:
 `target_profile` is a public `AgentCharacterView`. It does not contain character
 `secrets`, `goals`, or internal `knowledge`.
 
+`AgentCharacterView` currently contains only safe role-card fields:
+
+- `id`
+- `display_name`
+- `public_role`
+- `public_description`
+- `speech_style`
+- `default_tone`
+- `catchphrases`
+- `visible_traits`
+- `defensive_style`
+- `pressure_response`
+- `trust_response`
+- `fear_response`
+
 `memory_candidates` are raw runtime candidates. `memory_snapshots` are the stable
 runtime aggregation produced from those candidates. The current version only
 passes player-scoped snapshots (`subject_id="player"`) and does not perform
@@ -132,6 +147,15 @@ audited, but Rule Engine rejects it. Narrative phase changes can only come from
 from the case package. It can vary speech and proposed actions by phase,
 discovered clues, asked subject, presented clue, interaction pressure, subject
 sensitivity, memory snapshots, and relationship metrics.
+
+Configured `mock_dialogues.yaml` replies still take priority. When no configured
+reply matches, MockAgent falls back to the safe character card:
+
+- `defensive_style=evasive` produces a conceal-style fallback.
+- `defensive_style=hostile` produces a refusal fallback.
+- `defensive_style=anxious` produces a panic fallback.
+- `pressure_response` can force refusal or panic-style concealment.
+- `speech_style` and `default_tone` may shape the fallback wording.
 
 `mock_dialogues.yaml` reply conditions currently support:
 

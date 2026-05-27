@@ -29,6 +29,48 @@ cases/{case_id}/
 - Legacy `source`, `target`, or generic player-action `target` fields are
   rejected.
 
+## characters.yaml
+
+Characters are authored as public/private role cards:
+
+```yaml
+- id: butler
+  display_name: Han Butler
+  public_role: House steward
+  public_description: Long-serving steward with access to the study.
+  speech:
+    style: restrained and polite
+    default_tone: formal
+    catchphrases: []
+    defensive_style: evasive
+  personality:
+    traits:
+      - cautious
+      - loyal
+      - observant
+    pressure_response: conceal
+    trust_response: cautious_help
+    fear_response: panic_conceal
+  private:
+    goals:
+      - Avoid becoming the prime suspect.
+    secrets:
+      - Knows the study key moved.
+    knowledge:
+      - Saw someone approach the desk.
+```
+
+Allowed `defensive_style` values are `evasive`, `hostile`, `anxious`, and
+`neutral`. Allowed response styles are `answer`, `conceal`, `deflect`, `refuse`,
+`panic_conceal`, and `cautious_help`.
+
+The loader still accepts legacy `name`, `role`, `personality`, `speech_style`,
+`secrets`, `goals`, and `knowledge` fields and normalizes them into the new card
+shape. New case packages should use the explicit public/private structure.
+
+`private` is author-only data. It must not appear in `StateSummary`,
+`AgentContext`, player journey Markdown, or runtime events.
+
 ## mock_dialogues.yaml
 
 Each dialogue block is keyed by `character_id`. Replies can be selected by:

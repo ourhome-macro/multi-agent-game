@@ -92,7 +92,12 @@ def build_state_summary(package: CasePackage, session: SessionState) -> StateSum
         narrative_phase=session.narrative.phase,
         completed_beats=sorted(session.narrative.completed_beats),
         characters=[
-            CharacterSummary(id=character.id, name=character.name, role=character.role)
+            CharacterSummary(
+                id=character.id,
+                display_name=character.display_name,
+                public_role=character.public_role,
+                public_description=character.public_description,
+            )
             for character in package.characters
         ],
         discovered_clues=discovered_clues,

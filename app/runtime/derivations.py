@@ -144,7 +144,7 @@ class DerivedEventSystem:
         metric = str(source_event.payload["metric"])
         state_name = str(source_event.payload["state"])
         character_name = next(
-            (item.name for item in case.characters if item.id == source_id),
+            (item.display_name for item in case.characters if item.id == source_id),
             source_id,
         )
         return self._store_memory_candidate(
@@ -166,7 +166,7 @@ class DerivedEventSystem:
     ) -> WorldEvent | None:
         target_id = str(source_event.payload["target_id"])
         character_name = next(
-            (item.name for item in case.characters if item.id == target_id),
+            (item.display_name for item in case.characters if item.id == target_id),
             target_id,
         )
         return self._store_memory_candidate(
@@ -269,7 +269,7 @@ class DerivedEventSystem:
 
     def _character_name(self, case: CasePackage, character_id: str) -> str:
         return next(
-            (item.name for item in case.characters if item.id == character_id),
+            (item.display_name for item in case.characters if item.id == character_id),
             character_id,
         )
 

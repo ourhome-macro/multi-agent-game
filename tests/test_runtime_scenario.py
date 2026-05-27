@@ -128,6 +128,8 @@ def _assert_journey_matches_snapshot(case: object, session: object, journey_path
         assert fact.text not in journey
         for blocked_term in fact.blocked_terms:
             assert blocked_term not in journey
+    for private_value in _private_character_values(case):
+        assert private_value not in journey
     assert journey_path.exists()
     assert journey == journey_path.read_text(encoding="utf-8")
 
@@ -251,11 +253,21 @@ def _summary_does_not_leak(serialized_summary: str) -> bool:
         '"secrets":',
         '"goals":',
         '"knowledge":',
+        '"private":',
         '"truth_status":',
         '"forbidden_facts":',
         '"solution_claims":',
     )
     return all(term not in serialized_summary for term in forbidden_terms)
+
+
+def _private_character_values(case: object) -> list[str]:
+    values: list[str] = []
+    for character in case.characters:
+        values.extend(character.private.goals)
+        values.extend(character.private.secrets)
+        values.extend(character.private.knowledge)
+    return values
 
 
 def _normalize_events(events: list[WorldEvent]) -> list[dict]:

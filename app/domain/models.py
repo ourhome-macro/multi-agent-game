@@ -34,6 +34,22 @@ class AgentIntentType(StrEnum):
     PANIC = "panic"
 
 
+class DefensiveStyle(StrEnum):
+    EVASIVE = "evasive"
+    HOSTILE = "hostile"
+    ANXIOUS = "anxious"
+    NEUTRAL = "neutral"
+
+
+class CharacterResponseStyle(StrEnum):
+    ANSWER = "answer"
+    CONCEAL = "conceal"
+    DEFLECT = "deflect"
+    REFUSE = "refuse"
+    PANIC_CONCEAL = "panic_conceal"
+    CAUTIOUS_HELP = "cautious_help"
+
+
 class EventType(StrEnum):
     SESSION_CREATED = "session.created"
     PLAYER_INSPECTED = "player.inspected"
@@ -75,23 +91,100 @@ class CaseMeta(APIModel):
     initial_phase: NonEmptyString
 
 
+class CharacterSpeechConfig(APIModel):
+    style: str = ""
+    default_tone: str = ""
+    catchphrases: list[NonEmptyString] = Field(default_factory=list)
+    defensive_style: DefensiveStyle = DefensiveStyle.EVASIVE
+
+
+class CharacterPersonalityConfig(APIModel):
+    traits: list[NonEmptyString] = Field(default_factory=list)
+    pressure_response: CharacterResponseStyle = CharacterResponseStyle.CONCEAL
+    trust_response: CharacterResponseStyle = CharacterResponseStyle.CAUTIOUS_HELP
+    fear_response: CharacterResponseStyle = CharacterResponseStyle.PANIC_CONCEAL
+
+
+class CharacterPrivateConfig(APIModel):
+    goals: list[NonEmptyString] = Field(default_factory=list)
+    secrets: list[NonEmptyString] = Field(default_factory=list)
+    knowledge: list[NonEmptyString] = Field(default_factory=list)
+
+
 class CharacterConfig(APIModel):
     id: NonEmptyString
-    name: NonEmptyString
-    role: NonEmptyString
-    personality: str = ""
-    speech_style: str = ""
-    secrets: list[str] = Field(default_factory=list)
-    goals: list[str] = Field(default_factory=list)
-    knowledge: list[str] = Field(default_factory=list)
+    display_name: NonEmptyString
+    public_role: NonEmptyString
+    public_description: str = ""
+    speech: CharacterSpeechConfig = Field(default_factory=CharacterSpeechConfig)
+    personality: CharacterPersonalityConfig = Field(default_factory=CharacterPersonalityConfig)
+    private: CharacterPrivateConfig = Field(default_factory=CharacterPrivateConfig)
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_legacy_character_fields(cls, value: object) -> object:
+        if not isinstance(value, dict):
+            return value
+
+        normalized = dict(value)
+        legacy_name = normalized.pop("name", None)
+        legacy_role = normalized.pop("role", None)
+        legacy_speech_style = normalized.pop("speech_style", None)
+        legacy_secrets = normalized.pop("secrets", None)
+        legacy_goals = normalized.pop("goals", None)
+        legacy_knowledge = normalized.pop("knowledge", None)
+        legacy_personality = normalized.get("personality")
+
+        if "display_name" not in normalized and legacy_name is not None:
+            normalized["display_name"] = legacy_name
+        if "public_role" not in normalized and legacy_role is not None:
+            normalized["public_role"] = legacy_role
+
+        if isinstance(legacy_personality, str):
+            if not normalized.get("public_description"):
+                normalized["public_description"] = legacy_personality
+            normalized["personality"] = {}
+
+        speech = normalized.get("speech")
+        if not isinstance(speech, dict):
+            speech = {}
+        else:
+            speech = dict(speech)
+        if legacy_speech_style is not None and not speech.get("style"):
+            speech["style"] = legacy_speech_style
+        normalized["speech"] = speech
+
+        private = normalized.get("private")
+        if not isinstance(private, dict):
+            private = {}
+        else:
+            private = dict(private)
+        legacy_private_fields = {
+            "goals": legacy_goals,
+            "secrets": legacy_secrets,
+            "knowledge": legacy_knowledge,
+        }
+        for field_name, field_value in legacy_private_fields.items():
+            if field_value is not None and field_name not in private:
+                private[field_name] = field_value
+        normalized["private"] = private
+
+        return normalized
 
 
 class AgentCharacterView(APIModel):
     id: NonEmptyString
-    name: NonEmptyString
-    role: NonEmptyString
-    personality: str = ""
+    display_name: NonEmptyString
+    public_role: NonEmptyString
+    public_description: str = ""
     speech_style: str = ""
+    default_tone: str = ""
+    catchphrases: list[NonEmptyString] = Field(default_factory=list)
+    visible_traits: list[NonEmptyString] = Field(default_factory=list)
+    defensive_style: DefensiveStyle = DefensiveStyle.EVASIVE
+    pressure_response: CharacterResponseStyle = CharacterResponseStyle.CONCEAL
+    trust_response: CharacterResponseStyle = CharacterResponseStyle.CAUTIOUS_HELP
+    fear_response: CharacterResponseStyle = CharacterResponseStyle.PANIC_CONCEAL
 
 
 class SceneHotspotConfig(APIModel):
@@ -440,8 +533,9 @@ class CreateSessionResponse(APIModel):
 
 class CharacterSummary(APIModel):
     id: NonEmptyString
-    name: NonEmptyString
-    role: NonEmptyString
+    display_name: NonEmptyString
+    public_role: NonEmptyString
+    public_description: str = ""
 
 
 class ClueSummary(APIModel):

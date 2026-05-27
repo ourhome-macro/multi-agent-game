@@ -1,23 +1,49 @@
 - id: dockmaster
-  name: 赵码头长
-  role: 码头管理员
-  personality: 圆滑、谨慎，习惯把责任推给潮汐和工人。
-  speech_style: 口吻平稳，常用码头行话。
-  secrets:
-    - 知道潮汐记录被人改过。
-  goals:
-    - 避免仓库走私线索被连起来。
-  knowledge:
-    - 破灯不是风吹倒的。
+  display_name: 赵码头长
+  public_role: 码头管理员
+  public_description: 圆滑谨慎，习惯把责任推给潮汐和工人。
+  speech:
+    style: 口吻平稳，常用码头行话
+    default_tone: practical
+    catchphrases: []
+    defensive_style: evasive
+  personality:
+    traits:
+      - cautious
+      - pragmatic
+      - evasive
+    pressure_response: deflect
+    trust_response: cautious_help
+    fear_response: conceal
+  private:
+    goals:
+      - 避免仓库走私线索被连起来。
+    secrets:
+      - 知道潮汐记录被人改过。
+    knowledge:
+      - 破灯不是风吹倒的。
 
 - id: clerk
-  name: 沈账房
-  role: 仓库账房
-  personality: 胆小、记性好，害怕被牵连。
-  speech_style: 断断续续，经常先否认再补充细节。
-  secrets:
-    - 偷藏过缺页账本。
-  goals:
-    - 证明自己只是被迫记录货物。
-  knowledge:
-    - 蓝墨账页对应午夜入库。
+  display_name: 沈账房
+  public_role: 仓库账房
+  public_description: 胆小但记性好，害怕自己被牵连进走私账目。
+  speech:
+    style: 断断续续，经常先否认再补充细节
+    default_tone: anxious
+    catchphrases: []
+    defensive_style: anxious
+  personality:
+    traits:
+      - fearful
+      - precise
+      - conflict_avoidant
+    pressure_response: panic_conceal
+    trust_response: cautious_help
+    fear_response: panic_conceal
+  private:
+    goals:
+      - 证明自己只是被迫记录货物。
+    secrets:
+      - 偷藏过缺页账本。
+    knowledge:
+      - 蓝墨账页对应午夜入库。

@@ -24,6 +24,20 @@ Current session state includes:
 The first runtime memory snapshot version is intentionally not exposed through
 `StateSummary`.
 
+## Character Cards
+
+Static character data is split into public role-card data and private author
+data:
+
+- public: `display_name`, `public_role`, `public_description`, `speech`,
+  visible personality traits, and response styles
+- private: goals, secrets, and internal character knowledge
+
+`AgentContext.target_profile` is derived from the public layer only. Runtime
+memory content may use public display names for readability, but it must not
+copy private goals, secrets, or internal knowledge into `WorldEvent`,
+`StateSummary`, `AgentContext`, or player journey output.
+
 ## Player Knowledge
 
 `clue.discovered` derives `player_knowledge.updated`. A player can only
@@ -182,5 +196,6 @@ state must remain replayable from `WorldEvent`.
 ## Leak Boundary
 
 Public summaries must not expose character `secrets`, character `goals`,
-internal character `knowledge`, clue `truth_status`, forbidden fact text, blocked
-terms, `forbidden_facts`, or `solution_claims`.
+internal character `knowledge`, the character-card `private` object, clue
+`truth_status`, forbidden fact text, blocked terms, `forbidden_facts`, or
+`solution_claims`.

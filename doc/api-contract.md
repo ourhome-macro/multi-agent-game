@@ -228,11 +228,19 @@ completed beats, public relationship metrics, and player knowledge summaries.
 It does not expose memory snapshots in v0.
 It also does not expose `solution_claims` or accusation truth configuration.
 
+Character summaries expose only public role-card fields:
+
+- `id`
+- `display_name`
+- `public_role`
+- `public_description`
+
 It must not expose:
 
 - character `secrets`
 - character `goals`
 - internal character `knowledge`
+- character-card `private`
 - clue `truth_status`
 - forbidden fact text or blocked terms
 - `forbidden_facts`

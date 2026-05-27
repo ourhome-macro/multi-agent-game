@@ -19,6 +19,11 @@ FastAPI app
 Startup fails with `CaseLoadError` when YAML schema validation or cross-reference
 validation fails.
 
+Character config now loads as a public/private character card. Public fields
+describe the NPC identity and visible behavior. Private goals, secrets, and
+internal knowledge stay inside `CasePackage` and are never copied into public
+state or agent input.
+
 ## Action Flow
 
 ```text
@@ -112,6 +117,12 @@ Forbidden fact scope is represented only by `blocked_fact_ids` and
 `asked_subject_id`. Presented evidence is represented by `presented_clue_id` and
 `presented_knowledge_id`. Interaction pressure is a backend-calculated scalar in
 the `0.0 .. 1.0` range.
+
+`AgentContext.target_profile` is built from `AgentCharacterView`, not raw
+`CharacterConfig`. It may include public identity, public description,
+speech style, visible traits, defensive style, and pressure/trust/fear response
+styles. It must not include `private`, goals, secrets, internal knowledge, truth
+status, forbidden fact text, or solution claims.
 
 `memory_candidate.created` is only a candidate memory event. The runtime-owned
 `MemorySnapshotSystem` consumes it and emits `agent_memory_snapshot.updated`,

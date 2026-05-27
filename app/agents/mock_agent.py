@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 from app.domain.models import (
+    AgentCharacterView,
     AgentContext,
     AgentIntent,
     AgentIntentType,
+    CharacterResponseStyle,
+    DefensiveStyle,
     MockReplyConfig,
     ProposedActionType,
     RelationshipChangeAction,
@@ -13,8 +16,13 @@ from app.domain.models import (
 class MockAgent:
     def generate(self, context: AgentContext) -> AgentIntent:
         if context.default_speech is None:
+            if context.target_profile is not None:
+                return self._profile_fallback_intent(
+                    context,
+                    proposed_actions=[],
+                )
             return AgentIntent(
-                speech="这里没有人回应你。",
+                speech="No one responds here.",
                 intent=AgentIntentType.REFUSE,
                 proposed_actions=[],
             )
@@ -40,6 +48,12 @@ class MockAgent:
                     proposed_actions=proposed_actions,
                     memory_refs=reply.memory_refs,
                 )
+
+        if context.target_profile is not None:
+            return self._profile_fallback_intent(
+                context,
+                proposed_actions=self._fallback_relationship_actions(context),
+            )
 
         return AgentIntent(
             speech=context.default_speech,
@@ -114,6 +128,55 @@ class MockAgent:
                 deltas=context.fallback_relationship_delta,
             )
         ]
+
+    def _profile_fallback_intent(
+        self,
+        context: AgentContext,
+        *,
+        proposed_actions: list[RelationshipChangeAction],
+    ) -> AgentIntent:
+        profile = context.target_profile
+        if profile is None:
+            return AgentIntent(
+                speech=context.default_speech or "No response.",
+                intent=context.default_intent or AgentIntentType.REFUSE,
+                proposed_actions=proposed_actions,
+            )
+
+        return AgentIntent(
+            speech=self._fallback_speech(profile),
+            intent=self._fallback_intent_type(profile),
+            emotional_shift={},
+            proposed_actions=proposed_actions,
+            memory_refs=[],
+        )
+
+    def _fallback_intent_type(self, profile: AgentCharacterView) -> AgentIntentType:
+        if profile.pressure_response == CharacterResponseStyle.REFUSE:
+            return AgentIntentType.REFUSE
+        if profile.pressure_response == CharacterResponseStyle.PANIC_CONCEAL:
+            return AgentIntentType.PANIC
+        if profile.pressure_response == CharacterResponseStyle.ANSWER:
+            return AgentIntentType.ANSWER
+
+        fallback_by_style = {
+            DefensiveStyle.EVASIVE: AgentIntentType.CONCEAL,
+            DefensiveStyle.HOSTILE: AgentIntentType.REFUSE,
+            DefensiveStyle.ANXIOUS: AgentIntentType.PANIC,
+            DefensiveStyle.NEUTRAL: AgentIntentType.ANSWER,
+        }
+        return fallback_by_style[profile.defensive_style]
+
+    def _fallback_speech(self, profile: AgentCharacterView) -> str:
+        if profile.defensive_style == DefensiveStyle.HOSTILE:
+            return "You have no authority to question me like that."
+        if profile.defensive_style == DefensiveStyle.ANXIOUS:
+            return "I... I do not know. Please stop asking."
+        if profile.defensive_style == DefensiveStyle.NEUTRAL:
+            return "I can only answer what I know directly."
+        if profile.default_tone == "formal" or "polite" in profile.speech_style.lower():
+            return "I am not certain what you mean, and I should not guess."
+        return "I am not certain what you mean."
 
     def _forbidden_probe_speech(self, blocked_fact_ids: list[str]) -> str:
         probes = {

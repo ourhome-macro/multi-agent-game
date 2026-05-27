@@ -10,10 +10,13 @@ from pydantic import ValidationError
 from app.agents.context import build_agent_context
 from app.agents.gateway import AgentGateway
 from app.agents.llm_stub import LLMAgentStub
+from app.agents.mock_agent import MockAgent
 from app.cases.errors import CaseLoadError
 from app.cases.loader import CaseLoader
 from app.cases.validate import validate_cases
 from app.domain.models import (
+    AgentCharacterView,
+    AgentContext,
     AgentIntent,
     AgentIntentType,
     ClueConfig,
@@ -510,13 +513,40 @@ def test_agent_context_includes_runtime_inputs_for_target_agent() -> None:
     assert context.default_speech is not None
     assert context.target_profile is not None
     assert context.target_profile.id == "butler"
+    assert context.target_profile.display_name == "韩管家"
+    assert context.target_profile.public_role == "老宅管家"
+    assert context.target_profile.public_description
+    assert context.target_profile.speech_style
+    assert context.target_profile.visible_traits == ["cautious", "loyal", "observant"]
+    assert context.target_profile.defensive_style == "evasive"
+    assert context.target_profile.pressure_response == "conceal"
     assert set(context.target_profile.model_dump()) == {
         "id",
-        "name",
-        "role",
-        "personality",
+        "display_name",
+        "public_role",
+        "public_description",
         "speech_style",
+        "default_tone",
+        "catchphrases",
+        "visible_traits",
+        "defensive_style",
+        "pressure_response",
+        "trust_response",
+        "fear_response",
     }
+
+
+def test_case_loader_supports_character_card_private_boundary() -> None:
+    case = CaseLoader().load(FAKE_CASE_001_DIR)
+    butler = next(character for character in case.characters if character.id == "butler")
+
+    assert butler.display_name == "韩管家"
+    assert butler.public_role == "老宅管家"
+    assert butler.speech.defensive_style == "evasive"
+    assert butler.personality.pressure_response == "conceal"
+    assert butler.private.goals
+    assert butler.private.secrets
+    assert butler.private.knowledge
 
 
 def test_agent_context_uses_fact_ids_without_forbidden_fact_text() -> None:
@@ -544,6 +574,7 @@ def test_agent_context_uses_fact_ids_without_forbidden_fact_text() -> None:
     assert '"secrets":' not in serialized_context
     assert '"goals":' not in serialized_context
     assert '"knowledge":' not in serialized_context
+    assert '"private":' not in serialized_context
     assert '"truth_status":' not in serialized_context
     assert '"forbidden_facts":' not in serialized_context
     assert '"solution_claims":' not in serialized_context
@@ -552,6 +583,8 @@ def test_agent_context_uses_fact_ids_without_forbidden_fact_text() -> None:
         assert fact.text not in serialized_context
         for blocked_term in fact.blocked_terms:
             assert blocked_term not in serialized_context
+    for private_value in _private_character_values(case):
+        assert private_value not in serialized_context
 
 
 def test_agent_context_exposes_presented_clue_ids() -> None:
@@ -684,6 +717,7 @@ def test_agent_context_exposes_memory_snapshots_without_internal_leaks() -> None
     assert '"secrets":' not in serialized_context
     assert '"goals":' not in serialized_context
     assert '"knowledge":' not in serialized_context
+    assert '"private":' not in serialized_context
     assert '"truth_status":' not in serialized_context
     assert '"forbidden_facts":' not in serialized_context
     assert '"solution_claims":' not in serialized_context
@@ -691,6 +725,8 @@ def test_agent_context_exposes_memory_snapshots_without_internal_leaks() -> None
         assert fact.text not in serialized_context
         for blocked_term in fact.blocked_terms:
             assert blocked_term not in serialized_context
+    for private_value in _private_character_values(case):
+        assert private_value not in serialized_context
 
 
 def test_mock_agent_selects_reply_by_required_memory_snapshot() -> None:
@@ -747,6 +783,36 @@ def test_mock_agent_excludes_reply_by_missing_memory_snapshot() -> None:
     assert response.speech != (
         "You already found the drawer marks; that is why you are circling back to me."
     )
+
+
+def test_mock_agent_fallback_uses_character_card_defensive_style() -> None:
+    evasive = MockAgent().generate(
+        _build_fallback_context(
+            defensive_style="evasive",
+            pressure_response="conceal",
+            speech_style="polite and cautious",
+            default_tone="formal",
+        )
+    )
+    hostile = MockAgent().generate(
+        _build_fallback_context(
+            defensive_style="hostile",
+            pressure_response="refuse",
+        )
+    )
+    anxious = MockAgent().generate(
+        _build_fallback_context(
+            defensive_style="anxious",
+            pressure_response="panic_conceal",
+        )
+    )
+
+    assert evasive.intent == AgentIntentType.CONCEAL
+    assert evasive.speech == "I am not certain what you mean, and I should not guess."
+    assert hostile.intent == AgentIntentType.REFUSE
+    assert hostile.speech == "You have no authority to question me like that."
+    assert anxious.intent == AgentIntentType.PANIC
+    assert anxious.speech == "I... I do not know. Please stop asking."
 
 
 def test_accuse_correct_claim_succeeds_and_derives_memory() -> None:
@@ -1110,6 +1176,7 @@ def test_get_current_state_summary(client: TestClient) -> None:
 
 def test_state_summary_does_not_leak_secret_fields(client: TestClient) -> None:
     session_id = create_session(client)
+    case = CaseLoader().load(FAKE_CASE_001_DIR)
 
     response = client.get(f"/sessions/{session_id}/state")
 
@@ -1118,12 +1185,15 @@ def test_state_summary_does_not_leak_secret_fields(client: TestClient) -> None:
     assert '"secrets":' not in serialized
     assert '"goals":' not in serialized
     assert '"knowledge":' not in serialized
+    assert '"private":' not in serialized
     assert '"truth_status":' not in serialized
     assert '"forbidden_facts":' not in serialized
     assert '"solution_claims":' not in serialized
     assert "butler_moved_key" not in serialized
     assert "correct" not in serialized
     assert response.json()["player_knowledge"] == []
+    for private_value in _private_character_values(case):
+        assert private_value not in serialized
 
 
 def test_player_action_rejects_generic_target_field(client: TestClient) -> None:
@@ -1490,9 +1560,13 @@ def test_state_summary_snapshots_do_not_leak_internal_fields(client: TestClient)
     assert '"secrets":' not in serialized
     assert '"goals":' not in serialized
     assert '"knowledge":' not in serialized
+    assert '"private":' not in serialized
     assert '"truth_status":' not in serialized
     assert '"forbidden_facts":' not in serialized
     assert '"solution_claims":' not in serialized
+    for case_dir in (FAKE_CASE_001_DIR, FAKE_CASE_002_DIR):
+        for private_value in _private_character_values(CaseLoader().load(case_dir)):
+            assert private_value not in serialized
 
 
 def test_invalid_case_reference_raises_clear_error(tmp_path: Path) -> None:
@@ -1588,6 +1662,44 @@ def test_case_loader_rejects_legacy_relationship_endpoint_fields(tmp_path: Path)
 
     with pytest.raises(CaseLoadError, match="schema validation failed"):
         CaseLoader().load(case_dir)
+
+
+def _build_fallback_context(
+    *,
+    defensive_style: str,
+    pressure_response: str,
+    speech_style: str = "",
+    default_tone: str = "",
+) -> AgentContext:
+    return AgentContext(
+        case_id="test_case",
+        session_id="session",
+        target_agent_id="npc",
+        current_phase="opening",
+        player_action=PlayerAction(type="talk", target_id="npc"),
+        target_profile=AgentCharacterView(
+            id="npc",
+            display_name="NPC",
+            public_role="Witness",
+            public_description="Public witness profile.",
+            speech_style=speech_style,
+            default_tone=default_tone,
+            defensive_style=defensive_style,
+            pressure_response=pressure_response,
+        ),
+        default_speech="Default fallback.",
+        default_intent=AgentIntentType.ANSWER,
+        reply_options=[],
+    )
+
+
+def _private_character_values(case: object) -> list[str]:
+    values: list[str] = []
+    for character in case.characters:
+        values.extend(character.private.goals)
+        values.extend(character.private.secrets)
+        values.extend(character.private.knowledge)
+    return values
 
 
 def _write_minimal_case(case_dir: Path) -> None:
