@@ -57,6 +57,20 @@
             suspicion: 0.7
             trust: 0.2
     - phase: investigation
+      requires_memory:
+        - memory.player.clue_discovered.scratched_drawer
+      missing_memory:
+        - memory.player.presented_clue.butler.scratched_drawer
+      speech: You already found the drawer marks; that is why you are circling back to me.
+      intent: probe
+      proposed_actions:
+        - type: relationship.change
+          source_id: butler
+          target_id: player
+          deltas:
+            suspicion: 1
+            fear: 1
+    - phase: investigation
       requires_discovered:
         - scratched_drawer
       speech: 抽屉确实有响动，但我不能确定是谁动过它。

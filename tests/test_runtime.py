@@ -30,6 +30,7 @@ from app.main import app
 from app.rules.engine import RuleEngine
 from app.runtime.events import EventRecorder
 from app.runtime.replay import replay_events
+from app.runtime.service import create_runtime
 from app.storage.memory import InMemorySessionStore, build_state_summary
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -119,6 +120,7 @@ def test_clue_discovered_completes_beat_and_advances_phase(client: TestClient) -
         "clue.discovered",
         "player_knowledge.updated",
         "memory_candidate.created",
+        "agent_memory_snapshot.updated",
         "narrative.beat.completed",
         "narrative.phase.changed",
     ]
@@ -591,6 +593,160 @@ def test_agent_context_exposes_asked_subject_and_interaction_pressure() -> None:
     assert context.presented_clue_id is None
 
 
+def test_memory_candidate_creates_memory_snapshot() -> None:
+    case = CaseLoader().load(FAKE_CASE_001_DIR)
+    runtime = create_runtime([case])
+    session = runtime.session_store.create(case)
+
+    response = runtime.action_service.handle(
+        session=session,
+        action=PlayerAction(type="inspect", target_id="desk"),
+    )
+
+    event_types = [event.type for event in response.new_events]
+    assert EventType.MEMORY_CANDIDATE_CREATED in event_types
+    assert EventType.AGENT_MEMORY_SNAPSHOT_UPDATED in event_types
+    assert session.memory_snapshots
+    snapshot = next(iter(session.memory_snapshots.values()))
+    assert snapshot.memory_id == "memory.player.clue_discovered.scratched_drawer"
+    assert snapshot.subject_id == "player"
+    assert snapshot.visibility == "private"
+    assert snapshot.source_event_ids
+
+
+def test_replay_rebuilds_memory_snapshots_without_extra_events() -> None:
+    case = CaseLoader().load(FAKE_CASE_001_DIR)
+    runtime = create_runtime([case])
+    session = runtime.session_store.create(case)
+    runtime.action_service.handle(
+        session=session,
+        action=PlayerAction(type="inspect", target_id="desk"),
+    )
+    runtime.action_service.handle(
+        session=session,
+        action=PlayerAction(type="talk", target_id="butler", text="Where were you?"),
+    )
+
+    replayed = replay_events(case, session.events)
+
+    assert len(replayed.events) == len(session.events)
+    assert replayed.memory_candidates == session.memory_candidates
+    assert replayed.memory_snapshots == session.memory_snapshots
+    assert [
+        event.type for event in replayed.events if event.type == EventType.MEMORY_CANDIDATE_CREATED
+    ] == [
+        event.type for event in session.events if event.type == EventType.MEMORY_CANDIDATE_CREATED
+    ]
+
+
+def test_memory_snapshot_update_does_not_create_memory_candidate() -> None:
+    case = CaseLoader().load(FAKE_CASE_001_DIR)
+    runtime = create_runtime([case])
+    session = runtime.session_store.create(case)
+
+    runtime.action_service.handle(
+        session=session,
+        action=PlayerAction(type="inspect", target_id="desk"),
+    )
+
+    snapshot_events = [
+        event for event in session.events if event.type == EventType.AGENT_MEMORY_SNAPSHOT_UPDATED
+    ]
+    assert snapshot_events
+    assert not any(
+        event.type == EventType.MEMORY_CANDIDATE_CREATED
+        and event.caused_by_event_id in {snapshot.id for snapshot in snapshot_events}
+        for event in session.events
+    )
+
+
+def test_agent_context_exposes_memory_snapshots_without_internal_leaks() -> None:
+    case = CaseLoader().load(FAKE_CASE_001_DIR)
+    runtime = create_runtime([case])
+    session = runtime.session_store.create(case)
+    runtime.action_service.handle(
+        session=session,
+        action=PlayerAction(type="inspect", target_id="desk"),
+    )
+
+    context = build_agent_context(
+        case,
+        session,
+        PlayerAction(type="talk", target_id="butler", text="What do you remember?"),
+    )
+
+    assert context.memory_snapshots
+    assert {
+        snapshot.memory_id for snapshot in context.memory_snapshots
+    } == {"memory.player.clue_discovered.scratched_drawer"}
+    serialized_context = context.model_dump_json()
+    assert '"secrets":' not in serialized_context
+    assert '"goals":' not in serialized_context
+    assert '"knowledge":' not in serialized_context
+    assert '"truth_status":' not in serialized_context
+    assert '"forbidden_facts":' not in serialized_context
+    for fact in case.forbidden_facts:
+        assert fact.text not in serialized_context
+        for blocked_term in fact.blocked_terms:
+            assert blocked_term not in serialized_context
+
+
+def test_mock_agent_selects_reply_by_required_memory_snapshot() -> None:
+    case = CaseLoader().load(FAKE_CASE_001_DIR)
+    runtime = create_runtime([case])
+    session = runtime.session_store.create(case)
+    runtime.action_service.handle(
+        session=session,
+        action=PlayerAction(type="inspect", target_id="desk"),
+    )
+
+    context = build_agent_context(
+        case,
+        session,
+        PlayerAction(type="talk", target_id="butler", text="Why are you nervous?"),
+    )
+    response = runtime.action_service.handle(
+        session=session,
+        action=PlayerAction(type="talk", target_id="butler", text="Why are you nervous?"),
+    )
+
+    assert {
+        snapshot.memory_id for snapshot in context.memory_snapshots
+    } == {"memory.player.clue_discovered.scratched_drawer"}
+    assert response.speech == (
+        "You already found the drawer marks; that is why you are circling back to me."
+    )
+
+
+def test_mock_agent_excludes_reply_by_missing_memory_snapshot() -> None:
+    case = CaseLoader().load(FAKE_CASE_001_DIR)
+    runtime = create_runtime([case])
+    session = runtime.session_store.create(case)
+    runtime.action_service.handle(
+        session=session,
+        action=PlayerAction(type="inspect", target_id="desk"),
+    )
+    runtime.action_service.handle(
+        session=session,
+        action=PlayerAction(
+            type="present_clue",
+            target_id="butler",
+            clue_id="scratched_drawer",
+            text="What about these scratch marks?",
+        ),
+    )
+
+    response = runtime.action_service.handle(
+        session=session,
+        action=PlayerAction(type="talk", target_id="butler", text="And after that?"),
+    )
+
+    assert "memory.player.presented_clue.butler.scratched_drawer" in session.memory_snapshots
+    assert response.speech != (
+        "You already found the drawer marks; that is why you are circling back to me."
+    )
+
+
 def test_agent_gateway_defaults_to_mock_agent() -> None:
     case = CaseLoader().load(FAKE_CASE_001_DIR)
     recorder = EventRecorder()
@@ -912,6 +1068,7 @@ def test_events_order_is_stable_for_mixed_action_sequence(client: TestClient) ->
         "clue.discovered",
         "player_knowledge.updated",
         "memory_candidate.created",
+        "agent_memory_snapshot.updated",
         "narrative.beat.completed",
         "narrative.phase.changed",
         "player.talked",
@@ -919,9 +1076,11 @@ def test_events_order_is_stable_for_mixed_action_sequence(client: TestClient) ->
         "relationship.changed",
         "relationship.threshold.crossed",
         "memory_candidate.created",
+        "agent_memory_snapshot.updated",
         "player.talked",
         "director.blocked",
         "memory_candidate.created",
+        "agent_memory_snapshot.updated",
     ]
 
 
@@ -1040,7 +1199,7 @@ def test_state_summary_snapshots_do_not_leak_internal_fields(client: TestClient)
             "completed_beats": ["drawer_found"],
             "discovered": ["scratched_drawer"],
             "player_knowledge": ["player_knowledge.scratched_drawer"],
-            "event_count": 7,
+            "event_count": 8,
         },
         "fake_case_002_after_first_talk": {
             "case_id": "fake_case_002",

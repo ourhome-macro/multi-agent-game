@@ -162,16 +162,24 @@ Important event types include:
 - `relationship.threshold.crossed`
 - `player_knowledge.updated`
 - `memory_candidate.created`
+- `agent_memory_snapshot.updated`
 - `narrative.beat.completed`
 - `narrative.phase.changed`
 
 `relationship.changed.payload.current` always contains clamped relationship
 metrics in the `-1.0 .. 1.0` range.
 
+`memory_candidate.created` is a candidate memory event derived from important
+runtime events. `agent_memory_snapshot.updated` is a runtime-derived update to
+stable `session.memory_snapshots`; its actor is `memory_snapshot_system`, and its
+payload includes `memory_id`, `subject_id`, `source_event_ids`, `salience`,
+`visibility`, and `operation`.
+
 ## StateSummary
 
 `StateSummary` is the public state view. It may include discovered clues,
 completed beats, public relationship metrics, and player knowledge summaries.
+It does not expose memory snapshots in v0.
 
 It must not expose:
 

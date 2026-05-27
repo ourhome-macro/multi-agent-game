@@ -89,6 +89,7 @@ def test_fake_case_001_full_runtime_scenario_smoke() -> None:
         EventType.RELATIONSHIP_THRESHOLD_CROSSED,
         EventType.PLAYER_KNOWLEDGE_UPDATED,
         EventType.MEMORY_CANDIDATE_CREATED,
+        EventType.AGENT_MEMORY_SNAPSHOT_UPDATED,
         EventType.DIRECTOR_BLOCKED,
         EventType.RULE_REJECTED,
     ):
@@ -102,6 +103,7 @@ def test_fake_case_001_full_runtime_scenario_smoke() -> None:
         summary.model_dump(mode="json")
     )
     assert sorted(replayed.memory_candidates) == sorted(session.memory_candidates)
+    assert sorted(replayed.memory_snapshots) == sorted(session.memory_snapshots)
     assert _summary_does_not_leak(summary.model_dump_json())
 
     snapshot = _normalize_events(session.events)
@@ -162,6 +164,8 @@ def _normalize_payload(payload: dict, id_map: dict[str, str]) -> dict:
     for key, value in payload.items():
         if key == "source_event_id" and isinstance(value, str):
             normalized[key] = id_map.get(value, value)
+        elif key == "source_event_ids" and isinstance(value, list):
+            normalized[key] = [id_map.get(str(item), str(item)) for item in value]
         elif key == "memory_id" and isinstance(value, str):
             normalized[key] = value.removesuffix(value.split(".")[-1]) + id_map.get(
                 value.split(".")[-1],

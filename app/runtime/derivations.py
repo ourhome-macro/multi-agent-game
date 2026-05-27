@@ -47,6 +47,22 @@ class DerivedEventSystem:
                 )
                 if memory_event is not None:
                     events.append(memory_event)
+            elif source_event.type == EventType.PLAYER_ASKED_ABOUT:
+                memory_event = self._derive_asked_about_memory_candidate(
+                    case,
+                    session,
+                    source_event,
+                )
+                if memory_event is not None:
+                    events.append(memory_event)
+            elif source_event.type == EventType.PLAYER_PRESENTED_CLUE:
+                memory_event = self._derive_presented_clue_memory_candidate(
+                    case,
+                    session,
+                    source_event,
+                )
+                if memory_event is not None:
+                    events.append(memory_event)
         return events
 
     def _derive_player_knowledge(
@@ -97,6 +113,7 @@ class DerivedEventSystem:
         return self._store_memory_candidate(
             session=session,
             source_event=source_event,
+            memory_id=f"memory.player.clue_discovered.{clue_id}",
             content=f"Player discovered clue '{clue.title}'.",
             salience=0.8,
         )
@@ -117,6 +134,10 @@ class DerivedEventSystem:
         return self._store_memory_candidate(
             session=session,
             source_event=source_event,
+            memory_id=(
+                "memory.player.relationship_threshold."
+                f"{source_id}.player.{metric}.{state_name}"
+            ),
             content=f"{character_name} became {state_name} toward the player ({metric}).",
             salience=0.7,
         )
@@ -135,8 +156,61 @@ class DerivedEventSystem:
         return self._store_memory_candidate(
             session=session,
             source_event=source_event,
+            memory_id=(
+                "memory.player.director_blocked."
+                f"{target_id}.{source_event.payload.get('blocked_fact_id', 'unknown')}"
+            ),
             content=f"Conversation with {character_name} was blocked by narrative rules.",
             salience=0.9,
+        )
+
+    def _derive_asked_about_memory_candidate(
+        self,
+        case: CasePackage,
+        session: SessionState,
+        source_event: WorldEvent,
+    ) -> WorldEvent | None:
+        target_id = str(source_event.payload["target_id"])
+        target_name = self._character_name(case, target_id)
+        subject_type = str(source_event.payload["subject_type"])
+        subject_id = str(source_event.payload["subject_id"])
+        pressure = float(source_event.payload["interaction_pressure"])
+        return self._store_memory_candidate(
+            session=session,
+            source_event=source_event,
+            memory_id=f"memory.player.asked_about.{target_id}.{subject_type}.{subject_id}",
+            content=(
+                f"Player asked {target_name} about {subject_type} '{subject_id}' "
+                f"with pressure {pressure}."
+            ),
+            salience=max(0.4, pressure),
+        )
+
+    def _derive_presented_clue_memory_candidate(
+        self,
+        case: CasePackage,
+        session: SessionState,
+        source_event: WorldEvent,
+    ) -> WorldEvent | None:
+        target_id = str(source_event.payload["target_id"])
+        target_name = self._character_name(case, target_id)
+        clue_id = str(source_event.payload["clue_id"])
+        pressure = float(source_event.payload["interaction_pressure"])
+        return self._store_memory_candidate(
+            session=session,
+            source_event=source_event,
+            memory_id=f"memory.player.presented_clue.{target_id}.{clue_id}",
+            content=(
+                f"Player pressured {target_name} with clue '{clue_id}' "
+                f"at pressure {pressure}."
+            ),
+            salience=max(0.6, pressure),
+        )
+
+    def _character_name(self, case: CasePackage, character_id: str) -> str:
+        return next(
+            (item.name for item in case.characters if item.id == character_id),
+            character_id,
         )
 
     def _store_memory_candidate(
@@ -144,11 +218,12 @@ class DerivedEventSystem:
         *,
         session: SessionState,
         source_event: WorldEvent,
+        memory_id: str,
         content: str,
         salience: float,
     ) -> WorldEvent | None:
-        memory_id = f"memory_candidate.{source_event.id}"
-        if memory_id in session.memory_candidates:
+        current = session.memory_candidates.get(memory_id)
+        if current is not None and current.source_event_id == source_event.id:
             return None
         session.memory_candidates[memory_id] = MemoryCandidateState(
             memory_id=memory_id,

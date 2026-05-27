@@ -17,9 +17,12 @@ Current session state includes:
 - `discovered_clues`
 - `player_knowledge`
 - `memory_candidates`
+- `memory_snapshots`
 - `events`
 
 `StateSummary` is a public projection of this state. It is not the authority.
+The first runtime memory snapshot version is intentionally not exposed through
+`StateSummary`.
 
 ## Player Knowledge
 
@@ -76,6 +79,37 @@ NPC replies or relationship changes.
 `subject_is_sensitive` is true when the subject is associated with the target NPC
 or is a key clue.
 
+## Runtime Memory
+
+`memory_candidate.created` is a derived candidate event. It records that a source
+event may matter for future agent context, but it is not the stable memory state.
+
+`AgentMemorySnapshot` is the runtime-owned structured memory state reduced from
+candidate events. Version 0 only supports `subject_id="player"` and stores:
+
+- `memory_id`
+- `subject_id`
+- `content`
+- `source_event_ids`
+- `salience`
+- `visibility`
+- `last_updated_event_id`
+- `created_at`
+- `updated_at`
+
+`MemorySnapshotSystem` consumes only `memory_candidate.created`, updates
+`session.memory_snapshots`, and writes `agent_memory_snapshot.updated`. Agents,
+LLMs, and `AgentIntent.proposed_actions` cannot write memory snapshots.
+
+Runtime-generated memory ids are semantic and stable enough for case-authored
+mock dialogue conditions, for example
+`memory.player.clue_discovered.scratched_drawer` or
+`memory.player.presented_clue.butler.scratched_drawer`. They must not depend on
+runtime UUIDs.
+
+This is not vector memory, RAG, an LLM summary, or database persistence. Snapshot
+state must remain replayable from `WorldEvent`.
+
 ## WorldEvent Types
 
 - `session.created`
@@ -91,6 +125,7 @@ or is a key clue.
 - `relationship.threshold.crossed`
 - `player_knowledge.updated`
 - `memory_candidate.created`
+- `agent_memory_snapshot.updated`
 - `narrative.beat.completed`
 - `narrative.phase.changed`
 
@@ -104,6 +139,8 @@ or is a key clue.
 - All accepted state changes must be represented by `WorldEvent`.
 - `replay_events(case, events)` must rebuild equivalent key state and preserve
   event count.
+- `agent_memory_snapshot.updated` is replayed from the event log; replay does not
+  re-run memory derivation.
 
 ## Leak Boundary
 

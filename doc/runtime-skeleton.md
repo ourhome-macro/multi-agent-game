@@ -18,6 +18,8 @@ state, rule execution, event logging, and replay.
 - Applies legal relationship changes with metric clamping.
 - Emits `relationship.threshold.crossed` once per threshold per session.
 - Derives `player_knowledge.updated` and `memory_candidate.created`.
+- Reduces `memory_candidate.created` into `agent_memory_snapshot.updated` and
+  `session.memory_snapshots`.
 - Completes beats and advances phases through `RuleTriggerSystem`.
 - Replays event logs with `replay_events(case, events)`.
 - Returns public `StateSummary`.
@@ -35,6 +37,7 @@ Case Package
   -> Narrative Director validates narrative boundary
   -> Rule Engine applies legal state changes
   -> Derived Event System derives public knowledge and memory candidates
+  -> Memory Snapshot System updates stable runtime memory snapshots
   -> Rule Trigger System evaluates narrative rules
   -> Write WorldEvent
   -> Return StateSummary
@@ -75,9 +78,17 @@ write player action events. Invalid `ask_about` and `present_clue` attempts writ
 `CasePackage`, raw `SessionState`, character secrets, goals, internal knowledge,
 clue truth status, or forbidden fact text.
 
+`AgentContext.memory_snapshots` contains only safe player-scoped structured
+snapshots produced by the runtime. It is not vector memory, RAG, a database, or a
+real LLM integration point.
+
 ## Replay Requirement
 
 The runtime scenario smoke test records a stable event snapshot and verifies that
 replaying those events rebuilds equivalent key state. This protects the rule
 chain, derived state, Director blocking, Rule Engine rejection, and phase
 progression from accidental drift.
+
+Replay rebuilds `memory_candidates` and `memory_snapshots` from persisted events.
+It does not re-run memory derivation or snapshot aggregation, preserving event
+count and preventing recursive memory events.

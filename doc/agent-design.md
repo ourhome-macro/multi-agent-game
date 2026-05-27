@@ -44,6 +44,7 @@ PlayerAction(talk | present_clue)
 - `relationship_thresholds_crossed`
 - `recent_events`
 - `memory_candidates`
+- `memory_snapshots`
 - `blocked_fact_ids`
 - `revealable_fact_ids`
 - `asked_subject_type`
@@ -66,6 +67,11 @@ configuration:
 `target_profile` is a public `AgentCharacterView`. It does not contain character
 `secrets`, `goals`, or internal `knowledge`.
 
+`memory_candidates` are raw runtime candidates. `memory_snapshots` are the stable
+runtime aggregation produced from those candidates. The current version only
+passes player-scoped snapshots (`subject_id="player"`) and does not perform
+vector retrieval, RAG, or LLM summarization.
+
 Case packages may still define `forbidden_test_speech` as a local fixture for
 mock-only Director tests, but that field is not copied into `AgentContext`.
 
@@ -78,6 +84,7 @@ mock-only Director tests, but that field is not copied into `AgentContext`.
 - internal character `knowledge`
 - clue `truth_status`
 - `forbidden_facts` with original text or blocked terms
+- character secrets, goals, or internal knowledge through memory snapshots
 
 Forbidden fact visibility is represented only by IDs:
 
@@ -103,6 +110,8 @@ Agent output must always be structured:
 
 `AgentIntent.proposed_actions` are not state changes. They are requests that must
 pass the whitelist and Rule Engine validation before any real state can change.
+Agent intents cannot create `memory_candidate.created` or
+`agent_memory_snapshot.updated`; both remain runtime-owned derived events.
 
 Allowed proposed action types:
 
@@ -119,7 +128,7 @@ audited, but Rule Engine rejects it. Narrative phase changes can only come from
 `MockAgent` consumes `AgentContext` and selects deterministic configured replies
 from the case package. It can vary speech and proposed actions by phase,
 discovered clues, asked subject, presented clue, interaction pressure, subject
-sensitivity, and relationship metrics.
+sensitivity, memory snapshots, and relationship metrics.
 
 `mock_dialogues.yaml` reply conditions currently support:
 
@@ -132,6 +141,8 @@ sensitivity, and relationship metrics.
 - `requires_subject_sensitive`
 - `requires_discovered`
 - `missing_discovered`
+- `requires_memory`
+- `missing_memory`
 - `min_relationship`
 - `max_relationship`
 

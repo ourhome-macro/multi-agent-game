@@ -40,6 +40,8 @@ Each dialogue block is keyed by `character_id`. Replies can be selected by:
 - `requires_subject_sensitive`
 - `requires_discovered`
 - `missing_discovered`
+- `requires_memory`
+- `missing_memory`
 - `min_relationship`
 - `max_relationship`
 
@@ -60,6 +62,13 @@ Example:
       speech: Are you asking whether I opened it?
       intent: probe
     - phase: investigation
+      requires_memory:
+        - memory.player.clue_discovered.scratched_drawer
+      missing_memory:
+        - memory.player.presented_clue.butler.scratched_drawer
+      speech: You already found the drawer marks.
+      intent: probe
+    - phase: investigation
       presented_clue: scratched_drawer
       requires_discovered:
         - scratched_drawer
@@ -75,6 +84,11 @@ Example:
 
 `asked_subject_id` must reference an existing clue, character, or scene according
 to `asked_subject_type`. `presented_clue` must reference an existing clue.
+
+`requires_memory` and `missing_memory` match stable
+`AgentMemorySnapshot.memory_id` values exposed through `AgentContext`. These
+conditions are deterministic MockAgent selection rules only. They are not vector
+memory, RAG, LLM summarization, or a way for agents to mutate memory.
 
 ## narrative_rules.yaml
 

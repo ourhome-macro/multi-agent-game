@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from app.domain.models import (
+    AgentMemorySnapshot,
     CasePackage,
     EventType,
     MemoryCandidateState,
@@ -85,6 +86,26 @@ def _apply_event(session: SessionState, event: WorldEvent) -> None:
             salience=float(event.payload["salience"]),
         )
         session.memory_candidates[memory.memory_id] = memory
+        return
+
+    if event.type == EventType.AGENT_MEMORY_SNAPSHOT_UPDATED:
+        memory_id = str(event.payload["memory_id"])
+        current = session.memory_snapshots.get(memory_id)
+        candidate = session.memory_candidates.get(memory_id)
+        content = candidate.content if candidate is not None else ""
+        created_at = current.created_at if current is not None else event.created_at
+        snapshot = AgentMemorySnapshot(
+            memory_id=memory_id,
+            subject_id=str(event.payload["subject_id"]),
+            content=current.content if current is not None else content,
+            source_event_ids=[str(item) for item in event.payload["source_event_ids"]],
+            salience=float(event.payload["salience"]),
+            visibility=str(event.payload["visibility"]),
+            last_updated_event_id=event.id,
+            created_at=created_at,
+            updated_at=event.created_at,
+        )
+        session.memory_snapshots[memory_id] = snapshot
         return
 
     if event.type == EventType.NARRATIVE_BEAT_COMPLETED:

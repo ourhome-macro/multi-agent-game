@@ -77,6 +77,14 @@ def build_agent_context(
             session.memory_candidates.values(),
             key=lambda value: value.memory_id,
         ),
+        memory_snapshots=sorted(
+            (
+                snapshot
+                for snapshot in session.memory_snapshots.values()
+                if snapshot.subject_id == "player"
+            ),
+            key=lambda value: value.memory_id,
+        ),
         blocked_fact_ids=blocked_fact_ids,
         revealable_fact_ids=revealable_fact_ids,
         asked_subject_type=asked_subject_type,

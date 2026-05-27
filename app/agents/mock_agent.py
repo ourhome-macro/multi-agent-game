@@ -86,6 +86,11 @@ class MockAgent:
             return False
         if set(reply.missing_discovered) & set(context.discovered_clues):
             return False
+        memory_ids = {snapshot.memory_id for snapshot in context.memory_snapshots}
+        if not set(reply.requires_memory).issubset(memory_ids):
+            return False
+        if set(reply.missing_memory) & memory_ids:
+            return False
         relationship = context.relationship_to_player
         for metric, minimum in reply.min_relationship.items():
             if getattr(relationship, metric, 0.0) < minimum:

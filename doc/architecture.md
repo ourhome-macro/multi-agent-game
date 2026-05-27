@@ -31,6 +31,7 @@ POST /sessions/{id}/actions
   -> NarrativeDirector.validate
   -> RuleEngine.apply_*
   -> DerivedEventSystem.derive
+  -> MemorySnapshotSystem.apply
   -> RuleTriggerSystem.evaluate
   -> EventRecorder.append
   -> StateSummary
@@ -71,6 +72,8 @@ through events and `RuleTriggerSystem`.
 - `app/rules/engine.py`: only authority for real state changes.
 - `app/rules/triggers.py`: completes beats and advances phases from events.
 - `app/runtime/derivations.py`: derives player knowledge and memory candidates.
+- `app/runtime/memory_snapshots.py`: reduces memory candidates into stable
+  agent memory snapshots.
 - `app/runtime/replay.py`: rebuilds `SessionState` from `WorldEvent`.
 - `app/storage/memory.py`: in-memory case/session stores and `StateSummary`.
 
@@ -97,6 +100,12 @@ Forbidden fact scope is represented only by `blocked_fact_ids` and
 `presented_knowledge_id`. Interaction pressure is a backend-calculated scalar in
 the `0.0 .. 1.0` range.
 
+`memory_candidate.created` is only a candidate memory event. The runtime-owned
+`MemorySnapshotSystem` consumes it and emits `agent_memory_snapshot.updated`,
+which updates `session.memory_snapshots`. Agents may read safe player-scoped
+memory snapshots through `AgentContext.memory_snapshots`, but they cannot create
+or mutate snapshots directly.
+
 ## Event Replay
 
 All real state changes and derived runtime facts must be represented as
@@ -109,4 +118,9 @@ All real state changes and derived runtime facts must be represented as
 - relationships
 - player knowledge
 - memory candidates
+- agent memory snapshots
 - event count
+
+Replay applies persisted `agent_memory_snapshot.updated` events explicitly. It
+does not re-run derivation or snapshot aggregation, so replay preserves event
+count and cannot create recursive memory events.

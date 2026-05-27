@@ -19,6 +19,7 @@ from app.rules.triggers import RuleTriggerSystem
 from app.runtime.derivations import DerivedEventSystem
 from app.runtime.errors import ActionValidationError
 from app.runtime.events import EventRecorder
+from app.runtime.memory_snapshots import MemorySnapshotSystem
 from app.storage.memory import InMemoryCaseStore, InMemorySessionStore, build_state_summary
 
 
@@ -41,6 +42,7 @@ class ActionService:
         rule_engine: RuleEngine,
         trigger_system: RuleTriggerSystem,
         derived_event_system: DerivedEventSystem,
+        memory_snapshot_system: MemorySnapshotSystem,
     ) -> None:
         self._case_store = case_store
         self._recorder = recorder
@@ -49,6 +51,7 @@ class ActionService:
         self._rule_engine = rule_engine
         self._trigger_system = trigger_system
         self._derived_event_system = derived_event_system
+        self._memory_snapshot_system = memory_snapshot_system
 
     def handle(self, *, session: SessionState, action: PlayerAction) -> ActionResponse:
         case = self._case_store.get(session.case_id)
@@ -248,11 +251,16 @@ class ActionService:
         session: SessionState,
         source_events: list[WorldEvent],
     ) -> list[WorldEvent]:
-        return self._derived_event_system.derive(
+        derived_events = self._derived_event_system.derive(
             case=case,
             session=session,
             source_events=source_events,
         )
+        events: list[WorldEvent] = []
+        for event in derived_events:
+            events.append(event)
+            events.extend(self._memory_snapshot_system.apply(session=session, event=event))
+        return events
 
 
 def create_runtime(case_packages: list[CasePackage]) -> RuntimeContainer:
@@ -270,6 +278,7 @@ def create_runtime(case_packages: list[CasePackage]) -> RuntimeContainer:
         rule_engine=rule_engine,
         trigger_system=RuleTriggerSystem(recorder),
         derived_event_system=DerivedEventSystem(recorder),
+        memory_snapshot_system=MemorySnapshotSystem(recorder),
     )
     return RuntimeContainer(
         case_store=case_store,

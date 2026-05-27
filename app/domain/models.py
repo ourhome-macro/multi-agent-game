@@ -47,6 +47,7 @@ class EventType(StrEnum):
     RELATIONSHIP_THRESHOLD_CROSSED = "relationship.threshold.crossed"
     PLAYER_KNOWLEDGE_UPDATED = "player_knowledge.updated"
     MEMORY_CANDIDATE_CREATED = "memory_candidate.created"
+    AGENT_MEMORY_SNAPSHOT_UPDATED = "agent_memory_snapshot.updated"
     NARRATIVE_BEAT_COMPLETED = "narrative.beat.completed"
     NARRATIVE_PHASE_CHANGED = "narrative.phase.changed"
 
@@ -178,6 +179,8 @@ class MockReplyConfig(APIModel):
     requires_subject_sensitive: bool | None = None
     requires_discovered: list[NonEmptyString] = Field(default_factory=list)
     missing_discovered: list[NonEmptyString] = Field(default_factory=list)
+    requires_memory: list[NonEmptyString] = Field(default_factory=list)
+    missing_memory: list[NonEmptyString] = Field(default_factory=list)
     min_relationship: dict[str, float] = Field(default_factory=dict)
     max_relationship: dict[str, float] = Field(default_factory=dict)
     speech: NonEmptyString
@@ -321,6 +324,18 @@ class MemoryCandidateState(APIModel):
     salience: float = Field(default=0.0, ge=0.0, le=1.0)
 
 
+class AgentMemorySnapshot(APIModel):
+    memory_id: NonEmptyString
+    subject_id: NonEmptyString
+    content: NonEmptyString
+    source_event_ids: list[NonEmptyString] = Field(default_factory=list)
+    salience: float = Field(default=0.0, ge=0.0, le=1.0)
+    visibility: Literal["private", "public"] = "private"
+    last_updated_event_id: NonEmptyString
+    created_at: str | None = None
+    updated_at: str | None = None
+
+
 class AgentContext(APIModel):
     case_id: NonEmptyString
     session_id: NonEmptyString
@@ -333,6 +348,7 @@ class AgentContext(APIModel):
     relationship_thresholds_crossed: list[str] = Field(default_factory=list)
     recent_events: list[WorldEvent] = Field(default_factory=list)
     memory_candidates: list[MemoryCandidateState] = Field(default_factory=list)
+    memory_snapshots: list[AgentMemorySnapshot] = Field(default_factory=list)
     blocked_fact_ids: list[NonEmptyString] = Field(default_factory=list)
     revealable_fact_ids: list[NonEmptyString] = Field(default_factory=list)
     asked_subject_type: SubjectType | None = None
@@ -375,6 +391,7 @@ class SessionState(APIModel):
     discovered_clues: set[str] = Field(default_factory=set)
     player_knowledge: dict[str, PlayerKnowledgeState] = Field(default_factory=dict)
     memory_candidates: dict[str, MemoryCandidateState] = Field(default_factory=dict)
+    memory_snapshots: dict[str, AgentMemorySnapshot] = Field(default_factory=dict)
     events: list[WorldEvent] = Field(default_factory=list)
 
 
