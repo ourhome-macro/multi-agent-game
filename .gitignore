@@ -25,5 +25,4 @@ env/
 *.log
 *.tmp
 *.bak
-*.md
 *.pyc

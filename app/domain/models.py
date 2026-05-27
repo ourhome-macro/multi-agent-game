@@ -72,6 +72,14 @@ class CharacterConfig(APIModel):
     knowledge: list[str] = Field(default_factory=list)
 
 
+class AgentCharacterView(APIModel):
+    id: NonEmptyString
+    name: NonEmptyString
+    role: NonEmptyString
+    personality: str = ""
+    speech_style: str = ""
+
+
 class SceneHotspotConfig(APIModel):
     id: NonEmptyString
     name: NonEmptyString
@@ -272,6 +280,28 @@ class MemoryCandidateState(APIModel):
     source_event_id: NonEmptyString
     visibility: list[NonEmptyString] = Field(default_factory=list)
     salience: float = Field(default=0.0, ge=0.0, le=1.0)
+
+
+class AgentContext(APIModel):
+    case_id: NonEmptyString
+    session_id: NonEmptyString
+    target_agent_id: NonEmptyString
+    current_phase: NonEmptyString
+    completed_beats: list[NonEmptyString] = Field(default_factory=list)
+    discovered_clues: list[NonEmptyString] = Field(default_factory=list)
+    player_knowledge: list[PlayerKnowledgeState] = Field(default_factory=list)
+    relationship_to_player: RelationshipState | None = None
+    relationship_thresholds_crossed: list[str] = Field(default_factory=list)
+    recent_events: list[WorldEvent] = Field(default_factory=list)
+    memory_candidates: list[MemoryCandidateState] = Field(default_factory=list)
+    blocked_fact_ids: list[NonEmptyString] = Field(default_factory=list)
+    revealable_fact_ids: list[NonEmptyString] = Field(default_factory=list)
+    player_action: PlayerAction
+    target_profile: AgentCharacterView | None = None
+    default_speech: str | None = None
+    default_intent: AgentIntentType | None = None
+    reply_options: list[MockReplyConfig] = Field(default_factory=list)
+    fallback_relationship_delta: dict[str, float] = Field(default_factory=dict)
 
 
 class NarrativeState(APIModel):

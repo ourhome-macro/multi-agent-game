@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from app.agents.mock_agent import MockAgent
+from app.agents.context import build_agent_context
+from app.agents.gateway import AgentGateway
 from app.director.narrative_director import NarrativeDirector
 from app.domain.models import (
     ActionResponse,
@@ -35,7 +36,7 @@ class ActionService:
         *,
         case_store: InMemoryCaseStore,
         recorder: EventRecorder,
-        mock_agent: MockAgent,
+        agent_gateway: AgentGateway,
         director: NarrativeDirector,
         rule_engine: RuleEngine,
         trigger_system: RuleTriggerSystem,
@@ -43,7 +44,7 @@ class ActionService:
     ) -> None:
         self._case_store = case_store
         self._recorder = recorder
-        self._mock_agent = mock_agent
+        self._agent_gateway = agent_gateway
         self._director = director
         self._rule_engine = rule_engine
         self._trigger_system = trigger_system
@@ -89,7 +90,8 @@ class ActionService:
                 payload={"target_id": action.target_id, "text": action.text},
             )
             new_events.append(player_event)
-            intent = self._mock_agent.generate(case, session, action)
+            context = build_agent_context(case, session, action)
+            intent = self._agent_gateway.generate(context)
             decision = self._director.validate(case, session.narrative, intent)
 
             speech = intent.speech
@@ -198,7 +200,7 @@ def create_runtime(case_packages: list[CasePackage]) -> RuntimeContainer:
     action_service = ActionService(
         case_store=case_store,
         recorder=recorder,
-        mock_agent=MockAgent(),
+        agent_gateway=AgentGateway(),
         director=NarrativeDirector(),
         rule_engine=rule_engine,
         trigger_system=RuleTriggerSystem(recorder),
