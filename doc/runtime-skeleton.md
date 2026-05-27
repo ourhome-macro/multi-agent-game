@@ -10,7 +10,8 @@ state, rule execution, event logging, and replay.
 - Supports `cases/fake_case_001` and `cases/fake_case_002`.
 - Validates case YAML with Pydantic v2 and cross-reference checks.
 - Creates in-memory sessions.
-- Processes `inspect`, `talk`, `ask_about`, and `present_clue` player actions.
+- Processes `inspect`, `talk`, `ask_about`, `present_clue`, and `accuse` player
+  actions.
 - Unlocks clues through Rule Engine.
 - Generates deterministic NPC intents through `AgentGateway` and `MockAgent`.
 - Provides `LLMAgentStub` as a non-network placeholder.
@@ -20,6 +21,8 @@ state, rule execution, event logging, and replay.
 - Derives `player_knowledge.updated` and `memory_candidate.created`.
 - Reduces `memory_candidate.created` into `agent_memory_snapshot.updated` and
   `session.memory_snapshots`.
+- Evaluates structured formal accusations through Rule Engine using
+  `solution_claims.yaml`.
 - Completes beats and advances phases through `RuleTriggerSystem`.
 - Replays event logs with `replay_events(case, events)`.
 - Returns public `StateSummary`.
@@ -49,6 +52,11 @@ Case Package
 first passes Rule Engine evidence validation, writes `player.presented_clue`, and
 then uses the same AgentGateway path as `talk`.
 
+`accuse` does not use AgentGateway. Rule Engine validates the structured claim
+and player-known evidence, writes `player.accused` and `accusation.evaluated`,
+then the normal derived-memory and trigger systems run. Accuse v0 does not
+directly advance phase or run an ending system.
+
 ## Public API
 
 - `GET /health`
@@ -62,8 +70,8 @@ then uses the same AgentGateway path as `talk`.
 fixed as `source_id` and `target_id`.
 
 Unknown inspect targets and unknown talk NPCs return business errors and do not
-write player action events. Invalid `ask_about` and `present_clue` attempts write
-`rule.rejected` and return `accepted=false`.
+write player action events. Invalid `ask_about`, `present_clue`, and `accuse`
+attempts write `rule.rejected` and return `accepted=false`.
 
 ## Agent Boundary
 
@@ -81,6 +89,9 @@ clue truth status, or forbidden fact text.
 `AgentContext.memory_snapshots` contains only safe player-scoped structured
 snapshots produced by the runtime. It is not vector memory, RAG, a database, or a
 real LLM integration point.
+
+`accuse` is outside the agent boundary in v0. Agents do not judge accusation
+correctness and cannot write `player.accused` or `accusation.evaluated`.
 
 ## Replay Requirement
 

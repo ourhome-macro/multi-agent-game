@@ -329,25 +329,6 @@
     "id": "event_019",
     "case_id": "fake_case_001",
     "session_id": "session",
-    "actor_id": "derived_event_system",
-    "type": "memory_candidate.created",
-    "payload": {
-      "memory_id": "memory.player.relationship_threshold.butler.player.suspicion.guarded",
-      "subject_id": "player",
-      "content": "韩管家 became guarded toward the player (suspicion).",
-      "source_event_id": "event_017",
-      "visibility": [
-        "player"
-      ],
-      "salience": 0.7
-    },
-    "caused_by_event_id": "event_017",
-    "created_at": "timestamp"
-  },
-  {
-    "id": "event_020",
-    "case_id": "fake_case_001",
-    "session_id": "session",
     "actor_id": "memory_snapshot_system",
     "type": "agent_memory_snapshot.updated",
     "payload": {
@@ -361,6 +342,25 @@
       "operation": "created"
     },
     "caused_by_event_id": "event_018",
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_020",
+    "case_id": "fake_case_001",
+    "session_id": "session",
+    "actor_id": "derived_event_system",
+    "type": "memory_candidate.created",
+    "payload": {
+      "memory_id": "memory.player.relationship_threshold.butler.player.suspicion.guarded",
+      "subject_id": "player",
+      "content": "韩管家 became guarded toward the player (suspicion).",
+      "source_event_id": "event_017",
+      "visibility": [
+        "player"
+      ],
+      "salience": 0.7
+    },
+    "caused_by_event_id": "event_017",
     "created_at": "timestamp"
   },
   {
@@ -379,7 +379,7 @@
       "visibility": "private",
       "operation": "created"
     },
-    "caused_by_event_id": "event_019",
+    "caused_by_event_id": "event_020",
     "created_at": "timestamp"
   },
   {
@@ -762,6 +762,121 @@
     "id": "event_044",
     "case_id": "fake_case_001",
     "session_id": "session",
+    "actor_id": "player",
+    "type": "player.accused",
+    "payload": {
+      "target_id": "butler",
+      "claim_id": "butler_moved_key",
+      "evidence_clue_ids": [
+        "scratched_drawer",
+        "dustless_frame",
+        "torn_note"
+      ],
+      "text": "You moved the key and staged the study entry."
+    },
+    "caused_by_event_id": null,
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_045",
+    "case_id": "fake_case_001",
+    "session_id": "session",
+    "actor_id": "rule_engine",
+    "type": "accusation.evaluated",
+    "payload": {
+      "target_id": "butler",
+      "claim_id": "butler_moved_key",
+      "result": "correct",
+      "matched_required_evidence": [
+        "dustless_frame",
+        "scratched_drawer",
+        "torn_note"
+      ],
+      "missing_required_evidence": []
+    },
+    "caused_by_event_id": "event_044",
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_046",
+    "case_id": "fake_case_001",
+    "session_id": "session",
+    "actor_id": "derived_event_system",
+    "type": "memory_candidate.created",
+    "payload": {
+      "memory_id": "memory.player.accused.butler.butler_moved_key",
+      "subject_id": "player",
+      "content": "Player formally accused 韩管家 with claim 'butler_moved_key' using evidence ['scratched_drawer', 'dustless_frame', 'torn_note'].",
+      "source_event_id": "event_044",
+      "visibility": [
+        "player"
+      ],
+      "salience": 1.0
+    },
+    "caused_by_event_id": "event_044",
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_047",
+    "case_id": "fake_case_001",
+    "session_id": "session",
+    "actor_id": "memory_snapshot_system",
+    "type": "agent_memory_snapshot.updated",
+    "payload": {
+      "memory_id": "memory.player.accused.butler.butler_moved_key",
+      "subject_id": "player",
+      "source_event_ids": [
+        "event_044"
+      ],
+      "salience": 1.0,
+      "visibility": "private",
+      "operation": "created"
+    },
+    "caused_by_event_id": "event_046",
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_048",
+    "case_id": "fake_case_001",
+    "session_id": "session",
+    "actor_id": "derived_event_system",
+    "type": "memory_candidate.created",
+    "payload": {
+      "memory_id": "memory.player.accusation_evaluated.butler.butler_moved_key.correct",
+      "subject_id": "player",
+      "content": "Rule Engine evaluated the accusation against 韩管家 for claim 'butler_moved_key' as correct.",
+      "source_event_id": "event_045",
+      "visibility": [
+        "player"
+      ],
+      "salience": 1.0
+    },
+    "caused_by_event_id": "event_045",
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_049",
+    "case_id": "fake_case_001",
+    "session_id": "session",
+    "actor_id": "memory_snapshot_system",
+    "type": "agent_memory_snapshot.updated",
+    "payload": {
+      "memory_id": "memory.player.accusation_evaluated.butler.butler_moved_key.correct",
+      "subject_id": "player",
+      "source_event_ids": [
+        "event_045"
+      ],
+      "salience": 1.0,
+      "visibility": "private",
+      "operation": "created"
+    },
+    "caused_by_event_id": "event_048",
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_050",
+    "case_id": "fake_case_001",
+    "session_id": "session",
     "actor_id": "rule_engine",
     "type": "rule.rejected",
     "payload": {
@@ -771,7 +886,7 @@
         "phase": "opening"
       }
     },
-    "caused_by_event_id": "event_043",
+    "caused_by_event_id": "event_049",
     "created_at": "timestamp"
   }
 ]

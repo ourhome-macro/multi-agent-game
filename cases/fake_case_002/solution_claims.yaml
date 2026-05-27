@@ -1,0 +1,18 @@
+claims:
+  - id: dockmaster_opened_warehouse
+    target_id: dockmaster
+    required_evidence:
+      - inward_tide_mark
+      - inward_broken_lamp
+      - blue_ledger_page
+    allowed_phases:
+      - expose
+    result: correct
+
+  - id: clerk_hid_ledger
+    target_id: clerk
+    required_evidence:
+      - blue_ledger_page
+    allowed_phases:
+      - expose
+    result: incorrect

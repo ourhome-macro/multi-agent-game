@@ -15,6 +15,7 @@ cases/{case_id}/
   forbidden_facts.yaml
   mock_dialogues.yaml
   narrative_rules.yaml
+  solution_claims.yaml
 ```
 
 ## Naming Rules
@@ -24,6 +25,7 @@ cases/{case_id}/
 - Relationship endpoints use `source_id` and `target_id`.
 - Clue references use `clue_id`, `discover_clues`, `asked_subject_id`, or
   `presented_clue`.
+- Accusation claims use `claim_id`.
 - Legacy `source`, `target`, or generic player-action `target` fields are
   rejected.
 
@@ -105,6 +107,46 @@ Only `RuleTriggerSystem` may complete beats or advance phase. Agent proposed
 `narrative.phase.change` actions are accepted by schema for auditability but are
 rejected by Rule Engine.
 
+## solution_claims.yaml
+
+`solution_claims.yaml` defines authored formal accusation claims. Rule Engine
+uses these claims for `PlayerAction.accuse`; Agents and LLMs do not evaluate
+accusation correctness.
+
+Example:
+
+```yaml
+claims:
+  - id: butler_moved_key
+    target_id: butler
+    required_evidence:
+      - scratched_drawer
+      - dustless_frame
+      - torn_note
+    allowed_phases:
+      - reveal
+    result: correct
+
+  - id: niece_staged_meeting
+    target_id: niece
+    required_evidence:
+      - torn_note
+    allowed_phases:
+      - reveal
+    result: incorrect
+```
+
+Validation checks:
+
+- claim ids are unique
+- `target_id` references an existing character
+- `required_evidence` references existing clues
+- `allowed_phases` references declared narrative phases
+- `result` is `correct` or `incorrect`
+
+Claim configuration is internal case-author truth data and must not appear in
+`StateSummary`.
+
 ## Validation
 
 Run:
@@ -114,9 +156,11 @@ py -3.12 -m app.cases.validate cases
 ```
 
 Validation checks characters, scenes, clues, hotspots, relationships,
-`mock_dialogues`, `forbidden_facts`, `narrative_rules`, and clue reachability.
+`mock_dialogues`, `forbidden_facts`, `narrative_rules`, `solution_claims`, and
+clue reachability.
 
 ## Public Summary Safety
 
 `StateSummary` must not return `secrets`, `goals`, internal `knowledge`,
-`truth_status`, forbidden fact text, blocked terms, or `forbidden_facts`.
+`truth_status`, forbidden fact text, blocked terms, `forbidden_facts`, or
+`solution_claims`.

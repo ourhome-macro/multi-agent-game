@@ -149,6 +149,32 @@ class ActionService:
                 new_events=new_events,
             )
 
+        if action.type == ActionType.ACCUSE:
+            new_events.extend(
+                self._rule_engine.apply_accuse(
+                    case=case,
+                    session=session,
+                    action=action,
+                )
+            )
+            if not new_events or new_events[-1].type == EventType.RULE_REJECTED:
+                return ActionResponse(
+                    session_id=session.id,
+                    accepted=False,
+                    new_events=new_events,
+                    state=build_state_summary(case, session),
+                )
+
+            trigger_source_event_id = new_events[-1].id
+            new_events.extend(self._derive_events(case, session, new_events))
+            new_events.extend(self._evaluate_triggers(case, session, trigger_source_event_id))
+            return ActionResponse(
+                session_id=session.id,
+                accepted=True,
+                new_events=new_events,
+                state=build_state_summary(case, session),
+            )
+
         raise ValueError(f"Unsupported action type: {action.type}")
 
     def _require_hotspot(self, case: CasePackage, target_id: str) -> None:
@@ -251,15 +277,16 @@ class ActionService:
         session: SessionState,
         source_events: list[WorldEvent],
     ) -> list[WorldEvent]:
-        derived_events = self._derived_event_system.derive(
-            case=case,
-            session=session,
-            source_events=source_events,
-        )
         events: list[WorldEvent] = []
-        for event in derived_events:
-            events.append(event)
-            events.extend(self._memory_snapshot_system.apply(session=session, event=event))
+        for source_event in source_events:
+            derived_events = self._derived_event_system.derive(
+                case=case,
+                session=session,
+                source_events=[source_event],
+            )
+            for event in derived_events:
+                events.append(event)
+                events.extend(self._memory_snapshot_system.apply(session=session, event=event))
         return events
 
 

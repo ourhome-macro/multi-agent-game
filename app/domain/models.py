@@ -16,6 +16,7 @@ class ActionType(StrEnum):
     TALK = "talk"
     ASK_ABOUT = "ask_about"
     PRESENT_CLUE = "present_clue"
+    ACCUSE = "accuse"
 
 
 class SubjectType(StrEnum):
@@ -39,6 +40,8 @@ class EventType(StrEnum):
     PLAYER_TALKED = "player.talked"
     PLAYER_ASKED_ABOUT = "player.asked_about"
     PLAYER_PRESENTED_CLUE = "player.presented_clue"
+    PLAYER_ACCUSED = "player.accused"
+    ACCUSATION_EVALUATED = "accusation.evaluated"
     NPC_REPLIED = "npc.replied"
     DIRECTOR_BLOCKED = "director.blocked"
     RULE_REJECTED = "rule.rejected"
@@ -219,6 +222,18 @@ class NarrativeRulesConfig(APIModel):
     beats: list[NarrativeBeatConfig] = Field(default_factory=list)
 
 
+class SolutionClaimConfig(APIModel):
+    id: NonEmptyString
+    target_id: NonEmptyString
+    required_evidence: list[NonEmptyString] = Field(default_factory=list)
+    allowed_phases: list[NonEmptyString] = Field(default_factory=list)
+    result: Literal["correct", "incorrect"]
+
+
+class SolutionClaimsConfig(APIModel):
+    claims: list[SolutionClaimConfig] = Field(default_factory=list)
+
+
 class CasePackage(APIModel):
     meta: CaseMeta
     characters: list[CharacterConfig]
@@ -228,12 +243,15 @@ class CasePackage(APIModel):
     forbidden_facts: list[ForbiddenFactConfig] = Field(default_factory=list)
     mock_dialogues: list[MockDialogueConfig] = Field(default_factory=list)
     narrative_rules: NarrativeRulesConfig = Field(default_factory=NarrativeRulesConfig)
+    solution_claims: SolutionClaimsConfig = Field(default_factory=SolutionClaimsConfig)
 
 
 class PlayerAction(APIModel):
     type: ActionType
     target_id: NonEmptyString
     clue_id: NonEmptyString | None = None
+    claim_id: NonEmptyString | None = None
+    evidence_clue_ids: list[NonEmptyString] = Field(default_factory=list)
     subject_type: SubjectType | None = None
     subject_id: NonEmptyString | None = None
     text: str | None = None
@@ -246,15 +264,29 @@ class PlayerAction(APIModel):
                 raise ValueError("ask_about requires subject_type and subject_id")
             if self.clue_id is not None:
                 raise ValueError("clue_id is only valid for present_clue")
+            if self.claim_id is not None or self.evidence_clue_ids:
+                raise ValueError("claim fields are only valid for accuse")
             return self
         if self.type == ActionType.PRESENT_CLUE:
             if self.clue_id is None:
                 raise ValueError("present_clue requires clue_id")
             if self.subject_type is not None or self.subject_id is not None:
                 raise ValueError("subject fields are only valid for ask_about")
+            if self.claim_id is not None or self.evidence_clue_ids:
+                raise ValueError("claim fields are only valid for accuse")
+            return self
+        if self.type == ActionType.ACCUSE:
+            if self.claim_id is None:
+                raise ValueError("accuse requires claim_id")
+            if self.clue_id is not None:
+                raise ValueError("clue_id is only valid for present_clue")
+            if self.subject_type is not None or self.subject_id is not None:
+                raise ValueError("subject fields are only valid for ask_about")
             return self
         if self.clue_id is not None:
             raise ValueError("clue_id is only valid for present_clue")
+        if self.claim_id is not None or self.evidence_clue_ids:
+            raise ValueError("claim fields are only valid for accuse")
         if self.subject_type is not None or self.subject_id is not None:
             raise ValueError("subject fields are only valid for ask_about")
         return self

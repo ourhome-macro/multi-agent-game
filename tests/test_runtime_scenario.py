@@ -54,6 +54,13 @@ def test_fake_case_001_full_runtime_scenario_smoke() -> None:
             force_forbidden=True,
         ),
         PlayerAction(type="inspect", target_id="carpet"),
+        PlayerAction(
+            type="accuse",
+            target_id="butler",
+            claim_id="butler_moved_key",
+            evidence_clue_ids=["scratched_drawer", "dustless_frame", "torn_note"],
+            text="You moved the key and staged the study entry.",
+        ),
     ):
         runtime.action_service.handle(session=session, action=action)
 
@@ -80,6 +87,8 @@ def test_fake_case_001_full_runtime_scenario_smoke() -> None:
         EventType.PLAYER_INSPECTED,
         EventType.PLAYER_ASKED_ABOUT,
         EventType.PLAYER_PRESENTED_CLUE,
+        EventType.PLAYER_ACCUSED,
+        EventType.ACCUSATION_EVALUATED,
         EventType.CLUE_DISCOVERED,
         EventType.NARRATIVE_BEAT_COMPLETED,
         EventType.NARRATIVE_PHASE_CHANGED,
@@ -104,6 +113,7 @@ def test_fake_case_001_full_runtime_scenario_smoke() -> None:
     )
     assert sorted(replayed.memory_candidates) == sorted(session.memory_candidates)
     assert sorted(replayed.memory_snapshots) == sorted(session.memory_snapshots)
+    assert len(replayed.events) == len(session.events)
     assert _summary_does_not_leak(summary.model_dump_json())
 
     snapshot = _normalize_events(session.events)
@@ -134,6 +144,7 @@ def _summary_does_not_leak(serialized_summary: str) -> bool:
         '"knowledge":',
         '"truth_status":',
         '"forbidden_facts":',
+        '"solution_claims":',
     )
     return all(term not in serialized_summary for term in forbidden_terms)
 

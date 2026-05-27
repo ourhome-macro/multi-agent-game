@@ -546,6 +546,7 @@ def test_agent_context_uses_fact_ids_without_forbidden_fact_text() -> None:
     assert '"knowledge":' not in serialized_context
     assert '"truth_status":' not in serialized_context
     assert '"forbidden_facts":' not in serialized_context
+    assert '"solution_claims":' not in serialized_context
     assert "forbidden_test_speech" not in serialized_context
     for fact in case.forbidden_facts:
         assert fact.text not in serialized_context
@@ -685,6 +686,7 @@ def test_agent_context_exposes_memory_snapshots_without_internal_leaks() -> None
     assert '"knowledge":' not in serialized_context
     assert '"truth_status":' not in serialized_context
     assert '"forbidden_facts":' not in serialized_context
+    assert '"solution_claims":' not in serialized_context
     for fact in case.forbidden_facts:
         assert fact.text not in serialized_context
         for blocked_term in fact.blocked_terms:
@@ -745,6 +747,245 @@ def test_mock_agent_excludes_reply_by_missing_memory_snapshot() -> None:
     assert response.speech != (
         "You already found the drawer marks; that is why you are circling back to me."
     )
+
+
+def test_accuse_correct_claim_succeeds_and_derives_memory() -> None:
+    case = CaseLoader().load(FAKE_CASE_001_DIR)
+    runtime = create_runtime([case])
+    session = runtime.session_store.create(case)
+    _run_fake_case_001_to_reveal(runtime, session)
+
+    response = runtime.action_service.handle(
+        session=session,
+        action=PlayerAction(
+            type="accuse",
+            target_id="butler",
+            claim_id="butler_moved_key",
+            evidence_clue_ids=["scratched_drawer", "dustless_frame", "torn_note"],
+            text="You moved the key and staged the study entry.",
+        ),
+    )
+
+    assert response.accepted is True
+    assert [event.type for event in response.new_events] == [
+        EventType.PLAYER_ACCUSED,
+        EventType.ACCUSATION_EVALUATED,
+        EventType.MEMORY_CANDIDATE_CREATED,
+        EventType.AGENT_MEMORY_SNAPSHOT_UPDATED,
+        EventType.MEMORY_CANDIDATE_CREATED,
+        EventType.AGENT_MEMORY_SNAPSHOT_UPDATED,
+    ]
+    evaluated_event = response.new_events[1]
+    assert evaluated_event.payload == {
+        "target_id": "butler",
+        "claim_id": "butler_moved_key",
+        "result": "correct",
+        "matched_required_evidence": [
+            "dustless_frame",
+            "scratched_drawer",
+            "torn_note",
+        ],
+        "missing_required_evidence": [],
+    }
+    assert "memory.player.accused.butler.butler_moved_key" in session.memory_snapshots
+    assert (
+        "memory.player.accusation_evaluated.butler.butler_moved_key.correct"
+        in session.memory_snapshots
+    )
+    assert response.state.narrative_phase == "reveal"
+
+
+def test_accuse_rejects_when_phase_is_not_allowed() -> None:
+    case = CaseLoader().load(FAKE_CASE_001_DIR)
+    runtime = create_runtime([case])
+    session = runtime.session_store.create(case)
+
+    response = runtime.action_service.handle(
+        session=session,
+        action=PlayerAction(
+            type="accuse",
+            target_id="butler",
+            claim_id="butler_moved_key",
+            evidence_clue_ids=["scratched_drawer", "dustless_frame", "torn_note"],
+        ),
+    )
+
+    assert response.accepted is False
+    assert [event.type for event in response.new_events] == [EventType.RULE_REJECTED]
+    assert response.new_events[0].payload["reason"] == (
+        "claim is not allowed in current narrative phase"
+    )
+    assert not any(event.type == EventType.PLAYER_ACCUSED for event in session.events)
+    assert not any(event.type == EventType.ACCUSATION_EVALUATED for event in session.events)
+    assert session.memory_snapshots == {}
+
+
+def test_accuse_rejects_undiscovered_evidence() -> None:
+    case = CaseLoader().load(FAKE_CASE_001_DIR)
+    runtime = create_runtime([case])
+    session = runtime.session_store.create(case)
+    session.narrative.phase = "reveal"
+
+    response = runtime.action_service.handle(
+        session=session,
+        action=PlayerAction(
+            type="accuse",
+            target_id="butler",
+            claim_id="butler_moved_key",
+            evidence_clue_ids=["scratched_drawer", "dustless_frame", "torn_note"],
+        ),
+    )
+
+    assert response.accepted is False
+    assert [event.type for event in response.new_events] == [EventType.RULE_REJECTED]
+    assert response.new_events[0].payload["reason"] == (
+        "evidence clues have not all been discovered"
+    )
+
+
+def test_accuse_rejects_missing_player_knowledge() -> None:
+    case = CaseLoader().load(FAKE_CASE_001_DIR)
+    runtime = create_runtime([case])
+    session = runtime.session_store.create(case)
+    session.narrative.phase = "reveal"
+    session.discovered_clues.update({"scratched_drawer", "dustless_frame", "torn_note"})
+    session.narrative.discovered_clues.update(session.discovered_clues)
+
+    response = runtime.action_service.handle(
+        session=session,
+        action=PlayerAction(
+            type="accuse",
+            target_id="butler",
+            claim_id="butler_moved_key",
+            evidence_clue_ids=["scratched_drawer", "dustless_frame", "torn_note"],
+        ),
+    )
+
+    assert response.accepted is False
+    assert [event.type for event in response.new_events] == [EventType.RULE_REJECTED]
+    assert response.new_events[0].payload["reason"] == (
+        "evidence clues are not all available in player knowledge"
+    )
+
+
+def test_accuse_rejects_unknown_claim_id() -> None:
+    case = CaseLoader().load(FAKE_CASE_001_DIR)
+    runtime = create_runtime([case])
+    session = runtime.session_store.create(case)
+
+    response = runtime.action_service.handle(
+        session=session,
+        action=PlayerAction(
+            type="accuse",
+            target_id="butler",
+            claim_id="not_defined_by_case",
+            evidence_clue_ids=["scratched_drawer"],
+        ),
+    )
+
+    assert response.accepted is False
+    assert [event.type for event in response.new_events] == [EventType.RULE_REJECTED]
+    assert response.new_events[0].payload["reason"] == (
+        "claim_id is not defined by the case package"
+    )
+
+
+def test_accuse_rejects_target_claim_mismatch() -> None:
+    case = CaseLoader().load(FAKE_CASE_001_DIR)
+    runtime = create_runtime([case])
+    session = runtime.session_store.create(case)
+
+    response = runtime.action_service.handle(
+        session=session,
+        action=PlayerAction(
+            type="accuse",
+            target_id="butler",
+            claim_id="niece_staged_meeting",
+            evidence_clue_ids=["torn_note"],
+        ),
+    )
+
+    assert response.accepted is False
+    assert [event.type for event in response.new_events] == [EventType.RULE_REJECTED]
+    assert response.new_events[0].payload["reason"] == (
+        "claim target_id does not match action target_id"
+    )
+
+
+def test_accuse_rejects_insufficient_evidence() -> None:
+    case = CaseLoader().load(FAKE_CASE_001_DIR)
+    runtime = create_runtime([case])
+    session = runtime.session_store.create(case)
+    _run_fake_case_001_to_reveal(runtime, session)
+
+    response = runtime.action_service.handle(
+        session=session,
+        action=PlayerAction(
+            type="accuse",
+            target_id="butler",
+            claim_id="butler_moved_key",
+            evidence_clue_ids=["scratched_drawer"],
+        ),
+    )
+
+    assert response.accepted is False
+    assert [event.type for event in response.new_events] == [EventType.RULE_REJECTED]
+    assert response.new_events[0].payload["reason"] == (
+        "evidence does not cover required claim evidence"
+    )
+    assert not any(
+        event.type == EventType.ACCUSATION_EVALUATED
+        and event.payload.get("claim_id") == "butler_moved_key"
+        for event in response.new_events
+    )
+
+
+def test_accuse_rejects_empty_evidence_with_rule_event() -> None:
+    case = CaseLoader().load(FAKE_CASE_001_DIR)
+    runtime = create_runtime([case])
+    session = runtime.session_store.create(case)
+    session.narrative.phase = "reveal"
+
+    response = runtime.action_service.handle(
+        session=session,
+        action=PlayerAction(
+            type="accuse",
+            target_id="butler",
+            claim_id="butler_moved_key",
+            evidence_clue_ids=[],
+        ),
+    )
+
+    assert response.accepted is False
+    assert [event.type for event in response.new_events] == [EventType.RULE_REJECTED]
+    assert response.new_events[0].payload["reason"] == "evidence_clue_ids cannot be empty"
+
+
+def test_accuse_replay_rebuilds_key_state_without_extra_events() -> None:
+    case = CaseLoader().load(FAKE_CASE_001_DIR)
+    runtime = create_runtime([case])
+    session = runtime.session_store.create(case)
+    _run_fake_case_001_to_reveal(runtime, session)
+    runtime.action_service.handle(
+        session=session,
+        action=PlayerAction(
+            type="accuse",
+            target_id="butler",
+            claim_id="butler_moved_key",
+            evidence_clue_ids=["scratched_drawer", "dustless_frame", "torn_note"],
+        ),
+    )
+
+    replayed = replay_events(case, session.events)
+
+    assert len(replayed.events) == len(session.events)
+    assert replayed.memory_candidates == session.memory_candidates
+    assert replayed.memory_snapshots == session.memory_snapshots
+    assert replayed.relationships == session.relationships
+    assert replayed.narrative.phase == session.narrative.phase
+    assert replayed.narrative.completed_beats == session.narrative.completed_beats
+    assert replayed.discovered_clues == session.discovered_clues
+    assert replayed.player_knowledge == session.player_knowledge
 
 
 def test_agent_gateway_defaults_to_mock_agent() -> None:
@@ -847,6 +1088,9 @@ def test_state_summary_does_not_leak_secret_fields(client: TestClient) -> None:
     assert '"knowledge":' not in serialized
     assert '"truth_status":' not in serialized
     assert '"forbidden_facts":' not in serialized
+    assert '"solution_claims":' not in serialized
+    assert "butler_moved_key" not in serialized
+    assert "correct" not in serialized
     assert response.json()["player_knowledge"] == []
 
 
@@ -1216,6 +1460,7 @@ def test_state_summary_snapshots_do_not_leak_internal_fields(client: TestClient)
     assert '"knowledge":' not in serialized
     assert '"truth_status":' not in serialized
     assert '"forbidden_facts":' not in serialized
+    assert '"solution_claims":' not in serialized
 
 
 def test_invalid_case_reference_raises_clear_error(tmp_path: Path) -> None:
@@ -1280,6 +1525,26 @@ def test_case_loader_rejects_bad_narrative_rule_reference(tmp_path: Path) -> Non
         CaseLoader().load(case_dir)
 
 
+def test_case_loader_rejects_bad_solution_claim_reference(tmp_path: Path) -> None:
+    case_dir = tmp_path / "bad_solution_claim_case"
+    case_dir.mkdir()
+    _write_minimal_case(case_dir)
+    (case_dir / "solution_claims.yaml").write_text(
+        "claims:\n"
+        "  - id: bad_claim\n"
+        "    target_id: ghost\n"
+        "    required_evidence:\n"
+        "      - missing_clue\n"
+        "    allowed_phases:\n"
+        "      - opening\n"
+        "    result: correct\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(CaseLoadError, match="unknown target_id"):
+        CaseLoader().load(case_dir)
+
+
 def test_case_loader_rejects_legacy_relationship_endpoint_fields(tmp_path: Path) -> None:
     case_dir = tmp_path / "legacy_relationship_case"
     case_dir.mkdir()
@@ -1319,3 +1584,11 @@ def _write_minimal_case(case_dir: Path) -> None:
         "phases:\n  - id: opening\nbeats: []\n",
         encoding="utf-8",
     )
+
+
+def _run_fake_case_001_to_reveal(runtime: object, session: object) -> None:
+    for target_id in ("desk", "portrait", "carpet"):
+        runtime.action_service.handle(
+            session=session,
+            action=PlayerAction(type="inspect", target_id=target_id),
+        )

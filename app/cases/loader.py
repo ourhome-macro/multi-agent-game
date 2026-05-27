@@ -33,6 +33,10 @@ class CaseLoader:
             "forbidden_facts": self._read_yaml(case_dir / "forbidden_facts.yaml", default=[]),
             "mock_dialogues": self._read_yaml(case_dir / "mock_dialogues.yaml", default=[]),
             "narrative_rules": self._read_yaml(case_dir / "narrative_rules.yaml"),
+            "solution_claims": self._read_yaml(
+                case_dir / "solution_claims.yaml",
+                default={"claims": []},
+            ),
         }
 
         try:
@@ -88,6 +92,11 @@ class CaseLoader:
         self._ensure_unique(
             "mock dialogue character",
             [dialogue.character_id for dialogue in package.mock_dialogues],
+            case_dir,
+        )
+        self._ensure_unique(
+            "solution claim",
+            [claim.id for claim in package.solution_claims.claims],
             case_dir,
         )
 
@@ -215,6 +224,24 @@ class CaseLoader:
                         clue_ids=clue_ids,
                         phase_ids=phase_ids,
                     )
+
+        for claim in package.solution_claims.claims:
+            if claim.target_id not in character_ids:
+                raise CaseLoadError(
+                    f"Solution claim '{claim.id}' references unknown target_id "
+                    f"'{claim.target_id}'"
+                )
+            self._ensure_known_clues(
+                clue_ids,
+                claim.required_evidence,
+                f"Solution claim '{claim.id}' required_evidence",
+            )
+            unknown_phases = sorted(set(claim.allowed_phases) - phase_ids)
+            if unknown_phases:
+                raise CaseLoadError(
+                    f"Solution claim '{claim.id}' references unknown allowed phases: "
+                    f"{unknown_phases}"
+                )
 
         for fact in package.forbidden_facts:
             if fact.reveal_phase is not None and fact.reveal_phase not in phase_ids:

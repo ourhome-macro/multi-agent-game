@@ -59,6 +59,12 @@ not produce an NPC reply or relationship change.
 pressure or testing the NPC with a clue. Narrative truth still advances only
 through events and `RuleTriggerSystem`.
 
+`accuse` is the structured formal accusation action. It does not call
+`AgentGateway`; Rule Engine validates the authored `claim_id`, current phase, and
+player-known evidence, writes `player.accused`, then writes
+`accusation.evaluated`. It does not directly mutate narrative phase. Any future
+ending or phase transition must be driven by events through `RuleTriggerSystem`.
+
 ## Core Modules
 
 - `app/domain/models.py`: Pydantic v2 domain models and API DTOs.
@@ -87,6 +93,9 @@ Illegal actions produce `rule.rejected` and must not pollute state.
 
 Narrative phase changes are driven by `narrative_rules.yaml` and
 `RuleTriggerSystem`, not by agent output.
+
+Accusation correctness is authored in `solution_claims.yaml` and evaluated by
+Rule Engine. Agents and LLMs do not decide whether a formal accusation is correct.
 
 ## Agent Input Safety
 

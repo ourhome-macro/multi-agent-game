@@ -42,7 +42,12 @@ def _apply_event(session: SessionState, event: WorldEvent) -> None:
         session.narrative.discovered_clues.add(clue_id)
         return
 
-    if event.type in {EventType.PLAYER_ASKED_ABOUT, EventType.PLAYER_PRESENTED_CLUE}:
+    if event.type in {
+        EventType.PLAYER_ASKED_ABOUT,
+        EventType.PLAYER_PRESENTED_CLUE,
+        EventType.PLAYER_ACCUSED,
+        EventType.ACCUSATION_EVALUATED,
+    }:
         return
 
     if event.type == EventType.RELATIONSHIP_CHANGED:

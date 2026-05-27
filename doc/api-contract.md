@@ -134,6 +134,47 @@ If validation succeeds, the runtime writes `player.presented_clue` with payload:
 
 Then the action enters `AgentGateway -> NarrativeDirector -> RuleEngine`.
 
+### accuse
+
+```json
+{
+  "type": "accuse",
+  "target_id": "butler",
+  "claim_id": "butler_moved_key",
+  "evidence_clue_ids": [
+    "scratched_drawer",
+    "dustless_frame",
+    "torn_note"
+  ],
+  "text": "You moved the key and staged the study entry."
+}
+```
+
+`accuse` is a structured formal accusation. It does not call `AgentGateway`, does
+not use an LLM, and does not let an NPC decide whether the accusation is correct.
+Rule Engine evaluates the action against `solution_claims.yaml`.
+
+Rule Engine validates:
+
+- `target_id` is a known character
+- `claim_id` exists
+- claim `target_id` matches action `target_id`
+- current narrative phase is allowed by the claim
+- `evidence_clue_ids` is not empty
+- all submitted evidence ids exist in the case package
+- all submitted evidence clues have been discovered
+- all submitted evidence clues are present in `player_knowledge`
+- submitted evidence covers the claim's `required_evidence`
+
+If validation fails, the response returns `accepted=false`, writes
+`rule.rejected`, and does not produce `player.accused`,
+`accusation.evaluated`, `npc.replied`, relationship changes, or memory snapshot
+pollution.
+
+If validation succeeds, the runtime writes `player.accused`, then
+`accusation.evaluated`. The result comes from case-authored configuration, not
+natural-language reasoning. `accuse` does not directly change narrative phase.
+
 ## Interaction Pressure
 
 The backend calculates `interaction_pressure`:
@@ -154,6 +195,8 @@ Important event types include:
 - `player.talked`
 - `player.asked_about`
 - `player.presented_clue`
+- `player.accused`
+- `accusation.evaluated`
 - `npc.replied`
 - `director.blocked`
 - `rule.rejected`
@@ -180,6 +223,7 @@ payload includes `memory_id`, `subject_id`, `source_event_ids`, `salience`,
 `StateSummary` is the public state view. It may include discovered clues,
 completed beats, public relationship metrics, and player knowledge summaries.
 It does not expose memory snapshots in v0.
+It also does not expose `solution_claims` or accusation truth configuration.
 
 It must not expose:
 
@@ -189,6 +233,7 @@ It must not expose:
 - clue `truth_status`
 - forbidden fact text or blocked terms
 - `forbidden_facts`
+- `solution_claims`
 
 ## Errors
 
@@ -197,5 +242,6 @@ It must not expose:
 - Unknown inspect target: 404
 - Unknown talk target: 404
 - Invalid request schema: 422
-- Invalid `ask_about` or `present_clue` evidence state: 200 with `accepted=false` and
+- Invalid `ask_about`, `present_clue`, or `accuse` evidence state: 200 with
+  `accepted=false` and
   `rule.rejected`

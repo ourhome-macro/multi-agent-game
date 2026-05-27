@@ -19,7 +19,7 @@ and does not call external services.
 Current agent-backed player action flow:
 
 ```text
-PlayerAction(talk | present_clue)
+PlayerAction(talk | ask_about | present_clue)
   -> build_agent_context(case, session, action)
   -> AgentGateway.generate(context)
   -> AgentIntent
@@ -28,6 +28,9 @@ PlayerAction(talk | present_clue)
 ```
 
 `ActionService` must not call `MockAgent` directly.
+
+`accuse` is intentionally not agent-backed in v0. It is a structured Rule Engine
+action; Agents and LLMs do not decide whether an accusation is correct.
 
 ## AgentContext
 

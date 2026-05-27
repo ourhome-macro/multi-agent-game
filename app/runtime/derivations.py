@@ -63,6 +63,22 @@ class DerivedEventSystem:
                 )
                 if memory_event is not None:
                     events.append(memory_event)
+            elif source_event.type == EventType.PLAYER_ACCUSED:
+                memory_event = self._derive_player_accused_memory_candidate(
+                    case,
+                    session,
+                    source_event,
+                )
+                if memory_event is not None:
+                    events.append(memory_event)
+            elif source_event.type == EventType.ACCUSATION_EVALUATED:
+                memory_event = self._derive_accusation_evaluated_memory_candidate(
+                    case,
+                    session,
+                    source_event,
+                )
+                if memory_event is not None:
+                    events.append(memory_event)
         return events
 
     def _derive_player_knowledge(
@@ -205,6 +221,50 @@ class DerivedEventSystem:
                 f"at pressure {pressure}."
             ),
             salience=max(0.6, pressure),
+        )
+
+    def _derive_player_accused_memory_candidate(
+        self,
+        case: CasePackage,
+        session: SessionState,
+        source_event: WorldEvent,
+    ) -> WorldEvent | None:
+        target_id = str(source_event.payload["target_id"])
+        claim_id = str(source_event.payload["claim_id"])
+        target_name = self._character_name(case, target_id)
+        evidence_ids = [
+            str(item) for item in source_event.payload.get("evidence_clue_ids", [])
+        ]
+        return self._store_memory_candidate(
+            session=session,
+            source_event=source_event,
+            memory_id=f"memory.player.accused.{target_id}.{claim_id}",
+            content=(
+                f"Player formally accused {target_name} with claim '{claim_id}' "
+                f"using evidence {evidence_ids}."
+            ),
+            salience=1.0,
+        )
+
+    def _derive_accusation_evaluated_memory_candidate(
+        self,
+        case: CasePackage,
+        session: SessionState,
+        source_event: WorldEvent,
+    ) -> WorldEvent | None:
+        target_id = str(source_event.payload["target_id"])
+        claim_id = str(source_event.payload["claim_id"])
+        result = str(source_event.payload["result"])
+        target_name = self._character_name(case, target_id)
+        return self._store_memory_candidate(
+            session=session,
+            source_event=source_event,
+            memory_id=f"memory.player.accusation_evaluated.{target_id}.{claim_id}.{result}",
+            content=(
+                f"Rule Engine evaluated the accusation against {target_name} "
+                f"for claim '{claim_id}' as {result}."
+            ),
+            salience=1.0,
         )
 
     def _character_name(self, case: CasePackage, character_id: str) -> str:

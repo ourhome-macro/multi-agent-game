@@ -65,6 +65,24 @@ not mean the clue proves the target NPC is guilty.
 Invalid `ask_about` or `present_clue` writes `rule.rejected` and does not produce
 NPC replies or relationship changes.
 
+## Accuse
+
+`accuse` is a formal structured accusation. It contains a `claim_id`, target
+character, submitted evidence clue ids, and optional player text. It is evaluated
+only by Rule Engine against case-authored `solution_claims.yaml`.
+
+Valid accuse writes:
+
+- `player.accused`
+- `accusation.evaluated`
+
+Invalid accuse writes only `rule.rejected`. It does not call AgentGateway, does
+not produce `npc.replied`, does not mutate relationships, and does not directly
+change `narrative.phase`.
+
+`accusation.evaluated` may contain the configured result, but `StateSummary` must
+not expose solution claim configuration or internal truth data.
+
 ## Interaction Pressure
 
 `interaction_pressure` is calculated by the backend:
@@ -107,6 +125,10 @@ mock dialogue conditions, for example
 `memory.player.presented_clue.butler.scratched_drawer`. They must not depend on
 runtime UUIDs.
 
+Successful accusations also enter this memory path with ids such as
+`memory.player.accused.butler.butler_moved_key` and
+`memory.player.accusation_evaluated.butler.butler_moved_key.correct`.
+
 This is not vector memory, RAG, an LLM summary, or database persistence. Snapshot
 state must remain replayable from `WorldEvent`.
 
@@ -117,6 +139,8 @@ state must remain replayable from `WorldEvent`.
 - `player.talked`
 - `player.asked_about`
 - `player.presented_clue`
+- `player.accused`
+- `accusation.evaluated`
 - `npc.replied`
 - `director.blocked`
 - `rule.rejected`
@@ -136,6 +160,8 @@ state must remain replayable from `WorldEvent`.
 - Relationship metrics are clamped to `-1.0 .. 1.0`.
 - Relationship threshold crossings are emitted once per session per threshold.
 - Agent-proposed phase changes are rejected.
+- Accusation result evaluation belongs to Rule Engine, not Agent or LLM output.
+- `accuse` does not directly mutate narrative phase.
 - All accepted state changes must be represented by `WorldEvent`.
 - `replay_events(case, events)` must rebuild equivalent key state and preserve
   event count.
@@ -146,4 +172,4 @@ state must remain replayable from `WorldEvent`.
 
 Public summaries must not expose character `secrets`, character `goals`,
 internal character `knowledge`, clue `truth_status`, forbidden fact text, blocked
-terms, or `forbidden_facts`.
+terms, `forbidden_facts`, or `solution_claims`.

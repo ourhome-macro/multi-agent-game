@@ -1,0 +1,18 @@
+claims:
+  - id: butler_moved_key
+    target_id: butler
+    required_evidence:
+      - scratched_drawer
+      - dustless_frame
+      - torn_note
+    allowed_phases:
+      - reveal
+    result: correct
+
+  - id: niece_staged_meeting
+    target_id: niece
+    required_evidence:
+      - torn_note
+    allowed_phases:
+      - reveal
+    result: incorrect
