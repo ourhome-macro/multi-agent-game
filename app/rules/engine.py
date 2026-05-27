@@ -10,10 +10,12 @@ from app.domain.models import (
     RelationshipChangeAction,
     RelationshipState,
     SessionState,
+    SubjectType,
     WorldEvent,
     clamp_relationship_metric,
 )
 from app.runtime.events import EventRecorder
+from app.runtime.pressure import calculate_interaction_pressure
 
 RELATIONSHIP_METRICS = {"trust", "suspicion", "fear", "intimacy", "hostility"}
 RELATIONSHIP_THRESHOLDS = {
@@ -100,6 +102,180 @@ class RuleEngine:
                     )
                 )
         return events
+
+    def apply_present_clue(
+        self,
+        *,
+        case: CasePackage,
+        session: SessionState,
+        action: PlayerAction,
+    ) -> list[WorldEvent]:
+        if not self._is_known_character(case, action.target_id):
+            return [
+                self._reject(
+                    session=session,
+                    action_type="player.present_clue",
+                    reason="target_id is not a known character",
+                    payload={
+                        "target_id": action.target_id,
+                        "clue_id": action.clue_id,
+                        "text": action.text,
+                    },
+                    caused_by_event_id=None,
+                )
+            ]
+        clue_id = str(action.clue_id)
+        clue_ids = {clue.id for clue in case.clues}
+        if clue_id not in clue_ids:
+            return [
+                self._reject(
+                    session=session,
+                    action_type="player.present_clue",
+                    reason="clue_id is not defined by the case package",
+                    payload={
+                        "target_id": action.target_id,
+                        "clue_id": clue_id,
+                        "text": action.text,
+                    },
+                    caused_by_event_id=None,
+                )
+            ]
+        if clue_id not in session.discovered_clues:
+            return [
+                self._reject(
+                    session=session,
+                    action_type="player.present_clue",
+                    reason="clue_id has not been discovered",
+                    payload={
+                        "target_id": action.target_id,
+                        "clue_id": clue_id,
+                        "text": action.text,
+                    },
+                    caused_by_event_id=None,
+                )
+            ]
+        knowledge_id = f"player_knowledge.{clue_id}"
+        if knowledge_id not in session.player_knowledge:
+            return [
+                self._reject(
+                    session=session,
+                    action_type="player.present_clue",
+                    reason="clue_id is not available in player knowledge",
+                    payload={
+                        "target_id": action.target_id,
+                        "clue_id": clue_id,
+                        "knowledge_id": knowledge_id,
+                        "text": action.text,
+                    },
+                    caused_by_event_id=None,
+                )
+            ]
+        return [
+            self._recorder.append(
+                session,
+                actor_id="player",
+                event_type=EventType.PLAYER_PRESENTED_CLUE,
+                payload={
+                    "target_id": action.target_id,
+                    "clue_id": clue_id,
+                    "knowledge_id": knowledge_id,
+                    "text": action.text,
+                    "interaction_pressure": calculate_interaction_pressure(case, action),
+                },
+            )
+        ]
+
+    def apply_ask_about(
+        self,
+        *,
+        case: CasePackage,
+        session: SessionState,
+        action: PlayerAction,
+    ) -> list[WorldEvent]:
+        if not self._is_known_character(case, action.target_id):
+            return [
+                self._reject(
+                    session=session,
+                    action_type="player.ask_about",
+                    reason="target_id is not a known character",
+                    payload={
+                        "target_id": action.target_id,
+                        "subject_type": action.subject_type,
+                        "subject_id": action.subject_id,
+                        "text": action.text,
+                    },
+                    caused_by_event_id=None,
+                )
+            ]
+
+        subject_id = str(action.subject_id)
+        payload: dict[str, object] = {
+            "target_id": action.target_id,
+            "subject_type": str(action.subject_type.value if action.subject_type else ""),
+            "subject_id": subject_id,
+            "text": action.text,
+            "interaction_pressure": calculate_interaction_pressure(case, action),
+        }
+        if action.subject_type == SubjectType.CLUE:
+            clue_ids = {clue.id for clue in case.clues}
+            if subject_id not in clue_ids:
+                return [
+                    self._reject(
+                        session=session,
+                        action_type="player.ask_about",
+                        reason="subject clue is not defined by the case package",
+                        payload=payload,
+                        caused_by_event_id=None,
+                    )
+            ]
+            knowledge_id = f"player_knowledge.{subject_id}"
+            if (
+                subject_id not in session.discovered_clues
+                and knowledge_id not in session.player_knowledge
+            ):
+                return [
+                    self._reject(
+                        session=session,
+                        action_type="player.ask_about",
+                        reason="subject clue has not been discovered",
+                        payload=payload,
+                        caused_by_event_id=None,
+                    )
+                ]
+            if knowledge_id in session.player_knowledge:
+                payload["knowledge_id"] = knowledge_id
+
+        elif action.subject_type == SubjectType.CHARACTER:
+            if not self._is_known_character(case, subject_id):
+                return [
+                    self._reject(
+                        session=session,
+                        action_type="player.ask_about",
+                        reason="subject character is not defined by the case package",
+                        payload=payload,
+                        caused_by_event_id=None,
+                    )
+                ]
+        elif action.subject_type == SubjectType.SCENE:
+            if not any(scene.id == subject_id for scene in case.scenes):
+                return [
+                    self._reject(
+                        session=session,
+                        action_type="player.ask_about",
+                        reason="subject scene is not defined by the case package",
+                        payload=payload,
+                        caused_by_event_id=None,
+                    )
+                ]
+
+        return [
+            self._recorder.append(
+                session,
+                actor_id="player",
+                event_type=EventType.PLAYER_ASKED_ABOUT,
+                payload=payload,
+            )
+        ]
 
     def _apply_relationship_change(
         self,
@@ -210,10 +386,10 @@ class RuleEngine:
         self,
         *,
         session: SessionState,
-        action_type: ProposedActionType,
+        action_type: ProposedActionType | str,
         reason: str,
         payload: dict[str, object],
-        caused_by_event_id: str,
+        caused_by_event_id: str | None,
     ) -> WorldEvent:
         return self._recorder.append(
             session,
@@ -266,6 +442,9 @@ class RuleEngine:
                     )
                 )
         return events
+
+    def _is_known_character(self, case: CasePackage, character_id: str) -> bool:
+        return any(character.id == character_id for character in case.characters)
 
 
 def relationship_key(source_id: str, target_id: str) -> str:

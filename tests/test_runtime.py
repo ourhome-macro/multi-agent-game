@@ -23,6 +23,7 @@ from app.domain.models import (
     PlayerAction,
     ProposedActionType,
     RelationshipChangeAction,
+    SubjectType,
     WorldEvent,
 )
 from app.main import app
@@ -225,6 +226,263 @@ def test_talk_butler_generates_mock_dialogue(client: TestClient) -> None:
     assert relationship_event["payload"]["target_id"] == "player"
 
 
+def test_present_clue_rejects_undiscovered_clue_without_state_pollution(
+    client: TestClient,
+) -> None:
+    session_id = create_session(client)
+
+    response = client.post(
+        f"/sessions/{session_id}/actions",
+        json={
+            "type": "present_clue",
+            "target_id": "butler",
+            "clue_id": "scratched_drawer",
+            "text": "What about these scratch marks?",
+        },
+    )
+    events_response = client.get(f"/sessions/{session_id}/events")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["accepted"] is False
+    assert [event["type"] for event in payload["new_events"]] == ["rule.rejected"]
+    assert payload["new_events"][0]["payload"]["reason"] == "clue_id has not been discovered"
+    assert payload["state"]["discovered_clues"] == []
+    assert [event["type"] for event in events_response.json()] == [
+        "session.created",
+        "rule.rejected",
+    ]
+
+
+def test_present_clue_success_triggers_mock_agent_and_rule_engine(
+    client: TestClient,
+) -> None:
+    session_id = create_session(client)
+    client.post(
+        f"/sessions/{session_id}/actions",
+        json={"type": "inspect", "target_id": "desk"},
+    )
+
+    response = client.post(
+        f"/sessions/{session_id}/actions",
+        json={
+            "type": "present_clue",
+            "target_id": "butler",
+            "clue_id": "scratched_drawer",
+            "text": "What about these scratch marks?",
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["accepted"] is True
+    assert "scratch marks" in payload["speech"]
+    event_types = [event["type"] for event in payload["new_events"]]
+    assert event_types[:3] == [
+        "player.presented_clue",
+        "npc.replied",
+        "relationship.changed",
+    ]
+    presented_event = payload["new_events"][0]
+    assert presented_event["payload"] == {
+        "target_id": "butler",
+        "clue_id": "scratched_drawer",
+        "knowledge_id": "player_knowledge.scratched_drawer",
+        "text": "What about these scratch marks?",
+        "interaction_pressure": 0.9,
+    }
+    relationship_event = next(
+        event for event in payload["new_events"] if event["type"] == "relationship.changed"
+    )
+    assert relationship_event["payload"]["source_id"] == "butler"
+    assert relationship_event["payload"]["target_id"] == "player"
+
+
+def test_present_clue_rejects_missing_player_knowledge() -> None:
+    case = CaseLoader().load(FAKE_CASE_001_DIR)
+    recorder = EventRecorder()
+    session = InMemorySessionStore(recorder).create(case)
+    session.discovered_clues.add("scratched_drawer")
+    session.narrative.discovered_clues.add("scratched_drawer")
+    action = PlayerAction(
+        type="present_clue",
+        target_id="butler",
+        clue_id="scratched_drawer",
+        text="What about these scratch marks?",
+    )
+
+    events = RuleEngine(recorder).apply_present_clue(
+        case=case,
+        session=session,
+        action=action,
+    )
+
+    assert events[0].type == EventType.RULE_REJECTED
+    assert events[0].payload["reason"] == "clue_id is not available in player knowledge"
+    assert not any(event.type == EventType.PLAYER_PRESENTED_CLUE for event in session.events)
+
+
+def test_present_clue_rejects_unknown_target() -> None:
+    case = CaseLoader().load(FAKE_CASE_001_DIR)
+    recorder = EventRecorder()
+    session = InMemorySessionStore(recorder).create(case)
+    action = PlayerAction(
+        type="present_clue",
+        target_id="ghost",
+        clue_id="scratched_drawer",
+        text="What about these scratch marks?",
+    )
+
+    events = RuleEngine(recorder).apply_present_clue(
+        case=case,
+        session=session,
+        action=action,
+    )
+
+    assert events[0].type == EventType.RULE_REJECTED
+    assert events[0].payload["reason"] == "target_id is not a known character"
+    assert not any(event.type == EventType.PLAYER_PRESENTED_CLUE for event in session.events)
+
+
+def test_present_clue_rejects_unknown_clue() -> None:
+    case = CaseLoader().load(FAKE_CASE_001_DIR)
+    recorder = EventRecorder()
+    session = InMemorySessionStore(recorder).create(case)
+    action = PlayerAction(
+        type="present_clue",
+        target_id="butler",
+        clue_id="not_defined_by_case",
+        text="What about this?",
+    )
+
+    events = RuleEngine(recorder).apply_present_clue(
+        case=case,
+        session=session,
+        action=action,
+    )
+
+    assert events[0].type == EventType.RULE_REJECTED
+    assert events[0].payload["reason"] == "clue_id is not defined by the case package"
+    assert not any(event.type == EventType.PLAYER_PRESENTED_CLUE for event in session.events)
+
+
+def test_ask_about_rejects_undiscovered_clue_without_state_pollution(
+    client: TestClient,
+) -> None:
+    session_id = create_session(client)
+
+    response = client.post(
+        f"/sessions/{session_id}/actions",
+        json={
+            "type": "ask_about",
+            "target_id": "butler",
+            "subject_type": "clue",
+            "subject_id": "scratched_drawer",
+            "text": "What about the drawer?",
+        },
+    )
+    events_response = client.get(f"/sessions/{session_id}/events")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["accepted"] is False
+    assert [event["type"] for event in payload["new_events"]] == ["rule.rejected"]
+    assert payload["new_events"][0]["payload"]["reason"] == "subject clue has not been discovered"
+    assert [event["type"] for event in events_response.json()] == [
+        "session.created",
+        "rule.rejected",
+    ]
+
+
+def test_ask_about_discovered_sensitive_clue_triggers_guarded_reply(
+    client: TestClient,
+) -> None:
+    session_id = create_session(client)
+    client.post(
+        f"/sessions/{session_id}/actions",
+        json={"type": "inspect", "target_id": "desk"},
+    )
+
+    response = client.post(
+        f"/sessions/{session_id}/actions",
+        json={
+            "type": "ask_about",
+            "target_id": "butler",
+            "subject_type": "clue",
+            "subject_id": "scratched_drawer",
+            "text": "What about the drawer?",
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["accepted"] is True
+    assert "drawer" in payload["speech"]
+    event_types = [event["type"] for event in payload["new_events"]]
+    assert event_types[:3] == [
+        "player.asked_about",
+        "npc.replied",
+        "relationship.changed",
+    ]
+    asked_event = payload["new_events"][0]
+    assert asked_event["payload"] == {
+        "target_id": "butler",
+        "subject_type": "clue",
+        "subject_id": "scratched_drawer",
+        "text": "What about the drawer?",
+        "interaction_pressure": 0.6,
+        "knowledge_id": "player_knowledge.scratched_drawer",
+    }
+    reply_event = payload["new_events"][1]
+    assert reply_event["payload"]["intent"] == "probe"
+
+
+def test_ask_about_rejects_unknown_character_subject() -> None:
+    case = CaseLoader().load(FAKE_CASE_001_DIR)
+    recorder = EventRecorder()
+    session = InMemorySessionStore(recorder).create(case)
+    action = PlayerAction(
+        type="ask_about",
+        target_id="butler",
+        subject_type=SubjectType.CHARACTER,
+        subject_id="ghost",
+        text="Who is this?",
+    )
+
+    events = RuleEngine(recorder).apply_ask_about(
+        case=case,
+        session=session,
+        action=action,
+    )
+
+    assert events[0].type == EventType.RULE_REJECTED
+    assert events[0].payload["reason"] == "subject character is not defined by the case package"
+    assert not any(event.type == EventType.PLAYER_ASKED_ABOUT for event in session.events)
+
+
+def test_ask_about_rejects_unknown_scene_subject() -> None:
+    case = CaseLoader().load(FAKE_CASE_001_DIR)
+    recorder = EventRecorder()
+    session = InMemorySessionStore(recorder).create(case)
+    action = PlayerAction(
+        type="ask_about",
+        target_id="butler",
+        subject_type=SubjectType.SCENE,
+        subject_id="cellar",
+        text="What about the cellar?",
+    )
+
+    events = RuleEngine(recorder).apply_ask_about(
+        case=case,
+        session=session,
+        action=action,
+    )
+
+    assert events[0].type == EventType.RULE_REJECTED
+    assert events[0].payload["reason"] == "subject scene is not defined by the case package"
+    assert not any(event.type == EventType.PLAYER_ASKED_ABOUT for event in session.events)
+
+
 def test_agent_context_includes_runtime_inputs_for_target_agent() -> None:
     case = CaseLoader().load(FAKE_CASE_001_DIR)
     recorder = EventRecorder()
@@ -245,6 +503,8 @@ def test_agent_context_includes_runtime_inputs_for_target_agent() -> None:
     assert context.discovered_clues == ["scratched_drawer"]
     assert context.player_action.target_id == "butler"
     assert context.relationship_to_player is not None
+    assert context.presented_clue_id is None
+    assert context.presented_knowledge_id is None
     assert context.default_speech is not None
     assert context.target_profile is not None
     assert context.target_profile.id == "butler"
@@ -289,6 +549,46 @@ def test_agent_context_uses_fact_ids_without_forbidden_fact_text() -> None:
         assert fact.text not in serialized_context
         for blocked_term in fact.blocked_terms:
             assert blocked_term not in serialized_context
+
+
+def test_agent_context_exposes_presented_clue_ids() -> None:
+    case = CaseLoader().load(FAKE_CASE_001_DIR)
+    recorder = EventRecorder()
+    session = InMemorySessionStore(recorder).create(case)
+    session.discovered_clues.add("scratched_drawer")
+    action = PlayerAction(
+        type="present_clue",
+        target_id="butler",
+        clue_id="scratched_drawer",
+        text="What about these scratch marks?",
+    )
+
+    context = build_agent_context(case, session, action)
+
+    assert context.presented_clue_id == "scratched_drawer"
+    assert context.presented_knowledge_id == "player_knowledge.scratched_drawer"
+
+
+def test_agent_context_exposes_asked_subject_and_interaction_pressure() -> None:
+    case = CaseLoader().load(FAKE_CASE_001_DIR)
+    recorder = EventRecorder()
+    session = InMemorySessionStore(recorder).create(case)
+    session.discovered_clues.add("scratched_drawer")
+    action = PlayerAction(
+        type="ask_about",
+        target_id="butler",
+        subject_type=SubjectType.CLUE,
+        subject_id="scratched_drawer",
+        text="What about the drawer?",
+    )
+
+    context = build_agent_context(case, session, action)
+
+    assert context.asked_subject_type == SubjectType.CLUE
+    assert context.asked_subject_id == "scratched_drawer"
+    assert context.interaction_pressure == 0.6
+    assert context.subject_is_sensitive is True
+    assert context.presented_clue_id is None
 
 
 def test_agent_gateway_defaults_to_mock_agent() -> None:
@@ -400,6 +700,28 @@ def test_player_action_rejects_generic_target_field(client: TestClient) -> None:
     response = client.post(
         f"/sessions/{session_id}/actions",
         json={"type": "inspect", "target": "desk"},
+    )
+
+    assert response.status_code == 422
+
+
+def test_player_action_rejects_clue_id_for_non_present_clue(client: TestClient) -> None:
+    session_id = create_session(client)
+
+    response = client.post(
+        f"/sessions/{session_id}/actions",
+        json={"type": "talk", "target_id": "butler", "clue_id": "scratched_drawer"},
+    )
+
+    assert response.status_code == 422
+
+
+def test_player_action_rejects_missing_ask_about_subject(client: TestClient) -> None:
+    session_id = create_session(client)
+
+    response = client.post(
+        f"/sessions/{session_id}/actions",
+        json={"type": "ask_about", "target_id": "butler"},
     )
 
     assert response.status_code == 422

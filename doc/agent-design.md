@@ -16,10 +16,10 @@ generate(context: AgentContext) -> AgentIntent
 backend is `MockAgent`. `LLMAgentStub` is present only as a schema-safe placeholder
 and does not call external services.
 
-Current talk flow:
+Current agent-backed player action flow:
 
 ```text
-PlayerAction(talk)
+PlayerAction(talk | present_clue)
   -> build_agent_context(case, session, action)
   -> AgentGateway.generate(context)
   -> AgentIntent
@@ -46,6 +46,12 @@ PlayerAction(talk)
 - `memory_candidates`
 - `blocked_fact_ids`
 - `revealable_fact_ids`
+- `asked_subject_type`
+- `asked_subject_id`
+- `interaction_pressure`
+- `subject_is_sensitive`
+- `presented_clue_id`
+- `presented_knowledge_id`
 
 For the current mock implementation it also includes case-authored reply
 configuration:
@@ -112,7 +118,26 @@ audited, but Rule Engine rejects it. Narrative phase changes can only come from
 
 `MockAgent` consumes `AgentContext` and selects deterministic configured replies
 from the case package. It can vary speech and proposed actions by phase,
-discovered clues, and relationship metrics.
+discovered clues, asked subject, presented clue, interaction pressure, subject
+sensitivity, and relationship metrics.
+
+`mock_dialogues.yaml` reply conditions currently support:
+
+- `phase`
+- `asked_subject_type`
+- `asked_subject_id`
+- `presented_clue`
+- `min_interaction_pressure`
+- `max_interaction_pressure`
+- `requires_subject_sensitive`
+- `requires_discovered`
+- `missing_discovered`
+- `min_relationship`
+- `max_relationship`
+
+`present_clue` does not mean the clue proves the NPC is guilty. It means the
+player is using a known clue to pressure, test, or confront the NPC. Truth
+progression still belongs to Rule Trigger System and narrative rules.
 
 `LLMAgentStub` returns a valid `AgentIntent` without calling an external model and
 without mutating `SessionState`. It exists to lock the future LLM integration

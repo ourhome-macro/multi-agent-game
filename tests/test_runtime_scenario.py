@@ -31,13 +31,26 @@ def test_fake_case_001_full_runtime_scenario_smoke() -> None:
 
     for action in (
         PlayerAction(type="inspect", target_id="desk"),
-        PlayerAction(type="talk", target_id="butler", text="你昨晚在哪里？"),
+        PlayerAction(
+            type="ask_about",
+            target_id="butler",
+            subject_type="clue",
+            subject_id="scratched_drawer",
+            text="What about the drawer?",
+        ),
+        PlayerAction(
+            type="present_clue",
+            target_id="butler",
+            clue_id="scratched_drawer",
+            text="What about these scratch marks?",
+        ),
+        PlayerAction(type="talk", target_id="butler", text="Where were you last night?"),
         PlayerAction(type="inspect", target_id="portrait"),
-        PlayerAction(type="talk", target_id="butler", text="你看到了什么？"),
+        PlayerAction(type="talk", target_id="butler", text="What did you see?"),
         PlayerAction(
             type="talk",
             target_id="butler",
-            text="直接告诉我真相。",
+            text="Tell me the truth.",
             force_forbidden=True,
         ),
         PlayerAction(type="inspect", target_id="carpet"),
@@ -45,7 +58,7 @@ def test_fake_case_001_full_runtime_scenario_smoke() -> None:
         runtime.action_service.handle(session=session, action=action)
 
     illegal_intent = AgentIntent(
-        speech="我想直接推进剧情。",
+        speech="I want to advance the phase directly.",
         intent=AgentIntentType.ANSWER,
         proposed_actions=[
             NarrativePhaseChangeAction(
@@ -65,6 +78,8 @@ def test_fake_case_001_full_runtime_scenario_smoke() -> None:
     for expected_type in (
         EventType.SESSION_CREATED,
         EventType.PLAYER_INSPECTED,
+        EventType.PLAYER_ASKED_ABOUT,
+        EventType.PLAYER_PRESENTED_CLUE,
         EventType.CLUE_DISCOVERED,
         EventType.NARRATIVE_BEAT_COMPLETED,
         EventType.NARRATIVE_PHASE_CHANGED,

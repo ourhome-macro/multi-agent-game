@@ -1,8 +1,9 @@
-# Case Package 协议
+# Case Package Protocol
 
-本文件冻结当前阶段的案件包文件协议。后续真实案件接入前，优先改这里和 Pydantic 模型，不允许文档、fake case、loader 三处各说各话。
+Case packages are YAML directories under `cases/{case_id}`. The runtime scans
+`cases/*` and loads every directory that contains `case.yaml`.
 
-## 目录结构
+## Files
 
 ```text
 cases/{case_id}/
@@ -16,55 +17,92 @@ cases/{case_id}/
   narrative_rules.yaml
 ```
 
-## 命名冻结
+## Naming Rules
 
-- 统一使用 `id` 表示配置实体自身 ID。
-- 玩家行为目标固定使用 `target_id`，禁止使用裸 `target`。
-- 关系端点固定使用 `source_id` 和 `target_id`，禁止使用裸 `source` / `target`。
-- 线索引用固定使用 `clue_id` 或 `discover_clues`。
-- proposed action 类型只能来自 `ProposedActionType` 白名单：`clue.discover`、`relationship.change`、`narrative.phase.change`。
-- `narrative.phase.change` 可以被 Agent 提出，但 Rule Engine 必须拒绝；真实 phase 只能由 `narrative_rules.yaml` 推进。
+- Entity identity uses `id`.
+- Player action targets use `target_id`.
+- Relationship endpoints use `source_id` and `target_id`.
+- Clue references use `clue_id`, `discover_clues`, `asked_subject_id`, or
+  `presented_clue`.
+- Legacy `source`, `target`, or generic player-action `target` fields are
+  rejected.
 
-## 文件职责
+## mock_dialogues.yaml
 
-- `case.yaml`：`id`、`title`、`description`、`initial_phase`。
-- `characters.yaml`：角色公开身份，以及后端内部使用的 `secrets`、`goals`、`knowledge`。
-- `scenes.yaml`：场景、热点、角色出现位置和热点可解锁线索。
-- `clues.yaml`：线索定义。`truth_status` 必须写成 `"true"`、`"false"` 或 `"unknown"` 字符串。
-- `relationships.yaml`：初始关系，端点字段为 `source_id`、`target_id`。
-- `forbidden_facts.yaml`：Director 禁说事实、触发词和允许透露阶段。
-- `mock_dialogues.yaml`：当前 mock Agent 回复和关系变化配置。
-- `narrative_rules.yaml`：剧情阶段、beat 条件和 phase 推进规则。
+Each dialogue block is keyed by `character_id`. Replies can be selected by:
 
-## Narrative Rules
+- `phase`
+- `asked_subject_type`
+- `asked_subject_id`
+- `presented_clue`
+- `min_interaction_pressure`
+- `max_interaction_pressure`
+- `requires_subject_sensitive`
+- `requires_discovered`
+- `missing_discovered`
+- `min_relationship`
+- `max_relationship`
 
-`narrative_rules.yaml` 当前支持：
+Example:
 
-- `phases`：声明所有合法剧情阶段。
-- `beats`：声明可完成的剧情 beat。
-- `all_completed`：要求已完成的 beat 列表。
-- `min_completed`：要求至少完成的 beat 数。
-- `all_discovered`：要求已发现的线索列表。
-- `next_phase`：beat 完成后推进到的阶段。
+```yaml
+- character_id: butler
+  default_speech: I do not know what you mean.
+  default_intent: conceal
+  relationship_delta_on_talk:
+    suspicion: 1
+  replies:
+    - phase: investigation
+      asked_subject_type: clue
+      asked_subject_id: scratched_drawer
+      min_interaction_pressure: 0.6
+      requires_subject_sensitive: true
+      speech: Are you asking whether I opened it?
+      intent: probe
+    - phase: investigation
+      presented_clue: scratched_drawer
+      requires_discovered:
+        - scratched_drawer
+      speech: Those scratch marks mean someone forced the drawer.
+      intent: probe
+      proposed_actions:
+        - type: relationship.change
+          source_id: butler
+          target_id: player
+          deltas:
+            suspicion: 0.7
+```
 
-Rule Trigger System 会在动作事件后评估 rules。满足条件时写入 `narrative.beat.completed`；如果配置了 `next_phase`，再写入 `narrative.phase.changed`。
+`asked_subject_id` must reference an existing clue, character, or scene according
+to `asked_subject_type`. `presented_clue` must reference an existing clue.
 
-## 校验命令
+## narrative_rules.yaml
 
-使用以下命令校验所有案件包：
+Supported fields:
+
+- `phases`
+- `beats`
+- `all_completed`
+- `min_completed`
+- `all_discovered`
+- `next_phase`
+
+Only `RuleTriggerSystem` may complete beats or advance phase. Agent proposed
+`narrative.phase.change` actions are accepted by schema for auditability but are
+rejected by Rule Engine.
+
+## Validation
+
+Run:
 
 ```powershell
 py -3.12 -m app.cases.validate cases
 ```
 
-校验范围包括角色、场景、线索、热点、关系、mock dialogues、forbidden facts、narrative rules 引用，以及所有线索至少有一种可达方式。
+Validation checks characters, scenes, clues, hotspots, relationships,
+`mock_dialogues`, `forbidden_facts`, `narrative_rules`, and clue reachability.
 
-## 防泄露要求
+## Public Summary Safety
 
-`StateSummary` 只能返回展示摘要：
-
-- 角色只返回 `id`、`name`、`role`。
-- 线索只返回已发现线索的 `id`、`title`、`description`、`key`。
-- 不返回 `secrets`、`goals`、`knowledge`、`truth_status`、`forbidden_facts`。
-
-这个约束已经由测试覆盖，未来新增字段时必须先判断它是公开展示字段还是后端内部字段。
+`StateSummary` must not return `secrets`, `goals`, internal `knowledge`,
+`truth_status`, forbidden fact text, blocked terms, or `forbidden_facts`.

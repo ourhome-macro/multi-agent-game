@@ -13,6 +13,7 @@ from app.domain.models import (
     NarrativePhaseChangeAction,
     ProposedActionType,
     RelationshipChangeAction,
+    SubjectType,
 )
 
 RELATIONSHIP_METRICS = {"trust", "suspicion", "fear", "intimacy", "hostility"}
@@ -158,6 +159,32 @@ class CaseLoader:
                     raise CaseLoadError(
                         f"Mock reply for character '{dialogue.character_id}' references unknown "
                         f"phase '{reply.phase}'"
+                    )
+                if reply.presented_clue is not None and reply.presented_clue not in clue_ids:
+                    raise CaseLoadError(
+                        f"Mock reply for character '{dialogue.character_id}' references unknown "
+                        f"presented_clue '{reply.presented_clue}'"
+                    )
+                if reply.asked_subject_type == SubjectType.CLUE and (
+                    reply.asked_subject_id not in clue_ids
+                ):
+                    raise CaseLoadError(
+                        f"Mock reply for character '{dialogue.character_id}' references unknown "
+                        f"asked clue '{reply.asked_subject_id}'"
+                    )
+                if reply.asked_subject_type == SubjectType.CHARACTER and (
+                    reply.asked_subject_id not in character_ids
+                ):
+                    raise CaseLoadError(
+                        f"Mock reply for character '{dialogue.character_id}' references unknown "
+                        f"asked character '{reply.asked_subject_id}'"
+                    )
+                if reply.asked_subject_type == SubjectType.SCENE and (
+                    reply.asked_subject_id not in scene_ids
+                ):
+                    raise CaseLoadError(
+                        f"Mock reply for character '{dialogue.character_id}' references unknown "
+                        f"asked scene '{reply.asked_subject_id}'"
                     )
                 self._ensure_known_clues(
                     clue_ids,

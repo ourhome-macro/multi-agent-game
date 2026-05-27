@@ -1,31 +1,16 @@
-# 世界状态与数据模型
+# World State
 
-世界状态由 `SessionState` 承载，案件静态配置由 `CasePackage` 承载。当前全部使用内存存储。
-
-## Case Package
-
-fake case 位于 `cases/fake_case_001` 和 `cases/fake_case_002`：
-
-- `case.yaml`：案件元信息和初始剧情阶段。
-- `characters.yaml`：角色设定、秘密、目标和认知。
-- `scenes.yaml`：场景、角色和可调查热点。
-- `clues.yaml`：线索、真假状态、关联角色和关键性。
-- `relationships.yaml`：初始关系。
-- `forbidden_facts.yaml`：Director 禁说事实。
-- `mock_dialogues.yaml`：mock Agent 回复和关系变化意图。
-- `narrative_rules.yaml`：剧情阶段、beat 条件和 phase 推进。
-
-加载时会校验角色、线索、场景、热点、关系和 mock 对话引用。引用错误会抛出 `CaseLoadError`。
-
-命名已经在当前阶段冻结：玩家行为目标使用 `target_id`，关系端点使用 `source_id` 和 `target_id`。
+`SessionState` is the in-memory authoritative runtime state. Static case content
+lives in `CasePackage`.
 
 ## SessionState
 
-`SessionState` 包含：
+Current session state includes:
 
 - `id`
 - `case_id`
 - `narrative.phase`
+- `narrative.discovered_clues`
 - `narrative.completed_beats`
 - `relationships`
 - `relationship_thresholds_crossed`
@@ -34,17 +19,70 @@ fake case 位于 `cases/fake_case_001` 和 `cases/fake_case_002`：
 - `memory_candidates`
 - `events`
 
-`discovered_clues` 是权威线索发现状态；`StateSummary.discovered_clues` 只是从该集合映射出的展示摘要。
+`StateSummary` is a public projection of this state. It is not the authority.
 
-`StateSummary.player_knowledge` 是玩家公开认知摘要，只暴露 `knowledge_id`、`clue_id`、`title` 和 `summary`。`StateSummary` 仍禁止泄露角色秘密、角色目标、角色认知、线索真假状态和 Director 禁说事实。
+## Player Knowledge
 
-## WorldEvent
+`clue.discovered` derives `player_knowledge.updated`. A player can only
+`present_clue` when both are true:
 
-所有可回放行为都写入事件：
+- the clue is present in `session.discovered_clues`
+- `player_knowledge.{clue_id}` exists in `session.player_knowledge`
+
+This prevents the UI or a future Agent from using a clue that exists in the case
+package but has not entered the player's public knowledge.
+
+## Present Clue
+
+`ask_about` writes `player.asked_about` after Rule Engine validates the subject:
+
+- `target_id`
+- `subject_type`
+- `subject_id`
+- `text`
+- `interaction_pressure`
+- `knowledge_id` when the subject is a known player clue
+
+`ask_about` is lower-pressure than `present_clue`, but it can still make an NPC
+guarded when the subject is sensitive.
+
+Valid `present_clue` writes `player.presented_clue`:
+
+- `target_id`
+- `clue_id`
+- `knowledge_id`
+- `text`
+- `interaction_pressure`
+
+The event itself does not mutate clue state. It is an auditable player pressure
+or probing action that can influence `AgentContext`, MockAgent reply selection,
+Director checking, and Rule Engine application of any proposed actions. It does
+not mean the clue proves the target NPC is guilty.
+
+Invalid `ask_about` or `present_clue` writes `rule.rejected` and does not produce
+NPC replies or relationship changes.
+
+## Interaction Pressure
+
+`interaction_pressure` is calculated by the backend:
+
+- `talk`: `0.1`
+- `ask_about`: `0.3`
+- `present_clue`: `0.6`
+- associated subject or clue targets the NPC: `+0.2`
+- key clue: `+0.1`
+- clamp to `0.0 .. 1.0`
+
+`subject_is_sensitive` is true when the subject is associated with the target NPC
+or is a key clue.
+
+## WorldEvent Types
 
 - `session.created`
 - `player.inspected`
 - `player.talked`
+- `player.asked_about`
+- `player.presented_clue`
 - `npc.replied`
 - `director.blocked`
 - `rule.rejected`
@@ -56,18 +94,19 @@ fake case 位于 `cases/fake_case_001` 和 `cases/fake_case_002`：
 - `narrative.beat.completed`
 - `narrative.phase.changed`
 
-事件包含 `case_id`、`session_id`、`actor_id`、`type`、`payload`、`caused_by_event_id` 和 `created_at`。
+## Rule Engine Principles
 
-## Rule Engine 写入原则
+- Repeated clue discovery is idempotent and does not duplicate
+  `clue.discovered`.
+- Relationship metrics are clamped to `-1.0 .. 1.0`.
+- Relationship threshold crossings are emitted once per session per threshold.
+- Agent-proposed phase changes are rejected.
+- All accepted state changes must be represented by `WorldEvent`.
+- `replay_events(case, events)` must rebuild equivalent key state and preserve
+  event count.
 
-- `inspect desk` 通过热点配置解锁 `scratched_drawer`。
-- `inspect portrait` 通过热点配置解锁 `dustless_frame`。
-- 重复发现同一线索不会重复写 `clue.discovered`。
-- `clue.discovered` 会派生 `player_knowledge.updated` 和 `memory_candidate.created`。
-- Agent 提出的未知线索、未知关系端点或未知关系指标会写 `rule.rejected`，不会污染状态。
-- Agent `proposed_actions` 的动作类型由 `ProposedActionType` 白名单约束。
-- Agent 提出的 phase change 会写 `rule.rejected`；phase 只能由 `narrative_rules.yaml` 触发。
-- relationship metrics 会被 clamp 到 `-1.0 .. 1.0`。阈值首次跨过时写 `relationship.threshold.crossed`，当前硬编码阈值包括 `suspicion >= 0.7`、`fear >= 0.7`、`trust >= 0.7`。
-- `director.blocked` 和 `relationship.threshold.crossed` 也会派生 `memory_candidate.created`，当前只生成 player 侧 memory candidate。
-- `replay_events(case, events)` 会根据事件日志重建 `SessionState`，用于验证存档和调试链路。
-- `truth_status` 支持 YAML 布尔值归一化，但 fake case 中显式写成字符串，避免配置歧义。
+## Leak Boundary
+
+Public summaries must not expose character `secrets`, character `goals`,
+internal character `knowledge`, clue `truth_status`, forbidden fact text, blocked
+terms, or `forbidden_facts`.

@@ -12,6 +12,51 @@
       speech: 我整晚都在整理餐具。至于书房，我只是在门口看了一眼。
       intent: conceal
     - phase: investigation
+      asked_subject_type: clue
+      asked_subject_id: scratched_drawer
+      min_interaction_pressure: 0.6
+      requires_subject_sensitive: true
+      requires_discovered:
+        - scratched_drawer
+      speech: You keep returning to that drawer. Are you asking whether I opened it, or whether I know who did?
+      intent: probe
+      proposed_actions:
+        - type: relationship.change
+          source_id: butler
+          target_id: player
+          deltas:
+            suspicion: 0.4
+            fear: 0.2
+    - phase: investigation
+      asked_subject_type: clue
+      asked_subject_id: dustless_frame
+      min_interaction_pressure: 0.5
+      requires_subject_sensitive: true
+      requires_discovered:
+        - dustless_frame
+      speech: The frame being moved proves someone searched the room, not that I know what they found.
+      intent: conceal
+      proposed_actions:
+        - type: relationship.change
+          source_id: butler
+          target_id: player
+          deltas:
+            suspicion: 0.3
+            trust: -0.1
+    - phase: investigation
+      presented_clue: scratched_drawer
+      requires_discovered:
+        - scratched_drawer
+      speech: Those scratch marks mean someone forced the drawer, but I did not see who held the tool.
+      intent: probe
+      proposed_actions:
+        - type: relationship.change
+          source_id: butler
+          target_id: player
+          deltas:
+            suspicion: 0.7
+            trust: 0.2
+    - phase: investigation
       requires_discovered:
         - scratched_drawer
       speech: 抽屉确实有响动，但我不能确定是谁动过它。

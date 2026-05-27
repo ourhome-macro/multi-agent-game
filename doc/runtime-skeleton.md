@@ -10,7 +10,7 @@ state, rule execution, event logging, and replay.
 - Supports `cases/fake_case_001` and `cases/fake_case_002`.
 - Validates case YAML with Pydantic v2 and cross-reference checks.
 - Creates in-memory sessions.
-- Processes `inspect` and `talk` player actions.
+- Processes `inspect`, `talk`, `ask_about`, and `present_clue` player actions.
 - Unlocks clues through Rule Engine.
 - Generates deterministic NPC intents through `AgentGateway` and `MockAgent`.
 - Provides `LLMAgentStub` as a non-network placeholder.
@@ -41,6 +41,10 @@ Case Package
 ```
 
 `inspect` skips agent generation. `talk` uses `AgentGateway.generate(context)`.
+`ask_about` validates a clue, character, or scene subject, writes
+`player.asked_about`, and then uses the same AgentGateway path. `present_clue`
+first passes Rule Engine evidence validation, writes `player.presented_clue`, and
+then uses the same AgentGateway path as `talk`.
 
 ## Public API
 
@@ -55,7 +59,8 @@ Case Package
 fixed as `source_id` and `target_id`.
 
 Unknown inspect targets and unknown talk NPCs return business errors and do not
-write player action events.
+write player action events. Invalid `ask_about` and `present_clue` attempts write
+`rule.rejected` and return `accepted=false`.
 
 ## Agent Boundary
 

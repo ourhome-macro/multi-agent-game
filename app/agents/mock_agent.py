@@ -52,6 +52,36 @@ class MockAgent:
     def _reply_matches(self, reply: MockReplyConfig, context: AgentContext) -> bool:
         if reply.phase is not None and reply.phase != context.current_phase:
             return False
+        if (
+            reply.asked_subject_type is not None
+            and reply.asked_subject_type != context.asked_subject_type
+        ):
+            return False
+        if (
+            reply.asked_subject_id is not None
+            and reply.asked_subject_id != context.asked_subject_id
+        ):
+            return False
+        if (
+            reply.presented_clue is not None
+            and reply.presented_clue != context.presented_clue_id
+        ):
+            return False
+        if (
+            reply.min_interaction_pressure is not None
+            and context.interaction_pressure < reply.min_interaction_pressure
+        ):
+            return False
+        if (
+            reply.max_interaction_pressure is not None
+            and context.interaction_pressure > reply.max_interaction_pressure
+        ):
+            return False
+        if (
+            reply.requires_subject_sensitive is not None
+            and reply.requires_subject_sensitive != context.subject_is_sensitive
+        ):
+            return False
         if not set(reply.requires_discovered).issubset(context.discovered_clues):
             return False
         if set(reply.missing_discovered) & set(context.discovered_clues):

@@ -43,6 +43,21 @@ discover legal clues.
 `MockAgent`; `LLMAgentStub` is only a local placeholder and does not call an
 external model.
 
+`ask_about` is a structured inquiry action. Rule Engine validates the subject
+reference, writes `player.asked_about`, and then follows the same AgentGateway ->
+Director -> Rule Engine path as `talk`.
+
+`present_clue` is the player-facing evidence pressure action. Rule Engine first
+validates that `target_id` is a known character, `clue_id` exists, the clue has
+been discovered, and the clue has a corresponding `player_knowledge` entry. A
+valid action writes `player.presented_clue`, then follows the same agent-backed
+path. An invalid `ask_about` or `present_clue` writes `rule.rejected` and does
+not produce an NPC reply or relationship change.
+
+`present_clue` is not treated as proof. It only means the player is applying
+pressure or testing the NPC with a clue. Narrative truth still advances only
+through events and `RuleTriggerSystem`.
+
 ## Core Modules
 
 - `app/domain/models.py`: Pydantic v2 domain models and API DTOs.
@@ -77,7 +92,10 @@ Agents receive `AgentContext`, not raw `CasePackage` or `SessionState`.
 `AgentContext` intentionally excludes character `secrets`, character `goals`,
 internal character `knowledge`, clue `truth_status`, and forbidden fact text.
 Forbidden fact scope is represented only by `blocked_fact_ids` and
-`revealable_fact_ids`.
+`revealable_fact_ids`. Asked subjects are represented by `asked_subject_type` and
+`asked_subject_id`. Presented evidence is represented by `presented_clue_id` and
+`presented_knowledge_id`. Interaction pressure is a backend-calculated scalar in
+the `0.0 .. 1.0` range.
 
 ## Event Replay
 

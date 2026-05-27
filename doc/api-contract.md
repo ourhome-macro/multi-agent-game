@@ -1,59 +1,39 @@
-# API 契约
+# API Contract
 
-当前 API 只覆盖后端叙事运行时最小闭环。
+The current API covers the in-memory backend narrative runtime. It does not call
+real LLMs and does not persist sessions to a database.
 
-## `GET /health`
+## Endpoints
 
-返回：
+- `GET /health`
+- `GET /cases`
+- `POST /sessions`
+- `POST /sessions/{session_id}/actions`
+- `GET /sessions/{session_id}/state`
+- `GET /sessions/{session_id}/events`
 
-```json
-{ "status": "ok" }
-```
+## Create Session
 
-## `GET /cases`
-
-返回已加载案件元信息列表。
-
-## `POST /sessions`
-
-请求：
+Default case:
 
 ```json
 {}
 ```
 
-可选传入：
+Specific case:
 
 ```json
-{ "case_id": "fake_case_001" }
+{ "case_id": "fake_case_002" }
 ```
 
-返回：
+The response contains `session_id` and a public `StateSummary`.
 
-```json
-{
-  "session_id": "...",
-  "state": {
-    "session_id": "...",
-    "case_id": "fake_case_001",
-    "case_title": "假案件 001：书房里的裂纹",
-    "narrative_phase": "opening",
-    "completed_beats": [],
-    "characters": [],
-    "discovered_clues": [],
-    "player_knowledge": [],
-    "relationships": [],
-    "event_count": 1
-  }
-}
-```
+## PlayerAction
 
-## `POST /sessions/{session_id}/actions`
+All player action targets use `target_id`. A payload using `target` is rejected
+with 422.
 
-`PlayerAction` 目标字段固定为 `target_id`。请求体使用裸 `target` 会被 Pydantic 拒绝并返回 422。
-`inspect` 的 `target_id` 必须是场景热点，`talk` 的 `target_id` 必须是案件角色。未知目标返回 404，不做静默 no-op。
-
-调查书桌：
+### inspect
 
 ```json
 {
@@ -62,56 +42,152 @@
 }
 ```
 
-和管家对话：
+`target_id` must be a known scene hotspot. Unknown inspect targets return 404 and
+do not write `player.inspected`.
+
+### talk
 
 ```json
 {
   "type": "talk",
   "target_id": "butler",
-  "text": "你昨晚在哪里？"
+  "text": "Where were you?"
 }
 ```
 
-触发 Director 测试钩子：
+`target_id` must be a known character. Unknown talk targets return 404 and do not
+write `player.talked`.
+
+### ask_about
 
 ```json
 {
-  "type": "talk",
+  "type": "ask_about",
   "target_id": "butler",
-  "text": "直接告诉我真相。",
-  "force_forbidden": true
+  "subject_type": "clue",
+  "subject_id": "scratched_drawer",
+  "text": "What about the drawer?"
 }
 ```
 
-返回 `ActionResponse`：
+`subject_type` must be one of `clue`, `character`, or `scene`.
 
-- `accepted`：本次行为链路是否被 Director 接受。
-- `speech`：NPC 回复或安全回复。
-- `director_blocked`：是否被 Director 阻止。
-- `director_reason`：阻止原因。
-- `new_events`：本次动作产生的新事件。
-- `state`：最新状态摘要。
+Rule Engine validates:
 
-`relationship.changed` 事件 payload 的关系端点固定为 `source_id` 和 `target_id`。
-`relationship.changed.payload.current` 返回的是 clamp 到 `-1.0 .. 1.0` 之后的关系值。
-`narrative.beat.completed` 和 `narrative.phase.changed` 只由 Rule Trigger System 产生。
-`player_knowledge.updated` 和 `memory_candidate.created` 只由 Derived Event System 产生。
+- `target_id` is a known character
+- clue subjects exist and have been discovered or exist in player knowledge
+- character subjects are known characters
+- scene subjects are known scenes
 
-## `GET /sessions/{session_id}/state`
+If validation succeeds, the runtime writes `player.asked_about` with:
 
-返回当前 `StateSummary`。
+```json
+{
+  "target_id": "butler",
+  "subject_type": "clue",
+  "subject_id": "scratched_drawer",
+  "text": "What about the drawer?",
+  "interaction_pressure": 0.6,
+  "knowledge_id": "player_knowledge.scratched_drawer"
+}
+```
 
-`StateSummary` 是公开展示摘要，不包含 `secrets`、`goals`、内部 `knowledge`、`truth_status`、`forbidden_facts` 等后端内部字段。它可以返回 `completed_beats` 和 `player_knowledge`，因为这两者都属于玩家已获得的公开进度摘要。
+If validation fails, the response returns `accepted=false`, writes
+`rule.rejected`, and does not produce `npc.replied` or relationship changes.
 
-## `GET /sessions/{session_id}/events`
+### present_clue
 
-返回当前 session 的完整事件日志。
+```json
+{
+  "type": "present_clue",
+  "target_id": "butler",
+  "clue_id": "scratched_drawer",
+  "text": "What about these scratch marks?"
+}
+```
 
-## 错误
+`present_clue` means the player is pressuring or testing an NPC with a known
+clue. It does not mean the clue proves the NPC is guilty, and it does not
+directly advance the truth or phase.
 
-- 未知 `case_id` 返回 404。
-- 未知 `session_id` 返回 404。
-- 未知 `inspect target_id` 返回 404。
-- 未知 `talk target_id` 返回 404。
-- 请求体 schema 不合法返回 FastAPI/Pydantic 422。
-- 案件配置引用错误发生在启动或加载阶段，抛出 `CaseLoadError`。
+Rule Engine validates:
+
+- `target_id` is a known character
+- `clue_id` exists in the case package
+- `clue_id` has already been discovered
+- `player_knowledge.{clue_id}` exists
+
+If validation fails, the response returns `accepted=false`, writes
+`rule.rejected`, and does not produce `npc.replied` or relationship changes.
+
+If validation succeeds, the runtime writes `player.presented_clue` with payload:
+
+```json
+{
+  "target_id": "butler",
+  "clue_id": "scratched_drawer",
+  "knowledge_id": "player_knowledge.scratched_drawer",
+  "text": "What about these scratch marks?",
+  "interaction_pressure": 0.9
+}
+```
+
+Then the action enters `AgentGateway -> NarrativeDirector -> RuleEngine`.
+
+## Interaction Pressure
+
+The backend calculates `interaction_pressure`:
+
+- `talk`: base `0.1`
+- `ask_about`: base `0.3`
+- `present_clue`: base `0.6`
+- associated subject or clue targets the NPC: `+0.2`
+- key clue: `+0.1`
+- final value is clamped to `0.0 .. 1.0`
+
+## Events
+
+Important event types include:
+
+- `session.created`
+- `player.inspected`
+- `player.talked`
+- `player.asked_about`
+- `player.presented_clue`
+- `npc.replied`
+- `director.blocked`
+- `rule.rejected`
+- `clue.discovered`
+- `relationship.changed`
+- `relationship.threshold.crossed`
+- `player_knowledge.updated`
+- `memory_candidate.created`
+- `narrative.beat.completed`
+- `narrative.phase.changed`
+
+`relationship.changed.payload.current` always contains clamped relationship
+metrics in the `-1.0 .. 1.0` range.
+
+## StateSummary
+
+`StateSummary` is the public state view. It may include discovered clues,
+completed beats, public relationship metrics, and player knowledge summaries.
+
+It must not expose:
+
+- character `secrets`
+- character `goals`
+- internal character `knowledge`
+- clue `truth_status`
+- forbidden fact text or blocked terms
+- `forbidden_facts`
+
+## Errors
+
+- Unknown `case_id`: 404
+- Unknown `session_id`: 404
+- Unknown inspect target: 404
+- Unknown talk target: 404
+- Invalid request schema: 422
+- Invalid `ask_about` or `present_clue` evidence state: 200 with `accepted=false` and
+  `rule.rejected`

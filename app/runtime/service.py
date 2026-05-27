@@ -90,64 +90,60 @@ class ActionService:
                 payload={"target_id": action.target_id, "text": action.text},
             )
             new_events.append(player_event)
-            context = build_agent_context(case, session, action)
-            intent = self._agent_gateway.generate(context)
-            decision = self._director.validate(case, session.narrative, intent)
-
-            speech = intent.speech
-            director_blocked = not decision.allowed
-            director_reason = decision.reason
-
-            if decision.allowed:
-                npc_event = self._recorder.append(
-                    session,
-                    actor_id=action.target_id,
-                    event_type=EventType.NPC_REPLIED,
-                    payload={
-                        "speech": intent.speech,
-                        "intent": intent.intent,
-                        "proposed_actions": [
-                            item.model_dump(mode="json") for item in intent.proposed_actions
-                        ],
-                    },
-                    caused_by_event_id=player_event.id,
-                )
-                new_events.append(npc_event)
-                new_events.extend(
-                    self._rule_engine.apply_agent_intent(
-                        case=case,
-                        session=session,
-                        intent=intent,
-                        caused_by_event_id=npc_event.id,
-                    )
-                )
-            else:
-                speech = decision.safe_speech
-                blocked_event = self._recorder.append(
-                    session,
-                    actor_id="director",
-                    event_type=EventType.DIRECTOR_BLOCKED,
-                    payload={
-                        "target_id": action.target_id,
-                        "blocked_fact_id": decision.blocked_fact_id,
-                        "reason": decision.reason,
-                    },
-                    caused_by_event_id=player_event.id,
-                )
-                new_events.append(blocked_event)
-
-            trigger_source_event_id = new_events[-1].id
-            new_events.extend(self._derive_events(case, session, new_events))
-            new_events.extend(self._evaluate_triggers(case, session, trigger_source_event_id))
-
-            return ActionResponse(
-                session_id=session.id,
-                accepted=decision.allowed,
-                speech=speech,
-                director_blocked=director_blocked,
-                director_reason=director_reason,
+            return self._complete_agent_backed_action(
+                case=case,
+                session=session,
+                action=action,
+                player_event=player_event,
                 new_events=new_events,
-                state=build_state_summary(case, session),
+            )
+
+        if action.type == ActionType.ASK_ABOUT:
+            new_events.extend(
+                self._rule_engine.apply_ask_about(
+                    case=case,
+                    session=session,
+                    action=action,
+                )
+            )
+            if not new_events or new_events[-1].type == EventType.RULE_REJECTED:
+                return ActionResponse(
+                    session_id=session.id,
+                    accepted=False,
+                    new_events=new_events,
+                    state=build_state_summary(case, session),
+                )
+
+            return self._complete_agent_backed_action(
+                case=case,
+                session=session,
+                action=action,
+                player_event=new_events[-1],
+                new_events=new_events,
+            )
+
+        if action.type == ActionType.PRESENT_CLUE:
+            new_events.extend(
+                self._rule_engine.apply_present_clue(
+                    case=case,
+                    session=session,
+                    action=action,
+                )
+            )
+            if not new_events or new_events[-1].type == EventType.RULE_REJECTED:
+                return ActionResponse(
+                    session_id=session.id,
+                    accepted=False,
+                    new_events=new_events,
+                    state=build_state_summary(case, session),
+                )
+
+            return self._complete_agent_backed_action(
+                case=case,
+                session=session,
+                action=action,
+                player_event=new_events[-1],
+                new_events=new_events,
             )
 
         raise ValueError(f"Unsupported action type: {action.type}")
@@ -164,6 +160,75 @@ class ActionService:
             if character.id == target_id:
                 return
         raise ActionValidationError(f"Unknown talk target_id: {target_id}")
+
+    def _complete_agent_backed_action(
+        self,
+        *,
+        case: CasePackage,
+        session: SessionState,
+        action: PlayerAction,
+        player_event: WorldEvent,
+        new_events: list[WorldEvent],
+    ) -> ActionResponse:
+        context = build_agent_context(case, session, action)
+        intent = self._agent_gateway.generate(context)
+        decision = self._director.validate(case, session.narrative, intent)
+
+        speech = intent.speech
+        director_blocked = not decision.allowed
+        director_reason = decision.reason
+
+        if decision.allowed:
+            npc_event = self._recorder.append(
+                session,
+                actor_id=action.target_id,
+                event_type=EventType.NPC_REPLIED,
+                payload={
+                    "speech": intent.speech,
+                    "intent": intent.intent,
+                    "proposed_actions": [
+                        item.model_dump(mode="json") for item in intent.proposed_actions
+                    ],
+                },
+                caused_by_event_id=player_event.id,
+            )
+            new_events.append(npc_event)
+            new_events.extend(
+                self._rule_engine.apply_agent_intent(
+                    case=case,
+                    session=session,
+                    intent=intent,
+                    caused_by_event_id=npc_event.id,
+                )
+            )
+        else:
+            speech = decision.safe_speech
+            blocked_event = self._recorder.append(
+                session,
+                actor_id="director",
+                event_type=EventType.DIRECTOR_BLOCKED,
+                payload={
+                    "target_id": action.target_id,
+                    "blocked_fact_id": decision.blocked_fact_id,
+                    "reason": decision.reason,
+                },
+                caused_by_event_id=player_event.id,
+            )
+            new_events.append(blocked_event)
+
+        trigger_source_event_id = new_events[-1].id
+        new_events.extend(self._derive_events(case, session, new_events))
+        new_events.extend(self._evaluate_triggers(case, session, trigger_source_event_id))
+
+        return ActionResponse(
+            session_id=session.id,
+            accepted=decision.allowed,
+            speech=speech,
+            director_blocked=director_blocked,
+            director_reason=director_reason,
+            new_events=new_events,
+            state=build_state_summary(case, session),
+        )
 
     def _evaluate_triggers(
         self,

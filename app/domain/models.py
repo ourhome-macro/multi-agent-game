@@ -4,7 +4,7 @@ from enum import StrEnum
 from typing import Annotated, Any, Literal
 from uuid import uuid4
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 NonEmptyString = Annotated[str, Field(min_length=1)]
 RELATIONSHIP_MIN = -1.0
@@ -14,6 +14,14 @@ RELATIONSHIP_MAX = 1.0
 class ActionType(StrEnum):
     INSPECT = "inspect"
     TALK = "talk"
+    ASK_ABOUT = "ask_about"
+    PRESENT_CLUE = "present_clue"
+
+
+class SubjectType(StrEnum):
+    CLUE = "clue"
+    CHARACTER = "character"
+    SCENE = "scene"
 
 
 class AgentIntentType(StrEnum):
@@ -29,6 +37,8 @@ class EventType(StrEnum):
     SESSION_CREATED = "session.created"
     PLAYER_INSPECTED = "player.inspected"
     PLAYER_TALKED = "player.talked"
+    PLAYER_ASKED_ABOUT = "player.asked_about"
+    PLAYER_PRESENTED_CLUE = "player.presented_clue"
     NPC_REPLIED = "npc.replied"
     DIRECTOR_BLOCKED = "director.blocked"
     RULE_REJECTED = "rule.rejected"
@@ -160,6 +170,12 @@ ProposedAction = DiscoverClueAction | RelationshipChangeAction | NarrativePhaseC
 
 class MockReplyConfig(APIModel):
     phase: NonEmptyString | None = None
+    asked_subject_type: SubjectType | None = None
+    asked_subject_id: NonEmptyString | None = None
+    presented_clue: NonEmptyString | None = None
+    min_interaction_pressure: float | None = Field(default=None, ge=0.0, le=1.0)
+    max_interaction_pressure: float | None = Field(default=None, ge=0.0, le=1.0)
+    requires_subject_sensitive: bool | None = None
     requires_discovered: list[NonEmptyString] = Field(default_factory=list)
     missing_discovered: list[NonEmptyString] = Field(default_factory=list)
     min_relationship: dict[str, float] = Field(default_factory=dict)
@@ -214,8 +230,31 @@ class CasePackage(APIModel):
 class PlayerAction(APIModel):
     type: ActionType
     target_id: NonEmptyString
+    clue_id: NonEmptyString | None = None
+    subject_type: SubjectType | None = None
+    subject_id: NonEmptyString | None = None
     text: str | None = None
     force_forbidden: bool = False
+
+    @model_validator(mode="after")
+    def validate_action_specific_fields(self) -> PlayerAction:
+        if self.type == ActionType.ASK_ABOUT:
+            if self.subject_type is None or self.subject_id is None:
+                raise ValueError("ask_about requires subject_type and subject_id")
+            if self.clue_id is not None:
+                raise ValueError("clue_id is only valid for present_clue")
+            return self
+        if self.type == ActionType.PRESENT_CLUE:
+            if self.clue_id is None:
+                raise ValueError("present_clue requires clue_id")
+            if self.subject_type is not None or self.subject_id is not None:
+                raise ValueError("subject fields are only valid for ask_about")
+            return self
+        if self.clue_id is not None:
+            raise ValueError("clue_id is only valid for present_clue")
+        if self.subject_type is not None or self.subject_id is not None:
+            raise ValueError("subject fields are only valid for ask_about")
+        return self
 
 
 class AgentIntent(APIModel):
@@ -296,6 +335,12 @@ class AgentContext(APIModel):
     memory_candidates: list[MemoryCandidateState] = Field(default_factory=list)
     blocked_fact_ids: list[NonEmptyString] = Field(default_factory=list)
     revealable_fact_ids: list[NonEmptyString] = Field(default_factory=list)
+    asked_subject_type: SubjectType | None = None
+    asked_subject_id: NonEmptyString | None = None
+    interaction_pressure: float = Field(default=0.0, ge=0.0, le=1.0)
+    subject_is_sensitive: bool = False
+    presented_clue_id: NonEmptyString | None = None
+    presented_knowledge_id: NonEmptyString | None = None
     player_action: PlayerAction
     target_profile: AgentCharacterView | None = None
     default_speech: str | None = None

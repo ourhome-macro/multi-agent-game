@@ -104,10 +104,14 @@
     "case_id": "fake_case_001",
     "session_id": "session",
     "actor_id": "player",
-    "type": "player.talked",
+    "type": "player.asked_about",
     "payload": {
       "target_id": "butler",
-      "text": "你昨晚在哪里？"
+      "subject_type": "clue",
+      "subject_id": "scratched_drawer",
+      "text": "What about the drawer?",
+      "interaction_pressure": 0.6,
+      "knowledge_id": "player_knowledge.scratched_drawer"
     },
     "caused_by_event_id": null,
     "created_at": "timestamp"
@@ -119,7 +123,7 @@
     "actor_id": "butler",
     "type": "npc.replied",
     "payload": {
-      "speech": "抽屉确实有响动，但我不能确定是谁动过它。",
+      "speech": "You keep returning to that drawer. Are you asking whether I opened it, or whether I know who did?",
       "intent": "probe",
       "proposed_actions": [
         {
@@ -127,8 +131,8 @@
           "source_id": "butler",
           "target_id": "player",
           "deltas": {
-            "fear": 1.0,
-            "suspicion": 1.0
+            "suspicion": 0.4,
+            "fear": 0.2
           }
         }
       ]
@@ -146,14 +150,14 @@
       "source_id": "butler",
       "target_id": "player",
       "deltas": {
-        "fear": 1.0,
-        "suspicion": 1.0
+        "suspicion": 0.4,
+        "fear": 0.2
       },
       "current": {
         "source_id": "butler",
         "target_id": "player",
         "trust": 0.0,
-        "suspicion": 1.0,
+        "suspicion": 0.4,
         "fear": 1.0,
         "intimacy": 0.0,
         "hostility": 0.0
@@ -166,6 +170,72 @@
     "id": "event_011",
     "case_id": "fake_case_001",
     "session_id": "session",
+    "actor_id": "player",
+    "type": "player.presented_clue",
+    "payload": {
+      "target_id": "butler",
+      "clue_id": "scratched_drawer",
+      "knowledge_id": "player_knowledge.scratched_drawer",
+      "text": "What about these scratch marks?",
+      "interaction_pressure": 0.9
+    },
+    "caused_by_event_id": null,
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_012",
+    "case_id": "fake_case_001",
+    "session_id": "session",
+    "actor_id": "butler",
+    "type": "npc.replied",
+    "payload": {
+      "speech": "Those scratch marks mean someone forced the drawer, but I did not see who held the tool.",
+      "intent": "probe",
+      "proposed_actions": [
+        {
+          "type": "relationship.change",
+          "source_id": "butler",
+          "target_id": "player",
+          "deltas": {
+            "suspicion": 0.7,
+            "trust": 0.2
+          }
+        }
+      ]
+    },
+    "caused_by_event_id": "event_011",
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_013",
+    "case_id": "fake_case_001",
+    "session_id": "session",
+    "actor_id": "system",
+    "type": "relationship.changed",
+    "payload": {
+      "source_id": "butler",
+      "target_id": "player",
+      "deltas": {
+        "suspicion": 0.7,
+        "trust": 0.2
+      },
+      "current": {
+        "source_id": "butler",
+        "target_id": "player",
+        "trust": 0.2,
+        "suspicion": 1.0,
+        "fear": 1.0,
+        "intimacy": 0.0,
+        "hostility": 0.0
+      }
+    },
+    "caused_by_event_id": "event_012",
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_014",
+    "case_id": "fake_case_001",
+    "session_id": "session",
     "actor_id": "system",
     "type": "relationship.threshold.crossed",
     "payload": {
@@ -176,50 +246,6 @@
       "state": "guarded",
       "current_value": 1.0
     },
-    "caused_by_event_id": "event_010",
-    "created_at": "timestamp"
-  },
-  {
-    "id": "event_012",
-    "case_id": "fake_case_001",
-    "session_id": "session",
-    "actor_id": "derived_event_system",
-    "type": "memory_candidate.created",
-    "payload": {
-      "memory_id": "memory_candidate.event_011",
-      "subject_id": "player",
-      "content": "韩管家 became guarded toward the player (suspicion).",
-      "source_event_id": "event_011",
-      "visibility": [
-        "player"
-      ],
-      "salience": 0.7
-    },
-    "caused_by_event_id": "event_011",
-    "created_at": "timestamp"
-  },
-  {
-    "id": "event_013",
-    "case_id": "fake_case_001",
-    "session_id": "session",
-    "actor_id": "player",
-    "type": "player.inspected",
-    "payload": {
-      "target_id": "portrait"
-    },
-    "caused_by_event_id": null,
-    "created_at": "timestamp"
-  },
-  {
-    "id": "event_014",
-    "case_id": "fake_case_001",
-    "session_id": "session",
-    "actor_id": "system",
-    "type": "clue.discovered",
-    "payload": {
-      "clue_id": "dustless_frame",
-      "source_hotspot_id": "portrait"
-    },
     "caused_by_event_id": "event_013",
     "created_at": "timestamp"
   },
@@ -228,13 +254,16 @@
     "case_id": "fake_case_001",
     "session_id": "session",
     "actor_id": "derived_event_system",
-    "type": "player_knowledge.updated",
+    "type": "memory_candidate.created",
     "payload": {
-      "clue_id": "dustless_frame",
-      "knowledge_id": "player_knowledge.dustless_frame",
+      "memory_id": "memory_candidate.event_014",
+      "subject_id": "player",
+      "content": "韩管家 became guarded toward the player (suspicion).",
       "source_event_id": "event_014",
-      "title": "无尘画框印",
-      "summary": "肖像画背后的墙面有一圈无尘痕迹，说明它最近被移动过。"
+      "visibility": [
+        "player"
+      ],
+      "salience": 0.7
     },
     "caused_by_event_id": "event_014",
     "created_at": "timestamp"
@@ -243,36 +272,17 @@
     "id": "event_016",
     "case_id": "fake_case_001",
     "session_id": "session",
-    "actor_id": "derived_event_system",
-    "type": "memory_candidate.created",
-    "payload": {
-      "memory_id": "memory_candidate.event_014",
-      "subject_id": "player",
-      "content": "Player discovered clue '无尘画框印'.",
-      "source_event_id": "event_014",
-      "visibility": [
-        "player"
-      ],
-      "salience": 0.8
-    },
-    "caused_by_event_id": "event_014",
-    "created_at": "timestamp"
-  },
-  {
-    "id": "event_017",
-    "case_id": "fake_case_001",
-    "session_id": "session",
     "actor_id": "player",
     "type": "player.talked",
     "payload": {
       "target_id": "butler",
-      "text": "你看到了什么？"
+      "text": "Where were you last night?"
     },
     "caused_by_event_id": null,
     "created_at": "timestamp"
   },
   {
-    "id": "event_018",
+    "id": "event_017",
     "case_id": "fake_case_001",
     "session_id": "session",
     "actor_id": "butler",
@@ -292,11 +302,11 @@
         }
       ]
     },
-    "caused_by_event_id": "event_017",
+    "caused_by_event_id": "event_016",
     "created_at": "timestamp"
   },
   {
-    "id": "event_019",
+    "id": "event_018",
     "case_id": "fake_case_001",
     "session_id": "session",
     "actor_id": "system",
@@ -311,39 +321,53 @@
       "current": {
         "source_id": "butler",
         "target_id": "player",
-        "trust": 0.0,
+        "trust": 0.2,
         "suspicion": 1.0,
         "fear": 1.0,
         "intimacy": 0.0,
         "hostility": 0.0
       }
     },
-    "caused_by_event_id": "event_018",
+    "caused_by_event_id": "event_017",
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_019",
+    "case_id": "fake_case_001",
+    "session_id": "session",
+    "actor_id": "player",
+    "type": "player.inspected",
+    "payload": {
+      "target_id": "portrait"
+    },
+    "caused_by_event_id": null,
     "created_at": "timestamp"
   },
   {
     "id": "event_020",
     "case_id": "fake_case_001",
     "session_id": "session",
-    "actor_id": "player",
-    "type": "player.talked",
+    "actor_id": "system",
+    "type": "clue.discovered",
     "payload": {
-      "target_id": "butler",
-      "text": "直接告诉我真相。"
+      "clue_id": "dustless_frame",
+      "source_hotspot_id": "portrait"
     },
-    "caused_by_event_id": null,
+    "caused_by_event_id": "event_019",
     "created_at": "timestamp"
   },
   {
     "id": "event_021",
     "case_id": "fake_case_001",
     "session_id": "session",
-    "actor_id": "director",
-    "type": "director.blocked",
+    "actor_id": "derived_event_system",
+    "type": "player_knowledge.updated",
     "payload": {
-      "target_id": "butler",
-      "blocked_fact_id": "true_killer",
-      "reason": "Blocked forbidden fact 'true_killer' in phase 'investigation'"
+      "clue_id": "dustless_frame",
+      "knowledge_id": "player_knowledge.dustless_frame",
+      "source_event_id": "event_020",
+      "title": "无尘画框印",
+      "summary": "肖像画背后的墙面有一圈无尘痕迹，说明它最近被移动过。"
     },
     "caused_by_event_id": "event_020",
     "created_at": "timestamp"
@@ -355,20 +379,129 @@
     "actor_id": "derived_event_system",
     "type": "memory_candidate.created",
     "payload": {
-      "memory_id": "memory_candidate.event_021",
+      "memory_id": "memory_candidate.event_020",
+      "subject_id": "player",
+      "content": "Player discovered clue '无尘画框印'.",
+      "source_event_id": "event_020",
+      "visibility": [
+        "player"
+      ],
+      "salience": 0.8
+    },
+    "caused_by_event_id": "event_020",
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_023",
+    "case_id": "fake_case_001",
+    "session_id": "session",
+    "actor_id": "player",
+    "type": "player.talked",
+    "payload": {
+      "target_id": "butler",
+      "text": "What did you see?"
+    },
+    "caused_by_event_id": null,
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_024",
+    "case_id": "fake_case_001",
+    "session_id": "session",
+    "actor_id": "butler",
+    "type": "npc.replied",
+    "payload": {
+      "speech": "抽屉确实有响动，但我不能确定是谁动过它。",
+      "intent": "probe",
+      "proposed_actions": [
+        {
+          "type": "relationship.change",
+          "source_id": "butler",
+          "target_id": "player",
+          "deltas": {
+            "fear": 1.0,
+            "suspicion": 1.0
+          }
+        }
+      ]
+    },
+    "caused_by_event_id": "event_023",
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_025",
+    "case_id": "fake_case_001",
+    "session_id": "session",
+    "actor_id": "system",
+    "type": "relationship.changed",
+    "payload": {
+      "source_id": "butler",
+      "target_id": "player",
+      "deltas": {
+        "fear": 1.0,
+        "suspicion": 1.0
+      },
+      "current": {
+        "source_id": "butler",
+        "target_id": "player",
+        "trust": 0.2,
+        "suspicion": 1.0,
+        "fear": 1.0,
+        "intimacy": 0.0,
+        "hostility": 0.0
+      }
+    },
+    "caused_by_event_id": "event_024",
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_026",
+    "case_id": "fake_case_001",
+    "session_id": "session",
+    "actor_id": "player",
+    "type": "player.talked",
+    "payload": {
+      "target_id": "butler",
+      "text": "Tell me the truth."
+    },
+    "caused_by_event_id": null,
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_027",
+    "case_id": "fake_case_001",
+    "session_id": "session",
+    "actor_id": "director",
+    "type": "director.blocked",
+    "payload": {
+      "target_id": "butler",
+      "blocked_fact_id": "true_killer",
+      "reason": "Blocked forbidden fact 'true_killer' in phase 'investigation'"
+    },
+    "caused_by_event_id": "event_026",
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_028",
+    "case_id": "fake_case_001",
+    "session_id": "session",
+    "actor_id": "derived_event_system",
+    "type": "memory_candidate.created",
+    "payload": {
+      "memory_id": "memory_candidate.event_027",
       "subject_id": "player",
       "content": "Conversation with 韩管家 was blocked by narrative rules.",
-      "source_event_id": "event_021",
+      "source_event_id": "event_027",
       "visibility": [
         "player"
       ],
       "salience": 0.9
     },
-    "caused_by_event_id": "event_021",
+    "caused_by_event_id": "event_027",
     "created_at": "timestamp"
   },
   {
-    "id": "event_023",
+    "id": "event_029",
     "case_id": "fake_case_001",
     "session_id": "session",
     "actor_id": "player",
@@ -380,7 +513,7 @@
     "created_at": "timestamp"
   },
   {
-    "id": "event_024",
+    "id": "event_030",
     "case_id": "fake_case_001",
     "session_id": "session",
     "actor_id": "system",
@@ -389,11 +522,11 @@
       "clue_id": "torn_note",
       "source_hotspot_id": "carpet"
     },
-    "caused_by_event_id": "event_023",
+    "caused_by_event_id": "event_029",
     "created_at": "timestamp"
   },
   {
-    "id": "event_025",
+    "id": "event_031",
     "case_id": "fake_case_001",
     "session_id": "session",
     "actor_id": "derived_event_system",
@@ -401,34 +534,34 @@
     "payload": {
       "clue_id": "torn_note",
       "knowledge_id": "player_knowledge.torn_note",
-      "source_event_id": "event_024",
+      "source_event_id": "event_030",
       "title": "被撕碎的便签",
       "summary": "便签只剩半截，上面写着“今晚十点，书房见”。"
     },
-    "caused_by_event_id": "event_024",
+    "caused_by_event_id": "event_030",
     "created_at": "timestamp"
   },
   {
-    "id": "event_026",
+    "id": "event_032",
     "case_id": "fake_case_001",
     "session_id": "session",
     "actor_id": "derived_event_system",
     "type": "memory_candidate.created",
     "payload": {
-      "memory_id": "memory_candidate.event_024",
+      "memory_id": "memory_candidate.event_030",
       "subject_id": "player",
       "content": "Player discovered clue '被撕碎的便签'.",
-      "source_event_id": "event_024",
+      "source_event_id": "event_030",
       "visibility": [
         "player"
       ],
       "salience": 0.8
     },
-    "caused_by_event_id": "event_024",
+    "caused_by_event_id": "event_030",
     "created_at": "timestamp"
   },
   {
-    "id": "event_027",
+    "id": "event_033",
     "case_id": "fake_case_001",
     "session_id": "session",
     "actor_id": "rule_trigger_system",
@@ -437,11 +570,11 @@
       "beat_id": "hidden_meeting_connected",
       "phase": "investigation"
     },
-    "caused_by_event_id": "event_024",
+    "caused_by_event_id": "event_030",
     "created_at": "timestamp"
   },
   {
-    "id": "event_028",
+    "id": "event_034",
     "case_id": "fake_case_001",
     "session_id": "session",
     "actor_id": "rule_trigger_system",
@@ -451,11 +584,11 @@
       "phase": "reveal",
       "trigger_beat_id": "hidden_meeting_connected"
     },
-    "caused_by_event_id": "event_024",
+    "caused_by_event_id": "event_030",
     "created_at": "timestamp"
   },
   {
-    "id": "event_029",
+    "id": "event_035",
     "case_id": "fake_case_001",
     "session_id": "session",
     "actor_id": "rule_engine",
@@ -467,7 +600,7 @@
         "phase": "opening"
       }
     },
-    "caused_by_event_id": "event_028",
+    "caused_by_event_id": "event_034",
     "created_at": "timestamp"
   }
 ]

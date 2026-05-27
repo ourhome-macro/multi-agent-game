@@ -8,6 +8,7 @@ from app.domain.models import (
     SessionState,
 )
 from app.rules.engine import relationship_key
+from app.runtime.pressure import calculate_interaction_pressure, subject_is_sensitive
 
 RECENT_EVENT_LIMIT = 10
 
@@ -47,6 +48,12 @@ def build_agent_context(
         if character is not None
         else None
     )
+    presented_clue_id = action.clue_id
+    presented_knowledge_id = (
+        f"player_knowledge.{action.clue_id}" if action.clue_id is not None else None
+    )
+    asked_subject_type = action.subject_type
+    asked_subject_id = action.subject_id
 
     return AgentContext(
         case_id=case.meta.id,
@@ -72,6 +79,12 @@ def build_agent_context(
         ),
         blocked_fact_ids=blocked_fact_ids,
         revealable_fact_ids=revealable_fact_ids,
+        asked_subject_type=asked_subject_type,
+        asked_subject_id=asked_subject_id,
+        interaction_pressure=calculate_interaction_pressure(case, action),
+        subject_is_sensitive=subject_is_sensitive(case, action),
+        presented_clue_id=presented_clue_id,
+        presented_knowledge_id=presented_knowledge_id,
         player_action=action,
         target_profile=target_profile,
         default_speech=dialogue.default_speech if dialogue is not None else None,
