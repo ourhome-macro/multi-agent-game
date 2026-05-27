@@ -1483,7 +1483,7 @@ def test_state_summary_snapshots_do_not_leak_internal_fields(client: TestClient)
             "completed_beats": [],
             "discovered": [],
             "player_knowledge": [],
-            "event_count": 4,
+            "event_count": 7,
         },
     }
     serialized = json.dumps([opening, investigation, second_case_talk], ensure_ascii=False)

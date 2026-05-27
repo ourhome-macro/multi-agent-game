@@ -15,7 +15,7 @@ def render_player_journey(events: list[WorldEvent]) -> str:
     accusation = _accusation_result(events)
 
     lines = [
-        "# fake_case_001 Player Journey",
+        f"# {events[0].case_id} Player Journey",
         "",
         "## Case summary",
         "",

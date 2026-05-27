@@ -101,15 +101,15 @@ correctness and cannot write `player.accused` or `accusation.evaluated`.
 
 ## Replay Requirement
 
-The runtime scenario smoke test records a stable event snapshot and verifies that
-replaying those events rebuilds equivalent key state. This protects the rule
-chain, derived state, Director blocking, Rule Engine rejection, and phase
-progression from accidental drift.
+The runtime scenario smoke tests record stable event snapshots for
+`fake_case_001` and `fake_case_002` and verify that replaying those events
+rebuilds equivalent key state. This protects the rule chain, derived state,
+Director blocking, Rule Engine rejection, accusation evaluation, narrative
+resolution, and phase progression from accidental drift.
 
-The same scenario also renders
-`tests/snapshots/fake_case_001_player_journey.md` from the actual `WorldEvent`
-list. The Markdown is for human review and must obey the same public-summary leak
-boundary.
+The same scenarios also render player journey Markdown files from the actual
+`WorldEvent` lists. The Markdown is for human review and must obey the same
+public-summary leak boundary.
 
 Replay rebuilds `memory_candidates` and `memory_snapshots` from persisted events.
 It does not re-run memory derivation or snapshot aggregation, preserving event

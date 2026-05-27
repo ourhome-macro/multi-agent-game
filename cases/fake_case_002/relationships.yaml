@@ -1,7 +1,7 @@
 - source_id: dockmaster
   target_id: player
   trust: 0
-  suspicion: 1
+  suspicion: 0
   fear: 0
   intimacy: 0
   hostility: 0
@@ -10,6 +10,6 @@
   target_id: player
   trust: -1
   suspicion: 0
-  fear: 1
+  fear: 0
   intimacy: 0
   hostility: 0

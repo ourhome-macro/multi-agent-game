@@ -1,0 +1,973 @@
+[
+  {
+    "id": "event_001",
+    "case_id": "fake_case_002",
+    "session_id": "session",
+    "actor_id": "system",
+    "type": "session.created",
+    "payload": {
+      "case_id": "fake_case_002",
+      "initial_phase": "opening"
+    },
+    "caused_by_event_id": null,
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_002",
+    "case_id": "fake_case_002",
+    "session_id": "session",
+    "actor_id": "player",
+    "type": "player.inspected",
+    "payload": {
+      "target_id": "tide_mark"
+    },
+    "caused_by_event_id": null,
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_003",
+    "case_id": "fake_case_002",
+    "session_id": "session",
+    "actor_id": "system",
+    "type": "clue.discovered",
+    "payload": {
+      "clue_id": "inward_tide_mark",
+      "source_hotspot_id": "tide_mark"
+    },
+    "caused_by_event_id": "event_002",
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_004",
+    "case_id": "fake_case_002",
+    "session_id": "session",
+    "actor_id": "derived_event_system",
+    "type": "player_knowledge.updated",
+    "payload": {
+      "clue_id": "inward_tide_mark",
+      "knowledge_id": "player_knowledge.inward_tide_mark",
+      "source_event_id": "event_003",
+      "title": "向内延伸的潮痕",
+      "summary": "潮痕从门缝向仓库内延伸，和码头长说的“门一直关着”不一致。"
+    },
+    "caused_by_event_id": "event_003",
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_005",
+    "case_id": "fake_case_002",
+    "session_id": "session",
+    "actor_id": "derived_event_system",
+    "type": "memory_candidate.created",
+    "payload": {
+      "memory_id": "memory.player.clue_discovered.inward_tide_mark",
+      "subject_id": "player",
+      "content": "Player discovered clue '向内延伸的潮痕'.",
+      "source_event_id": "event_003",
+      "visibility": [
+        "player"
+      ],
+      "salience": 0.8
+    },
+    "caused_by_event_id": "event_003",
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_006",
+    "case_id": "fake_case_002",
+    "session_id": "session",
+    "actor_id": "memory_snapshot_system",
+    "type": "agent_memory_snapshot.updated",
+    "payload": {
+      "memory_id": "memory.player.clue_discovered.inward_tide_mark",
+      "subject_id": "player",
+      "source_event_ids": [
+        "event_003"
+      ],
+      "salience": 0.8,
+      "visibility": "private",
+      "operation": "created"
+    },
+    "caused_by_event_id": "event_005",
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_007",
+    "case_id": "fake_case_002",
+    "session_id": "session",
+    "actor_id": "rule_trigger_system",
+    "type": "narrative.beat.completed",
+    "payload": {
+      "beat_id": "tide_trace_found",
+      "phase": "opening"
+    },
+    "caused_by_event_id": "event_003",
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_008",
+    "case_id": "fake_case_002",
+    "session_id": "session",
+    "actor_id": "rule_trigger_system",
+    "type": "narrative.phase.changed",
+    "payload": {
+      "from_phase": "opening",
+      "phase": "pressure",
+      "to_phase": "pressure",
+      "trigger_beat_id": "tide_trace_found"
+    },
+    "caused_by_event_id": "event_003",
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_009",
+    "case_id": "fake_case_002",
+    "session_id": "session",
+    "actor_id": "player",
+    "type": "player.asked_about",
+    "payload": {
+      "target_id": "dockmaster",
+      "subject_type": "clue",
+      "subject_id": "inward_tide_mark",
+      "text": "What about the tide mark?",
+      "interaction_pressure": 0.6,
+      "knowledge_id": "player_knowledge.inward_tide_mark"
+    },
+    "caused_by_event_id": null,
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_010",
+    "case_id": "fake_case_002",
+    "session_id": "session",
+    "actor_id": "dockmaster",
+    "type": "npc.replied",
+    "payload": {
+      "speech": "潮痕只能说明门开过，不能说明是谁开的。",
+      "intent": "probe",
+      "proposed_actions": [
+        {
+          "type": "relationship.change",
+          "source_id": "dockmaster",
+          "target_id": "player",
+          "deltas": {
+            "suspicion": 1.0,
+            "hostility": 1.0
+          }
+        }
+      ]
+    },
+    "caused_by_event_id": "event_009",
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_011",
+    "case_id": "fake_case_002",
+    "session_id": "session",
+    "actor_id": "system",
+    "type": "relationship.changed",
+    "payload": {
+      "source_id": "dockmaster",
+      "target_id": "player",
+      "deltas": {
+        "suspicion": 1.0,
+        "hostility": 1.0
+      },
+      "current": {
+        "source_id": "dockmaster",
+        "target_id": "player",
+        "trust": 0.0,
+        "suspicion": 1.0,
+        "fear": 0.0,
+        "intimacy": 0.0,
+        "hostility": 1.0
+      }
+    },
+    "caused_by_event_id": "event_010",
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_012",
+    "case_id": "fake_case_002",
+    "session_id": "session",
+    "actor_id": "system",
+    "type": "relationship.threshold.crossed",
+    "payload": {
+      "source_id": "dockmaster",
+      "target_id": "player",
+      "metric": "suspicion",
+      "threshold": 0.7,
+      "state": "guarded",
+      "current_value": 1.0
+    },
+    "caused_by_event_id": "event_011",
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_013",
+    "case_id": "fake_case_002",
+    "session_id": "session",
+    "actor_id": "derived_event_system",
+    "type": "memory_candidate.created",
+    "payload": {
+      "memory_id": "memory.player.asked_about.dockmaster.clue.inward_tide_mark",
+      "subject_id": "player",
+      "content": "Player asked 赵码头长 about clue 'inward_tide_mark' with pressure 0.6.",
+      "source_event_id": "event_009",
+      "visibility": [
+        "player"
+      ],
+      "salience": 0.6
+    },
+    "caused_by_event_id": "event_009",
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_014",
+    "case_id": "fake_case_002",
+    "session_id": "session",
+    "actor_id": "memory_snapshot_system",
+    "type": "agent_memory_snapshot.updated",
+    "payload": {
+      "memory_id": "memory.player.asked_about.dockmaster.clue.inward_tide_mark",
+      "subject_id": "player",
+      "source_event_ids": [
+        "event_009"
+      ],
+      "salience": 0.6,
+      "visibility": "private",
+      "operation": "created"
+    },
+    "caused_by_event_id": "event_013",
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_015",
+    "case_id": "fake_case_002",
+    "session_id": "session",
+    "actor_id": "derived_event_system",
+    "type": "memory_candidate.created",
+    "payload": {
+      "memory_id": "memory.player.relationship_threshold.dockmaster.player.suspicion.guarded",
+      "subject_id": "player",
+      "content": "赵码头长 became guarded toward the player (suspicion).",
+      "source_event_id": "event_012",
+      "visibility": [
+        "player"
+      ],
+      "salience": 0.7
+    },
+    "caused_by_event_id": "event_012",
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_016",
+    "case_id": "fake_case_002",
+    "session_id": "session",
+    "actor_id": "memory_snapshot_system",
+    "type": "agent_memory_snapshot.updated",
+    "payload": {
+      "memory_id": "memory.player.relationship_threshold.dockmaster.player.suspicion.guarded",
+      "subject_id": "player",
+      "source_event_ids": [
+        "event_012"
+      ],
+      "salience": 0.7,
+      "visibility": "private",
+      "operation": "created"
+    },
+    "caused_by_event_id": "event_015",
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_017",
+    "case_id": "fake_case_002",
+    "session_id": "session",
+    "actor_id": "player",
+    "type": "player.talked",
+    "payload": {
+      "target_id": "dockmaster",
+      "text": "Was the door opened?"
+    },
+    "caused_by_event_id": null,
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_018",
+    "case_id": "fake_case_002",
+    "session_id": "session",
+    "actor_id": "dockmaster",
+    "type": "npc.replied",
+    "payload": {
+      "speech": "潮痕只能说明门开过，不能说明是谁开的。",
+      "intent": "probe",
+      "proposed_actions": [
+        {
+          "type": "relationship.change",
+          "source_id": "dockmaster",
+          "target_id": "player",
+          "deltas": {
+            "suspicion": 1.0,
+            "hostility": 1.0
+          }
+        }
+      ]
+    },
+    "caused_by_event_id": "event_017",
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_019",
+    "case_id": "fake_case_002",
+    "session_id": "session",
+    "actor_id": "system",
+    "type": "relationship.changed",
+    "payload": {
+      "source_id": "dockmaster",
+      "target_id": "player",
+      "deltas": {
+        "suspicion": 1.0,
+        "hostility": 1.0
+      },
+      "current": {
+        "source_id": "dockmaster",
+        "target_id": "player",
+        "trust": 0.0,
+        "suspicion": 1.0,
+        "fear": 0.0,
+        "intimacy": 0.0,
+        "hostility": 1.0
+      }
+    },
+    "caused_by_event_id": "event_018",
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_020",
+    "case_id": "fake_case_002",
+    "session_id": "session",
+    "actor_id": "player",
+    "type": "player.talked",
+    "payload": {
+      "target_id": "clerk",
+      "text": "Who hid the ledger?"
+    },
+    "caused_by_event_id": null,
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_021",
+    "case_id": "fake_case_002",
+    "session_id": "session",
+    "actor_id": "director",
+    "type": "director.blocked",
+    "payload": {
+      "target_id": "clerk",
+      "blocked_fact_id": "ledger_owner",
+      "reason": "Blocked forbidden fact 'ledger_owner' in phase 'pressure'"
+    },
+    "caused_by_event_id": "event_020",
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_022",
+    "case_id": "fake_case_002",
+    "session_id": "session",
+    "actor_id": "derived_event_system",
+    "type": "memory_candidate.created",
+    "payload": {
+      "memory_id": "memory.player.director_blocked.clerk.ledger_owner",
+      "subject_id": "player",
+      "content": "Conversation with 沈账房 was blocked by narrative rules.",
+      "source_event_id": "event_021",
+      "visibility": [
+        "player"
+      ],
+      "salience": 0.9
+    },
+    "caused_by_event_id": "event_021",
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_023",
+    "case_id": "fake_case_002",
+    "session_id": "session",
+    "actor_id": "memory_snapshot_system",
+    "type": "agent_memory_snapshot.updated",
+    "payload": {
+      "memory_id": "memory.player.director_blocked.clerk.ledger_owner",
+      "subject_id": "player",
+      "source_event_ids": [
+        "event_021"
+      ],
+      "salience": 0.9,
+      "visibility": "private",
+      "operation": "created"
+    },
+    "caused_by_event_id": "event_022",
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_024",
+    "case_id": "fake_case_002",
+    "session_id": "session",
+    "actor_id": "player",
+    "type": "player.inspected",
+    "payload": {
+      "target_id": "broken_lamp"
+    },
+    "caused_by_event_id": null,
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_025",
+    "case_id": "fake_case_002",
+    "session_id": "session",
+    "actor_id": "system",
+    "type": "clue.discovered",
+    "payload": {
+      "clue_id": "inward_broken_lamp",
+      "source_hotspot_id": "broken_lamp"
+    },
+    "caused_by_event_id": "event_024",
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_026",
+    "case_id": "fake_case_002",
+    "session_id": "session",
+    "actor_id": "derived_event_system",
+    "type": "player_knowledge.updated",
+    "payload": {
+      "clue_id": "inward_broken_lamp",
+      "knowledge_id": "player_knowledge.inward_broken_lamp",
+      "source_event_id": "event_025",
+      "title": "向内破裂的煤油灯",
+      "summary": "碎片位置说明灯是在有人进门后被撞倒，不像外力吹倒。"
+    },
+    "caused_by_event_id": "event_025",
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_027",
+    "case_id": "fake_case_002",
+    "session_id": "session",
+    "actor_id": "derived_event_system",
+    "type": "memory_candidate.created",
+    "payload": {
+      "memory_id": "memory.player.clue_discovered.inward_broken_lamp",
+      "subject_id": "player",
+      "content": "Player discovered clue '向内破裂的煤油灯'.",
+      "source_event_id": "event_025",
+      "visibility": [
+        "player"
+      ],
+      "salience": 0.8
+    },
+    "caused_by_event_id": "event_025",
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_028",
+    "case_id": "fake_case_002",
+    "session_id": "session",
+    "actor_id": "memory_snapshot_system",
+    "type": "agent_memory_snapshot.updated",
+    "payload": {
+      "memory_id": "memory.player.clue_discovered.inward_broken_lamp",
+      "subject_id": "player",
+      "source_event_ids": [
+        "event_025"
+      ],
+      "salience": 0.8,
+      "visibility": "private",
+      "operation": "created"
+    },
+    "caused_by_event_id": "event_027",
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_029",
+    "case_id": "fake_case_002",
+    "session_id": "session",
+    "actor_id": "player",
+    "type": "player.inspected",
+    "payload": {
+      "target_id": "ledger_box"
+    },
+    "caused_by_event_id": null,
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_030",
+    "case_id": "fake_case_002",
+    "session_id": "session",
+    "actor_id": "system",
+    "type": "clue.discovered",
+    "payload": {
+      "clue_id": "blue_ledger_page",
+      "source_hotspot_id": "ledger_box"
+    },
+    "caused_by_event_id": "event_029",
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_031",
+    "case_id": "fake_case_002",
+    "session_id": "session",
+    "actor_id": "derived_event_system",
+    "type": "player_knowledge.updated",
+    "payload": {
+      "clue_id": "blue_ledger_page",
+      "knowledge_id": "player_knowledge.blue_ledger_page",
+      "source_event_id": "event_030",
+      "title": "蓝墨账页",
+      "summary": "账页记录了午夜后入库的三只木箱，墨色与账房常用笔一致。"
+    },
+    "caused_by_event_id": "event_030",
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_032",
+    "case_id": "fake_case_002",
+    "session_id": "session",
+    "actor_id": "derived_event_system",
+    "type": "memory_candidate.created",
+    "payload": {
+      "memory_id": "memory.player.clue_discovered.blue_ledger_page",
+      "subject_id": "player",
+      "content": "Player discovered clue '蓝墨账页'.",
+      "source_event_id": "event_030",
+      "visibility": [
+        "player"
+      ],
+      "salience": 0.8
+    },
+    "caused_by_event_id": "event_030",
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_033",
+    "case_id": "fake_case_002",
+    "session_id": "session",
+    "actor_id": "memory_snapshot_system",
+    "type": "agent_memory_snapshot.updated",
+    "payload": {
+      "memory_id": "memory.player.clue_discovered.blue_ledger_page",
+      "subject_id": "player",
+      "source_event_ids": [
+        "event_030"
+      ],
+      "salience": 0.8,
+      "visibility": "private",
+      "operation": "created"
+    },
+    "caused_by_event_id": "event_032",
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_034",
+    "case_id": "fake_case_002",
+    "session_id": "session",
+    "actor_id": "rule_trigger_system",
+    "type": "narrative.beat.completed",
+    "payload": {
+      "beat_id": "ledger_pattern_found",
+      "phase": "pressure"
+    },
+    "caused_by_event_id": "event_030",
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_035",
+    "case_id": "fake_case_002",
+    "session_id": "session",
+    "actor_id": "rule_trigger_system",
+    "type": "narrative.phase.changed",
+    "payload": {
+      "from_phase": "pressure",
+      "phase": "expose",
+      "to_phase": "expose",
+      "trigger_beat_id": "ledger_pattern_found"
+    },
+    "caused_by_event_id": "event_030",
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_036",
+    "case_id": "fake_case_002",
+    "session_id": "session",
+    "actor_id": "player",
+    "type": "player.presented_clue",
+    "payload": {
+      "target_id": "clerk",
+      "clue_id": "blue_ledger_page",
+      "knowledge_id": "player_knowledge.blue_ledger_page",
+      "text": "Explain this ledger page.",
+      "interaction_pressure": 0.9
+    },
+    "caused_by_event_id": null,
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_037",
+    "case_id": "fake_case_002",
+    "session_id": "session",
+    "actor_id": "clerk",
+    "type": "npc.replied",
+    "payload": {
+      "speech": "我只记录货物，不知道谁让箱子午夜后进仓。",
+      "intent": "refuse",
+      "proposed_actions": [
+        {
+          "type": "relationship.change",
+          "source_id": "clerk",
+          "target_id": "player",
+          "deltas": {
+            "fear": 1.0
+          }
+        }
+      ]
+    },
+    "caused_by_event_id": "event_036",
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_038",
+    "case_id": "fake_case_002",
+    "session_id": "session",
+    "actor_id": "system",
+    "type": "relationship.changed",
+    "payload": {
+      "source_id": "clerk",
+      "target_id": "player",
+      "deltas": {
+        "fear": 1.0
+      },
+      "current": {
+        "source_id": "clerk",
+        "target_id": "player",
+        "trust": -1.0,
+        "suspicion": 0.0,
+        "fear": 1.0,
+        "intimacy": 0.0,
+        "hostility": 0.0
+      }
+    },
+    "caused_by_event_id": "event_037",
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_039",
+    "case_id": "fake_case_002",
+    "session_id": "session",
+    "actor_id": "system",
+    "type": "relationship.threshold.crossed",
+    "payload": {
+      "source_id": "clerk",
+      "target_id": "player",
+      "metric": "fear",
+      "threshold": 0.7,
+      "state": "afraid",
+      "current_value": 1.0
+    },
+    "caused_by_event_id": "event_038",
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_040",
+    "case_id": "fake_case_002",
+    "session_id": "session",
+    "actor_id": "derived_event_system",
+    "type": "memory_candidate.created",
+    "payload": {
+      "memory_id": "memory.player.presented_clue.clerk.blue_ledger_page",
+      "subject_id": "player",
+      "content": "Player pressured 沈账房 with clue 'blue_ledger_page' at pressure 0.9.",
+      "source_event_id": "event_036",
+      "visibility": [
+        "player"
+      ],
+      "salience": 0.9
+    },
+    "caused_by_event_id": "event_036",
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_041",
+    "case_id": "fake_case_002",
+    "session_id": "session",
+    "actor_id": "memory_snapshot_system",
+    "type": "agent_memory_snapshot.updated",
+    "payload": {
+      "memory_id": "memory.player.presented_clue.clerk.blue_ledger_page",
+      "subject_id": "player",
+      "source_event_ids": [
+        "event_036"
+      ],
+      "salience": 0.9,
+      "visibility": "private",
+      "operation": "created"
+    },
+    "caused_by_event_id": "event_040",
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_042",
+    "case_id": "fake_case_002",
+    "session_id": "session",
+    "actor_id": "derived_event_system",
+    "type": "memory_candidate.created",
+    "payload": {
+      "memory_id": "memory.player.relationship_threshold.clerk.player.fear.afraid",
+      "subject_id": "player",
+      "content": "沈账房 became afraid toward the player (fear).",
+      "source_event_id": "event_039",
+      "visibility": [
+        "player"
+      ],
+      "salience": 0.7
+    },
+    "caused_by_event_id": "event_039",
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_043",
+    "case_id": "fake_case_002",
+    "session_id": "session",
+    "actor_id": "memory_snapshot_system",
+    "type": "agent_memory_snapshot.updated",
+    "payload": {
+      "memory_id": "memory.player.relationship_threshold.clerk.player.fear.afraid",
+      "subject_id": "player",
+      "source_event_ids": [
+        "event_039"
+      ],
+      "salience": 0.7,
+      "visibility": "private",
+      "operation": "created"
+    },
+    "caused_by_event_id": "event_042",
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_044",
+    "case_id": "fake_case_002",
+    "session_id": "session",
+    "actor_id": "player",
+    "type": "player.talked",
+    "payload": {
+      "target_id": "dockmaster",
+      "text": "The lamp was broken inside."
+    },
+    "caused_by_event_id": null,
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_045",
+    "case_id": "fake_case_002",
+    "session_id": "session",
+    "actor_id": "dockmaster",
+    "type": "npc.replied",
+    "payload": {
+      "speech": "那盏灯不是风吹的。有人进门太急，撞到了门后的箱子。",
+      "intent": "answer",
+      "proposed_actions": [
+        {
+          "type": "relationship.change",
+          "source_id": "dockmaster",
+          "target_id": "player",
+          "deltas": {
+            "suspicion": 1.0
+          }
+        }
+      ]
+    },
+    "caused_by_event_id": "event_044",
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_046",
+    "case_id": "fake_case_002",
+    "session_id": "session",
+    "actor_id": "system",
+    "type": "relationship.changed",
+    "payload": {
+      "source_id": "dockmaster",
+      "target_id": "player",
+      "deltas": {
+        "suspicion": 1.0
+      },
+      "current": {
+        "source_id": "dockmaster",
+        "target_id": "player",
+        "trust": 0.0,
+        "suspicion": 1.0,
+        "fear": 0.0,
+        "intimacy": 0.0,
+        "hostility": 1.0
+      }
+    },
+    "caused_by_event_id": "event_045",
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_047",
+    "case_id": "fake_case_002",
+    "session_id": "session",
+    "actor_id": "player",
+    "type": "player.accused",
+    "payload": {
+      "target_id": "dockmaster",
+      "claim_id": "dockmaster_opened_warehouse",
+      "evidence_clue_ids": [
+        "inward_tide_mark",
+        "inward_broken_lamp",
+        "blue_ledger_page"
+      ],
+      "text": "You opened the warehouse after the tide and staged the entry."
+    },
+    "caused_by_event_id": null,
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_048",
+    "case_id": "fake_case_002",
+    "session_id": "session",
+    "actor_id": "rule_engine",
+    "type": "accusation.evaluated",
+    "payload": {
+      "target_id": "dockmaster",
+      "claim_id": "dockmaster_opened_warehouse",
+      "result": "correct",
+      "matched_required_evidence": [
+        "blue_ledger_page",
+        "inward_broken_lamp",
+        "inward_tide_mark"
+      ],
+      "missing_required_evidence": []
+    },
+    "caused_by_event_id": "event_047",
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_049",
+    "case_id": "fake_case_002",
+    "session_id": "session",
+    "actor_id": "derived_event_system",
+    "type": "memory_candidate.created",
+    "payload": {
+      "memory_id": "memory.player.accused.dockmaster.dockmaster_opened_warehouse",
+      "subject_id": "player",
+      "content": "Player formally accused 赵码头长 with claim 'dockmaster_opened_warehouse' using evidence ['inward_tide_mark', 'inward_broken_lamp', 'blue_ledger_page'].",
+      "source_event_id": "event_047",
+      "visibility": [
+        "player"
+      ],
+      "salience": 1.0
+    },
+    "caused_by_event_id": "event_047",
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_050",
+    "case_id": "fake_case_002",
+    "session_id": "session",
+    "actor_id": "memory_snapshot_system",
+    "type": "agent_memory_snapshot.updated",
+    "payload": {
+      "memory_id": "memory.player.accused.dockmaster.dockmaster_opened_warehouse",
+      "subject_id": "player",
+      "source_event_ids": [
+        "event_047"
+      ],
+      "salience": 1.0,
+      "visibility": "private",
+      "operation": "created"
+    },
+    "caused_by_event_id": "event_049",
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_051",
+    "case_id": "fake_case_002",
+    "session_id": "session",
+    "actor_id": "derived_event_system",
+    "type": "memory_candidate.created",
+    "payload": {
+      "memory_id": "memory.player.accusation_evaluated.dockmaster.dockmaster_opened_warehouse.correct",
+      "subject_id": "player",
+      "content": "Rule Engine evaluated the accusation against 赵码头长 for claim 'dockmaster_opened_warehouse' as correct.",
+      "source_event_id": "event_048",
+      "visibility": [
+        "player"
+      ],
+      "salience": 1.0
+    },
+    "caused_by_event_id": "event_048",
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_052",
+    "case_id": "fake_case_002",
+    "session_id": "session",
+    "actor_id": "memory_snapshot_system",
+    "type": "agent_memory_snapshot.updated",
+    "payload": {
+      "memory_id": "memory.player.accusation_evaluated.dockmaster.dockmaster_opened_warehouse.correct",
+      "subject_id": "player",
+      "source_event_ids": [
+        "event_048"
+      ],
+      "salience": 1.0,
+      "visibility": "private",
+      "operation": "created"
+    },
+    "caused_by_event_id": "event_051",
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_053",
+    "case_id": "fake_case_002",
+    "session_id": "session",
+    "actor_id": "rule_trigger_system",
+    "type": "narrative.beat.completed",
+    "payload": {
+      "beat_id": "case_solved",
+      "phase": "expose"
+    },
+    "caused_by_event_id": "event_048",
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_054",
+    "case_id": "fake_case_002",
+    "session_id": "session",
+    "actor_id": "rule_trigger_system",
+    "type": "narrative.phase.changed",
+    "payload": {
+      "from_phase": "expose",
+      "phase": "resolved",
+      "to_phase": "resolved",
+      "trigger_beat_id": "case_solved"
+    },
+    "caused_by_event_id": "event_048",
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_055",
+    "case_id": "fake_case_002",
+    "session_id": "session",
+    "actor_id": "rule_engine",
+    "type": "rule.rejected",
+    "payload": {
+      "action_type": "narrative.phase.change",
+      "reason": "narrative phase changes must be driven by narrative rules",
+      "proposed_payload": {
+        "phase": "opening"
+      }
+    },
+    "caused_by_event_id": "event_054",
+    "created_at": "timestamp"
+  }
+]
