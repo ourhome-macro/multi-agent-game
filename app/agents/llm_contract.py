@@ -19,11 +19,16 @@ def build_llm_agent_input(context: AgentContext) -> LLMAgentContractInput:
     )
 
 
-def validate_llm_agent_output(payload: dict[str, Any]) -> AgentIntent:
+def validate_llm_agent_output(
+    payload: dict[str, Any],
+    contract_input: LLMAgentContractInput | None = None,
+) -> AgentIntent:
     intent = AgentIntent.model_validate(payload)
     for action in intent.proposed_actions:
         if action.type == ProposedActionType.NARRATIVE_PHASE_CHANGE:
             raise ValueError("LLM Agent output must not propose narrative phase changes")
+    if contract_input is not None:
+        _reject_raw_private_echo(intent, contract_input)
     return intent
 
 
@@ -63,3 +68,31 @@ def _constraint_from_self_knowledge(item: SelfKnowledgeItem) -> LLMDisclosureCon
         related_clue_ids=item.related_clue_ids,
         blocked=not policy.revealable,
     )
+
+
+def _reject_raw_private_echo(
+    intent: AgentIntent,
+    contract_input: LLMAgentContractInput,
+) -> None:
+    inner_context = contract_input.agent_context.inner_context
+    if inner_context is None:
+        return
+
+    serialized_output = intent.model_dump_json()
+    for item in [
+        *inner_context.inner_goals,
+        *inner_context.inner_secrets,
+        *inner_context.inner_knowledge,
+    ]:
+        if item.disclosure_policy.direct_quote_allowed:
+            continue
+        if item.summary and item.summary in serialized_output:
+            raise ValueError("LLM Agent output must not quote raw private data")
+    for portrait in inner_context.inner_portraits:
+        for value in [
+            portrait.personality_impression,
+            portrait.perceived_motive,
+            portrait.trust_boundary,
+        ]:
+            if value and value in serialized_output:
+                raise ValueError("LLM Agent output must not quote raw private data")

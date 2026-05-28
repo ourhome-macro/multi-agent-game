@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
@@ -12,6 +13,7 @@ from app.agents.gateway import AgentGateway
 from app.agents.llm_contract import build_llm_agent_input, validate_llm_agent_output
 from app.agents.llm_stub import LLMAgentStub
 from app.agents.mock_agent import MockAgent
+from app.agents.real_llm_agent import OpenAILLMAgent
 from app.cases.errors import CaseLoadError
 from app.cases.loader import CaseLoader
 from app.cases.validate import validate_cases
@@ -20,6 +22,7 @@ from app.domain.models import (
     AgentContext,
     AgentIntent,
     AgentIntentType,
+    CharacterImpression,
     CharacterInnerContext,
     ClueConfig,
     DisclosurePolicy,
@@ -39,6 +42,7 @@ from app.runtime.events import EventRecorder
 from app.runtime.replay import replay_events
 from app.runtime.service import create_runtime
 from app.storage.memory import InMemorySessionStore, build_state_summary
+from tests.utils.render_player_journey import render_player_journey
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 FAKE_CASE_001_DIR = PROJECT_ROOT / "cases" / "fake_case_001"
@@ -307,6 +311,34 @@ def test_present_clue_success_triggers_mock_agent_and_rule_engine(
     assert relationship_event["payload"]["target_id"] == "player"
 
 
+def test_present_clue_derives_private_character_impression() -> None:
+    case = CaseLoader().load(FAKE_CASE_001_DIR)
+    runtime = create_runtime([case])
+    session = runtime.session_store.create(case)
+    runtime.action_service.handle(
+        session=session,
+        action=PlayerAction(type="inspect", target_id="desk"),
+    )
+
+    response = runtime.action_service.handle(
+        session=session,
+        action=PlayerAction(
+            type="present_clue",
+            target_id="butler",
+            clue_id="scratched_drawer",
+            text="What about these scratch marks?",
+        ),
+    )
+
+    event_types = [event.type for event in response.new_events]
+    assert EventType.CHARACTER_IMPRESSION_UPDATED in event_types
+    impression = session.character_impressions["butler"]["player"]
+    assert "presented_clue.scratched_drawer" in impression.suspicious_points
+    assert "evidence_pressure" in impression.tags
+    assert "player_knowledge.scratched_drawer" in impression.suspected_knowledge_refs
+    assert impression.threat_level > 0
+
+
 def test_present_clue_rejects_missing_player_knowledge() -> None:
     case = CaseLoader().load(FAKE_CASE_001_DIR)
     recorder = EventRecorder()
@@ -446,6 +478,38 @@ def test_ask_about_discovered_sensitive_clue_triggers_guarded_reply(
     assert reply_event["payload"]["intent"] == "probe"
 
 
+def test_ask_about_derives_private_character_impression() -> None:
+    case = CaseLoader().load(FAKE_CASE_001_DIR)
+    runtime = create_runtime([case])
+    session = runtime.session_store.create(case)
+
+    response = runtime.action_service.handle(
+        session=session,
+        action=PlayerAction(
+            type="ask_about",
+            target_id="butler",
+            subject_type="character",
+            subject_id="niece",
+            text="What do you think of her?",
+        ),
+    )
+
+    event_types = [event.type for event in response.new_events]
+    assert EventType.CHARACTER_IMPRESSION_UPDATED in event_types
+    impression = session.character_impressions["butler"]["player"]
+    assert impression.observer_id == "butler"
+    assert impression.target_id == "player"
+    assert "asked_about.character.niece" in impression.suspicious_points
+    assert "targeted_questioning" in impression.tags
+    assert impression.last_updated_event_id
+    impression_event = next(
+        event
+        for event in reversed(response.new_events)
+        if event.type == EventType.CHARACTER_IMPRESSION_UPDATED
+    )
+    assert impression_event.payload == impression.model_dump(mode="json")
+
+
 def test_ask_about_rejects_unknown_character_subject() -> None:
     case = CaseLoader().load(FAKE_CASE_001_DIR)
     recorder = EventRecorder()
@@ -547,6 +611,45 @@ def test_agent_context_includes_runtime_inputs_for_target_agent() -> None:
         "trust_response",
         "fear_response",
     }
+
+
+def test_agent_context_exposes_only_target_npc_inner_portraits() -> None:
+    case = CaseLoader().load(FAKE_CASE_001_DIR)
+    runtime = create_runtime([case])
+    session = runtime.session_store.create(case)
+    runtime.action_service.handle(
+        session=session,
+        action=PlayerAction(
+            type="ask_about",
+            target_id="butler",
+            subject_type="character",
+            subject_id="niece",
+            text="What do you think of her?",
+        ),
+    )
+
+    butler_context = build_agent_context(
+        case,
+        session,
+        PlayerAction(type="talk", target_id="butler", text="What now?"),
+    )
+    niece_context = build_agent_context(
+        case,
+        session,
+        PlayerAction(type="talk", target_id="niece", text="What now?"),
+    )
+
+    assert butler_context.inner_context is not None
+    assert [item.target_id for item in butler_context.inner_context.inner_portraits] == [
+        "player"
+    ]
+    assert butler_context.inner_context.inner_portraits[0].observer_id == "butler"
+    assert all(
+        event.type != EventType.CHARACTER_IMPRESSION_UPDATED
+        for event in butler_context.recent_events
+    )
+    assert niece_context.inner_context is not None
+    assert niece_context.inner_context.inner_portraits == []
 
 
 def test_case_loader_supports_character_card_private_boundary() -> None:
@@ -908,6 +1011,35 @@ def test_mock_agent_fallback_uses_inner_goal_to_avoid_suspicion() -> None:
     assert intent.speech == "I would rather not be treated as the center of this."
 
 
+def test_mock_agent_fallback_uses_inner_portrait_without_quoting_it() -> None:
+    raw_impression = "The player is extremely dangerous and manipulative."
+    context = _build_fallback_context(
+        defensive_style="neutral",
+        pressure_response="answer",
+        inner_context=CharacterInnerContext(
+            character_id="npc",
+            inner_portraits=[
+                CharacterImpression(
+                    observer_id="npc",
+                    target_id="player",
+                    personality_impression=raw_impression,
+                    perceived_motive="Testing the witness.",
+                    trust_boundary="Do not volunteer anything.",
+                    threat_level=0.9,
+                    manipulation_risk=0.8,
+                    last_updated_event_id="event_001",
+                )
+            ],
+        ),
+    )
+
+    intent = MockAgent().generate(context)
+
+    assert intent.intent == AgentIntentType.CONCEAL
+    assert intent.speech == "I need to be careful about what I say to you."
+    assert raw_impression not in intent.speech
+
+
 def test_agent_inner_context_does_not_enter_events_or_state_summary(client: TestClient) -> None:
     case = CaseLoader().load(FAKE_CASE_001_DIR)
     session_id = create_session(client)
@@ -949,8 +1081,10 @@ def test_accuse_correct_claim_succeeds_and_derives_memory() -> None:
     assert [event.type for event in response.new_events] == [
         EventType.PLAYER_ACCUSED,
         EventType.ACCUSATION_EVALUATED,
+        EventType.CHARACTER_IMPRESSION_UPDATED,
         EventType.MEMORY_CANDIDATE_CREATED,
         EventType.AGENT_MEMORY_SNAPSHOT_UPDATED,
+        EventType.CHARACTER_IMPRESSION_UPDATED,
         EventType.MEMORY_CANDIDATE_CREATED,
         EventType.AGENT_MEMORY_SNAPSHOT_UPDATED,
         EventType.NARRATIVE_BEAT_COMPLETED,
@@ -1213,6 +1347,25 @@ def test_agent_gateway_defaults_to_mock_agent() -> None:
     assert intent.proposed_actions[0].type == ProposedActionType.RELATIONSHIP_CHANGE
 
 
+def test_agent_gateway_from_env_enables_real_only_with_api_key(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("LLM_BACKEND", raising=False)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+
+    assert AgentGateway.from_env().backend_name == "mock"
+
+    monkeypatch.setenv("LLM_BACKEND", "real")
+    assert AgentGateway.from_env().backend_name == "mock"
+
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    assert AgentGateway.from_env().backend_name == "real"
+
+    monkeypatch.setenv("LLM_BACKEND", "llm_stub")
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    assert AgentGateway.from_env().backend_name == "llm_stub"
+
+
 def test_llm_agent_stub_outputs_valid_schema_without_mutating_session() -> None:
     case = CaseLoader().load(FAKE_CASE_001_DIR)
     recorder = EventRecorder()
@@ -1227,6 +1380,133 @@ def test_llm_agent_stub_outputs_valid_schema_without_mutating_session() -> None:
     assert intent.intent == AgentIntentType.REFUSE
     assert intent.proposed_actions == []
     assert session.model_dump(mode="json") == before_session
+
+
+def test_real_llm_agent_generates_validated_intent_from_strict_json() -> None:
+    context = _build_butler_agent_context()
+    client = _FakeOpenAIClient(
+        {
+            "output_text": json.dumps(
+                {
+                    "speech": "I will answer only what I can safely say.",
+                    "intent": "answer",
+                    "emotional_shift": {},
+                    "proposed_actions": [],
+                    "memory_refs": [],
+                }
+            )
+        }
+    )
+
+    intent = OpenAILLMAgent(
+        api_key="test-key",
+        model="test-model",
+        client=client,
+    ).generate(context)
+
+    assert intent.speech == "I will answer only what I can safely say."
+    assert intent.intent == AgentIntentType.ANSWER
+    assert client.request_payload is not None
+    assert client.request_payload["model"] == "test-model"
+    assert client.request_payload["text"]["format"]["strict"] is True
+    serialized_request = json.dumps(client.request_payload, ensure_ascii=True)
+    assert "test-key" not in serialized_request
+
+
+def test_real_llm_agent_falls_back_without_api_key() -> None:
+    context = _build_butler_agent_context()
+    client = _FakeOpenAIClient({})
+
+    intent = OpenAILLMAgent(api_key="", client=client).generate(context)
+
+    assert intent.intent == AgentIntentType.REFUSE
+    assert intent.proposed_actions == []
+    assert client.request_payload is None
+
+
+def test_real_llm_agent_falls_back_when_output_violates_contract() -> None:
+    context = _build_butler_agent_context()
+    client = _FakeOpenAIClient(
+        {
+            "output_text": json.dumps(
+                {
+                    "speech": "I will move the narrative myself.",
+                    "intent": "answer",
+                    "emotional_shift": {},
+                    "proposed_actions": [
+                        {
+                            "type": "narrative.phase.change",
+                            "phase": "resolved",
+                        }
+                    ],
+                    "memory_refs": [],
+                }
+            )
+        }
+    )
+
+    intent = OpenAILLMAgent(api_key="test-key", client=client).generate(context)
+
+    assert intent.intent == AgentIntentType.REFUSE
+    assert intent.proposed_actions == []
+
+
+def test_real_llm_agent_falls_back_when_output_quotes_private_text() -> None:
+    context = _build_butler_agent_context()
+    assert context.inner_context is not None
+    raw_secret = context.inner_context.inner_secrets[0].summary
+    client = _FakeOpenAIClient(
+        {
+            "output_text": json.dumps(
+                {
+                    "speech": raw_secret,
+                    "intent": "answer",
+                    "emotional_shift": {},
+                    "proposed_actions": [],
+                    "memory_refs": [],
+                },
+                ensure_ascii=False,
+            )
+        }
+    )
+
+    intent = OpenAILLMAgent(api_key="test-key", client=client).generate(context)
+
+    assert intent.intent == AgentIntentType.REFUSE
+    assert raw_secret not in intent.speech
+
+
+def test_llm_contract_rejects_raw_inner_portrait_echo() -> None:
+    context = _build_fallback_context(
+        defensive_style="neutral",
+        pressure_response="answer",
+        inner_context=CharacterInnerContext(
+            character_id="npc",
+            inner_portraits=[
+                CharacterImpression(
+                    observer_id="npc",
+                    target_id="player",
+                    personality_impression="The player pushes hard on weak points.",
+                    perceived_motive="Testing whether the NPC will slip.",
+                    trust_boundary="Do not answer without evidence.",
+                    last_updated_event_id="event_001",
+                )
+            ],
+        ),
+    )
+    contract_input = build_llm_agent_input(context)
+
+    with pytest.raises(ValueError, match="must not quote raw private data"):
+        validate_llm_agent_output(
+            {
+                "speech": "The player pushes hard on weak points.",
+                "intent": "answer",
+                "emotional_shift": {},
+                "proposed_actions": [],
+                "memory_refs": [],
+            },
+            contract_input,
+        )
 
 
 def test_llm_agent_contract_input_includes_controlled_inner_context() -> None:
@@ -1282,6 +1562,47 @@ def test_llm_agent_contract_input_excludes_other_npc_private() -> None:
     assert context.inner_context.character_id == "butler"
     for private_value in _private_values_for_character(niece):
         assert private_value not in serialized_input
+
+
+def test_llm_agent_contract_input_includes_only_target_inner_portraits() -> None:
+    case = CaseLoader().load(FAKE_CASE_001_DIR)
+    runtime = create_runtime([case])
+    session = runtime.session_store.create(case)
+    runtime.action_service.handle(
+        session=session,
+        action=PlayerAction(
+            type="ask_about",
+            target_id="butler",
+            subject_type="character",
+            subject_id="niece",
+            text="What do you think of her?",
+        ),
+    )
+    butler_context = build_agent_context(
+        case,
+        session,
+        PlayerAction(type="talk", target_id="butler", text="What now?"),
+    )
+    niece_context = build_agent_context(
+        case,
+        session,
+        PlayerAction(type="talk", target_id="niece", text="What now?"),
+    )
+
+    butler_input = build_llm_agent_input(butler_context)
+    niece_input = build_llm_agent_input(niece_context)
+
+    assert butler_input.agent_context.inner_context is not None
+    assert len(butler_input.agent_context.inner_context.inner_portraits) == 1
+    impression = butler_input.agent_context.inner_context.inner_portraits[0]
+    assert impression.observer_id == "butler"
+    assert impression.target_id == "player"
+    assert niece_input.agent_context.inner_context is not None
+    assert niece_input.agent_context.inner_context.inner_portraits == []
+    serialized_niece_input = niece_input.model_dump_json()
+    assert impression.personality_impression not in serialized_niece_input
+    assert impression.perceived_motive not in serialized_niece_input
+    assert impression.trust_boundary not in serialized_niece_input
 
 
 def test_llm_agent_contract_rejects_phase_change_output() -> None:
@@ -1621,10 +1942,12 @@ def test_events_order_is_stable_for_mixed_action_sequence(client: TestClient) ->
         "npc.replied",
         "relationship.changed",
         "relationship.threshold.crossed",
+        "character_impression.updated",
         "memory_candidate.created",
         "agent_memory_snapshot.updated",
         "player.talked",
         "director.blocked",
+        "character_impression.updated",
         "memory_candidate.created",
         "agent_memory_snapshot.updated",
     ]
@@ -1680,6 +2003,68 @@ def test_replay_events_rebuilds_same_session_state(client: TestClient) -> None:
     replayed_summary = build_state_summary(case, replayed).model_dump(mode="json")
 
     assert replayed_summary == state_response.json()
+
+
+def test_character_impressions_are_private_and_replayable() -> None:
+    case = CaseLoader().load(FAKE_CASE_001_DIR)
+    runtime = create_runtime([case])
+    session = runtime.session_store.create(case)
+    runtime.action_service.handle(
+        session=session,
+        action=PlayerAction(
+            type="ask_about",
+            target_id="butler",
+            subject_type="character",
+            subject_id="niece",
+            text="What do you think of her?",
+        ),
+    )
+    impression = session.character_impressions["butler"]["player"]
+
+    summary_json = build_state_summary(case, session).model_dump_json()
+    journey = render_player_journey(session.events)
+    replayed = replay_events(case, session.events)
+
+    assert replayed.character_impressions == session.character_impressions
+    assert len(replayed.events) == len(session.events)
+    assert "character_impressions" not in summary_json
+    assert "inner_portraits" not in summary_json
+    assert impression.personality_impression not in journey
+    assert impression.perceived_motive not in journey
+    assert impression.trust_boundary not in journey
+    assert "Private character impression updated." in journey
+
+
+def test_character_impression_events_do_not_contain_case_secrets() -> None:
+    case = CaseLoader().load(FAKE_CASE_001_DIR)
+    runtime = create_runtime([case])
+    session = runtime.session_store.create(case)
+    response = runtime.action_service.handle(
+        session=session,
+        action=PlayerAction(
+            type="ask_about",
+            target_id="butler",
+            subject_type="character",
+            subject_id="niece",
+            text="What do you think of her?",
+        ),
+    )
+
+    impression_payloads = [
+        event.payload
+        for event in response.new_events
+        if event.type == EventType.CHARACTER_IMPRESSION_UPDATED
+    ]
+    serialized = json.dumps(impression_payloads, ensure_ascii=False)
+
+    assert impression_payloads
+    assert "solution_claims" not in serialized
+    for private_value in _private_character_values(case):
+        assert private_value not in serialized
+    for fact in case.forbidden_facts:
+        assert fact.text not in serialized
+        for blocked_term in fact.blocked_terms:
+            assert blocked_term not in serialized
 
 
 def test_state_summary_snapshots_do_not_leak_internal_fields(client: TestClient) -> None:
@@ -1753,7 +2138,7 @@ def test_state_summary_snapshots_do_not_leak_internal_fields(client: TestClient)
             "completed_beats": [],
             "discovered": [],
             "player_knowledge": [],
-            "event_count": 7,
+            "event_count": 8,
         },
     }
     serialized = json.dumps([opening, investigation, second_case_talk], ensure_ascii=False)
@@ -1761,6 +2146,8 @@ def test_state_summary_snapshots_do_not_leak_internal_fields(client: TestClient)
     assert '"goals":' not in serialized
     assert '"knowledge":' not in serialized
     assert '"private":' not in serialized
+    assert '"character_impressions":' not in serialized
+    assert '"inner_portraits":' not in serialized
     assert '"truth_status":' not in serialized
     assert '"forbidden_facts":' not in serialized
     assert '"solution_claims":' not in serialized
@@ -1862,6 +2249,40 @@ def test_case_loader_rejects_legacy_relationship_endpoint_fields(tmp_path: Path)
 
     with pytest.raises(CaseLoadError, match="schema validation failed"):
         CaseLoader().load(case_dir)
+
+
+class _FakeOpenAIResponse:
+    def __init__(self, payload: dict[str, Any]) -> None:
+        self._payload = payload
+
+    def raise_for_status(self) -> None:
+        return None
+
+    def json(self) -> dict[str, Any]:
+        return self._payload
+
+
+class _FakeOpenAIClient:
+    def __init__(self, payload: dict[str, Any]) -> None:
+        self._payload = payload
+        self.request_payload: dict[str, Any] | None = None
+
+    def post(self, _url: str, **kwargs: Any) -> _FakeOpenAIResponse:
+        request_payload = kwargs.get("json")
+        if isinstance(request_payload, dict):
+            self.request_payload = request_payload
+        return _FakeOpenAIResponse(self._payload)
+
+
+def _build_butler_agent_context() -> AgentContext:
+    case = CaseLoader().load(FAKE_CASE_001_DIR)
+    recorder = EventRecorder()
+    session = InMemorySessionStore(recorder).create(case)
+    return build_agent_context(
+        case,
+        session,
+        PlayerAction(type="talk", target_id="butler", text="Where were you?"),
+    )
 
 
 def _build_fallback_context(

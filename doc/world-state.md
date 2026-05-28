@@ -18,11 +18,12 @@ Current session state includes:
 - `player_knowledge`
 - `memory_candidates`
 - `memory_snapshots`
+- `character_impressions`
 - `events`
 
 `StateSummary` is a public projection of this state. It is not the authority.
-The first runtime memory snapshot version is intentionally not exposed through
-`StateSummary`.
+Runtime memory snapshots and private character impressions are intentionally not
+exposed through `StateSummary`.
 
 ## Character Cards
 
@@ -34,8 +35,8 @@ perspective data:
 - private: goals, secrets, and internal character knowledge
 
 `private` is not hidden from the NPC itself. The target NPC always knows its own
-private goals, secrets, and knowledge. The restriction is about public
-projection, other NPC visibility, outward expression, and state authority.
+private goals, secrets, knowledge, and impressions. The restriction is about
+public projection, other NPC visibility, outward expression, and state authority.
 
 `AgentContext.target_profile` is derived from the public layer only. Runtime
 memory content may use public display names for readability, but it must not
@@ -47,6 +48,10 @@ into `AgentContext.inner_context`. It does not copy another NPC's private data,
 and it does not expose the raw `CharacterPrivateConfig` object. Each inner item
 carries a `DisclosurePolicy` so fallback agent behavior can use the knowledge
 without automatically revealing it.
+
+`private.goals` means what the NPC wants. `private.secrets` means what the NPC
+is hiding. `private.knowledge` means what facts the NPC knows from its own
+perspective. Runtime `inner_portraits` means how the NPC sees someone else.
 
 Private data is character cognition; it is not an automatic public fact and not
 a direct state mutation channel.
@@ -170,6 +175,45 @@ Successful accusations also enter this memory path with ids such as
 This is not vector memory, RAG, an LLM summary, or database persistence. Snapshot
 state must remain replayable from `WorldEvent`.
 
+## Private Character Impressions
+
+`CharacterImpression` is private cognition owned by an observer character. It is
+not a character-card truth and not a public profile. It records how one NPC sees
+the player:
+
+- personality impression
+- perceived motive
+- suspected knowledge refs
+- suspicious points
+- trust boundary
+- alliance potential
+- threat level
+- manipulation risk
+- usefulness
+- tags and confidence
+
+V0 only supports NPC -> player impressions, stored as:
+
+```text
+session.character_impressions[npc_id]["player"]
+```
+
+Impressions are derived by runtime code from safe event signals:
+
+- `player.asked_about`
+- `player.presented_clue`
+- `player.accused`
+- `relationship.threshold.crossed`
+- `director.blocked`
+- `accusation.evaluated`
+
+Each change writes `character_impression.updated`. Agents and LLMs may consume
+the current target NPC's impressions through `CharacterInnerContext`, but they
+cannot directly write or mutate impression state.
+
+Replay applies `character_impression.updated` directly. It must not re-run
+impression derivation.
+
 ## WorldEvent Types
 
 - `session.created`
@@ -188,6 +232,7 @@ state must remain replayable from `WorldEvent`.
 - `player_knowledge.updated`
 - `memory_candidate.created`
 - `agent_memory_snapshot.updated`
+- `character_impression.updated`
 - `narrative.beat.completed`
 - `narrative.phase.changed`
 
@@ -205,13 +250,15 @@ state must remain replayable from `WorldEvent`.
   event count.
 - `agent_memory_snapshot.updated` is replayed from the event log; replay does not
   re-run memory derivation.
+- `character_impression.updated` is replayed from the event log; replay does not
+  re-run impression derivation.
 
 ## Leak Boundary
 
 Public summaries must not expose character `secrets`, character `goals`,
-internal character `knowledge`, the character-card `private` object, clue
-`truth_status`, forbidden fact text, blocked terms, `forbidden_facts`, or
-`solution_claims`.
+internal character `knowledge`, private character impressions, the
+character-card `private` object, clue `truth_status`, forbidden fact text,
+blocked terms, `forbidden_facts`, or `solution_claims`.
 
 `StateSummary`, `WorldEvent` payloads, and `player_journey.md` must also not
 expose `inner_context` or raw private summaries.

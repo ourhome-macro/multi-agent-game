@@ -210,6 +210,8 @@ def _timeline_text(event: WorldEvent, id_map: dict[str, str]) -> str:
             f"Memory snapshot `{_safe_memory_id(str(payload['memory_id']))}` "
             f"{payload['operation']} from `{_cause(event, id_map)}`."
         )
+    if event.type == EventType.CHARACTER_IMPRESSION_UPDATED:
+        return "Private character impression updated."
     if event.type == EventType.PLAYER_TALKED:
         return f"Player talked to `{payload['target_id']}`."
     if event.type == EventType.PLAYER_ASKED_ABOUT:

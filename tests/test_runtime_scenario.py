@@ -84,6 +84,7 @@ def _assert_full_scenario_state(case: object, session: object, expected_final_ph
         EventType.PLAYER_KNOWLEDGE_UPDATED,
         EventType.MEMORY_CANDIDATE_CREATED,
         EventType.AGENT_MEMORY_SNAPSHOT_UPDATED,
+        EventType.CHARACTER_IMPRESSION_UPDATED,
         EventType.DIRECTOR_BLOCKED,
         EventType.RULE_REJECTED,
     ):
@@ -105,6 +106,7 @@ def _assert_full_scenario_state(case: object, session: object, expected_final_ph
     assert replayed.discovered_clues == session.discovered_clues
     assert replayed.player_knowledge == session.player_knowledge
     assert replayed.relationships == session.relationships
+    assert replayed.character_impressions == session.character_impressions
     assert len(replayed.events) == len(session.events)
     assert _summary_does_not_leak(summary.model_dump_json())
 
@@ -130,6 +132,11 @@ def _assert_journey_matches_snapshot(case: object, session: object, journey_path
             assert blocked_term not in journey
     for private_value in _private_character_values(case):
         assert private_value not in journey
+    for impressions_by_target in session.character_impressions.values():
+        for impression in impressions_by_target.values():
+            assert impression.personality_impression not in journey
+            assert impression.perceived_motive not in journey
+            assert impression.trust_boundary not in journey
     assert journey_path.exists()
     assert journey == journey_path.read_text(encoding="utf-8")
 
@@ -254,6 +261,8 @@ def _summary_does_not_leak(serialized_summary: str) -> bool:
         '"goals":',
         '"knowledge":',
         '"private":',
+        '"character_impressions":',
+        '"inner_portraits":',
         '"truth_status":',
         '"forbidden_facts":',
         '"solution_claims":',
@@ -294,7 +303,7 @@ def _normalize_events(events: list[WorldEvent]) -> list[dict]:
 def _normalize_payload(payload: dict, id_map: dict[str, str]) -> dict:
     normalized: dict[str, object] = {}
     for key, value in payload.items():
-        if key == "source_event_id" and isinstance(value, str):
+        if key in {"source_event_id", "last_updated_event_id"} and isinstance(value, str):
             normalized[key] = id_map.get(value, value)
         elif key == "source_event_ids" and isinstance(value, list):
             normalized[key] = [id_map.get(str(item), str(item)) for item in value]

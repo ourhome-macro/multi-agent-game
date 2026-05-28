@@ -1,7 +1,8 @@
 # LLM Agent Contract
 
-This runtime still does not call a real LLM. The LLM Agent Contract defines the
-safe input and output protocol for a future real LLM backend.
+The runtime uses `MockAgent` by default. The LLM Agent Contract defines the safe
+input and output protocol used by `LLMAgentStub` and by the disabled-by-default
+real LLM adapter.
 
 ## Goal
 
@@ -32,6 +33,7 @@ class LLMAgentContractInput(BaseModel):
 - current `PlayerAction`
 - target public profile
 - target-only `CharacterInnerContext`
+- target-only `inner_portraits`
 - `memory_snapshots`
 - `relationship_to_player`
 - player knowledge
@@ -40,8 +42,8 @@ class LLMAgentContractInput(BaseModel):
 - action pressure and sensitivity metadata
 
 It must not include raw `CasePackage`, raw `SessionState`, another NPC's private
-data, clue `truth_status`, forbidden fact text, blocked terms, or solution
-claims.
+data, another NPC's impressions, clue `truth_status`, forbidden fact text,
+blocked terms, or solution claims.
 
 ## Disclosure Constraints
 
@@ -81,6 +83,16 @@ contract is stricter than the generic `AgentIntent` model: it rejects direct
 `narrative.phase.change` proposals. Phase progression belongs to
 `RuleTriggerSystem`.
 
+When `validate_llm_agent_output` receives the originating
+`LLMAgentContractInput`, it also rejects output that quotes raw target private
+text for self-knowledge items whose `DisclosurePolicy.direct_quote_allowed` is
+false. The validation error does not include the private text.
+
+The same validator rejects exact quotation of target `inner_portraits` text such
+as `personality_impression`, `perceived_motive`, or `trust_boundary`. The LLM may
+use impressions to choose a safer intent, but it must not publish the private
+portrait verbatim.
+
 ## Stub
 
 `LLMAgentStub` now builds `LLMAgentContractInput`, emits a deterministic JSON
@@ -88,6 +100,59 @@ payload, and validates it back into `AgentIntent`.
 
 The stub does not call an external model, does not mutate `SessionState`, and
 does not reveal target private text.
+
+## Real Adapter v0
+
+`OpenAILLMAgent` is available but disabled by default. It is selected only by
+environment:
+
+```text
+LLM_BACKEND=real
+OPENAI_API_KEY=...
+```
+
+Optional:
+
+```text
+OPENAI_MODEL=...
+```
+
+If `LLM_BACKEND=real` is present without `OPENAI_API_KEY`, `AgentGateway` remains
+on `MockAgent`. CI, local tests, and full scenario snapshots therefore continue
+to run on `mock` unless explicitly configured otherwise.
+
+The adapter flow is:
+
+```text
+AgentContext
+  -> build_llm_agent_input
+  -> OpenAI Responses API strict JSON request
+  -> parse model JSON
+  -> validate_llm_agent_output(contract_input)
+  -> AgentIntent or safe fallback
+```
+
+The strict JSON schema allows only these proposed action families for the real
+adapter:
+
+- `clue.discover`
+- `relationship.change`
+
+It intentionally does not allow `narrative.phase.change`. The Python validator
+still rejects phase changes as a second line of defense.
+
+All adapter failures return a safe refusal intent with empty `proposed_actions`
+and no `memory_refs`. Failure includes:
+
+- missing API key when the adapter is constructed directly
+- HTTP or transport errors
+- malformed response JSON
+- schema validation failures
+- raw private-text echo
+- attempted narrative phase changes
+
+The adapter never writes `WorldEvent`, never mutates `SessionState`, never calls
+Rule Engine directly, and never bypasses Narrative Director.
 
 ## Runtime Review Chain
 
@@ -110,9 +175,13 @@ LLM, or `LLMAgentStub`.
 The contract must keep these invariants:
 
 - `LLMAgentContractInput` includes the target NPC's own `inner_context`
-- it excludes other NPCs' private data
+- it includes the target NPC's own `inner_portraits`
+- it excludes other NPCs' private data and other NPCs' impressions
 - `LLMAgentStub` returns a valid `AgentIntent`
+- `OpenAILLMAgent` is disabled by default and env-gated
+- real adapter failures fall back to a safe `AgentIntent`
 - LLM output proposing phase changes is rejected before Rule Engine
+- LLM output quoting raw private text is rejected before public output
 - StateSummary, WorldEvent payloads, snapshots, and player journey Markdown do
   not expose raw private data
 - existing full scenario JSON snapshots and player journey Markdown remain

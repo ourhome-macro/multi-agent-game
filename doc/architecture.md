@@ -2,8 +2,9 @@
 
 This project is a case-agnostic backend narrative runtime. It loads case
 packages, creates in-memory sessions, processes player actions, produces
-auditable world events, and returns public state summaries. It still does not use
-a real LLM, database persistence, vector memory, or a frontend.
+auditable world events, and returns public state summaries. It still does not
+call a real LLM by default, use database persistence, use vector memory, or ship
+a frontend.
 
 ## Startup
 
@@ -22,8 +23,25 @@ validation fails.
 Character config now loads as a public/private character card. Public fields
 describe the NPC identity and visible behavior. Private goals, secrets, and
 internal knowledge are the NPC's own non-public perspective. They are not hidden
-from that NPC, but current v0 does not copy raw private data into public state or
-the current `AgentContext`.
+from that NPC. Current v0 does not copy the raw private config into public state;
+it exposes only a controlled target-only `CharacterInnerContext` inside
+`AgentContext`.
+
+Private Character Impression v0 adds runtime-derived NPC -> player portraits to
+that private cognition layer. These impressions are subjective observer state,
+not character-card truth and not public StateSummary data.
+
+`AgentGateway.from_env()` keeps `mock` as the default backend. An opt-in
+real OpenAI adapter can be selected only when both environment variables
+are present:
+
+```text
+LLM_BACKEND=real
+OPENAI_API_KEY=...
+```
+
+Without both variables, startup remains on `MockAgent`. `LLM_BACKEND=llm_stub`
+selects the local contract stub without any network call.
 
 ## Action Flow
 
@@ -48,7 +66,8 @@ discover legal clues.
 
 `talk` builds an `AgentContext` and calls `AgentGateway`. The gateway defaults to
 `MockAgent`; `LLMAgentStub` is only a local placeholder and does not call an
-external model.
+external model. `OpenAILLMAgent` is registered as an opt-in adapter and remains
+outside default tests and scenario snapshots.
 
 `ask_about` is a structured inquiry action. Rule Engine validates the subject
 reference, writes `player.asked_about`, and then follows the same AgentGateway ->
@@ -83,10 +102,13 @@ declared in `narrative_rules.yaml`.
 - `app/agents/mock_agent.py`: deterministic mock implementation.
 - `app/agents/llm_contract.py`: future LLM input/output safety contract.
 - `app/agents/llm_stub.py`: schema-safe placeholder for future LLM integration.
+- `app/agents/real_llm_agent.py`: disabled-by-default OpenAI adapter that emits
+  only validated `AgentIntent` or a safe fallback.
 - `app/director/narrative_director.py`: blocks forbidden facts from NPC output.
 - `app/rules/engine.py`: only authority for real state changes.
 - `app/rules/triggers.py`: completes beats and advances phases from events.
-- `app/runtime/derivations.py`: derives player knowledge and memory candidates.
+- `app/runtime/derivations.py`: derives player knowledge, memory candidates, and
+  private character impressions.
 - `app/runtime/memory_snapshots.py`: reduces memory candidates into stable
   agent memory snapshots.
 - `app/runtime/replay.py`: rebuilds `SessionState` from `WorldEvent`.
@@ -129,11 +151,16 @@ status, forbidden fact text, or solution claims.
 `AgentContext.inner_context` is a target-only `CharacterInnerContext`. It
 contains controlled self-knowledge items for the target NPC and disclosure
 policy metadata. It must not contain another NPC's private data, must not be
-written to `WorldEvent`, and must not be returned through public APIs.
+returned through public APIs, and must not be copied into `WorldEvent`.
 
 The inner context represents what the target NPC knows about itself, while
 Narrative Director still controls outward speech and Rule Engine still controls
 all accepted state changes.
+
+`CharacterInnerContext.inner_portraits` contains only the current target NPC's
+own `CharacterImpression` records. V0 supports NPC -> player impressions only.
+`AgentContext.recent_events` filters out `character_impression.updated` events so
+private portraits do not leak from one NPC context to another.
 
 `memory_candidate.created` is only a candidate memory event. The runtime-owned
 `MemorySnapshotSystem` consumes it and emits `agent_memory_snapshot.updated`,
@@ -141,10 +168,22 @@ which updates `session.memory_snapshots`. Agents may read safe player-scoped
 memory snapshots through `AgentContext.memory_snapshots`, but they cannot create
 or mutate snapshots directly.
 
+`character_impression.updated` is a runtime-derived private cognition event.
+It is created from safe event signals such as `player.asked_about`,
+`player.presented_clue`, `player.accused`, `relationship.threshold.crossed`,
+`director.blocked`, and `accusation.evaluated`. LLMs can consume the current
+target NPC's impression view, but they cannot directly write impression state.
+
 `LLMAgentContractInput` wraps `AgentContext` with explicit disclosure
 constraints for future real LLM use. `validate_llm_agent_output` requires strict
 `AgentIntent` JSON and rejects LLM-proposed narrative phase changes before Rule
 Engine.
+
+When the real adapter is enabled, it sends `LLMAgentContractInput`, requests
+strict JSON, validates the returned payload with `validate_llm_agent_output`, and
+falls back to a safe refusal on API errors, malformed JSON, validation failures,
+phase-change proposals, or raw private-text echo. The adapter does not write
+events and does not bypass Narrative Director or Rule Engine.
 
 ## Event Replay
 
@@ -159,8 +198,12 @@ All real state changes and derived runtime facts must be represented as
 - player knowledge
 - memory candidates
 - agent memory snapshots
+- private character impressions
 - event count
 
 Replay applies persisted `agent_memory_snapshot.updated` events explicitly. It
 does not re-run derivation or snapshot aggregation, so replay preserves event
 count and cannot create recursive memory events.
+
+Replay also applies persisted `character_impression.updated` events explicitly.
+It does not re-run impression derivation.

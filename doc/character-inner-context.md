@@ -4,9 +4,9 @@ Character private data represents non-public information from the character's
 own perspective. It is not hidden from the character itself.
 
 The target NPC always knows its own `private.goals`, `private.secrets`, and
-`private.knowledge`. Those fields are core character cognition. The runtime
-restriction is about outward disclosure and authoritative state writes, not
-about whether the NPC has access to its own perspective.
+`private.knowledge`. Runtime-derived private impressions are also character
+cognition. The runtime restriction is about outward disclosure and authoritative
+state writes, not about whether the NPC has access to its own perspective.
 
 ## Private Semantics
 
@@ -23,6 +23,10 @@ checks allow it.
 the same as `forbidden_facts`, and it is not an absolute speech ban. It cannot
 be automatically exposed to players, other NPCs, public summaries, or journey
 artifacts.
+
+`inner_portraits` are how the NPC sees someone else. V0 only stores NPC ->
+player impressions. They are subjective, private, and runtime-derived; they are
+not character-card truth.
 
 ## Current Runtime Status
 
@@ -53,6 +57,7 @@ class CharacterInnerContext(BaseModel):
     inner_goals: list[SelfKnowledgeItem]
     inner_secrets: list[SelfKnowledgeItem]
     inner_knowledge: list[SelfKnowledgeItem]
+    inner_portraits: list[CharacterImpression]
 ```
 
 `CharacterInnerContext` is not authoritative state. It is a runtime-built input
@@ -139,6 +144,8 @@ Current fallback behavior is deliberately small:
   fallback intent toward `conceal`
 - if `direct_reveal_allowed=false`, fallback speech must not quote the secret
   summary directly
+- a high-threat `inner_portraits` entry can shift fallback intent toward guarded
+  concealment without quoting the portrait text
 
 ## Non-Leak Requirements
 
@@ -150,6 +157,10 @@ Raw `private` data must not appear in:
 - `WorldEvent` payloads
 - other NPCs' contexts
 - memory snapshots unless explicitly produced from an allowed public event
+
+`character_impression.updated` event payloads are private runtime events used for
+replay. Player journey Markdown may say that a private impression changed, but it
+must not print the impression text.
 
 `AgentContext.inner_context` may include target self summaries, but it must not
 include another NPC's private data and must not be serialized into public
@@ -169,6 +180,7 @@ Rule Engine remains the authority for:
 - relationship changes
 - player knowledge
 - memory candidates and snapshots through runtime systems
+- private character impressions through runtime derivation
 - narrative phase changes through Rule Trigger System
 - accusation evaluation
 

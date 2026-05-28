@@ -6,6 +6,7 @@ from app.domain.models import (
     CasePackage,
     CharacterConfig,
     CharacterInnerContext,
+    EventType,
     PlayerAction,
     SelfKnowledgeItem,
     SessionState,
@@ -87,7 +88,11 @@ def build_agent_context(
             for item in session.relationship_thresholds_crossed
             if item.startswith(threshold_prefix)
         ),
-        recent_events=session.events[-RECENT_EVENT_LIMIT:],
+        recent_events=[
+            event
+            for event in session.events
+            if event.type != EventType.CHARACTER_IMPRESSION_UPDATED
+        ][-RECENT_EVENT_LIMIT:],
         memory_candidates=sorted(
             session.memory_candidates.values(),
             key=lambda value: value.memory_id,
@@ -126,7 +131,11 @@ def build_character_inner_context(
     target_character: CharacterConfig,
     action: PlayerAction,
 ) -> CharacterInnerContext:
-    _ = case, session, action
+    _ = case, action
+    portraits = sorted(
+        session.character_impressions.get(target_character.id, {}).values(),
+        key=lambda value: value.target_id,
+    )
     return CharacterInnerContext(
         character_id=target_character.id,
         inner_goals=[
@@ -164,4 +173,5 @@ def build_character_inner_context(
             )
             for knowledge in target_character.private.knowledge
         ],
+        inner_portraits=portraits,
     )

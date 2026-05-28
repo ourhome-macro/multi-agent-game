@@ -82,6 +82,7 @@ class EventType(StrEnum):
     PLAYER_KNOWLEDGE_UPDATED = "player_knowledge.updated"
     MEMORY_CANDIDATE_CREATED = "memory_candidate.created"
     AGENT_MEMORY_SNAPSHOT_UPDATED = "agent_memory_snapshot.updated"
+    CHARACTER_IMPRESSION_UPDATED = "character_impression.updated"
     NARRATIVE_BEAT_COMPLETED = "narrative.beat.completed"
     NARRATIVE_PHASE_CHANGED = "narrative.phase.changed"
 
@@ -267,11 +268,30 @@ class SelfKnowledgeItem(APIModel):
     source: Literal["character_card"] = "character_card"
 
 
+class CharacterImpression(APIModel):
+    observer_id: NonEmptyString
+    target_id: NonEmptyString
+    personality_impression: str = ""
+    perceived_motive: str = ""
+    suspected_knowledge_refs: list[NonEmptyString] = Field(default_factory=list)
+    suspicious_points: list[NonEmptyString] = Field(default_factory=list)
+    trust_boundary: str = ""
+    alliance_potential: float = Field(default=0.0, ge=0.0, le=1.0)
+    threat_level: float = Field(default=0.0, ge=0.0, le=1.0)
+    manipulation_risk: float = Field(default=0.0, ge=0.0, le=1.0)
+    usefulness: float = Field(default=0.0, ge=0.0, le=1.0)
+    tags: list[NonEmptyString] = Field(default_factory=list)
+    confidence: float = Field(default=0.0, ge=0.0, le=1.0)
+    source_event_ids: list[NonEmptyString] = Field(default_factory=list)
+    last_updated_event_id: NonEmptyString
+
+
 class CharacterInnerContext(APIModel):
     character_id: NonEmptyString
     inner_goals: list[SelfKnowledgeItem] = Field(default_factory=list)
     inner_secrets: list[SelfKnowledgeItem] = Field(default_factory=list)
     inner_knowledge: list[SelfKnowledgeItem] = Field(default_factory=list)
+    inner_portraits: list[CharacterImpression] = Field(default_factory=list)
 
 
 class LLMDisclosureConstraint(APIModel):
@@ -623,6 +643,9 @@ class SessionState(APIModel):
     player_knowledge: dict[str, PlayerKnowledgeState] = Field(default_factory=dict)
     memory_candidates: dict[str, MemoryCandidateState] = Field(default_factory=dict)
     memory_snapshots: dict[str, AgentMemorySnapshot] = Field(default_factory=dict)
+    character_impressions: dict[str, dict[str, CharacterImpression]] = Field(
+        default_factory=dict
+    )
     events: list[WorldEvent] = Field(default_factory=list)
 
 

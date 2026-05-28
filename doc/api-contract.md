@@ -209,6 +209,7 @@ Important event types include:
 - `player_knowledge.updated`
 - `memory_candidate.created`
 - `agent_memory_snapshot.updated`
+- `character_impression.updated`
 - `narrative.beat.completed`
 - `narrative.phase.changed`
 
@@ -221,12 +222,18 @@ stable `session.memory_snapshots`; its actor is `memory_snapshot_system`, and it
 payload includes `memory_id`, `subject_id`, `source_event_ids`, `salience`,
 `visibility`, and `operation`.
 
+`character_impression.updated` records runtime-derived private NPC -> player
+impressions. It includes `observer_id`, `target_id`, subjective impression
+fields, confidence, source event ids, and `last_updated_event_id`. It is not
+generated directly by Agent or LLM output. See `doc/character-portrait.md` for
+details.
+
 ## StateSummary
 
 `StateSummary` is the public state view. It may include discovered clues,
 completed beats, public relationship metrics, and player knowledge summaries.
-It does not expose memory snapshots in v0.
-It also does not expose `solution_claims` or accusation truth configuration.
+It does not expose memory snapshots or private character impressions in v0. It
+also does not expose `solution_claims` or accusation truth configuration.
 
 Character `private` data is the NPC's own non-public perspective, not data that
 is hidden from that NPC. The API boundary is different: raw private data must
@@ -247,6 +254,7 @@ It must not expose:
 - character `secrets`
 - character `goals`
 - internal character `knowledge`
+- private character impressions
 - character-card `private`
 - `inner_context`
 - clue `truth_status`

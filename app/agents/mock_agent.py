@@ -5,6 +5,7 @@ from app.domain.models import (
     AgentContext,
     AgentIntent,
     AgentIntentType,
+    CharacterImpression,
     CharacterResponseStyle,
     DefensiveStyle,
     MockReplyConfig,
@@ -162,6 +163,11 @@ class MockAgent:
             return AgentIntentType.CONCEAL
         if self._has_high_priority_avoid_suspicion_goal(context):
             return AgentIntentType.CONCEAL
+        impression = self._player_impression(context)
+        if impression is not None and impression.threat_level >= 0.75:
+            return AgentIntentType.CONCEAL
+        if impression is not None and impression.alliance_potential >= 0.7:
+            return AgentIntentType.ANSWER
         if profile.pressure_response == CharacterResponseStyle.REFUSE:
             return AgentIntentType.REFUSE
         if profile.pressure_response == CharacterResponseStyle.PANIC_CONCEAL:
@@ -182,6 +188,11 @@ class MockAgent:
             return "That clue does not prove what you think it proves."
         if self._has_high_priority_avoid_suspicion_goal(context):
             return "I would rather not be treated as the center of this."
+        impression = self._player_impression(context)
+        if impression is not None and impression.threat_level >= 0.75:
+            return "I need to be careful about what I say to you."
+        if impression is not None and impression.alliance_potential >= 0.7:
+            return "You may be useful, but I will choose my words carefully."
         if profile.defensive_style == DefensiveStyle.HOSTILE:
             return "You have no authority to question me like that."
         if profile.defensive_style == DefensiveStyle.ANXIOUS:
@@ -215,6 +226,19 @@ class MockAgent:
         return any(
             goal.priority == PrivatePriority.HIGH and "avoid_suspicion" in goal.tags
             for goal in inner_context.inner_goals
+        )
+
+    def _player_impression(self, context: AgentContext) -> CharacterImpression | None:
+        inner_context = context.inner_context
+        if inner_context is None:
+            return None
+        return next(
+            (
+                portrait
+                for portrait in inner_context.inner_portraits
+                if portrait.target_id == "player"
+            ),
+            None,
         )
 
     def _forbidden_probe_speech(self, blocked_fact_ids: list[str]) -> str:

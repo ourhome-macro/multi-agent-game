@@ -1,8 +1,8 @@
 # Agent Design
 
-The current runtime still does not call a real LLM. Agent behavior is routed
-through a stable interface so MockAgent and a future LLMAgent can share the same
-input and output contract.
+The current runtime still uses `MockAgent` by default. Agent behavior is routed
+through a stable interface so deterministic mock, local stub, and opt-in real
+LLM adapters share the same input and output contract.
 
 ## Entry Point
 
@@ -13,8 +13,9 @@ generate(context: AgentContext) -> AgentIntent
 ```
 
 `AgentGateway` is the only runtime entry point for agent generation. The default
-backend is `MockAgent`. `LLMAgentStub` is present only as a schema-safe placeholder
-and does not call external services.
+backend is `MockAgent`. `LLMAgentStub` is present only as a schema-safe
+placeholder and does not call external services. `OpenAILLMAgent` exists as a
+disabled-by-default adapter.
 
 Current agent-backed player action flow:
 
@@ -31,6 +32,18 @@ PlayerAction(talk | ask_about | present_clue)
 
 `accuse` is intentionally not agent-backed in v0. It is a structured Rule Engine
 action; Agents and LLMs do not decide whether an accusation is correct.
+
+Backend selection is environment-gated:
+
+```text
+default -> mock
+LLM_BACKEND=llm_stub -> LLMAgentStub
+LLM_BACKEND=real + OPENAI_API_KEY=... -> OpenAILLMAgent
+```
+
+`LLM_BACKEND=real` without an API key falls back to `mock` at gateway creation so
+CI and default local scenario runs cannot accidentally drift into safe refusal
+snapshots.
 
 ## AgentContext
 
@@ -103,7 +116,8 @@ mock-only Director tests, but that field is not copied into `AgentContext`.
 
 Character `private` data is the NPC's own non-public perspective. It is not
 hidden from the target NPC. A target NPC should know its own goals, secrets, and
-knowledge; the runtime limits disclosure and state mutation, not cognition.
+knowledge. Runtime-derived private impressions are also part of character
+cognition. The runtime limits disclosure and state mutation, not cognition.
 
 Character Inner Context v0 keeps the raw `CharacterPrivateConfig` object out of
 public output and exposes only a target-only self view inside `AgentContext`:
@@ -115,7 +129,14 @@ CharacterInnerContext
 ```
 
 `SelfKnowledgeView` / `inner_context` contains only the target NPC's own selected
-goals, secrets, and knowledge. It must not contain another NPC's private data.
+goals, secrets, knowledge, and `inner_portraits`. It must not contain another
+NPC's private data or another NPC's impressions.
+
+`inner_portraits` contains `CharacterImpression` records for how the target NPC
+currently sees the player. V0 only supports NPC -> player impressions. A
+portrait is not character truth and not public profile data; it is subjective
+private cognition that can influence later speech, caution, cooperation, threat
+assessment, and branch conditions.
 
 `DisclosurePolicy` decides whether each self-known item can be used as:
 
@@ -134,16 +155,22 @@ Even with `CharacterInnerContext`, outward speech remains governed by Narrative
 Director, and `proposed_actions` remain governed by Rule Engine. Private
 knowledge can shape intent; it cannot directly write `WorldEvent`.
 
+`AgentContext.recent_events` filters out `character_impression.updated` events so
+one NPC cannot learn another NPC's private portrait through the recent-event
+feed. The current target NPC receives its own portraits only through
+`inner_context.inner_portraits`.
+
 ## Safety Boundary
 
 `AgentContext` must not contain:
 
 - raw `CharacterPrivateConfig`
 - another NPC's `secrets`, `goals`, or internal `knowledge`
+- another NPC's private impressions
 - clue `truth_status`
 - `forbidden_facts` with original text or blocked terms
 - character secrets, goals, or internal knowledge through memory snapshots
-- raw private data in `WorldEvent` payloads
+- raw private character-card data in `WorldEvent` payloads
 
 Forbidden fact visibility is represented only by IDs:
 
@@ -170,7 +197,9 @@ Agent output must always be structured:
 `AgentIntent.proposed_actions` are not state changes. They are requests that must
 pass the whitelist and Rule Engine validation before any real state can change.
 Agent intents cannot create `memory_candidate.created` or
-`agent_memory_snapshot.updated`; both remain runtime-owned derived events.
+`agent_memory_snapshot.updated`; both remain runtime-owned derived events. Agent
+intents also cannot create or update `character_impression.updated`; impressions
+are derived by runtime systems from accepted events.
 
 Allowed proposed action types:
 
@@ -187,7 +216,8 @@ audited, but Rule Engine rejects it. Narrative phase changes can only come from
 `MockAgent` consumes `AgentContext` and selects deterministic configured replies
 from the case package. It can vary speech and proposed actions by phase,
 discovered clues, asked subject, presented clue, interaction pressure, subject
-sensitivity, memory snapshots, and relationship metrics.
+sensitivity, memory snapshots, relationship metrics, and target-owned
+`inner_portraits`.
 
 Configured `mock_dialogues.yaml` replies still take priority. When no configured
 reply matches, MockAgent falls back to the safe character card:
@@ -197,6 +227,8 @@ reply matches, MockAgent falls back to the safe character card:
 - `defensive_style=anxious` produces a panic fallback.
 - `pressure_response` can force refusal or panic-style concealment.
 - `speech_style` and `default_tone` may shape the fallback wording.
+- a high-threat `inner_portraits` entry can make fallback speech more guarded
+  without quoting portrait text
 
 `mock_dialogues.yaml` reply conditions currently support:
 
@@ -223,5 +255,18 @@ without mutating `SessionState`. It builds `LLMAgentContractInput`, emits a
 deterministic JSON payload, and validates that payload back into `AgentIntent`.
 It exists to lock the future LLM integration contract before adding real model
 calls.
+
+`OpenAILLMAgent` is a minimal real backend adapter. It builds
+`LLMAgentContractInput`, sends it to the OpenAI Responses API, requests strict
+JSON matching `AgentIntent`, runs `validate_llm_agent_output`, and returns the
+validated intent. Any failure returns a safe refusal intent with no
+`proposed_actions`. Failure includes missing API key, HTTP errors, malformed
+JSON, invalid schema, raw private-text echo, and direct narrative phase-change
+proposals.
+
+The real adapter does not change the state authority model. Its output still
+goes through Narrative Director, and any `proposed_actions` still go through Rule
+Engine. It is not used by the full scenario snapshots unless explicitly enabled
+through the environment.
 
 See `doc/llm-agent-contract.md` for the full input/output contract.

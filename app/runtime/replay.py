@@ -3,6 +3,7 @@ from __future__ import annotations
 from app.domain.models import (
     AgentMemorySnapshot,
     CasePackage,
+    CharacterImpression,
     EventType,
     MemoryCandidateState,
     NarrativeState,
@@ -111,6 +112,13 @@ def _apply_event(session: SessionState, event: WorldEvent) -> None:
             updated_at=event.created_at,
         )
         session.memory_snapshots[memory_id] = snapshot
+        return
+
+    if event.type == EventType.CHARACTER_IMPRESSION_UPDATED:
+        impression = CharacterImpression.model_validate(event.payload)
+        session.character_impressions.setdefault(impression.observer_id, {})[
+            impression.target_id
+        ] = impression
         return
 
     if event.type == EventType.NARRATIVE_BEAT_COMPLETED:

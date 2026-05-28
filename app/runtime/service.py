@@ -300,7 +300,7 @@ def create_runtime(case_packages: list[CasePackage]) -> RuntimeContainer:
     action_service = ActionService(
         case_store=case_store,
         recorder=recorder,
-        agent_gateway=AgentGateway(),
+        agent_gateway=AgentGateway.from_env(),
         director=NarrativeDirector(),
         rule_engine=rule_engine,
         trigger_system=RuleTriggerSystem(recorder),
