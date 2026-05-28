@@ -219,5 +219,9 @@ player is using a known clue to pressure, test, or confront the NPC. Truth
 progression still belongs to Rule Trigger System and narrative rules.
 
 `LLMAgentStub` returns a valid `AgentIntent` without calling an external model and
-without mutating `SessionState`. It exists to lock the future LLM integration
-contract before adding real model calls.
+without mutating `SessionState`. It builds `LLMAgentContractInput`, emits a
+deterministic JSON payload, and validates that payload back into `AgentIntent`.
+It exists to lock the future LLM integration contract before adding real model
+calls.
+
+See `doc/llm-agent-contract.md` for the full input/output contract.

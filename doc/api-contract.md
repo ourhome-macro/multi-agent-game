@@ -232,6 +232,8 @@ Character `private` data is the NPC's own non-public perspective, not data that
 is hidden from that NPC. The API boundary is different: raw private data must
 not be returned to players, other NPCs, public summaries, or journey artifacts.
 `AgentContext.inner_context` is not part of any public API response.
+`LLMAgentContractInput` is internal agent input and is also not part of any
+public API response.
 
 Character summaries expose only public role-card fields:
 

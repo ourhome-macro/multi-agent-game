@@ -274,6 +274,16 @@ class CharacterInnerContext(APIModel):
     inner_knowledge: list[SelfKnowledgeItem] = Field(default_factory=list)
 
 
+class LLMDisclosureConstraint(APIModel):
+    item_id: NonEmptyString
+    item_kind: Literal["goal", "secret", "knowledge", "forbidden_fact"]
+    allowed_modes: list[DisclosureMode] = Field(default_factory=list)
+    direct_reveal_allowed: bool = False
+    direct_quote_allowed: bool = False
+    related_clue_ids: list[NonEmptyString] = Field(default_factory=list)
+    blocked: bool = True
+
+
 class SceneHotspotConfig(APIModel):
     id: NonEmptyString
     name: NonEmptyString
@@ -578,6 +588,12 @@ class AgentContext(APIModel):
     default_intent: AgentIntentType | None = None
     reply_options: list[MockReplyConfig] = Field(default_factory=list)
     fallback_relationship_delta: dict[str, float] = Field(default_factory=dict)
+
+
+class LLMAgentContractInput(APIModel):
+    agent_context: AgentContext
+    disclosure_constraints: list[LLMDisclosureConstraint] = Field(default_factory=list)
+    required_output_schema: Literal["AgentIntent"] = "AgentIntent"
 
 
 class NarrativeState(APIModel):

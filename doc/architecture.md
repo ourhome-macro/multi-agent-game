@@ -81,6 +81,7 @@ declared in `narrative_rules.yaml`.
 - `app/agents/protocol.py`: defines `AgentProtocol`.
 - `app/agents/gateway.py`: single runtime entry point for agent generation.
 - `app/agents/mock_agent.py`: deterministic mock implementation.
+- `app/agents/llm_contract.py`: future LLM input/output safety contract.
 - `app/agents/llm_stub.py`: schema-safe placeholder for future LLM integration.
 - `app/director/narrative_director.py`: blocks forbidden facts from NPC output.
 - `app/rules/engine.py`: only authority for real state changes.
@@ -139,6 +140,11 @@ all accepted state changes.
 which updates `session.memory_snapshots`. Agents may read safe player-scoped
 memory snapshots through `AgentContext.memory_snapshots`, but they cannot create
 or mutate snapshots directly.
+
+`LLMAgentContractInput` wraps `AgentContext` with explicit disclosure
+constraints for future real LLM use. `validate_llm_agent_output` requires strict
+`AgentIntent` JSON and rejects LLM-proposed narrative phase changes before Rule
+Engine.
 
 ## Event Replay
 

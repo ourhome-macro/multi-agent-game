@@ -9,6 +9,7 @@ from pydantic import ValidationError
 
 from app.agents.context import build_agent_context
 from app.agents.gateway import AgentGateway
+from app.agents.llm_contract import build_llm_agent_input, validate_llm_agent_output
 from app.agents.llm_stub import LLMAgentStub
 from app.agents.mock_agent import MockAgent
 from app.cases.errors import CaseLoadError
@@ -1228,6 +1229,93 @@ def test_llm_agent_stub_outputs_valid_schema_without_mutating_session() -> None:
     assert session.model_dump(mode="json") == before_session
 
 
+def test_llm_agent_contract_input_includes_controlled_inner_context() -> None:
+    case = CaseLoader().load(FAKE_CASE_001_DIR)
+    recorder = EventRecorder()
+    session = InMemorySessionStore(recorder).create(case)
+    context = build_agent_context(
+        case,
+        session,
+        PlayerAction(type="talk", target_id="butler", text="What do you know?"),
+    )
+
+    contract_input = build_llm_agent_input(context)
+
+    assert contract_input.required_output_schema == "AgentIntent"
+    assert contract_input.agent_context.player_action.target_id == "butler"
+    assert contract_input.agent_context.memory_snapshots == []
+    assert contract_input.agent_context.relationship_to_player is not None
+    assert contract_input.agent_context.inner_context is not None
+    assert contract_input.agent_context.inner_context.character_id == "butler"
+    assert {constraint.item_id for constraint in contract_input.disclosure_constraints} >= {
+        "avoid_suspicion",
+        "swapped_will_awareness",
+        "drawer_opened_last_night",
+        "true_killer",
+        "swapped_will",
+    }
+    secret_constraint = next(
+        item
+        for item in contract_input.disclosure_constraints
+        if item.item_id == "swapped_will_awareness"
+    )
+    assert secret_constraint.item_kind == "secret"
+    assert secret_constraint.direct_reveal_allowed is False
+    assert secret_constraint.direct_quote_allowed is False
+    assert "scratched_drawer" in secret_constraint.related_clue_ids
+
+
+def test_llm_agent_contract_input_excludes_other_npc_private() -> None:
+    case = CaseLoader().load(FAKE_CASE_001_DIR)
+    recorder = EventRecorder()
+    session = InMemorySessionStore(recorder).create(case)
+    context = build_agent_context(
+        case,
+        session,
+        PlayerAction(type="talk", target_id="butler", text="What do you know?"),
+    )
+
+    serialized_input = build_llm_agent_input(context).model_dump_json()
+    niece = next(character for character in case.characters if character.id == "niece")
+
+    assert context.inner_context is not None
+    assert context.inner_context.character_id == "butler"
+    for private_value in _private_values_for_character(niece):
+        assert private_value not in serialized_input
+
+
+def test_llm_agent_contract_rejects_phase_change_output() -> None:
+    with pytest.raises(ValueError, match="must not propose narrative phase changes"):
+        validate_llm_agent_output(
+            {
+                "speech": "I will move the story myself.",
+                "intent": "answer",
+                "proposed_actions": [
+                    {
+                        "type": "narrative.phase.change",
+                        "phase": "reveal",
+                    }
+                ],
+            }
+        )
+
+
+def test_llm_agent_stub_does_not_reveal_inner_context_private_text() -> None:
+    case = CaseLoader().load(FAKE_CASE_001_DIR)
+    recorder = EventRecorder()
+    session = InMemorySessionStore(recorder).create(case)
+    context = build_agent_context(
+        case,
+        session,
+        PlayerAction(type="talk", target_id="butler", text="Tell me the truth."),
+    )
+
+    intent = LLMAgentStub().generate(context)
+
+    for private_value in _private_character_values(case):
+        assert private_value not in intent.speech
+
+
 def test_director_blocks_forbidden_fact(client: TestClient) -> None:
     session_id = create_session(client)
 
@@ -1841,9 +1929,15 @@ def _private_character_values(
     for character in case.characters:
         if character.id == exclude_character_id:
             continue
-        values.extend(goal.summary for goal in character.private.goals)
-        values.extend(secret.summary for secret in character.private.secrets)
-        values.extend(knowledge.summary for knowledge in character.private.knowledge)
+        values.extend(_private_values_for_character(character))
+    return values
+
+
+def _private_values_for_character(character: object) -> list[str]:
+    values: list[str] = []
+    values.extend(goal.summary for goal in character.private.goals)
+    values.extend(secret.summary for secret in character.private.secrets)
+    values.extend(knowledge.summary for knowledge in character.private.knowledge)
     return values
 
 

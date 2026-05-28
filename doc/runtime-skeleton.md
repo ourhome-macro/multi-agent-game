@@ -16,7 +16,8 @@ state, rule execution, event logging, and replay.
   actions.
 - Unlocks clues through Rule Engine.
 - Generates deterministic NPC intents through `AgentGateway` and `MockAgent`.
-- Provides `LLMAgentStub` as a non-network placeholder.
+- Provides `LLMAgentStub` as a non-network placeholder that validates the future
+  LLM Agent Contract.
 - Blocks forbidden NPC output through Narrative Director.
 - Applies legal relationship changes with metric clamping.
 - Emits `relationship.threshold.crossed` once per threshold per session.
@@ -89,6 +90,9 @@ attempts write `rule.rejected` and return `accepted=false`.
 
 - `mock`: default deterministic backend.
 - `llm_stub`: local stub that returns a valid `AgentIntent` without model calls.
+
+`llm_stub` builds `LLMAgentContractInput` and validates strict JSON-shaped
+`AgentIntent` output. It does not call an external model.
 
 `AgentContext` is the only input shape exposed to current agents. It must not
 include raw `CasePackage`, raw `SessionState`, another NPC's private data, clue
