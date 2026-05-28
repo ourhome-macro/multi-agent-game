@@ -17,11 +17,31 @@
     fear_response: conceal
   private:
     goals:
-      - 避免仓库走私线索被连起来。
+      - id: avoid_smuggling_chain
+        summary: 避免仓库走私线索被连起来。
+        priority: high
+        tags:
+          - avoid_suspicion
     secrets:
-      - 知道潮汐记录被人改过。
+      - id: tide_record_changed
+        summary: 知道潮汐记录被人改过。
+        priority: high
+        related_clue_ids:
+          - inward_tide_mark
+        disclosure_policy:
+          revealable: false
+          allowed_modes:
+            - deny
+            - deflect
+            - hint
+          direct_reveal_allowed: false
+          direct_quote_allowed: false
     knowledge:
-      - 破灯不是风吹倒的。
+      - id: broken_lamp_not_wind
+        summary: 破灯不是风吹倒的。
+        priority: medium
+        related_clue_ids:
+          - inward_broken_lamp
 
 - id: clerk
   display_name: 沈账房
@@ -42,8 +62,26 @@
     fear_response: panic_conceal
   private:
     goals:
-      - 证明自己只是被迫记录货物。
+      - id: prove_forced_bookkeeping
+        summary: 证明自己只是被迫记录货物。
+        priority: medium
     secrets:
-      - 偷藏过缺页账本。
+      - id: hid_missing_ledger_pages
+        summary: 偷藏过缺页账本。
+        priority: high
+        related_clue_ids:
+          - blue_ledger_page
+        disclosure_policy:
+          revealable: false
+          allowed_modes:
+            - deny
+            - deflect
+            - hint
+          direct_reveal_allowed: false
+          direct_quote_allowed: false
     knowledge:
-      - 蓝墨账页对应午夜入库。
+      - id: blue_ledger_midnight_entry
+        summary: 蓝墨账页对应午夜入库。
+        priority: medium
+        related_clue_ids:
+          - blue_ledger_page

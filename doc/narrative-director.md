@@ -1,34 +1,81 @@
 # Narrative Director
 
-当前 Director 是最小剧透防护器，负责在 NPC 回复落入事件日志前检查禁说事实。它不负责推进剧情阶段；phase 和 beat 由 `narrative_rules.yaml` 和 Rule Trigger System 控制。
+The current Narrative Director is a minimal spoiler-safety layer. It validates
+NPC speech before it can be written as an `npc.replied` event. It does not
+advance phase or complete beats; those remain owned by `narrative_rules.yaml`
+and `RuleTriggerSystem`.
 
-## 配置来源
+## Configuration Source
 
-禁说事实定义在每个案件包的 `forbidden_facts.yaml`，当前示例案件位于：
+Forbidden facts are authored in each case package's `forbidden_facts.yaml`.
 
-- `cases/fake_case_001/forbidden_facts.yaml`
-- `cases/fake_case_002/forbidden_facts.yaml`
+Each forbidden fact contains:
 
-- `id`：禁说事实标识。
-- `text`：事实说明。
-- `blocked_terms`：触发拦截的文本片段。
-- `reveal_phase`：允许透露的剧情阶段。
+- `id`: stable forbidden fact identifier
+- `text`: internal fact description
+- `blocked_terms`: terms that trigger blocking before reveal
+- `reveal_phase`: phase where this fact may be spoken
 
-## 检查规则
+Forbidden fact text and blocked terms are internal safety configuration. They
+must not appear in `StateSummary`, `AgentContext`, or `player_journey.md`.
 
-`NarrativeDirector.validate(case, narrative, intent)` 会扫描 `intent.speech`。如果文本包含某个禁说事实的 `blocked_terms`，且当前 `narrative.phase` 不是该事实的 `reveal_phase`，则返回拒绝决策。这里的 `phase` 来自 `narrative_rules.yaml` 中声明的 phases。
+## Current Validation
 
-被拒绝时：
+`NarrativeDirector.validate(case, narrative, intent)` scans `intent.speech`.
+If the speech contains a forbidden fact's `blocked_terms` before that fact's
+`reveal_phase`, the Director rejects the reply.
 
-- 不写入 `npc.replied`。
-- 写入 `director.blocked`。
-- 返回安全回复 `我现在还不能谈这个。`
-- `ActionResponse.accepted=false`。
+When blocked:
 
-## 当前局限
+- `npc.replied` is not written.
+- `director.blocked` is written.
+- the response returns safe speech.
+- `ActionResponse.accepted=false`.
 
-- 只做关键词阻止，不做语义级剧透检测。
-- 当前只检查 `AgentIntent.speech`，不检查复杂推理链、`memory_refs` 或 proposed action 语义。
-- 不负责线索释放或 phase 推进；这些由 Rule Engine 和 Rule Trigger System 执行。
+`director.blocked` may include the blocked fact id for audit, but it must not
+include forbidden fact text or blocked terms.
 
-这些局限是有意保留的。当前目标是先建立可测试的叙事边界，而不是过早引入真实 LLM 审查。
+## Character Private Disclosure Boundary
+
+Character `private` data is the target NPC's own non-public perspective. It is
+not hidden from the NPC itself. The target NPC always knows its own private
+goals, secrets, and knowledge.
+
+The runtime restriction is about outward speech, public projection, other NPC
+visibility, and authoritative state mutation. `private` is not a permanent
+speech ban, and it is not the same as `forbidden_facts`.
+
+Character Inner Context v0 passes a target-only controlled self view into
+`AgentContext.inner_context`. It does not pass another NPC's private data and
+does not write private data into public runtime outputs. Outward expression must
+still pass Narrative Director validation.
+
+Future Director checks should verify whether generated speech:
+
+- reveals a locked forbidden fact
+- exceeds the disclosure mode selected by `DisclosurePolicy`
+- quotes raw private content when only evasion, hinting, or partial disclosure
+  is allowed
+- contradicts case anchors, unlocked player knowledge, or narrative phase
+  constraints
+- exposes one NPC's private data to another NPC without an allowed public event
+
+## Rule Engine Boundary
+
+Narrative Director controls whether speech is safe to emit. It does not make
+state changes authoritative.
+
+Rule Engine remains responsible for deciding whether
+`AgentIntent.proposed_actions` become real `WorldEvent` records. Knowing private
+information never gives an NPC permission to directly mutate world state, clue
+state, relationship state, memory snapshots, or narrative phase.
+
+## Current Limits
+
+Current v0 only performs term-based forbidden fact checks over
+`AgentIntent.speech`.
+
+It does not yet perform semantic spoiler detection, full disclosure policy
+evaluation, multi-hop contradiction checks, or private-item redaction beyond the
+current deterministic fallback behavior. Those belong to future
+`DisclosurePolicy` enforcement work.

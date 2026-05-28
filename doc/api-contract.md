@@ -228,6 +228,11 @@ completed beats, public relationship metrics, and player knowledge summaries.
 It does not expose memory snapshots in v0.
 It also does not expose `solution_claims` or accusation truth configuration.
 
+Character `private` data is the NPC's own non-public perspective, not data that
+is hidden from that NPC. The API boundary is different: raw private data must
+not be returned to players, other NPCs, public summaries, or journey artifacts.
+`AgentContext.inner_context` is not part of any public API response.
+
 Character summaries expose only public role-card fields:
 
 - `id`
@@ -241,6 +246,7 @@ It must not expose:
 - character `goals`
 - internal character `knowledge`
 - character-card `private`
+- `inner_context`
 - clue `truth_status`
 - forbidden fact text or blocked terms
 - `forbidden_facts`

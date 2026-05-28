@@ -26,17 +26,30 @@ The first runtime memory snapshot version is intentionally not exposed through
 
 ## Character Cards
 
-Static character data is split into public role-card data and private author
-data:
+Static character data is split into public role-card data and private character
+perspective data:
 
 - public: `display_name`, `public_role`, `public_description`, `speech`,
   visible personality traits, and response styles
 - private: goals, secrets, and internal character knowledge
 
+`private` is not hidden from the NPC itself. The target NPC always knows its own
+private goals, secrets, and knowledge. The restriction is about public
+projection, other NPC visibility, outward expression, and state authority.
+
 `AgentContext.target_profile` is derived from the public layer only. Runtime
 memory content may use public display names for readability, but it must not
 copy private goals, secrets, or internal knowledge into `WorldEvent`,
 `StateSummary`, `AgentContext`, or player journey output.
+
+Character Inner Context v0 copies only the target NPC's controlled self view
+into `AgentContext.inner_context`. It does not copy another NPC's private data,
+and it does not expose the raw `CharacterPrivateConfig` object. Each inner item
+carries a `DisclosurePolicy` so fallback agent behavior can use the knowledge
+without automatically revealing it.
+
+Private data is character cognition; it is not an automatic public fact and not
+a direct state mutation channel.
 
 ## Player Knowledge
 
@@ -199,3 +212,6 @@ Public summaries must not expose character `secrets`, character `goals`,
 internal character `knowledge`, the character-card `private` object, clue
 `truth_status`, forbidden fact text, blocked terms, `forbidden_facts`, or
 `solution_claims`.
+
+`StateSummary`, `WorldEvent` payloads, and `player_journey.md` must also not
+expose `inner_context` or raw private summaries.

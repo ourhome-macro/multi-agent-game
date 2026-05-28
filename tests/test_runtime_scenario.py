@@ -264,9 +264,9 @@ def _summary_does_not_leak(serialized_summary: str) -> bool:
 def _private_character_values(case: object) -> list[str]:
     values: list[str] = []
     for character in case.characters:
-        values.extend(character.private.goals)
-        values.extend(character.private.secrets)
-        values.extend(character.private.knowledge)
+        values.extend(goal.summary for goal in character.private.goals)
+        values.extend(secret.summary for secret in character.private.secrets)
+        values.extend(knowledge.summary for knowledge in character.private.knowledge)
     return values
 
 

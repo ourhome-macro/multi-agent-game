@@ -9,8 +9,8 @@ state, rule execution, event logging, and replay.
 - Scans `cases/*` and loads every case package containing `case.yaml`.
 - Supports `cases/fake_case_001` and `cases/fake_case_002`.
 - Validates case YAML with Pydantic v2 and cross-reference checks.
-- Loads public/private character cards and exposes only public character views to
-  agents and public summaries.
+- Loads public/private character cards, exposes public character views, and
+  builds target-only `CharacterInnerContext` for agent-backed NPC actions.
 - Creates in-memory sessions.
 - Processes `inspect`, `talk`, `ask_about`, `present_clue`, and `accuse` player
   actions.
@@ -90,13 +90,19 @@ attempts write `rule.rejected` and return `accepted=false`.
 - `mock`: default deterministic backend.
 - `llm_stub`: local stub that returns a valid `AgentIntent` without model calls.
 
-`AgentContext` is the only input shape exposed to agents. It must not include raw
-`CasePackage`, raw `SessionState`, character secrets, goals, internal knowledge,
-clue truth status, or forbidden fact text.
+`AgentContext` is the only input shape exposed to current agents. It must not
+include raw `CasePackage`, raw `SessionState`, another NPC's private data, clue
+truth status, or forbidden fact text.
 
 `AgentContext.target_profile` is a safe `AgentCharacterView` derived from the
 public side of the character card. MockAgent uses it only as fallback behavior
 input when no configured `mock_dialogues.yaml` reply matches.
+
+Character `private` is the NPC's own non-public knowledge. Current v0 exposes a
+target-only `CharacterInnerContext` to the target NPC through `AgentContext`.
+Public speech is still checked by Narrative Director and proposed state changes
+by Rule Engine. `inner_context` must not appear in state summaries, event
+payloads, player journey Markdown, or other NPC contexts.
 
 `AgentContext.memory_snapshots` contains only safe player-scoped structured
 snapshots produced by the runtime. It is not vector memory, RAG, a database, or a

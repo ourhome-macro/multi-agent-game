@@ -8,8 +8,10 @@ from app.domain.models import (
     CharacterResponseStyle,
     DefensiveStyle,
     MockReplyConfig,
+    PrivatePriority,
     ProposedActionType,
     RelationshipChangeAction,
+    SelfKnowledgeItem,
 )
 
 
@@ -144,14 +146,22 @@ class MockAgent:
             )
 
         return AgentIntent(
-            speech=self._fallback_speech(profile),
-            intent=self._fallback_intent_type(profile),
+            speech=self._fallback_speech(context, profile),
+            intent=self._fallback_intent_type(context, profile),
             emotional_shift={},
             proposed_actions=proposed_actions,
             memory_refs=[],
         )
 
-    def _fallback_intent_type(self, profile: AgentCharacterView) -> AgentIntentType:
+    def _fallback_intent_type(
+        self,
+        context: AgentContext,
+        profile: AgentCharacterView,
+    ) -> AgentIntentType:
+        if self._matching_blocked_secret(context) is not None:
+            return AgentIntentType.CONCEAL
+        if self._has_high_priority_avoid_suspicion_goal(context):
+            return AgentIntentType.CONCEAL
         if profile.pressure_response == CharacterResponseStyle.REFUSE:
             return AgentIntentType.REFUSE
         if profile.pressure_response == CharacterResponseStyle.PANIC_CONCEAL:
@@ -167,7 +177,11 @@ class MockAgent:
         }
         return fallback_by_style[profile.defensive_style]
 
-    def _fallback_speech(self, profile: AgentCharacterView) -> str:
+    def _fallback_speech(self, context: AgentContext, profile: AgentCharacterView) -> str:
+        if self._matching_blocked_secret(context) is not None:
+            return "That clue does not prove what you think it proves."
+        if self._has_high_priority_avoid_suspicion_goal(context):
+            return "I would rather not be treated as the center of this."
         if profile.defensive_style == DefensiveStyle.HOSTILE:
             return "You have no authority to question me like that."
         if profile.defensive_style == DefensiveStyle.ANXIOUS:
@@ -177,6 +191,31 @@ class MockAgent:
         if profile.default_tone == "formal" or "polite" in profile.speech_style.lower():
             return "I am not certain what you mean, and I should not guess."
         return "I am not certain what you mean."
+
+    def _matching_blocked_secret(self, context: AgentContext) -> SelfKnowledgeItem | None:
+        inner_context = context.inner_context
+        if inner_context is None:
+            return None
+        clue_id = context.presented_clue_id
+        if clue_id is None and context.asked_subject_type == "clue":
+            clue_id = context.asked_subject_id
+        if clue_id is None:
+            return None
+        for secret in inner_context.inner_secrets:
+            if clue_id not in secret.related_clue_ids:
+                continue
+            if not secret.disclosure_policy.direct_reveal_allowed:
+                return secret
+        return None
+
+    def _has_high_priority_avoid_suspicion_goal(self, context: AgentContext) -> bool:
+        inner_context = context.inner_context
+        if inner_context is None:
+            return False
+        return any(
+            goal.priority == PrivatePriority.HIGH and "avoid_suspicion" in goal.tags
+            for goal in inner_context.inner_goals
+        )
 
     def _forbidden_probe_speech(self, blocked_fact_ids: list[str]) -> str:
         probes = {

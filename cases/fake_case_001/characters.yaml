@@ -17,11 +17,32 @@
     fear_response: panic_conceal
   private:
     goals:
-      - 避免玩家过早发现遗嘱真相。
+      - id: avoid_suspicion
+        summary: 避免玩家过早发现遗嘱真相。
+        priority: high
+        tags:
+          - avoid_suspicion
     secrets:
-      - 知道遗嘱被调换过。
+      - id: swapped_will_awareness
+        summary: 知道遗嘱相关文件存在异常。
+        priority: high
+        related_clue_ids:
+          - scratched_drawer
+          - dustless_frame
+        disclosure_policy:
+          revealable: false
+          allowed_modes:
+            - deny
+            - deflect
+            - hint
+          direct_reveal_allowed: false
+          direct_quote_allowed: false
     knowledge:
-      - 书桌抽屉昨夜被人打开过。
+      - id: drawer_opened_last_night
+        summary: 书桌抽屉昨夜被人打开过。
+        priority: medium
+        related_clue_ids:
+          - scratched_drawer
 
 - id: niece
   display_name: 林侄女
@@ -42,8 +63,26 @@
     fear_response: conceal
   private:
     goals:
-      - 隐瞒自己进入书房的时间。
+      - id: hide_study_timeline
+        summary: 隐瞒自己进入书房的时间。
+        priority: high
+        tags:
+          - avoid_suspicion
     secrets:
-      - 曾在案发前进入书房。
+      - id: entered_study_before_case
+        summary: 曾在案发前进入书房。
+        priority: high
+        related_clue_ids:
+          - torn_note
+        disclosure_policy:
+          revealable: false
+          allowed_modes:
+            - deny
+            - deflect
+            - hint
+          direct_reveal_allowed: false
+          direct_quote_allowed: false
     knowledge:
-      - 管家案发当晚在走廊出现过。
+      - id: butler_seen_in_hall
+        summary: 管家案发当晚在走廊出现过。
+        priority: medium

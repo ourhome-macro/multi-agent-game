@@ -21,8 +21,9 @@ validation fails.
 
 Character config now loads as a public/private character card. Public fields
 describe the NPC identity and visible behavior. Private goals, secrets, and
-internal knowledge stay inside `CasePackage` and are never copied into public
-state or agent input.
+internal knowledge are the NPC's own non-public perspective. They are not hidden
+from that NPC, but current v0 does not copy raw private data into public state or
+the current `AgentContext`.
 
 ## Action Flow
 
@@ -123,6 +124,15 @@ the `0.0 .. 1.0` range.
 speech style, visible traits, defensive style, and pressure/trust/fear response
 styles. It must not include `private`, goals, secrets, internal knowledge, truth
 status, forbidden fact text, or solution claims.
+
+`AgentContext.inner_context` is a target-only `CharacterInnerContext`. It
+contains controlled self-knowledge items for the target NPC and disclosure
+policy metadata. It must not contain another NPC's private data, must not be
+written to `WorldEvent`, and must not be returned through public APIs.
+
+The inner context represents what the target NPC knows about itself, while
+Narrative Director still controls outward speech and Rule Engine still controls
+all accepted state changes.
 
 `memory_candidate.created` is only a candidate memory event. The runtime-owned
 `MemorySnapshotSystem` consumes it and emits `agent_memory_snapshot.updated`,

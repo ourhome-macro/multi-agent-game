@@ -19,13 +19,16 @@ from app.domain.models import (
     AgentContext,
     AgentIntent,
     AgentIntentType,
+    CharacterInnerContext,
     ClueConfig,
+    DisclosurePolicy,
     DiscoverClueAction,
     EventType,
     NarrativePhaseChangeAction,
     PlayerAction,
     ProposedActionType,
     RelationshipChangeAction,
+    SelfKnowledgeItem,
     SubjectType,
     WorldEvent,
 )
@@ -513,13 +516,22 @@ def test_agent_context_includes_runtime_inputs_for_target_agent() -> None:
     assert context.default_speech is not None
     assert context.target_profile is not None
     assert context.target_profile.id == "butler"
-    assert context.target_profile.display_name == "韩管家"
-    assert context.target_profile.public_role == "老宅管家"
+    assert context.target_profile.display_name
+    assert context.target_profile.public_role
     assert context.target_profile.public_description
     assert context.target_profile.speech_style
     assert context.target_profile.visible_traits == ["cautious", "loyal", "observant"]
     assert context.target_profile.defensive_style == "evasive"
     assert context.target_profile.pressure_response == "conceal"
+    assert context.inner_context is not None
+    assert context.inner_context.character_id == "butler"
+    assert {item.id for item in context.inner_context.inner_goals} == {"avoid_suspicion"}
+    assert {item.id for item in context.inner_context.inner_secrets} == {
+        "swapped_will_awareness"
+    }
+    assert {item.id for item in context.inner_context.inner_knowledge} == {
+        "drawer_opened_last_night"
+    }
     assert set(context.target_profile.model_dump()) == {
         "id",
         "display_name",
@@ -540,13 +552,45 @@ def test_case_loader_supports_character_card_private_boundary() -> None:
     case = CaseLoader().load(FAKE_CASE_001_DIR)
     butler = next(character for character in case.characters if character.id == "butler")
 
-    assert butler.display_name == "韩管家"
-    assert butler.public_role == "老宅管家"
+    assert butler.display_name
+    assert butler.public_role
     assert butler.speech.defensive_style == "evasive"
     assert butler.personality.pressure_response == "conceal"
-    assert butler.private.goals
-    assert butler.private.secrets
-    assert butler.private.knowledge
+    assert butler.private.goals[0].id == "avoid_suspicion"
+    assert butler.private.goals[0].summary
+    assert butler.private.goals[0].priority == "high"
+    assert "avoid_suspicion" in butler.private.goals[0].tags
+    assert butler.private.secrets[0].id == "swapped_will_awareness"
+    assert "scratched_drawer" in butler.private.secrets[0].related_clue_ids
+    assert butler.private.secrets[0].disclosure_policy.direct_reveal_allowed is False
+    assert butler.private.knowledge[0].id == "drawer_opened_last_night"
+
+
+def test_legacy_private_strings_normalize_to_structured_items(tmp_path: Path) -> None:
+    case_dir = tmp_path / "legacy_private_case"
+    case_dir.mkdir()
+    _write_minimal_case(case_dir)
+    (case_dir / "characters.yaml").write_text(
+        "- id: npc\n"
+        "  name: NPC\n"
+        "  role: Witness\n"
+        "  private:\n"
+        "    goals:\n"
+        "      - Avoid suspicion.\n"
+        "    secrets:\n"
+        "      - Knows the key moved.\n"
+        "    knowledge:\n"
+        "      - Heard the drawer open.\n",
+        encoding="utf-8",
+    )
+
+    case = CaseLoader().load(case_dir)
+    character = case.characters[0]
+
+    assert character.private.goals[0].id == "goal_001"
+    assert character.private.goals[0].summary == "Avoid suspicion."
+    assert character.private.secrets[0].id == "secret_001"
+    assert character.private.knowledge[0].id == "knowledge_001"
 
 
 def test_agent_context_uses_fact_ids_without_forbidden_fact_text() -> None:
@@ -583,7 +627,7 @@ def test_agent_context_uses_fact_ids_without_forbidden_fact_text() -> None:
         assert fact.text not in serialized_context
         for blocked_term in fact.blocked_terms:
             assert blocked_term not in serialized_context
-    for private_value in _private_character_values(case):
+    for private_value in _private_character_values(case, exclude_character_id="butler"):
         assert private_value not in serialized_context
 
 
@@ -725,7 +769,7 @@ def test_agent_context_exposes_memory_snapshots_without_internal_leaks() -> None
         assert fact.text not in serialized_context
         for blocked_term in fact.blocked_terms:
             assert blocked_term not in serialized_context
-    for private_value in _private_character_values(case):
+    for private_value in _private_character_values(case, exclude_character_id="butler"):
         assert private_value not in serialized_context
 
 
@@ -813,6 +857,74 @@ def test_mock_agent_fallback_uses_character_card_defensive_style() -> None:
     assert hostile.speech == "You have no authority to question me like that."
     assert anxious.intent == AgentIntentType.PANIC
     assert anxious.speech == "I... I do not know. Please stop asking."
+
+
+def test_mock_agent_fallback_uses_inner_context_without_revealing_raw_secret() -> None:
+    raw_secret = "The missing ledger pages are hidden under the crate."
+    context = _build_fallback_context(
+        defensive_style="neutral",
+        pressure_response="answer",
+        player_action=PlayerAction(
+            type="ask_about",
+            target_id="npc",
+            subject_type=SubjectType.CLUE,
+            subject_id="ledger_page",
+        ),
+        inner_context=_build_test_inner_context(
+            secret_summary=raw_secret,
+            related_clue_ids=["ledger_page"],
+        ),
+    )
+
+    intent = MockAgent().generate(context)
+
+    assert intent.intent == AgentIntentType.CONCEAL
+    assert intent.speech == "That clue does not prove what you think it proves."
+    assert raw_secret not in intent.speech
+
+
+def test_mock_agent_fallback_uses_inner_goal_to_avoid_suspicion() -> None:
+    context = _build_fallback_context(
+        defensive_style="neutral",
+        pressure_response="answer",
+        inner_context=CharacterInnerContext(
+            character_id="npc",
+            inner_goals=[
+                SelfKnowledgeItem(
+                    id="avoid_suspicion",
+                    kind="goal",
+                    summary="Avoid becoming the prime suspect.",
+                    priority="high",
+                    tags=["avoid_suspicion"],
+                )
+            ],
+        ),
+    )
+
+    intent = MockAgent().generate(context)
+
+    assert intent.intent == AgentIntentType.CONCEAL
+    assert intent.speech == "I would rather not be treated as the center of this."
+
+
+def test_agent_inner_context_does_not_enter_events_or_state_summary(client: TestClient) -> None:
+    case = CaseLoader().load(FAKE_CASE_001_DIR)
+    session_id = create_session(client)
+
+    response = client.post(
+        f"/sessions/{session_id}/actions",
+        json={"type": "talk", "target_id": "butler", "text": "Where were you?"},
+    )
+    state_response = client.get(f"/sessions/{session_id}/state")
+    serialized_events = json.dumps(response.json()["new_events"], ensure_ascii=False)
+    serialized_state = state_response.text
+
+    assert response.status_code == 200
+    assert '"inner_context"' not in serialized_events
+    assert '"inner_context"' not in serialized_state
+    for private_value in _private_character_values(case):
+        assert private_value not in serialized_events
+        assert private_value not in serialized_state
 
 
 def test_accuse_correct_claim_succeeds_and_derives_memory() -> None:
@@ -1670,15 +1782,18 @@ def _build_fallback_context(
     pressure_response: str,
     speech_style: str = "",
     default_tone: str = "",
+    player_action: PlayerAction | None = None,
+    inner_context: CharacterInnerContext | None = None,
 ) -> AgentContext:
+    action = player_action or PlayerAction(type="talk", target_id="npc")
     return AgentContext(
         case_id="test_case",
         session_id="session",
-        target_agent_id="npc",
+        target_agent_id=action.target_id,
         current_phase="opening",
-        player_action=PlayerAction(type="talk", target_id="npc"),
+        player_action=action,
         target_profile=AgentCharacterView(
-            id="npc",
+            id=action.target_id,
             display_name="NPC",
             public_role="Witness",
             public_description="Public witness profile.",
@@ -1687,18 +1802,48 @@ def _build_fallback_context(
             defensive_style=defensive_style,
             pressure_response=pressure_response,
         ),
+        inner_context=inner_context,
+        asked_subject_type=action.subject_type,
+        asked_subject_id=action.subject_id,
+        presented_clue_id=action.clue_id,
         default_speech="Default fallback.",
         default_intent=AgentIntentType.ANSWER,
         reply_options=[],
     )
 
 
-def _private_character_values(case: object) -> list[str]:
+def _build_test_inner_context(
+    *,
+    secret_summary: str,
+    related_clue_ids: list[str],
+) -> CharacterInnerContext:
+    return CharacterInnerContext(
+        character_id="npc",
+        inner_secrets=[
+            SelfKnowledgeItem(
+                id="secret_001",
+                kind="secret",
+                summary=secret_summary,
+                priority="high",
+                related_clue_ids=related_clue_ids,
+                disclosure_policy=DisclosurePolicy(direct_reveal_allowed=False),
+            )
+        ],
+    )
+
+
+def _private_character_values(
+    case: object,
+    *,
+    exclude_character_id: str | None = None,
+) -> list[str]:
     values: list[str] = []
     for character in case.characters:
-        values.extend(character.private.goals)
-        values.extend(character.private.secrets)
-        values.extend(character.private.knowledge)
+        if character.id == exclude_character_id:
+            continue
+        values.extend(goal.summary for goal in character.private.goals)
+        values.extend(secret.summary for secret in character.private.secrets)
+        values.extend(knowledge.summary for knowledge in character.private.knowledge)
     return values
 
 

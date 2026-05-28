@@ -50,6 +50,21 @@ class CharacterResponseStyle(StrEnum):
     CAUTIOUS_HELP = "cautious_help"
 
 
+class PrivatePriority(StrEnum):
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+
+
+class DisclosureMode(StrEnum):
+    NONE = "none"
+    DENY = "deny"
+    DEFLECT = "deflect"
+    HINT = "hint"
+    PARTIAL = "partial"
+    FULL = "full"
+
+
 class EventType(StrEnum):
     SESSION_CREATED = "session.created"
     PLAYER_INSPECTED = "player.inspected"
@@ -105,10 +120,64 @@ class CharacterPersonalityConfig(APIModel):
     fear_response: CharacterResponseStyle = CharacterResponseStyle.PANIC_CONCEAL
 
 
+class DisclosurePolicy(APIModel):
+    revealable: bool = False
+    allowed_modes: list[DisclosureMode] = Field(
+        default_factory=lambda: [
+            DisclosureMode.DENY,
+            DisclosureMode.DEFLECT,
+            DisclosureMode.HINT,
+        ]
+    )
+    direct_reveal_allowed: bool = False
+    direct_quote_allowed: bool = False
+
+
+class PrivateGoal(APIModel):
+    id: NonEmptyString
+    summary: NonEmptyString
+    priority: PrivatePriority = PrivatePriority.MEDIUM
+    tags: list[NonEmptyString] = Field(default_factory=list)
+    disclosure_policy: DisclosurePolicy = Field(default_factory=DisclosurePolicy)
+
+
+class PrivateSecret(APIModel):
+    id: NonEmptyString
+    summary: NonEmptyString
+    priority: PrivatePriority = PrivatePriority.MEDIUM
+    related_clue_ids: list[NonEmptyString] = Field(default_factory=list)
+    tags: list[NonEmptyString] = Field(default_factory=list)
+    disclosure_policy: DisclosurePolicy = Field(default_factory=DisclosurePolicy)
+
+
+class PrivateKnowledge(APIModel):
+    id: NonEmptyString
+    summary: NonEmptyString
+    priority: PrivatePriority = PrivatePriority.MEDIUM
+    related_clue_ids: list[NonEmptyString] = Field(default_factory=list)
+    tags: list[NonEmptyString] = Field(default_factory=list)
+    disclosure_policy: DisclosurePolicy = Field(default_factory=DisclosurePolicy)
+
+
 class CharacterPrivateConfig(APIModel):
-    goals: list[NonEmptyString] = Field(default_factory=list)
-    secrets: list[NonEmptyString] = Field(default_factory=list)
-    knowledge: list[NonEmptyString] = Field(default_factory=list)
+    goals: list[PrivateGoal] = Field(default_factory=list)
+    secrets: list[PrivateSecret] = Field(default_factory=list)
+    knowledge: list[PrivateKnowledge] = Field(default_factory=list)
+
+    @field_validator("goals", mode="before")
+    @classmethod
+    def normalize_goals(cls, value: object) -> object:
+        return normalize_private_items(value, "goal")
+
+    @field_validator("secrets", mode="before")
+    @classmethod
+    def normalize_secrets(cls, value: object) -> object:
+        return normalize_private_items(value, "secret")
+
+    @field_validator("knowledge", mode="before")
+    @classmethod
+    def normalize_knowledge(cls, value: object) -> object:
+        return normalize_private_items(value, "knowledge")
 
 
 class CharacterConfig(APIModel):
@@ -185,6 +254,24 @@ class AgentCharacterView(APIModel):
     pressure_response: CharacterResponseStyle = CharacterResponseStyle.CONCEAL
     trust_response: CharacterResponseStyle = CharacterResponseStyle.CAUTIOUS_HELP
     fear_response: CharacterResponseStyle = CharacterResponseStyle.PANIC_CONCEAL
+
+
+class SelfKnowledgeItem(APIModel):
+    id: NonEmptyString
+    kind: Literal["goal", "secret", "knowledge"]
+    summary: NonEmptyString
+    priority: PrivatePriority = PrivatePriority.MEDIUM
+    related_clue_ids: list[NonEmptyString] = Field(default_factory=list)
+    tags: list[NonEmptyString] = Field(default_factory=list)
+    disclosure_policy: DisclosurePolicy = Field(default_factory=DisclosurePolicy)
+    source: Literal["character_card"] = "character_card"
+
+
+class CharacterInnerContext(APIModel):
+    character_id: NonEmptyString
+    inner_goals: list[SelfKnowledgeItem] = Field(default_factory=list)
+    inner_secrets: list[SelfKnowledgeItem] = Field(default_factory=list)
+    inner_knowledge: list[SelfKnowledgeItem] = Field(default_factory=list)
 
 
 class SceneHotspotConfig(APIModel):
@@ -486,6 +573,7 @@ class AgentContext(APIModel):
     presented_knowledge_id: NonEmptyString | None = None
     player_action: PlayerAction
     target_profile: AgentCharacterView | None = None
+    inner_context: CharacterInnerContext | None = None
     default_speech: str | None = None
     default_intent: AgentIntentType | None = None
     reply_options: list[MockReplyConfig] = Field(default_factory=list)
@@ -579,3 +667,23 @@ def clamp_relationship_metric(value: object) -> float:
     numeric_value = float(value)
     clamped = min(max(numeric_value, RELATIONSHIP_MIN), RELATIONSHIP_MAX)
     return round(clamped, 4)
+
+
+def normalize_private_items(value: object, prefix: str) -> object:
+    if value is None:
+        return []
+    if not isinstance(value, list):
+        return value
+
+    normalized: list[object] = []
+    for index, item in enumerate(value, start=1):
+        if isinstance(item, str):
+            normalized.append(
+                {
+                    "id": f"{prefix}_{index:03d}",
+                    "summary": item,
+                }
+            )
+        else:
+            normalized.append(item)
+    return normalized

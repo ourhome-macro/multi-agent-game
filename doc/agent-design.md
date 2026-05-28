@@ -56,6 +56,7 @@ action; Agents and LLMs do not decide whether an accusation is correct.
 - `subject_is_sensitive`
 - `presented_clue_id`
 - `presented_knowledge_id`
+- `inner_context`
 
 For the current mock implementation it also includes case-authored reply
 configuration:
@@ -67,8 +68,13 @@ configuration:
 - `reply_options`
 - `fallback_relationship_delta`
 
-`target_profile` is a public `AgentCharacterView`. It does not contain character
-`secrets`, `goals`, or internal `knowledge`.
+`target_profile` is a public `AgentCharacterView`. It does not contain raw
+character `private`, `secrets`, `goals`, or internal `knowledge`.
+
+`inner_context` is a target-only `CharacterInnerContext` for the current NPC.
+It contains a controlled self view derived from that NPC's own private goals,
+secrets, and knowledge. It is never built for another NPC and is not returned
+through public APIs.
 
 `AgentCharacterView` currently contains only safe role-card fields:
 
@@ -93,16 +99,51 @@ vector retrieval, RAG, or LLM summarization.
 Case packages may still define `forbidden_test_speech` as a local fixture for
 mock-only Director tests, but that field is not copied into `AgentContext`.
 
+## Character Inner Context
+
+Character `private` data is the NPC's own non-public perspective. It is not
+hidden from the target NPC. A target NPC should know its own goals, secrets, and
+knowledge; the runtime limits disclosure and state mutation, not cognition.
+
+Character Inner Context v0 keeps the raw `CharacterPrivateConfig` object out of
+public output and exposes only a target-only self view inside `AgentContext`:
+
+```text
+CharacterInnerContext
+  -> SelfKnowledgeView
+  -> DisclosurePolicy
+```
+
+`SelfKnowledgeView` / `inner_context` contains only the target NPC's own selected
+goals, secrets, and knowledge. It must not contain another NPC's private data.
+
+`DisclosurePolicy` decides whether each self-known item can be used as:
+
+- no disclosure
+- evasion
+- hint
+- partial disclosure
+- full disclosure
+
+The policy should consider narrative phase, player-known evidence,
+relationship thresholds, interaction pressure, forbidden fact references, and
+whether verbatim disclosure is allowed. Raw private strings should not become
+public speech by default.
+
+Even with `CharacterInnerContext`, outward speech remains governed by Narrative
+Director, and `proposed_actions` remain governed by Rule Engine. Private
+knowledge can shape intent; it cannot directly write `WorldEvent`.
+
 ## Safety Boundary
 
 `AgentContext` must not contain:
 
-- character `secrets`
-- character `goals`
-- internal character `knowledge`
+- raw `CharacterPrivateConfig`
+- another NPC's `secrets`, `goals`, or internal `knowledge`
 - clue `truth_status`
 - `forbidden_facts` with original text or blocked terms
 - character secrets, goals, or internal knowledge through memory snapshots
+- raw private data in `WorldEvent` payloads
 
 Forbidden fact visibility is represented only by IDs:
 

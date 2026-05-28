@@ -140,6 +140,21 @@ class CaseLoader:
                         f"Clue '{clue.id}' references unknown character '{character_id}'"
                     )
 
+        for character in package.characters:
+            for secret in character.private.secrets:
+                self._ensure_known_clues(
+                    clue_ids,
+                    secret.related_clue_ids,
+                    f"Character '{character.id}' private secret '{secret.id}' related_clue_ids",
+                )
+            for knowledge in character.private.knowledge:
+                self._ensure_known_clues(
+                    clue_ids,
+                    knowledge.related_clue_ids,
+                    f"Character '{character.id}' private knowledge "
+                    f"'{knowledge.id}' related_clue_ids",
+                )
+
         for relationship in package.relationships:
             if relationship.source_id not in character_ids and relationship.source_id != "player":
                 raise CaseLoadError(

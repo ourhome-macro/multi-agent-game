@@ -4,7 +4,10 @@ from app.domain.models import (
     AgentCharacterView,
     AgentContext,
     CasePackage,
+    CharacterConfig,
+    CharacterInnerContext,
     PlayerAction,
+    SelfKnowledgeItem,
     SessionState,
 )
 from app.rules.engine import relationship_key
@@ -61,6 +64,11 @@ def build_agent_context(
     )
     asked_subject_type = action.subject_type
     asked_subject_id = action.subject_id
+    inner_context = (
+        build_character_inner_context(case, session, character, action)
+        if character is not None
+        else None
+    )
 
     return AgentContext(
         case_id=case.meta.id,
@@ -102,10 +110,58 @@ def build_agent_context(
         presented_knowledge_id=presented_knowledge_id,
         player_action=action,
         target_profile=target_profile,
+        inner_context=inner_context,
         default_speech=dialogue.default_speech if dialogue is not None else None,
         default_intent=dialogue.default_intent if dialogue is not None else None,
         reply_options=dialogue.replies if dialogue is not None else [],
         fallback_relationship_delta=(
             dialogue.relationship_delta_on_talk if dialogue is not None else {}
         ),
+    )
+
+
+def build_character_inner_context(
+    case: CasePackage,
+    session: SessionState,
+    target_character: CharacterConfig,
+    action: PlayerAction,
+) -> CharacterInnerContext:
+    _ = case, session, action
+    return CharacterInnerContext(
+        character_id=target_character.id,
+        inner_goals=[
+            SelfKnowledgeItem(
+                id=goal.id,
+                kind="goal",
+                summary=goal.summary,
+                priority=goal.priority,
+                tags=goal.tags,
+                disclosure_policy=goal.disclosure_policy,
+            )
+            for goal in target_character.private.goals
+        ],
+        inner_secrets=[
+            SelfKnowledgeItem(
+                id=secret.id,
+                kind="secret",
+                summary=secret.summary,
+                priority=secret.priority,
+                related_clue_ids=secret.related_clue_ids,
+                tags=secret.tags,
+                disclosure_policy=secret.disclosure_policy,
+            )
+            for secret in target_character.private.secrets
+        ],
+        inner_knowledge=[
+            SelfKnowledgeItem(
+                id=knowledge.id,
+                kind="knowledge",
+                summary=knowledge.summary,
+                priority=knowledge.priority,
+                related_clue_ids=knowledge.related_clue_ids,
+                tags=knowledge.tags,
+                disclosure_policy=knowledge.disclosure_policy,
+            )
+            for knowledge in target_character.private.knowledge
+        ],
     )

@@ -53,11 +53,31 @@ Characters are authored as public/private role cards:
     fear_response: panic_conceal
   private:
     goals:
-      - Avoid becoming the prime suspect.
+      - id: avoid_suspicion
+        summary: Avoid becoming the prime suspect.
+        priority: high
+        tags:
+          - avoid_suspicion
     secrets:
-      - Knows the study key moved.
+      - id: study_key_moved
+        summary: Knows the study key moved.
+        priority: high
+        related_clue_ids:
+          - scratched_drawer
+        disclosure_policy:
+          revealable: false
+          allowed_modes:
+            - deny
+            - deflect
+            - hint
+          direct_reveal_allowed: false
+          direct_quote_allowed: false
     knowledge:
-      - Saw someone approach the desk.
+      - id: desk_approached
+        summary: Saw someone approach the desk.
+        priority: medium
+        related_clue_ids:
+          - scratched_drawer
 ```
 
 Allowed `defensive_style` values are `evasive`, `hostile`, `anxious`, and
@@ -68,8 +88,25 @@ The loader still accepts legacy `name`, `role`, `personality`, `speech_style`,
 `secrets`, `goals`, and `knowledge` fields and normalizes them into the new card
 shape. New case packages should use the explicit public/private structure.
 
-`private` is author-only data. It must not appear in `StateSummary`,
-`AgentContext`, player journey Markdown, or runtime events.
+`private` is the character's own non-public perspective. It is not hidden from
+the NPC itself:
+
+- `private.goals`: internal motivations that can shape behavior, preference,
+  avoidance, and pressure response
+- `private.secrets`: information the NPC has reason to hide by default
+- `private.knowledge`: facts the NPC knows from its own perspective
+
+`private` is not the same as `forbidden_facts`, and it is not a permanent speech
+ban. It must not be automatically exposed to players, other NPCs,
+`StateSummary`, player journey Markdown, or runtime events.
+
+Current Character Inner Context v0 uses stable private ids and
+`DisclosurePolicy` metadata to expose target-only inner context to the target
+NPC without leaking raw private data publicly.
+
+Legacy string entries remain accepted and normalize to stable ordered ids such
+as `goal_001`, `secret_001`, and `knowledge_001`. New case packages should use
+structured entries.
 
 ## mock_dialogues.yaml
 
