@@ -1,43 +1,37 @@
-# Private Character Impression v0
+﻿# 私有角色画像 v0
 
-Private Character Impression v0 adds subjective NPC cognition about the player.
-It is also called a character portrait in design notes, but the runtime event
-name is `character_impression.updated`.
+私有角色画像用于记录 NPC 对玩家的主观认知。设计笔记里也称为 character portrait，运行时事件名是 `character_impression.updated`。
 
-## Definitions
+## 定义
 
-- Character Card: author-defined true character setup.
-- CharacterInnerContext: target NPC's controlled private cognition input.
-- `private.goals`: what I want.
-- `private.secrets`: what I am hiding.
-- `private.knowledge`: what facts I know from my own perspective.
-- `inner_portraits`: how I see someone else.
-- Relationship Metrics: numeric social state such as `trust`, `suspicion`, and
-  `fear`.
-- Character Impression: one observer's subjective judgment, bias, hypothesis,
-  trust boundary, alliance potential, and threat sense about one target.
-- Memory Snapshot: runtime-owned important experience derived from events.
-- Narrative Rules: phases, beats, and resolution conditions.
-- RuleEngine: authority for accepted state changes.
-- NarrativeDirector: authority for output safety and spoiler control.
+- Character Card：作者定义的角色真实设定。
+- CharacterInnerContext：目标 NPC 专属的受控私有认知输入。
+- `private.goals`：我想要什么。
+- `private.secrets`：我正在隐藏什么。
+- `private.knowledge`：我从自身视角知道什么。
+- `inner_portraits`：我如何看待别人。
+- Relationship Metrics：数值化社交状态，例如 `trust`、`suspicion`、`fear`。
+- Character Impression：某个观察者对某个目标的主观判断、偏见、假设、信任边界、结盟潜力和威胁感。
+- Memory Snapshot：运行时从事件派生的重要经历快照。
+- Narrative Rules：阶段、beat 和结案条件。
+- RuleEngine：接受状态变化的权威。
+- NarrativeDirector：输出安全和防剧透权威。
 
-## Boundary
+## 边界
 
-A character impression is not a character-card truth. It does not say who the
-target really is. It records how `observer_id` currently interprets `target_id`.
+角色画像不是角色卡真相。它不说明目标真实是什么样，只记录 `observer_id` 当前如何解释 `target_id`。
 
-V0 only supports NPC -> player impressions:
+v0 只支持 NPC -> player：
 
 ```text
 session.character_impressions[npc_id]["player"]
 ```
 
-The runtime does not support player -> NPC impressions or NPC -> NPC impressions
-yet.
+当前运行时不支持 player -> NPC 或 NPC -> NPC 画像。
 
-## Model
+## 模型
 
-`CharacterImpression` contains:
+`CharacterImpression` 包含：
 
 - `observer_id`
 - `target_id`
@@ -55,14 +49,13 @@ yet.
 - `source_event_ids`
 - `last_updated_event_id`
 
-The text fields must be generated from safe runtime signals. They must not copy
-forbidden fact text, blocked terms, raw character private secrets, or solution
-claim configuration.
+文本字段必须来自安全运行时信号。不得复制禁说事实原文、blocked terms、角色 private secrets 或 solution claim 配置。
 
-## Derivation
+## 派生来源
 
-V0 impressions are derived by runtime code, not by LLM output. The derivation
-sources are:
+v0 画像由运行时代码派生，不由 LLM 输出。
+
+派生来源包括：
 
 - `player.asked_about`
 - `player.presented_clue`
@@ -71,58 +64,45 @@ sources are:
 - `director.blocked`
 - `accusation.evaluated`
 
-Each update writes a `character_impression.updated` event. Replay applies that
-event directly and does not re-run impression derivation.
+每次更新都会写入 `character_impression.updated`。Replay 直接应用该事件，不重新运行画像派生逻辑。
 
-## Agent Input
+## Agent 输入
 
-`CharacterInnerContext.inner_portraits` exposes only the current target NPC's own
-impressions. If the butler has an impression of the player, the butler can see it
-in `inner_portraits`; another NPC cannot.
+`CharacterInnerContext.inner_portraits` 只暴露当前目标 NPC 自己的画像。如果 butler 对 player 有画像，butler 可以在 `inner_portraits` 中看到；另一个 NPC 看不到。
 
-`AgentContext.recent_events` filters out `character_impression.updated` events so
-one NPC cannot see another NPC's private portrait through the recent-event feed.
+`AgentContext.recent_events` 会过滤 `character_impression.updated`，避免一个 NPC 通过近期事件流看到其他 NPC 的私有画像。
 
-LLM agents may consume `inner_portraits`, but they cannot directly modify
-`SessionState`. Any future impression write must still be a runtime-derived
-`character_impression.updated` event.
+LLM Agent 可以读取 `inner_portraits`，但不能直接修改 `SessionState`。未来任何画像写入仍必须是运行时派生的 `character_impression.updated` 事件。
 
-## Impression-Aware Disclosure v0
+## 画像感知披露 v0
 
-`inner_portraits` now influence the effective disclosure policy built into the
-target NPC's `CharacterInnerContext`. This is a runtime input projection, not a
-state mutation.
+`inner_portraits` 会影响目标 NPC `CharacterInnerContext` 中的有效披露策略。这是运行时输入投影，不是状态变更。
 
-When the target NPC's player impression has:
+当目标 NPC 对玩家的画像具有以下特征时：
 
-- high `threat_level`: effective disclosure narrows toward `deny` and `deflect`
-- high `alliance_potential`: effective disclosure may allow `hint`
-- `has_relevant_evidence`: matching self-knowledge may allow `partial`
-- `dangerous_topic_triggered`: effective disclosure narrows to `deny` and
-  `deflect`
+- `threat_level` 高：披露模式收窄到 `deny` / `deflect`
+- `alliance_potential` 高：可能允许 `hint`
+- `has_relevant_evidence`：匹配的 self-knowledge 可允许 `partial`
+- `dangerous_topic_triggered`：披露模式收窄到 `deny` / `deflect`
 
-V0 never grants `full` disclosure from an impression. It also never grants direct
-quotation of raw private text.
+v0 永远不会因为画像授予 `full` 披露，也不会允许直接引用 private 原文。
 
-MockAgent fallback consumes the effective modes:
+MockAgent fallback 会消费有效披露模式：
 
-- `partial` with relevant evidence gives a partial-truth style answer
-- `hint` with alliance potential gives a cautious hint
-- dangerous topics tend to refusal
-- high threat tends to guarded concealment
+- 有相关证据且允许 `partial` 时，给出部分真相风格回复
+- 有结盟潜力且允许 `hint` 时，给出谨慎提示
+- 危险话题倾向拒答
+- 高威胁倾向谨慎隐瞒
 
-## Output Safety
+## 输出安全
 
-Impressions are private cognition. They must not be exposed through:
+画像是私有认知，不得通过以下渠道暴露：
 
 - `StateSummary`
-- `player_journey.md` raw text
-- another NPC's `AgentContext`
+- `player_journey.md` 原文
+- 另一个 NPC 的 `AgentContext`
 - `AgentIntent.proposed_actions`
 
-Player journey Markdown may mention that a private impression changed, but it
-must not print `personality_impression`, `perceived_motive`, or `trust_boundary`
-text.
+玩家旅程 Markdown 可以提到私有画像发生了更新，但不能打印 `personality_impression`、`perceived_motive` 或 `trust_boundary` 文本。
 
-NarrativeDirector still validates outward speech. RuleEngine still validates
-state-changing proposed actions.
+NarrativeDirector 仍校验对外发言。RuleEngine 仍校验状态变化 proposed actions。

@@ -106,6 +106,9 @@ def build_state_summary(package: CasePackage, session: SessionState) -> StateSum
                 knowledge_id=item.knowledge_id,
                 clue_id=item.clue_id,
                 world_info_id=item.world_info_id,
+                confidence=item.confidence,
+                acquisition=item.acquisition,
+                source_type=item.source_type,
                 title=item.title,
                 summary=item.summary,
             )

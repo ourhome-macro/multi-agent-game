@@ -7,6 +7,8 @@ from app.domain.models import (
     EventType,
     MemoryCandidateState,
     NarrativeState,
+    PlayerKnowledgeAcquisition,
+    PlayerKnowledgeSourceType,
     PlayerKnowledgeState,
     RelationshipState,
     SessionState,
@@ -83,6 +85,13 @@ def _apply_event(session: SessionState, event: WorldEvent) -> None:
                 str(event.payload["world_info_id"])
                 if event.payload.get("world_info_id") is not None
                 else None
+            ),
+            confidence=float(event.payload.get("confidence", 1.0)),
+            acquisition=PlayerKnowledgeAcquisition(
+                str(event.payload.get("acquisition", PlayerKnowledgeAcquisition.DISCOVERED))
+            ),
+            source_type=PlayerKnowledgeSourceType(
+                str(event.payload.get("source_type", PlayerKnowledgeSourceType.CLUE))
             ),
             title=str(event.payload["title"]),
             summary=str(event.payload["summary"]),

@@ -161,11 +161,13 @@ def build_character_inner_context(
                 kind="goal",
                 summary=goal.summary,
                 priority=goal.priority,
+                related_world_info_ids=goal.related_world_info_ids,
                 tags=goal.tags,
                 disclosure_policy=_effective_disclosure_policy(
                     policy=goal.disclosure_policy,
                     impression=player_impression,
                     related_clue_ids=[],
+                    related_world_info_ids=goal.related_world_info_ids,
                     action=action,
                 ),
             )
@@ -178,11 +180,13 @@ def build_character_inner_context(
                 summary=secret.summary,
                 priority=secret.priority,
                 related_clue_ids=secret.related_clue_ids,
+                related_world_info_ids=secret.related_world_info_ids,
                 tags=secret.tags,
                 disclosure_policy=_effective_disclosure_policy(
                     policy=secret.disclosure_policy,
                     impression=player_impression,
                     related_clue_ids=secret.related_clue_ids,
+                    related_world_info_ids=secret.related_world_info_ids,
                     action=action,
                 ),
             )
@@ -195,11 +199,13 @@ def build_character_inner_context(
                 summary=knowledge.summary,
                 priority=knowledge.priority,
                 related_clue_ids=knowledge.related_clue_ids,
+                related_world_info_ids=knowledge.related_world_info_ids,
                 tags=knowledge.tags,
                 disclosure_policy=_effective_disclosure_policy(
                     policy=knowledge.disclosure_policy,
                     impression=player_impression,
                     related_clue_ids=knowledge.related_clue_ids,
+                    related_world_info_ids=knowledge.related_world_info_ids,
                     action=action,
                 ),
             )
@@ -214,6 +220,7 @@ def _effective_disclosure_policy(
     policy: DisclosurePolicy,
     impression: CharacterImpression | None,
     related_clue_ids: list[str],
+    related_world_info_ids: list[str],
     action: PlayerAction,
 ) -> DisclosurePolicy:
     if impression is None:
@@ -235,7 +242,12 @@ def _effective_disclosure_policy(
     else:
         if impression.alliance_potential >= 0.7:
             modes.add(DisclosureMode.HINT)
-        if _impression_matches_related_evidence(impression, related_clue_ids, action):
+        if _impression_matches_related_evidence(
+            impression,
+            related_clue_ids,
+            related_world_info_ids,
+            action,
+        ):
             modes.update({DisclosureMode.HINT, DisclosureMode.PARTIAL})
 
     modes.discard(DisclosureMode.FULL)
@@ -263,19 +275,25 @@ def _effective_disclosure_policy(
 def _impression_matches_related_evidence(
     impression: CharacterImpression,
     related_clue_ids: list[str],
+    related_world_info_ids: list[str],
     action: PlayerAction,
 ) -> bool:
     if "has_relevant_evidence" not in impression.tags:
         return False
-    if not related_clue_ids:
+    if not related_clue_ids and not related_world_info_ids:
         return False
     if _action_matches_related_clue(action, related_clue_ids):
         return True
     refs = set(impression.suspected_knowledge_refs)
-    return any(
+    clue_matches = any(
         clue_id in refs or f"player_knowledge.{clue_id}" in refs
         for clue_id in related_clue_ids
     )
+    world_info_matches = any(
+        world_info_id in refs or f"player_knowledge.{world_info_id}" in refs
+        for world_info_id in related_world_info_ids
+    )
+    return clue_matches or world_info_matches
 
 
 def _action_matches_related_clue(action: PlayerAction, related_clue_ids: list[str]) -> bool:

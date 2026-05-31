@@ -47,6 +47,9 @@
       "clue_id": "inward_tide_mark",
       "world_info_id": "warehouse_opened_after_tide",
       "knowledge_id": "player_knowledge.warehouse_opened_after_tide",
+      "confidence": 1.0,
+      "acquisition": "discovered",
+      "source_type": "clue",
       "source_event_id": "event_003",
       "title": "仓库门在涨潮后被打开",
       "summary": "向内延伸的潮痕说明仓库门曾在涨潮后被打开。"
@@ -552,6 +555,9 @@
       "clue_id": "inward_broken_lamp",
       "world_info_id": "lamp_broken_from_inside_entry",
       "knowledge_id": "player_knowledge.lamp_broken_from_inside_entry",
+      "confidence": 1.0,
+      "acquisition": "discovered",
+      "source_type": "clue",
       "source_event_id": "event_028",
       "title": "煤油灯因入门碰撞破裂",
       "summary": "破裂方向说明煤油灯是在有人进门后被撞倒。"
@@ -632,6 +638,9 @@
       "clue_id": "blue_ledger_page",
       "world_info_id": "blue_ledger_records_midnight_boxes",
       "knowledge_id": "player_knowledge.blue_ledger_records_midnight_boxes",
+      "confidence": 1.0,
+      "acquisition": "discovered",
+      "source_type": "clue",
       "source_event_id": "event_033",
       "title": "蓝墨账页记录午夜木箱",
       "summary": "蓝墨账页记录了午夜后入库的三只木箱。"

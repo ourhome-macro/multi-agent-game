@@ -1,25 +1,21 @@
-# LLM Agent Contract
+﻿# LLM Agent 合同
 
-The runtime uses `MockAgent` by default. The LLM Agent Contract defines the safe
-input and output protocol used by `LLMAgentStub` and by the disabled-by-default
-real LLM adapter.
+运行时默认使用 `MockAgent`。LLM Agent 合同定义了 `LLMAgentStub` 和默认禁用的真实 LLM 适配器共同使用的安全输入/输出协议。
 
-## Goal
+## 目标
 
-The contract allows a future LLM agent to read the same controlled runtime view
-as other agents, including target-only inner context, while preserving these
-boundaries:
+合同允许未来的 LLM Agent 读取与其他 Agent 相同的受控运行时视图，包括目标 NPC 专属的 inner context，同时保持这些边界：
 
-- no direct world-state mutation
-- no direct narrative phase change
-- no raw private text in public output
-- no forbidden fact text or blocked terms in public output
-- every `AgentIntent` is checked by Narrative Director
-- every `proposed_actions` entry is checked by Rule Engine
+- 不直接修改世界状态
+- 不直接推进剧情阶段
+- 不把 private 原文输出给玩家
+- 不把禁说事实原文或 blocked terms 输出给玩家
+- 每个 `AgentIntent` 都必须经过 Narrative Director 检查
+- 每个 `proposed_actions` 都必须经过 Rule Engine 检查
 
-## Input
+## 输入
 
-The contract input is `LLMAgentContractInput`:
+合同输入是 `LLMAgentContractInput`：
 
 ```python
 class LLMAgentContractInput(BaseModel):
@@ -28,27 +24,24 @@ class LLMAgentContractInput(BaseModel):
     required_output_schema: Literal["AgentIntent"] = "AgentIntent"
 ```
 
-`agent_context` includes:
+`agent_context` 包含：
 
-- current `PlayerAction`
-- target public profile
-- target-only `CharacterInnerContext`
-- target-only `inner_portraits`
+- 当前 `PlayerAction`
+- 目标 NPC 公开画像
+- 目标 NPC 专属 `CharacterInnerContext`
+- 目标 NPC 专属 `inner_portraits`
 - `memory_snapshots`
 - `relationship_to_player`
-- player knowledge
-- recent events
-- blocked and revealable forbidden fact ids
-- action pressure and sensitivity metadata
+- 玩家已知
+- 近期事件
+- blocked/revealable forbidden fact ids
+- 行为压力和敏感度元数据
 
-It must not include raw `CasePackage`, raw `SessionState`, another NPC's private
-data, another NPC's impressions, clue `truth_status`, forbidden fact text,
-blocked terms, or solution claims.
+它不得包含原始 `CasePackage`、原始 `SessionState`、其他 NPC 的 private 数据、其他 NPC 的 impressions、线索 `truth_status`、禁说事实原文、blocked terms 或 solution claims。
 
-## Disclosure Constraints
+## 披露约束
 
-`LLMDisclosureConstraint` is derived from target self-knowledge items and
-blocked forbidden fact ids:
+`LLMDisclosureConstraint` 来自目标 NPC 的 self-knowledge items 和 blocked forbidden fact ids：
 
 ```python
 class LLMDisclosureConstraint(BaseModel):
@@ -58,29 +51,27 @@ class LLMDisclosureConstraint(BaseModel):
     direct_reveal_allowed: bool
     direct_quote_allowed: bool
     related_clue_ids: list[str]
+    related_world_info_ids: list[str]
     blocked: bool
 ```
 
-These constraints control expression, not cognition. A target NPC may know its
-own private data, but the LLM must obey the allowed disclosure mode.
+这些约束控制表达，不控制认知。目标 NPC 可以知道自己的 private 数据，但 LLM 必须遵守允许的披露模式。
 
-The `allowed_modes` values are the effective modes for this AgentContext, not
-just the authored character-card defaults. Runtime may narrow or expand them
-based on the target NPC's private impression of the player:
+`allowed_modes` 是当前 `AgentContext` 下的有效模式，不只是角色卡默认值。运行时可根据目标 NPC 对玩家的私有画像收窄或放宽：
 
-- threat or dangerous-topic impressions narrow toward `deny` / `deflect`
-- alliance impressions may permit `hint`
-- relevant-evidence impressions may permit `partial`
+- 威胁或危险话题：收窄到 `deny` / `deflect`
+- 结盟倾向：可允许 `hint`
+- 玩家有相关证据：可允许 `partial`
 
-The projection never grants `full` disclosure or raw private quotation.
+该投影永远不会授予 `full` 披露，也不会允许直接引用 private 原文。
 
-## Output
+## 输出
 
-The required output is strict JSON matching `AgentIntent`:
+要求输出严格匹配 `AgentIntent` 的 JSON：
 
 ```json
 {
-  "speech": "natural language reply",
+  "speech": "自然语言回复",
   "intent": "answer | conceal | lie | refuse | probe | panic",
   "emotional_shift": {},
   "proposed_actions": [],
@@ -88,50 +79,36 @@ The required output is strict JSON matching `AgentIntent`:
 }
 ```
 
-Allowed proposed action types remain limited by the runtime model. The LLM
-contract is stricter than the generic `AgentIntent` model: it rejects direct
-`narrative.phase.change` proposals. Phase progression belongs to
-`RuleTriggerSystem`.
+允许的 proposed action 类型仍受运行时模型限制。LLM 合同比通用 `AgentIntent` 更严格：它拒绝直接提出 `narrative.phase.change`。剧情推进属于 `RuleTriggerSystem`。
 
-When `validate_llm_agent_output` receives the originating
-`LLMAgentContractInput`, it also rejects output that quotes raw target private
-text for self-knowledge items whose `DisclosurePolicy.direct_quote_allowed` is
-false. The validation error does not include the private text.
+当 `validate_llm_agent_output` 收到来源 `LLMAgentContractInput` 时，还会拒绝输出中逐字引用目标 private 文本的情况，除非对应 self-knowledge item 的 `DisclosurePolicy.direct_quote_allowed=true`。校验错误不会包含 private 文本。
 
-The same validator rejects exact quotation of target `inner_portraits` text such
-as `personality_impression`, `perceived_motive`, or `trust_boundary`. The LLM may
-use impressions to choose a safer intent, but it must not publish the private
-portrait verbatim.
+同一校验器还会拒绝逐字引用目标 `inner_portraits` 文本，例如 `personality_impression`、`perceived_motive` 或 `trust_boundary`。LLM 可以用画像选择更安全的意图，但不能把私有画像原文发布出去。
 
 ## Stub
 
-`LLMAgentStub` now builds `LLMAgentContractInput`, emits a deterministic JSON
-payload, and validates it back into `AgentIntent`.
+`LLMAgentStub` 会构造 `LLMAgentContractInput`，输出确定性 JSON payload，并将其校验回 `AgentIntent`。
 
-The stub does not call an external model, does not mutate `SessionState`, and
-does not reveal target private text.
+Stub 不调用外部模型，不修改 `SessionState`，也不泄露目标 private 文本。
 
-## Real Adapter v0
+## 真实适配器 v0
 
-`OpenAILLMAgent` is available but disabled by default. It is selected only by
-environment:
+`OpenAILLMAgent` 已存在，但默认禁用。只有环境变量选择时才启用：
 
 ```text
 LLM_BACKEND=real
 OPENAI_API_KEY=...
 ```
 
-Optional:
+可选：
 
 ```text
 OPENAI_MODEL=...
 ```
 
-If `LLM_BACKEND=real` is present without `OPENAI_API_KEY`, `AgentGateway` remains
-on `MockAgent`. CI, local tests, and full scenario snapshots therefore continue
-to run on `mock` unless explicitly configured otherwise.
+如果设置了 `LLM_BACKEND=real` 但没有 `OPENAI_API_KEY`，`AgentGateway` 仍保持 `MockAgent`。因此 CI、本地测试和完整场景快照默认继续使用 mock。
 
-The adapter flow is:
+适配器流程：
 
 ```text
 AgentContext
@@ -142,57 +119,50 @@ AgentContext
   -> AgentIntent or safe fallback
 ```
 
-The strict JSON schema allows only these proposed action families for the real
-adapter:
+真实适配器的严格 JSON schema 只允许这些 proposed action：
 
 - `clue.discover`
 - `relationship.change`
 
-It intentionally does not allow `narrative.phase.change`. The Python validator
-still rejects phase changes as a second line of defense.
+它故意不允许 `narrative.phase.change`。Python 校验器也会再次拒绝阶段变化，作为第二道防线。
 
-All adapter failures return a safe refusal intent with empty `proposed_actions`
-and no `memory_refs`. Failure includes:
+所有适配器失败都会返回无 `proposed_actions`、无 `memory_refs` 的安全拒答。失败包括：
 
-- missing API key when the adapter is constructed directly
-- HTTP or transport errors
-- malformed response JSON
-- schema validation failures
-- raw private-text echo
-- attempted narrative phase changes
+- 直接构造适配器时缺少 API key
+- HTTP 或传输错误
+- 响应 JSON 非法
+- schema 校验失败
+- private 原文回显
+- 尝试推进剧情阶段
 
-The adapter never writes `WorldEvent`, never mutates `SessionState`, never calls
-Rule Engine directly, and never bypasses Narrative Director.
+适配器永远不写 `WorldEvent`，不修改 `SessionState`，不直接调用 Rule Engine，也不绕过 Narrative Director。
 
-## Runtime Review Chain
+## 运行时审查链路
 
 ```text
 AgentContext + CharacterInnerContext
   -> build_llm_agent_input
-  -> LLM or LLMAgentStub emits JSON
+  -> LLM 或 LLMAgentStub 输出 JSON
   -> validate_llm_agent_output
   -> AgentIntent
   -> NarrativeDirector.validate
   -> RuleEngine.apply_agent_intent
-  -> WorldEvent only for accepted runtime changes
+  -> 只有被接受的运行时变化才写 WorldEvent
 ```
 
-`accuse` stays outside the agent path. It does not call `AgentGateway`, a real
-LLM, or `LLMAgentStub`.
+`accuse` 保持在 Agent 路径之外。它不调用 `AgentGateway`、真实 LLM 或 `LLMAgentStub`。
 
-## Test Requirements
+## 测试要求
 
-The contract must keep these invariants:
+合同必须保持这些不变量：
 
-- `LLMAgentContractInput` includes the target NPC's own `inner_context`
-- it includes the target NPC's own `inner_portraits`
-- it excludes other NPCs' private data and other NPCs' impressions
-- `LLMAgentStub` returns a valid `AgentIntent`
-- `OpenAILLMAgent` is disabled by default and env-gated
-- real adapter failures fall back to a safe `AgentIntent`
-- LLM output proposing phase changes is rejected before Rule Engine
-- LLM output quoting raw private text is rejected before public output
-- StateSummary, WorldEvent payloads, snapshots, and player journey Markdown do
-  not expose raw private data
-- existing full scenario JSON snapshots and player journey Markdown remain
-  stable
+- `LLMAgentContractInput` 包含目标 NPC 自己的 `inner_context`
+- 包含目标 NPC 自己的 `inner_portraits`
+- 排除其他 NPC 的 private 数据和 impressions
+- `LLMAgentStub` 返回合法 `AgentIntent`
+- `OpenAILLMAgent` 默认禁用并由环境变量控制
+- 真实适配器失败会回退到安全 `AgentIntent`
+- LLM 输出剧情阶段变化会在 Rule Engine 前被拒绝
+- LLM 输出 private 原文会在公开输出前被拒绝
+- StateSummary、WorldEvent payload、snapshots 和 player journey Markdown 不暴露原始 private 数据
+- 完整场景 JSON 快照和 player journey Markdown 保持稳定

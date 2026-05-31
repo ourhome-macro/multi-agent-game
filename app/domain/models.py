@@ -79,6 +79,20 @@ class WorldInfoSensitivity(StrEnum):
     HIGH = "high"
 
 
+class PlayerKnowledgeAcquisition(StrEnum):
+    DISCOVERED = "discovered"
+    HEARD = "heard"
+    INFERRED = "inferred"
+    ACCUSED = "accused"
+
+
+class PlayerKnowledgeSourceType(StrEnum):
+    CLUE = "clue"
+    DIALOGUE = "dialogue"
+    INFERENCE = "inference"
+    ACCUSATION = "accusation"
+
+
 class EventType(StrEnum):
     SESSION_CREATED = "session.created"
     PLAYER_INSPECTED = "player.inspected"
@@ -152,6 +166,7 @@ class PrivateGoal(APIModel):
     id: NonEmptyString
     summary: NonEmptyString
     priority: PrivatePriority = PrivatePriority.MEDIUM
+    related_world_info_ids: list[NonEmptyString] = Field(default_factory=list)
     tags: list[NonEmptyString] = Field(default_factory=list)
     disclosure_policy: DisclosurePolicy = Field(default_factory=DisclosurePolicy)
 
@@ -161,6 +176,7 @@ class PrivateSecret(APIModel):
     summary: NonEmptyString
     priority: PrivatePriority = PrivatePriority.MEDIUM
     related_clue_ids: list[NonEmptyString] = Field(default_factory=list)
+    related_world_info_ids: list[NonEmptyString] = Field(default_factory=list)
     tags: list[NonEmptyString] = Field(default_factory=list)
     disclosure_policy: DisclosurePolicy = Field(default_factory=DisclosurePolicy)
 
@@ -170,6 +186,7 @@ class PrivateKnowledge(APIModel):
     summary: NonEmptyString
     priority: PrivatePriority = PrivatePriority.MEDIUM
     related_clue_ids: list[NonEmptyString] = Field(default_factory=list)
+    related_world_info_ids: list[NonEmptyString] = Field(default_factory=list)
     tags: list[NonEmptyString] = Field(default_factory=list)
     disclosure_policy: DisclosurePolicy = Field(default_factory=DisclosurePolicy)
 
@@ -277,6 +294,7 @@ class SelfKnowledgeItem(APIModel):
     summary: NonEmptyString
     priority: PrivatePriority = PrivatePriority.MEDIUM
     related_clue_ids: list[NonEmptyString] = Field(default_factory=list)
+    related_world_info_ids: list[NonEmptyString] = Field(default_factory=list)
     tags: list[NonEmptyString] = Field(default_factory=list)
     disclosure_policy: DisclosurePolicy = Field(default_factory=DisclosurePolicy)
     source: Literal["character_card"] = "character_card"
@@ -315,6 +333,7 @@ class LLMDisclosureConstraint(APIModel):
     direct_reveal_allowed: bool = False
     direct_quote_allowed: bool = False
     related_clue_ids: list[NonEmptyString] = Field(default_factory=list)
+    related_world_info_ids: list[NonEmptyString] = Field(default_factory=list)
     blocked: bool = True
 
 
@@ -581,6 +600,9 @@ class PlayerKnowledgeState(APIModel):
     knowledge_id: NonEmptyString
     clue_id: NonEmptyString | None = None
     world_info_id: NonEmptyString | None = None
+    confidence: float = Field(default=1.0, ge=0.0, le=1.0)
+    acquisition: PlayerKnowledgeAcquisition = PlayerKnowledgeAcquisition.DISCOVERED
+    source_type: PlayerKnowledgeSourceType = PlayerKnowledgeSourceType.CLUE
     title: NonEmptyString
     summary: str
     source_event_id: NonEmptyString
@@ -703,6 +725,9 @@ class PlayerKnowledgeSummary(APIModel):
     knowledge_id: NonEmptyString
     clue_id: NonEmptyString | None = None
     world_info_id: NonEmptyString | None = None
+    confidence: float
+    acquisition: PlayerKnowledgeAcquisition
+    source_type: PlayerKnowledgeSourceType
     title: NonEmptyString
     summary: str
 

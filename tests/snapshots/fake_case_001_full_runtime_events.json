@@ -47,6 +47,9 @@
       "clue_id": "scratched_drawer",
       "world_info_id": "desk_forced_open",
       "knowledge_id": "player_knowledge.desk_forced_open",
+      "confidence": 1.0,
+      "acquisition": "discovered",
+      "source_type": "clue",
       "source_event_id": "event_003",
       "title": "书桌抽屉被撬开",
       "summary": "书桌抽屉锁孔旁的新鲜划痕表明，抽屉在案发前后被非正常打开过。"
@@ -604,6 +607,9 @@
       "clue_id": "dustless_frame",
       "world_info_id": "portrait_was_moved",
       "knowledge_id": "player_knowledge.portrait_was_moved",
+      "confidence": 1.0,
+      "acquisition": "discovered",
+      "source_type": "clue",
       "source_event_id": "event_029",
       "title": "肖像画近期被移动过",
       "summary": "肖像画背后的无尘痕迹说明它最近被移动过，可能遮挡过隐藏物。"
@@ -861,6 +867,9 @@
       "clue_id": "torn_note",
       "world_info_id": "secret_meeting_note_exists",
       "knowledge_id": "player_knowledge.secret_meeting_note_exists",
+      "confidence": 1.0,
+      "acquisition": "discovered",
+      "source_type": "clue",
       "source_event_id": "event_042",
       "title": "存在十点书房会面便签",
       "summary": "被撕碎的便签显示，有人在今晚十点约定于书房见面。"

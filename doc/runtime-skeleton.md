@@ -1,41 +1,32 @@
-# Runtime Skeleton
+﻿# 后端运行时骨架
 
-The runtime is still intentionally small: no default real LLM call, no frontend,
-no database, and no vector memory. Its purpose is to prove the backend contract
-for narrative state, rule execution, event logging, and replay.
+当前运行时仍刻意保持很小：默认不调用真实 LLM、不做前端、不接数据库、不做向量记忆。它的目的，是证明后端叙事状态、规则执行、事件日志和 replay 的合同成立。
 
-## Implemented Scope
+## 已实现范围
 
-- Scans `cases/*` and loads every case package containing `case.yaml`.
-- Supports `cases/fake_case_001` and `cases/fake_case_002`.
-- Validates case YAML with Pydantic v2 and cross-reference checks.
-- Loads public/private character cards, exposes public character views, and
-  builds target-only `CharacterInnerContext` for agent-backed NPC actions.
-- Derives private NPC -> player `CharacterImpression` state from runtime events.
-- Creates in-memory sessions.
-- Processes `inspect`, `talk`, `ask_about`, `present_clue`, and `accuse` player
-  actions.
-- Unlocks clues through Rule Engine.
-- Generates deterministic NPC intents through `AgentGateway` and `MockAgent`.
-- Provides `LLMAgentStub` as a non-network placeholder that validates the future
-  LLM Agent Contract.
-- Provides `OpenAILLMAgent` as an env-gated real adapter that is disabled by
-  default and excluded from scenario snapshots.
-- Blocks forbidden NPC output through Narrative Director.
-- Applies legal relationship changes with metric clamping.
-- Emits `relationship.threshold.crossed` once per threshold per session.
-- Derives `player_knowledge.updated` and `memory_candidate.created`.
-- Reduces `memory_candidate.created` into `agent_memory_snapshot.updated` and
-  `session.memory_snapshots`.
-- Evaluates structured formal accusations through Rule Engine using
-  `solution_claims.yaml`.
-- Resolves `fake_case_001` through a `case_solved` beat when
-  `accusation.evaluated(result=correct)` is observed by `RuleTriggerSystem`.
-- Completes beats and advances phases through `RuleTriggerSystem`.
-- Replays event logs with `replay_events(case, events)`.
-- Returns public `StateSummary`.
+- 扫描 `cases/*`，加载所有包含 `case.yaml` 的案件包。
+- 支持 `cases/fake_case_001` 和 `cases/fake_case_002`。
+- 用 Pydantic v2 校验 YAML schema 和跨文件引用。
+- 加载公开/私有角色卡，暴露公开角色视图，并为 Agent 支持的 NPC 行为构造目标专属 `CharacterInnerContext`。
+- 从运行时事件派生 NPC -> player 私有 `CharacterImpression`。
+- 创建内存 session。
+- 处理 `inspect`、`talk`、`ask_about`、`present_clue`、`accuse` 玩家动作。
+- 通过 Rule Engine 解锁线索。
+- 通过 `AgentGateway` 和 `MockAgent` 生成确定性 NPC 意图。
+- 提供 `LLMAgentStub` 作为不联网的未来 LLM 合同占位。
+- 提供默认禁用、环境变量控制的 `OpenAILLMAgent`。
+- 通过 Narrative Director 阻止禁说 NPC 输出。
+- 应用合法关系变化，并限制关系指标范围。
+- 每个阈值每个 session 只发出一次 `relationship.threshold.crossed`。
+- 派生 `player_knowledge.updated` 和 `memory_candidate.created`。
+- 把 `memory_candidate.created` 归并为 `agent_memory_snapshot.updated` 和 `session.memory_snapshots`。
+- 使用 `solution_claims.yaml` 通过 Rule Engine 评估结构化正式指控。
+- 当 `RuleTriggerSystem` 观察到 `accusation.evaluated(result=correct)` 时，`fake_case_001` 可通过 `case_solved` beat 进入 resolved。
+- 通过 `RuleTriggerSystem` 完成 beats 并推进 phases。
+- 使用 `replay_events(case, events)` 回放事件日志。
+- 返回公开 `StateSummary`。
 
-## Runtime Chain
+## 运行链路
 
 ```text
 Case Package
@@ -45,31 +36,22 @@ Case Package
   -> Build AgentContext
   -> AgentGateway.generate(context)
   -> AgentIntent
-  -> Narrative Director validates narrative boundary
-  -> Rule Engine applies legal state changes
-  -> Derived Event System derives public knowledge and memory candidates
-  -> Memory Snapshot System updates stable runtime memory snapshots
-  -> Rule Trigger System evaluates narrative rules
+  -> Narrative Director 校验叙事边界
+  -> Rule Engine 应用合法状态变化
+  -> Derived Event System 派生玩家已知和记忆候选
+  -> Memory Snapshot System 更新稳定运行时记忆快照
+  -> Rule Trigger System 评估叙事规则
   -> Write WorldEvent
   -> Return StateSummary
 ```
 
-`inspect` skips agent generation. `talk` uses `AgentGateway.generate(context)`.
-`ask_about` validates a clue, character, or scene subject, writes
-`player.asked_about`, and then uses the same AgentGateway path. `present_clue`
-first passes Rule Engine evidence validation, writes `player.presented_clue`, and
-then uses the same AgentGateway path as `talk`.
+`inspect` 跳过 Agent 生成。`talk` 使用 `AgentGateway.generate(context)`。`ask_about` 先校验 clue、character 或 scene subject，写入 `player.asked_about`，再走同一 AgentGateway 路径。`present_clue` 先通过 Rule Engine 证据校验，写入 `player.presented_clue`，再走与 `talk` 相同的 AgentGateway 路径。
 
-`accuse` does not use AgentGateway. Rule Engine validates the structured claim
-and player-known evidence, writes `player.accused` and `accusation.evaluated`,
-then the normal derived-memory and trigger systems run. Accuse v0 does not
-directly advance phase or run an ending system.
+`accuse` 不使用 AgentGateway。Rule Engine 校验结构化 claim 和玩家已知证据，写入 `player.accused` 与 `accusation.evaluated`，然后继续运行派生记忆和触发系统。v0 中 accuse 不直接推进 phase 或运行 ending system。
 
-Narrative resolution v0 is intentionally small: the resolved phase is reached
-only by a `narrative_rules.yaml` beat reacting to `accusation.evaluated`, not by
-accuse code.
+叙事结案 v0 故意保持简单：resolved phase 只能由 `narrative_rules.yaml` 中响应 `accusation.evaluated` 的 beat 达成，而不是 accuse 代码直接设置。
 
-## Public API
+## 公开 API
 
 - `GET /health`
 - `GET /cases`
@@ -78,80 +60,46 @@ accuse code.
 - `GET /sessions/{session_id}/state`
 - `GET /sessions/{session_id}/events`
 
-`PlayerAction` target fields are fixed as `target_id`. Relationship endpoints are
-fixed as `source_id` and `target_id`.
+`PlayerAction` 目标字段固定为 `target_id`。关系两端固定为 `source_id` 和 `target_id`。
 
-Unknown inspect targets and unknown talk NPCs return business errors and do not
-write player action events. Invalid `ask_about`, `present_clue`, and `accuse`
-attempts write `rule.rejected` and return `accepted=false`.
+未知 inspect target 和未知 talk NPC 会返回业务错误，并且不写玩家动作事件。非法 `ask_about`、`present_clue`、`accuse` 会写 `rule.rejected` 并返回 `accepted=false`。
 
-## Agent Boundary
+## Agent 边界
 
-`ActionService` depends on `AgentGateway`, not `MockAgent` directly.
+`ActionService` 依赖 `AgentGateway`，不直接依赖 `MockAgent`。
 
-`AgentGateway` currently supports:
+`AgentGateway` 当前支持：
 
-- `mock`: default deterministic backend.
-- `llm_stub`: local stub that returns a valid `AgentIntent` without model calls.
-- `real`: OpenAI adapter selected only with `LLM_BACKEND=real` and
-  `OPENAI_API_KEY`.
+- `mock`：默认确定性后端。
+- `llm_stub`：本地 stub，返回合法 `AgentIntent`，不调用模型。
+- `real`：仅在 `LLM_BACKEND=real` 且存在 `OPENAI_API_KEY` 时选择 OpenAI 适配器。
 
-`llm_stub` builds `LLMAgentContractInput` and validates strict JSON-shaped
-`AgentIntent` output. It does not call an external model.
+`llm_stub` 会构造 `LLMAgentContractInput` 并校验严格 JSON 形态的 `AgentIntent` 输出，不调用外部模型。
 
-`real` also builds `LLMAgentContractInput`, asks for strict JSON, validates the
-model output, and returns a safe refusal on any failure. It does not alter the
-default backend, scenario snapshots, replay path, or Rule Engine authority.
+`real` 也会构造 `LLMAgentContractInput`，请求严格 JSON，校验模型输出，任何失败都返回安全拒答。它不改变默认后端、场景快照、replay 路径或 Rule Engine 权威。
 
-`AgentContext` is the only input shape exposed to current agents. It must not
-include raw `CasePackage`, raw `SessionState`, another NPC's private data, clue
-truth status, or forbidden fact text.
+`AgentContext` 是当前 Agent 唯一输入形态。它不得包含原始 `CasePackage`、原始 `SessionState`、其他 NPC 的 private 数据、线索真相状态或禁说事实原文。
 
-`AgentContext.target_profile` is a safe `AgentCharacterView` derived from the
-public side of the character card. MockAgent uses it only as fallback behavior
-input when no configured `mock_dialogues.yaml` reply matches.
+`AgentContext.target_profile` 是从角色卡公开侧派生的安全 `AgentCharacterView`。MockAgent 只在没有匹配 `mock_dialogues.yaml` reply 时用它做 fallback 行为输入。
 
-Character `private` is the NPC's own non-public knowledge. Current v0 exposes a
-target-only `CharacterInnerContext` to the target NPC through `AgentContext`.
-Public speech is still checked by Narrative Director and proposed state changes
-by Rule Engine. `inner_context` must not appear in state summaries, event
-payloads, player journey Markdown, or other NPC contexts.
+角色 `private` 是 NPC 自己的非公开知识。v0 会通过 `AgentContext` 给目标 NPC 暴露目标专属 `CharacterInnerContext`。公开台词仍由 Narrative Director 检查，状态变化仍由 Rule Engine 检查。`inner_context` 不得出现在状态摘要、事件 payload、玩家旅程 Markdown 或其他 NPC 上下文中。
 
-`CharacterInnerContext.inner_portraits` contains only the current target NPC's
-own private impressions. V0 supports NPC -> player impressions only. The
-impression state is stored in `session.character_impressions[npc_id]["player"]`
-and written through `character_impression.updated`, not through AgentIntent.
+`CharacterInnerContext.inner_portraits` 只包含当前目标 NPC 自己的 private impressions。v0 只支持 NPC -> player。画像状态存储在 `session.character_impressions[npc_id]["player"]`，并通过 `character_impression.updated` 写入，不通过 `AgentIntent` 写入。
 
-`AgentContext.recent_events` excludes `character_impression.updated` so another
-NPC cannot see the portrait event as recent context.
+`AgentContext.recent_events` 排除 `character_impression.updated`，避免其他 NPC 把画像事件当作近期上下文看到。
 
-Impression-aware disclosure v0 adjusts the effective `DisclosurePolicy` in the
-target NPC's inner context. High threat and dangerous-topic tags narrow
-disclosure; alliance can allow hints; relevant evidence can allow partial
-truth. This remains input shaping only and does not alter Rule Engine authority.
+画像感知披露 v0 会调整目标 NPC inner context 中的有效 `DisclosurePolicy`。高威胁和危险话题会收窄披露；结盟可能允许 hint；相关证据可能允许 partial。这只是输入塑形，不改变 Rule Engine 权威。
 
-`AgentContext.memory_snapshots` contains only safe player-scoped structured
-snapshots produced by the runtime. It is not vector memory, RAG, a database, or a
-real LLM integration point.
+`AgentContext.memory_snapshots` 只包含运行时生成的安全 player-scoped 结构化快照。它不是向量记忆、RAG、数据库或真实 LLM 接入点。
 
-`accuse` is outside the agent boundary in v0. Agents do not judge accusation
-correctness and cannot write `player.accused` or `accusation.evaluated`.
+`accuse` 在 v0 中位于 Agent 边界外。Agent 不判断指控正确性，也不能写 `player.accused` 或 `accusation.evaluated`。
 
-## Replay Requirement
+## Replay 要求
 
-The runtime scenario smoke tests record stable event snapshots for
-`fake_case_001` and `fake_case_002` and verify that replaying those events
-rebuilds equivalent key state. This protects the rule chain, derived state,
-Director blocking, Rule Engine rejection, accusation evaluation, narrative
-resolution, and phase progression from accidental drift.
+运行时场景 smoke tests 为 `fake_case_001` 和 `fake_case_002` 记录稳定事件快照，并验证 replay 能重建等价关键状态。这保护规则链、派生状态、Director 阻止、Rule Engine 拒绝、指控评估、叙事结案和阶段推进不会意外漂移。
 
-The same scenarios also render player journey Markdown files from the actual
-`WorldEvent` lists. The Markdown is for human review and must obey the same
-public-summary leak boundary.
+同一场景还会从实际 `WorldEvent` 列表渲染玩家旅程 Markdown。Markdown 用于人工审阅，并必须遵守与公开摘要相同的防泄漏边界。
 
-Replay rebuilds `memory_candidates` and `memory_snapshots` from persisted events.
-It does not re-run memory derivation or snapshot aggregation, preserving event
-count and preventing recursive memory events.
+Replay 会从持久化事件重建 `memory_candidates` 和 `memory_snapshots`，不会重新运行记忆派生或快照聚合，因此保持事件数量并避免递归记忆事件。
 
-Replay also rebuilds `character_impressions` from persisted
-`character_impression.updated` events. It does not re-run impression derivation.
+Replay 也会从持久化 `character_impression.updated` 事件重建 `character_impressions`，不会重新运行画像派生。

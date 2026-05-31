@@ -118,6 +118,16 @@ def test_inspect_desk_discovers_scratched_drawer(client: TestClient) -> None:
     knowledge = payload["state"]["player_knowledge"][0]
     assert knowledge["clue_id"] == "scratched_drawer"
     assert knowledge["world_info_id"] == "desk_forced_open"
+    assert knowledge["confidence"] == 1.0
+    assert knowledge["acquisition"] == "discovered"
+    assert knowledge["source_type"] == "clue"
+    knowledge_event = next(
+        event for event in payload["new_events"] if event["type"] == "player_knowledge.updated"
+    )
+    assert knowledge_event["payload"]["world_info_id"] == "desk_forced_open"
+    assert knowledge_event["payload"]["confidence"] == 1.0
+    assert knowledge_event["payload"]["acquisition"] == "discovered"
+    assert knowledge_event["payload"]["source_type"] == "clue"
 
 
 def test_clue_discovered_completes_beat_and_advances_phase(client: TestClient) -> None:
@@ -625,6 +635,16 @@ def test_agent_context_includes_runtime_inputs_for_target_agent() -> None:
     assert {item.id for item in context.inner_context.inner_knowledge} == {
         "drawer_opened_last_night"
     }
+    goal = context.inner_context.inner_goals[0]
+    secret = context.inner_context.inner_secrets[0]
+    knowledge = context.inner_context.inner_knowledge[0]
+    assert goal.related_world_info_ids == ["will_swapped"]
+    assert set(secret.related_world_info_ids) == {
+        "will_swapped",
+        "desk_forced_open",
+        "portrait_was_moved",
+    }
+    assert knowledge.related_world_info_ids == ["desk_forced_open"]
     assert set(context.target_profile.model_dump()) == {
         "id",
         "display_name",
@@ -678,6 +698,48 @@ def test_agent_context_exposes_only_target_npc_inner_portraits() -> None:
     )
     assert niece_context.inner_context is not None
     assert niece_context.inner_context.inner_portraits == []
+
+
+def test_agent_context_exposes_only_target_npc_private_world_info_refs() -> None:
+    case = CaseLoader().load(FAKE_CASE_001_DIR)
+    recorder = EventRecorder()
+    session = InMemorySessionStore(recorder).create(case)
+
+    butler_context = build_agent_context(
+        case,
+        session,
+        PlayerAction(type="talk", target_id="butler", text="What do you know?"),
+    )
+    niece_context = build_agent_context(
+        case,
+        session,
+        PlayerAction(type="talk", target_id="niece", text="What do you know?"),
+    )
+
+    assert butler_context.inner_context is not None
+    assert niece_context.inner_context is not None
+    butler_refs = {
+        ref
+        for item in [
+            *butler_context.inner_context.inner_goals,
+            *butler_context.inner_context.inner_secrets,
+            *butler_context.inner_context.inner_knowledge,
+        ]
+        for ref in item.related_world_info_ids
+    }
+    niece_refs = {
+        ref
+        for item in [
+            *niece_context.inner_context.inner_goals,
+            *niece_context.inner_context.inner_secrets,
+            *niece_context.inner_context.inner_knowledge,
+        ]
+        for ref in item.related_world_info_ids
+    }
+    assert "will_swapped" in butler_refs
+    assert "portrait_was_moved" in butler_refs
+    assert "secret_meeting_note_exists" not in butler_refs
+    assert niece_refs == {"secret_meeting_note_exists", "desk_forced_open"}
 
 
 def test_inner_portrait_with_relevant_evidence_allows_partial_disclosure_mode() -> None:
@@ -776,8 +838,10 @@ def test_case_loader_supports_character_card_private_boundary() -> None:
     assert "avoid_suspicion" in butler.private.goals[0].tags
     assert butler.private.secrets[0].id == "swapped_will_awareness"
     assert "scratched_drawer" in butler.private.secrets[0].related_clue_ids
+    assert "will_swapped" in butler.private.secrets[0].related_world_info_ids
     assert butler.private.secrets[0].disclosure_policy.direct_reveal_allowed is False
     assert butler.private.knowledge[0].id == "drawer_opened_last_night"
+    assert butler.private.knowledge[0].related_world_info_ids == ["desk_forced_open"]
 
 
 def test_legacy_private_strings_normalize_to_structured_items(tmp_path: Path) -> None:
@@ -1751,6 +1815,8 @@ def test_llm_agent_contract_input_includes_controlled_inner_context() -> None:
     assert secret_constraint.direct_reveal_allowed is False
     assert secret_constraint.direct_quote_allowed is False
     assert "scratched_drawer" in secret_constraint.related_clue_ids
+    assert "will_swapped" in secret_constraint.related_world_info_ids
+    assert "desk_forced_open" in secret_constraint.related_world_info_ids
 
 
 def test_llm_agent_contract_input_excludes_other_npc_private() -> None:
@@ -2550,6 +2616,29 @@ def test_case_loader_rejects_bad_world_info_reference_from_solution_claim(
     )
 
     with pytest.raises(CaseLoadError, match="unknown world_info"):
+        CaseLoader().load(case_dir)
+
+
+def test_case_loader_rejects_bad_world_info_reference_from_character_private(
+    tmp_path: Path,
+) -> None:
+    case_dir = tmp_path / "bad_private_world_info_case"
+    case_dir.mkdir()
+    _write_minimal_case(case_dir)
+    (case_dir / "characters.yaml").write_text(
+        "- id: npc\n"
+        "  name: NPC\n"
+        "  role: Witness\n"
+        "  private:\n"
+        "    goals:\n"
+        "      - id: goal\n"
+        "        summary: Goal.\n"
+        "        related_world_info_ids:\n"
+        "          - missing_world_info\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(CaseLoadError, match="related_world_info_ids"):
         CaseLoader().load(case_dir)
 
 

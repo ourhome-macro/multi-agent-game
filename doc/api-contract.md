@@ -1,9 +1,8 @@
-# API Contract
+﻿# API 契约
 
-The current API covers the in-memory backend narrative runtime. It does not call
-real LLMs and does not persist sessions to a database.
+当前 API 覆盖内存版后端叙事运行时。它默认不调用真实 LLM，也不把 session 持久化到数据库。
 
-## Endpoints
+## 接口列表
 
 - `GET /health`
 - `GET /cases`
@@ -12,26 +11,25 @@ real LLMs and does not persist sessions to a database.
 - `GET /sessions/{session_id}/state`
 - `GET /sessions/{session_id}/events`
 
-## Create Session
+## 创建 Session
 
-Default case:
+使用默认案件：
 
 ```json
 {}
 ```
 
-Specific case:
+指定案件：
 
 ```json
 { "case_id": "fake_case_002" }
 ```
 
-The response contains `session_id` and a public `StateSummary`.
+响应包含 `session_id` 和公开 `StateSummary`。
 
 ## PlayerAction
 
-All player action targets use `target_id`. A payload using `target` is rejected
-with 422.
+所有玩家动作目标统一使用 `target_id`。如果请求使用旧字段 `target`，会被 422 拒绝。
 
 ### inspect
 
@@ -42,8 +40,7 @@ with 422.
 }
 ```
 
-`target_id` must be a known scene hotspot. Unknown inspect targets return 404 and
-do not write `player.inspected`.
+`target_id` 必须是已知场景热点。未知调查目标返回 404，且不会写入 `player.inspected`。
 
 ### talk
 
@@ -55,8 +52,7 @@ do not write `player.inspected`.
 }
 ```
 
-`target_id` must be a known character. Unknown talk targets return 404 and do not
-write `player.talked`.
+`target_id` 必须是已知角色。未知对话目标返回 404，且不会写入 `player.talked`。
 
 ### ask_about
 
@@ -70,16 +66,16 @@ write `player.talked`.
 }
 ```
 
-`subject_type` must be one of `clue`, `character`, or `scene`.
+`subject_type` 必须是 `clue`、`character` 或 `scene`。
 
-Rule Engine validates:
+Rule Engine 会校验：
 
-- `target_id` is a known character
-- clue subjects exist and have been discovered or exist in player knowledge
-- character subjects are known characters
-- scene subjects are known scenes
+- `target_id` 是已知角色
+- clue subject 存在，且已被玩家发现或已在玩家已知账本中
+- character subject 是已知角色
+- scene subject 是已知场景
 
-If validation succeeds, the runtime writes `player.asked_about` with:
+校验成功时写入 `player.asked_about`，payload 示例：
 
 ```json
 {
@@ -88,12 +84,11 @@ If validation succeeds, the runtime writes `player.asked_about` with:
   "subject_id": "scratched_drawer",
   "text": "What about the drawer?",
   "interaction_pressure": 0.6,
-  "knowledge_id": "player_knowledge.scratched_drawer"
+  "knowledge_id": "player_knowledge.desk_forced_open"
 }
 ```
 
-If validation fails, the response returns `accepted=false`, writes
-`rule.rejected`, and does not produce `npc.replied` or relationship changes.
+校验失败时返回 `accepted=false`，写入 `rule.rejected`，不会产生 `npc.replied` 或关系变化。
 
 ### present_clue
 
@@ -106,33 +101,30 @@ If validation fails, the response returns `accepted=false`, writes
 }
 ```
 
-`present_clue` means the player is pressuring or testing an NPC with a known
-clue. It does not mean the clue proves the NPC is guilty, and it does not
-directly advance the truth or phase.
+`present_clue` 表示玩家用已知线索向 NPC 施压或试探。它不表示该线索已经证明 NPC 有罪，也不直接推进真相或阶段。
 
-Rule Engine validates:
+Rule Engine 会校验：
 
-- `target_id` is a known character
-- `clue_id` exists in the case package
-- `clue_id` has already been discovered
-- `player_knowledge.{clue_id}` exists
+- `target_id` 是已知角色
+- `clue_id` 存在于案件包
+- `clue_id` 已经被发现
+- 对应 `player_knowledge.<world_info_id>` 存在
 
-If validation fails, the response returns `accepted=false`, writes
-`rule.rejected`, and does not produce `npc.replied` or relationship changes.
+校验失败时返回 `accepted=false`，写入 `rule.rejected`，不会产生 `npc.replied` 或关系变化。
 
-If validation succeeds, the runtime writes `player.presented_clue` with payload:
+校验成功时写入 `player.presented_clue`，payload 示例：
 
 ```json
 {
   "target_id": "butler",
   "clue_id": "scratched_drawer",
-  "knowledge_id": "player_knowledge.scratched_drawer",
+  "knowledge_id": "player_knowledge.desk_forced_open",
   "text": "What about these scratch marks?",
   "interaction_pressure": 0.9
 }
 ```
 
-Then the action enters `AgentGateway -> NarrativeDirector -> RuleEngine`.
+之后进入 `AgentGateway -> NarrativeDirector -> RuleEngine` 链路。
 
 ### accuse
 
@@ -150,48 +142,39 @@ Then the action enters `AgentGateway -> NarrativeDirector -> RuleEngine`.
 }
 ```
 
-`accuse` is a structured formal accusation. It does not call `AgentGateway`, does
-not use an LLM, and does not let an NPC decide whether the accusation is correct.
-Rule Engine evaluates the action against `solution_claims.yaml`.
+`accuse` 是结构化正式指控。它不调用 `AgentGateway`，不使用 LLM，也不让 NPC 判断指控是否正确。Rule Engine 根据 `solution_claims.yaml` 评估。
 
-Rule Engine validates:
+Rule Engine 会校验：
 
-- `target_id` is a known character
-- `claim_id` exists
-- claim `target_id` matches action `target_id`
-- current narrative phase is allowed by the claim
-- `evidence_clue_ids` is not empty
-- all submitted evidence ids exist in the case package
-- all submitted evidence clues have been discovered
-- all submitted evidence clues are present in `player_knowledge`
-- submitted evidence covers the claim's `required_evidence`
+- `target_id` 是已知角色
+- `claim_id` 存在
+- claim 的 `target_id` 与动作 `target_id` 一致
+- 当前剧情阶段允许该 claim
+- `evidence_clue_ids` 非空
+- 所有 evidence id 都存在于案件包
+- 所有 evidence clue 都已被发现
+- 所有 evidence clue 都已进入玩家已知账本
+- 玩家提交的 evidence 覆盖 claim 的 `required_evidence`
+- 玩家已知 WorldInfo 覆盖 claim 的 `required_world_info`
 
-If validation fails, the response returns `accepted=false`, writes
-`rule.rejected`, and does not produce `player.accused`,
-`accusation.evaluated`, `npc.replied`, relationship changes, or memory snapshot
-pollution.
+校验失败时返回 `accepted=false`，写入 `rule.rejected`，不会产生 `player.accused`、`accusation.evaluated`、`npc.replied`、关系变化或记忆污染。
 
-If validation succeeds, the runtime writes `player.accused`, then
-`accusation.evaluated`. The result comes from case-authored configuration, not
-natural-language reasoning. `accuse` does not directly change narrative phase.
-If `narrative_rules.yaml` defines a matching event-triggered beat, the later
-`RuleTriggerSystem` step may write `narrative.beat.completed` and
-`narrative.phase.changed`.
+校验成功时写入 `player.accused` 和 `accusation.evaluated`。结果来自案件配置，不来自自然语言推理。`accuse` 不直接改变剧情阶段；如果 `narrative_rules.yaml` 定义了匹配事件触发的 beat，后续 `RuleTriggerSystem` 可写入 `narrative.beat.completed` 和 `narrative.phase.changed`。
 
-## Interaction Pressure
+## 交互压力
 
-The backend calculates `interaction_pressure`:
+后端计算 `interaction_pressure`：
 
-- `talk`: base `0.1`
-- `ask_about`: base `0.3`
-- `present_clue`: base `0.6`
-- associated subject or clue targets the NPC: `+0.2`
-- key clue: `+0.1`
-- final value is clamped to `0.0 .. 1.0`
+- `talk`：基础 `0.1`
+- `ask_about`：基础 `0.3`
+- `present_clue`：基础 `0.6`
+- 关联 subject 或 clue 命中 NPC：`+0.2`
+- 关键线索：`+0.1`
+- 最终值限制在 `0.0 .. 1.0`
 
-## Events
+## 事件
 
-Important event types include:
+重要事件类型包括：
 
 - `session.created`
 - `player.inspected`
@@ -213,43 +196,38 @@ Important event types include:
 - `narrative.beat.completed`
 - `narrative.phase.changed`
 
-`relationship.changed.payload.current` always contains clamped relationship
-metrics in the `-1.0 .. 1.0` range.
+`relationship.changed.payload.current` 总是包含限制在 `-1.0 .. 1.0` 的关系指标。
 
-`memory_candidate.created` is a candidate memory event derived from important
-runtime events. `agent_memory_snapshot.updated` is a runtime-derived update to
-stable `session.memory_snapshots`; its actor is `memory_snapshot_system`, and its
-payload includes `memory_id`, `subject_id`, `source_event_ids`, `salience`,
-`visibility`, and `operation`.
+`player_knowledge.updated` 记录玩家通过什么来源掌握了哪个 WorldInfo，包含：
 
-`character_impression.updated` records runtime-derived private NPC -> player
-impressions. It includes `observer_id`, `target_id`, subjective impression
-fields, confidence, source event ids, and `last_updated_event_id`. It is not
-generated directly by Agent or LLM output. See `doc/character-portrait.md` for
-details.
+- `clue_id`
+- `world_info_id`
+- `knowledge_id`
+- `confidence`
+- `acquisition`
+- `source_type`
+- `source_event_id`
+- `title`
+- `summary`
+
+`memory_candidate.created` 是重要事件派生出的候选记忆。`agent_memory_snapshot.updated` 是运行时派生的稳定记忆快照更新，actor 是 `memory_snapshot_system`。
+
+`character_impression.updated` 记录运行时派生的 NPC -> player 私有画像，不由 Agent 或 LLM 直接生成。
 
 ## StateSummary
 
-`StateSummary` is the public state view. It may include discovered clues,
-completed beats, public relationship metrics, and player knowledge summaries.
-It does not expose memory snapshots or private character impressions in v0. It
-also does not expose `solution_claims` or accusation truth configuration.
+`StateSummary` 是公开状态视图。它可以包含已发现线索、完成的 beats、公开关系指标和玩家已知摘要。v0 不暴露记忆快照或私有角色画像，也不暴露 `solution_claims` 或指控真相配置。
 
-Character `private` data is the NPC's own non-public perspective, not data that
-is hidden from that NPC. The API boundary is different: raw private data must
-not be returned to players, other NPCs, public summaries, or journey artifacts.
-`AgentContext.inner_context` is not part of any public API response.
-`LLMAgentContractInput` is internal agent input and is also not part of any
-public API response.
+角色 `private` 数据是 NPC 自己的非公开视角，不是对 NPC 自己隐藏。API 边界是：原始 private 数据不能返回给玩家、其他 NPC、公开 summary 或 journey artifacts。`AgentContext.inner_context` 不属于公开 API 响应。
 
-Character summaries expose only public role-card fields:
+角色摘要只暴露公开角色卡字段：
 
 - `id`
 - `display_name`
 - `public_role`
 - `public_description`
 
-It must not expose:
+不得暴露：
 
 - character `secrets`
 - character `goals`
@@ -258,17 +236,15 @@ It must not expose:
 - character-card `private`
 - `inner_context`
 - clue `truth_status`
-- forbidden fact text or blocked terms
+- forbidden fact text 或 blocked terms
 - `forbidden_facts`
 - `solution_claims`
 
-## Errors
+## 错误
 
-- Unknown `case_id`: 404
-- Unknown `session_id`: 404
-- Unknown inspect target: 404
-- Unknown talk target: 404
-- Invalid request schema: 422
-- Invalid `ask_about`, `present_clue`, or `accuse` evidence state: 200 with
-  `accepted=false` and
-  `rule.rejected`
+- 未知 `case_id`：404
+- 未知 `session_id`：404
+- 未知 inspect target：404
+- 未知 talk target：404
+- 请求 schema 非法：422
+- `ask_about`、`present_clue` 或 `accuse` 证据状态非法：200 + `accepted=false` + `rule.rejected`

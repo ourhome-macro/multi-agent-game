@@ -20,6 +20,9 @@
       - id: avoid_smuggling_chain
         summary: 避免仓库走私线索被连起来。
         priority: high
+        related_world_info_ids:
+          - warehouse_opened_after_tide
+          - blue_ledger_records_midnight_boxes
         tags:
           - avoid_suspicion
     secrets:
@@ -28,6 +31,8 @@
         priority: high
         related_clue_ids:
           - inward_tide_mark
+        related_world_info_ids:
+          - warehouse_opened_after_tide
         disclosure_policy:
           revealable: false
           allowed_modes:
@@ -42,6 +47,8 @@
         priority: medium
         related_clue_ids:
           - inward_broken_lamp
+        related_world_info_ids:
+          - lamp_broken_from_inside_entry
 
 - id: clerk
   display_name: 沈账房
@@ -65,12 +72,17 @@
       - id: prove_forced_bookkeeping
         summary: 证明自己只是被迫记录货物。
         priority: medium
+        related_world_info_ids:
+          - blue_ledger_records_midnight_boxes
     secrets:
       - id: hid_missing_ledger_pages
         summary: 偷藏过缺页账本。
         priority: high
         related_clue_ids:
           - blue_ledger_page
+        related_world_info_ids:
+          - clerk_hid_ledger_page
+          - blue_ledger_records_midnight_boxes
         disclosure_policy:
           revealable: false
           allowed_modes:
@@ -85,3 +97,5 @@
         priority: medium
         related_clue_ids:
           - blue_ledger_page
+        related_world_info_ids:
+          - blue_ledger_records_midnight_boxes

@@ -66,6 +66,7 @@ def _constraint_from_self_knowledge(item: SelfKnowledgeItem) -> LLMDisclosureCon
         direct_reveal_allowed=policy.direct_reveal_allowed,
         direct_quote_allowed=policy.direct_quote_allowed,
         related_clue_ids=item.related_clue_ids,
+        related_world_info_ids=item.related_world_info_ids,
         blocked=not policy.revealable,
     )
 

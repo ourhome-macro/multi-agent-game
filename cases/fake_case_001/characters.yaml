@@ -20,6 +20,8 @@
       - id: avoid_suspicion
         summary: 避免玩家过早发现遗嘱真相。
         priority: high
+        related_world_info_ids:
+          - will_swapped
         tags:
           - avoid_suspicion
     secrets:
@@ -29,6 +31,10 @@
         related_clue_ids:
           - scratched_drawer
           - dustless_frame
+        related_world_info_ids:
+          - will_swapped
+          - desk_forced_open
+          - portrait_was_moved
         disclosure_policy:
           revealable: false
           allowed_modes:
@@ -43,6 +49,8 @@
         priority: medium
         related_clue_ids:
           - scratched_drawer
+        related_world_info_ids:
+          - desk_forced_open
 
 - id: niece
   display_name: 林侄女
@@ -66,6 +74,8 @@
       - id: hide_study_timeline
         summary: 隐瞒自己进入书房的时间。
         priority: high
+        related_world_info_ids:
+          - secret_meeting_note_exists
         tags:
           - avoid_suspicion
     secrets:
@@ -74,6 +84,8 @@
         priority: high
         related_clue_ids:
           - torn_note
+        related_world_info_ids:
+          - secret_meeting_note_exists
         disclosure_policy:
           revealable: false
           allowed_modes:
@@ -86,3 +98,5 @@
       - id: butler_seen_in_hall
         summary: 管家案发当晚在走廊出现过。
         priority: medium
+        related_world_info_ids:
+          - desk_forced_open

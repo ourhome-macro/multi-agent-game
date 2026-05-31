@@ -1,13 +1,13 @@
-# Case Package Protocol
+﻿# 案件包协议
 
-Case packages are YAML directories under `cases/{case_id}`. The runtime scans
-`cases/*` and loads every directory that contains `case.yaml`.
+案件包是 `cases/{case_id}` 下的一组 YAML 文件。运行时会扫描 `cases/*`，加载所有包含 `case.yaml` 的目录。
 
-## Files
+## 文件结构
 
 ```text
 cases/{case_id}/
   case.yaml
+  world_info.yaml
   characters.yaml
   scenes.yaml
   clues.yaml
@@ -18,28 +18,49 @@ cases/{case_id}/
   solution_claims.yaml
 ```
 
-## Naming Rules
+## 命名规则
 
-- Entity identity uses `id`.
-- Player action targets use `target_id`.
-- Relationship endpoints use `source_id` and `target_id`.
-- Clue references use `clue_id`, `discover_clues`, `asked_subject_id`, or
-  `presented_clue`.
-- Accusation claims use `claim_id`.
-- Legacy `source`, `target`, or generic player-action `target` fields are
-  rejected.
+- 实体身份统一使用 `id`。
+- 玩家动作目标统一使用 `target_id`。
+- 关系两端使用 `source_id` 和 `target_id`。
+- 线索引用使用 `clue_id`、`discover_clues`、`asked_subject_id` 或 `presented_clue`。
+- 世界事实锚点使用 `world_info_id` 或 `related_world_info_ids`。
+- 正式指控使用 `claim_id`。
+- 旧字段 `source`、`target` 或玩家动作里的通用 `target` 会被拒绝。
+
+## world_info.yaml
+
+`world_info.yaml` 定义案件中的稳定事实锚点。它不等于线索，而是“可被知道、隐藏、误解、禁说、证明、指控”的事实。
+
+示例：
+
+```yaml
+- id: desk_forced_open
+  title: 书桌抽屉被撬开
+  description: 抽屉在案发前后被非正常打开过。
+  category: physical_fact
+  sensitivity: low
+```
+
+常用字段：
+
+- `id`：稳定事实 ID。
+- `title`：事实标题。
+- `description`：事实说明。
+- `category`：事实类别，例如 `physical_fact`、`character_action`、`case_truth`。
+- `sensitivity`：敏感度，例如 `low`、`medium`、`high`。
 
 ## characters.yaml
 
-Characters are authored as public/private role cards:
+角色使用公开/私有角色卡结构：
 
 ```yaml
 - id: butler
-  display_name: Han Butler
-  public_role: House steward
-  public_description: Long-serving steward with access to the study.
+  display_name: 韩管家
+  public_role: 老宅管家
+  public_description: 熟悉书房和钥匙管理。
   speech:
-    style: restrained and polite
+    style: 克制、谨慎、礼貌
     default_tone: formal
     catchphrases: []
     defensive_style: evasive
@@ -54,16 +75,21 @@ Characters are authored as public/private role cards:
   private:
     goals:
       - id: avoid_suspicion
-        summary: Avoid becoming the prime suspect.
+        summary: 避免玩家过早发现遗嘱真相。
         priority: high
+        related_world_info_ids:
+          - will_swapped
         tags:
           - avoid_suspicion
     secrets:
-      - id: study_key_moved
-        summary: Knows the study key moved.
+      - id: swapped_will_awareness
+        summary: 知道遗嘱相关文件存在异常。
         priority: high
         related_clue_ids:
           - scratched_drawer
+        related_world_info_ids:
+          - desk_forced_open
+          - will_swapped
         disclosure_policy:
           revealable: false
           allowed_modes:
@@ -73,44 +99,67 @@ Characters are authored as public/private role cards:
           direct_reveal_allowed: false
           direct_quote_allowed: false
     knowledge:
-      - id: desk_approached
-        summary: Saw someone approach the desk.
+      - id: drawer_opened_last_night
+        summary: 书桌抽屉昨夜被人打开过。
         priority: medium
         related_clue_ids:
           - scratched_drawer
+        related_world_info_ids:
+          - desk_forced_open
 ```
 
-Allowed `defensive_style` values are `evasive`, `hostile`, `anxious`, and
-`neutral`. Allowed response styles are `answer`, `conceal`, `deflect`, `refuse`,
-`panic_conceal`, and `cautious_help`.
+`defensive_style` 可用值：`evasive`、`hostile`、`anxious`、`neutral`。
 
-The loader still accepts legacy `name`, `role`, `personality`, `speech_style`,
-`secrets`, `goals`, and `knowledge` fields and normalizes them into the new card
-shape. New case packages should use the explicit public/private structure.
+响应风格可用值：`answer`、`conceal`、`deflect`、`refuse`、`panic_conceal`、`cautious_help`。
 
-`private` is the character's own non-public perspective. It is not hidden from
-the NPC itself:
+Loader 仍兼容旧字段 `name`、`role`、`personality`、`speech_style`、`secrets`、`goals`、`knowledge`，并会归一化为新角色卡结构。新案件应使用显式 public/private 结构。
 
-- `private.goals`: internal motivations that can shape behavior, preference,
-  avoidance, and pressure response
-- `private.secrets`: information the NPC has reason to hide by default
-- `private.knowledge`: facts the NPC knows from its own perspective
+`private` 表示角色自己的非公开视角，不是对 NPC 自己隐藏：
 
-`private` is not the same as `forbidden_facts`, and it is not a permanent speech
-ban. It must not be automatically exposed to players, other NPCs,
-`StateSummary`, player journey Markdown, or runtime events.
+- `private.goals`：内部动机，影响行为、偏好、回避和压力反应。
+- `private.secrets`：NPC 默认有理由隐藏的信息。
+- `private.knowledge`：NPC 自己视角中知道的事实。
 
-Current Character Inner Context v0 uses stable private ids and
-`DisclosurePolicy` metadata to expose target-only inner context to the target
-NPC without leaking raw private data publicly.
+`private` 不等于 `forbidden_facts`，也不是永久禁言。它不能自动暴露给玩家、其他 NPC、`StateSummary`、玩家旅程 Markdown 或运行时事件。
 
-Legacy string entries remain accepted and normalize to stable ordered ids such
-as `goal_001`, `secret_001`, and `knowledge_001`. New case packages should use
-structured entries.
+新案件应给 private 项配置 `related_world_info_ids`，旧的 `related_clue_ids` 保留用于证据触发兼容。
+
+## clues.yaml
+
+`Clue` 是证据，不是真相本身。线索通过 `reveals_world_info` 指向事实锚点。
+
+```yaml
+- id: scratched_drawer
+  title: 抽屉划痕
+  description: 锁孔旁有新鲜划痕。
+  truth_status: "true"
+  reveals_world_info:
+    - desk_forced_open
+  related_characters:
+    - butler
+  key: true
+```
+
+`truth_status` 不会出现在公开 `StateSummary` 中。
+
+## forbidden_facts.yaml
+
+禁说事实应绑定到 `world_info_id`。关键词只是文本兜底校验，不是唯一事实锚点。
+
+```yaml
+- id: swapped_will
+  world_info_id: will_swapped
+  text: 遗嘱被调换过。
+  blocked_terms:
+    - 遗嘱被调换
+  reveal_phase: reveal
+```
+
+`text` 和 `blocked_terms` 不得进入 `AgentContext` 或公开 API。
 
 ## mock_dialogues.yaml
 
-Each dialogue block is keyed by `character_id`. Replies can be selected by:
+每个对话块用 `character_id` 绑定角色。reply 可以按以下条件匹配：
 
 - `phase`
 - `asked_subject_type`
@@ -126,11 +175,11 @@ Each dialogue block is keyed by `character_id`. Replies can be selected by:
 - `min_relationship`
 - `max_relationship`
 
-Example:
+示例：
 
 ```yaml
 - character_id: butler
-  default_speech: I do not know what you mean.
+  default_speech: 我不知道你是什么意思。
   default_intent: conceal
   relationship_delta_on_talk:
     suspicion: 1
@@ -140,40 +189,17 @@ Example:
       asked_subject_id: scratched_drawer
       min_interaction_pressure: 0.6
       requires_subject_sensitive: true
-      speech: Are you asking whether I opened it?
+      speech: 你是在问我有没有打开过它吗？
       intent: probe
-    - phase: investigation
-      requires_memory:
-        - memory.player.clue_discovered.scratched_drawer
-      missing_memory:
-        - memory.player.presented_clue.butler.scratched_drawer
-      speech: You already found the drawer marks.
-      intent: probe
-    - phase: investigation
-      presented_clue: scratched_drawer
-      requires_discovered:
-        - scratched_drawer
-      speech: Those scratch marks mean someone forced the drawer.
-      intent: probe
-      proposed_actions:
-        - type: relationship.change
-          source_id: butler
-          target_id: player
-          deltas:
-            suspicion: 0.7
 ```
 
-`asked_subject_id` must reference an existing clue, character, or scene according
-to `asked_subject_type`. `presented_clue` must reference an existing clue.
+`asked_subject_id` 必须按 `asked_subject_type` 引用已存在的线索、角色或场景。`presented_clue` 必须引用已存在的线索。
 
-`requires_memory` and `missing_memory` match stable
-`AgentMemorySnapshot.memory_id` values exposed through `AgentContext`. These
-conditions are deterministic MockAgent selection rules only. They are not vector
-memory, RAG, LLM summarization, or a way for agents to mutate memory.
+`requires_memory` 和 `missing_memory` 匹配 `AgentMemorySnapshot.memory_id`。它们只是确定性 MockAgent 选择规则，不是向量记忆、RAG、LLM 摘要，也不能让 Agent 修改记忆。
 
 ## narrative_rules.yaml
 
-Supported fields:
+支持字段：
 
 - `phases`
 - `beats`
@@ -184,12 +210,9 @@ Supported fields:
 - `trigger_payload`
 - `next_phase`
 
-Only `RuleTriggerSystem` may complete beats or advance phase. Agent proposed
-`narrative.phase.change` actions are accepted by schema for auditability but are
-rejected by Rule Engine.
+只有 `RuleTriggerSystem` 可以完成 beat 或推进 phase。Agent 提出的 `narrative.phase.change` 会被 schema 接受以便审计，但会被 Rule Engine 拒绝。
 
-Event-triggered beats may use `trigger_event_type` and `trigger_payload`.
-Example:
+事件触发 beat 示例：
 
 ```yaml
 - id: case_solved
@@ -204,16 +227,11 @@ Example:
   next_phase: resolved
 ```
 
-The trigger checks the exact event that caused `RuleTriggerSystem.evaluate` to
-run. It does not replay derivations or scan arbitrary future events.
+触发检查只看导致 `RuleTriggerSystem.evaluate` 运行的当前事件，不扫描任意未来事件。
 
 ## solution_claims.yaml
 
-`solution_claims.yaml` defines authored formal accusation claims. Rule Engine
-uses these claims for `PlayerAction.accuse`; Agents and LLMs do not evaluate
-accusation correctness.
-
-Example:
+`solution_claims.yaml` 定义正式指控。Rule Engine 使用它处理 `PlayerAction.accuse`；Agent 和 LLM 不评估指控正确性。
 
 ```yaml
 claims:
@@ -223,44 +241,34 @@ claims:
       - scratched_drawer
       - dustless_frame
       - torn_note
+    required_world_info:
+      - desk_forced_open
+      - portrait_was_moved
+      - secret_meeting_note_exists
     allowed_phases:
       - reveal
     result: correct
-
-  - id: niece_staged_meeting
-    target_id: niece
-    required_evidence:
-      - torn_note
-    allowed_phases:
-      - reveal
-    result: incorrect
 ```
 
-Validation checks:
+校验内容：
 
-- claim ids are unique
-- `target_id` references an existing character
-- `required_evidence` references existing clues
-- `allowed_phases` references declared narrative phases
-- `result` is `correct` or `incorrect`
+- claim id 唯一
+- `target_id` 引用已存在角色
+- `required_evidence` 引用已存在线索
+- `required_world_info` 引用已存在 WorldInfo
+- `allowed_phases` 引用已声明剧情阶段
+- `result` 只能是 `correct` 或 `incorrect`
 
-Claim configuration is internal case-author truth data and must not appear in
-`StateSummary`.
+claim 配置是案件作者真相数据，不得出现在 `StateSummary`。
 
-## Validation
-
-Run:
+## 校验命令
 
 ```powershell
 py -3.12 -m app.cases.validate cases
 ```
 
-Validation checks characters, scenes, clues, hotspots, relationships,
-`mock_dialogues`, `forbidden_facts`, `narrative_rules`, `solution_claims`, and
-clue reachability.
+校验会覆盖 characters、world_info、scenes、clues、hotspots、relationships、mock_dialogues、forbidden_facts、narrative_rules、solution_claims 和线索可达性。
 
-## Public Summary Safety
+## 公开摘要安全
 
-`StateSummary` must not return `secrets`, `goals`, internal `knowledge`,
-`truth_status`, forbidden fact text, blocked terms, `forbidden_facts`, or
-`solution_claims`.
+`StateSummary` 不得返回 `secrets`、`goals`、内部 `knowledge`、`truth_status`、禁说事实原文、blocked terms、`forbidden_facts`、`solution_claims` 或角色 private world_info refs。

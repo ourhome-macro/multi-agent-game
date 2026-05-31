@@ -153,11 +153,24 @@ class CaseLoader:
                     )
 
         for character in package.characters:
+            for goal in character.private.goals:
+                self._ensure_known_world_info(
+                    world_info_ids,
+                    goal.related_world_info_ids,
+                    f"Character '{character.id}' private goal '{goal.id}' "
+                    "related_world_info_ids",
+                )
             for secret in character.private.secrets:
                 self._ensure_known_clues(
                     clue_ids,
                     secret.related_clue_ids,
                     f"Character '{character.id}' private secret '{secret.id}' related_clue_ids",
+                )
+                self._ensure_known_world_info(
+                    world_info_ids,
+                    secret.related_world_info_ids,
+                    f"Character '{character.id}' private secret '{secret.id}' "
+                    "related_world_info_ids",
                 )
             for knowledge in character.private.knowledge:
                 self._ensure_known_clues(
@@ -165,6 +178,12 @@ class CaseLoader:
                     knowledge.related_clue_ids,
                     f"Character '{character.id}' private knowledge "
                     f"'{knowledge.id}' related_clue_ids",
+                )
+                self._ensure_known_world_info(
+                    world_info_ids,
+                    knowledge.related_world_info_ids,
+                    f"Character '{character.id}' private knowledge "
+                    f"'{knowledge.id}' related_world_info_ids",
                 )
 
         for relationship in package.relationships:
