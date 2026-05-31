@@ -175,7 +175,8 @@ Agent 输出必须始终是结构化结果：
   "intent": "answer | conceal | lie | refuse | probe | panic",
   "emotional_shift": {},
   "proposed_actions": [],
-  "memory_refs": []
+  "memory_refs": [],
+  "disclosure_claims": []
 }
 ```
 
@@ -184,6 +185,20 @@ Agent 输出必须始终是结构化结果：
 同理，Agent intent 不能创建或修改 `character_fact_awareness.updated`。角色事实认知只由运行时根据案件初始配置和玩家交互事件派生。
 
 Agent 也不能写 `FactDisclosureStrategy`。策略是上下文投影，不是状态；每次构造 `AgentContext` 时由后端重新计算。
+
+`AgentIntent.disclosure_claims` 是 Agent 对最终台词触碰事实的自我声明。它不是状态变化，也不是授权来源。每个 claim 都必须被 Narrative Director 对照目标 NPC 当前的 `FactDisclosureStrategy` 审计：
+
+- `world_info_id` 必须存在于当前约束中。
+- `mode` 必须在 `allowed_modes` 内。
+- `mode` 不能在 `forbidden_modes` 内。
+- `full` 永远拒绝。
+- `claim_refs` 不能命中 `must_not_claim`。
+
+如果台词直接命名某个 `WorldInfo`，但没有对应 `disclosure_claim`，Director 会拒绝该回复并降级为安全台词。
+
+更重要的是，`disclosure_claims` 只是 Agent 自报，不是通行证。Narrative Director 会独立扫描最终 `speech`，用 `WorldInfo.title`、`WorldInfo.aliases`、`WorldInfo.claim_patterns` 和禁说词映射判断实际触碰了哪些事实。只要 speech 的实际触碰超过 claim.mode，或触碰了没有声明的另一个 `WorldInfo`，回复都会被拒绝。
+
+这意味着 LLM 负责语言表现，但不能通过“claim 写得保守、台词说得直接”的方式绕过事实披露边界。安全降级和 `director.blocked` 事件由后端生成，不由 Agent 决定。
 
 允许的 proposed action 类型：
 
@@ -233,6 +248,8 @@ Agent 也不能写 `FactDisclosureStrategy`。策略是上下文投影，不是�
 `OpenAILLMAgent` 是最小真实后端适配器。它构造 `LLMAgentContractInput`，请求符合 `AgentIntent` 的严格 JSON，运行 `validate_llm_agent_output`，返回校验后的 intent。任何失败都会返回无 `proposed_actions` 的安全拒答。失败包括缺少 API key、HTTP 错误、JSON 错误、schema 错误、private 原文回显、直接提议剧情阶段变化。
 
 `LLMAgentContractInput.disclosure_constraints` 会同时包含 private self-knowledge 约束和 `world_info` 级事实披露策略约束。`world_info` 约束会带 `allowed_modes`、`forbidden_modes`、`rhetoric_tactics`、`must_not_claim` 和 `safe_fact_refs`，用于告诉 LLM：你可以怎么说，但不能说到哪里。
+
+真实 LLM 输出必须包含 `disclosure_claims`。合同校验器会先拒绝越权 claim；Narrative Director 会再次根据最终文本、`WorldInfo` 文本审计字段和 `FactDisclosureStrategy` 执法。这样 strategy 不再只是提示，而是后置安全门。
 
 真实适配器不改变状态权威模型。它的输出仍经过 Narrative Director，所有 `proposed_actions` 仍经过 Rule Engine。除非显式环境变量启用，否则它不参与完整场景快照。
 

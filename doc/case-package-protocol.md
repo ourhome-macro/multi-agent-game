@@ -40,6 +40,11 @@ cases/{case_id}/
   description: 抽屉在案发前后被非正常打开过。
   category: physical_fact
   sensitivity: low
+  aliases:
+    - 抽屉被撬
+    - 书桌被强行打开
+  claim_patterns:
+    - "抽屉.*(撬|强行打开)"
 ```
 
 常用字段：
@@ -49,6 +54,12 @@ cases/{case_id}/
 - `description`：事实说明。
 - `category`：事实类别，例如 `physical_fact`、`character_action`、`case_truth`。
 - `sensitivity`：敏感度，例如 `low`、`medium`、`high`。
+- `aliases`：可选，该事实常见自然语言说法，只用于 Director 文本审计。
+- `claim_patterns`：可选，该事实变体表达的正则 pattern，只用于 Director 文本审计。
+
+`aliases` 和 `claim_patterns` 不是新事实，不是线索，也不是状态。它们不会进入 `PlayerKnowledge`，也不会让 NPC 自动知道该事实。它们的唯一职责是帮助 `NarrativeDirector` 判断最终 `speech` 是否实际触碰某个 `WorldInfo`。
+
+Loader 会在案件加载时校验 `claim_patterns` 正则语法。非法 pattern 会导致服务启动或 `case validate` 明确失败。旧案件没有这两个字段时仍按空列表加载。
 
 ## characters.yaml
 
@@ -284,7 +295,7 @@ claim 配置是案件作者真相数据，不得出现在 `StateSummary`。
 py -3.12 -m app.cases.validate cases
 ```
 
-校验会覆盖 characters、world_info、scenes、clues、hotspots、relationships、mock_dialogues、forbidden_facts、narrative_rules、solution_claims 和线索可达性。
+校验会覆盖 characters、world_info、world_info claim patterns、scenes、clues、hotspots、relationships、mock_dialogues、forbidden_facts、narrative_rules、solution_claims 和线索可达性。
 
 ## 公开摘要安全
 

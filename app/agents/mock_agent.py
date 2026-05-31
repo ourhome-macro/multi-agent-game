@@ -8,12 +8,14 @@ from app.domain.models import (
     CharacterImpression,
     CharacterResponseStyle,
     DefensiveStyle,
+    DisclosureClaim,
     DisclosureMode,
     FactDisclosureStrategy,
     MockReplyConfig,
     PrivatePriority,
     ProposedActionType,
     RelationshipChangeAction,
+    RhetoricTactic,
     SelfKnowledgeItem,
 )
 
@@ -154,6 +156,7 @@ class MockAgent:
             emotional_shift={},
             proposed_actions=proposed_actions,
             memory_refs=[],
+            disclosure_claims=self._fallback_disclosure_claims(context),
         )
 
     def _fallback_intent_type(
@@ -275,6 +278,58 @@ class MockAgent:
         if DisclosureMode.DENY in modes:
             return "That clue does not prove what you think it proves."
         return "I cannot help you with that."
+
+    def _fallback_disclosure_claims(self, context: AgentContext) -> list[DisclosureClaim]:
+        matching_secret = self._matching_secret(context)
+        if matching_secret is None:
+            return []
+        strategy = self._matching_strategy(context, matching_secret)
+        if strategy is None:
+            return []
+        mode = self._selected_claim_mode(context, matching_secret, strategy)
+        if mode is None:
+            return []
+        tactic = self._selected_claim_tactic(strategy)
+        return [
+            DisclosureClaim(
+                world_info_id=strategy.world_info_id,
+                mode=mode,
+                tactic=tactic,
+                source_refs=strategy.safe_fact_refs,
+                claim_refs=[],
+            )
+        ]
+
+    def _selected_claim_mode(
+        self,
+        context: AgentContext,
+        secret: SelfKnowledgeItem,
+        strategy: FactDisclosureStrategy,
+    ) -> DisclosureMode | None:
+        modes = self._merged_allowed_modes(secret, strategy)
+        impression = self._player_impression(context)
+        if self._dangerous_topic_triggered(impression):
+            return DisclosureMode.DEFLECT if DisclosureMode.DEFLECT in modes else None
+        if DisclosureMode.PARTIAL in modes and (
+            self._has_relevant_evidence(impression)
+            or self._strategy_has_evidence(strategy)
+        ):
+            return DisclosureMode.PARTIAL
+        if DisclosureMode.HINT in modes and self._alliance_ready(impression):
+            return DisclosureMode.HINT
+        if DisclosureMode.DEFLECT in modes:
+            return DisclosureMode.DEFLECT
+        if DisclosureMode.DENY in modes:
+            return DisclosureMode.DENY
+        return None
+
+    def _selected_claim_tactic(
+        self,
+        strategy: FactDisclosureStrategy,
+    ) -> RhetoricTactic | None:
+        for tactic in strategy.rhetoric_tactics:
+            return tactic
+        return None
 
     def _matching_strategy(
         self,

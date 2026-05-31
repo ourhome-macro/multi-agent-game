@@ -18,9 +18,33 @@
 
 ## 当前校验
 
-`NarrativeDirector.validate(case, narrative, intent)` 会扫描 `intent.speech`。
+`NarrativeDirector.validate(case, narrative, intent, context)` 会在 NPC 回复写入事件前执行三类检查：
 
-如果台词在 `reveal_phase` 之前包含某个禁说事实的 `blocked_terms`，Director 会拒绝该回复。
+1. 禁说词检查：如果台词在 `reveal_phase` 之前包含某个禁说事实的 `blocked_terms`，Director 会拒绝该回复。
+2. 事实披露检查：如果 `AgentIntent.disclosure_claims` 声明了某个 `WorldInfo` 的披露行为，Director 会对照目标 NPC 当前的 `FactDisclosureStrategy` 校验。
+3. 最终台词审计：Director 会独立检测 `speech` 是否命中 `WorldInfo.title`、`WorldInfo.aliases`、`WorldInfo.claim_patterns` 或禁说词映射的事实锚点。
+
+事实披露检查会拒绝：
+
+- `world_info_id` 没有对应策略约束。
+- `mode` 不在 `allowed_modes`。
+- `mode` 出现在 `forbidden_modes`。
+- `mode=full`。
+- `claim_refs` 命中 `must_not_claim`。
+- 台词触碰某个 `WorldInfo`，但没有提交对应 `disclosure_claim`。
+- claim 声明为 `hint`、`deny` 或 `deflect`，但台词实际命中直接事实表达。
+- claim 只声明了事实 A，但台词实际触碰事实 B。
+
+`disclosure_claims` 是 Agent 自报；`speech detection` 是 Director 自查。两者不一致时，以 Director block 为准。LLM 不能通过“claim 写 hint，但 speech 直接揭露事实”的方式绕过披露边界。
+
+当前 `detect_world_info_mentions` 会返回：
+
+- `world_info_id`
+- `matched_by`：`title`、`alias`、`pattern` 或 `forbidden_term`
+- `matched_text` 或 `pattern_id`
+- `directness`：`hint_like` 或 `direct_claim`
+
+v0 采用保守策略：命中 title、alias、claim pattern 或 forbidden term 都视为 `direct_claim`。如果无法确定是否只是暗示，先按更安全的直接触碰处理。
 
 被阻止时：
 
@@ -29,7 +53,7 @@
 - 响应返回安全台词
 - `ActionResponse.accepted=false`
 
-`director.blocked` 可以包含 blocked fact id 用于审计，但不得包含禁说事实原文或 blocked terms。
+`director.blocked` 可以包含 blocked fact id、`world_info_id`、`claimed_mode`、`detected_directness`、`matched_by`、`pattern_id` 和 `safe_fallback_used` 用于审计，但不得包含禁说事实原文、blocked terms 或 private 原文。公开 payload 中的 `matched_text` 必须脱敏。
 
 ## 角色 private 披露边界
 
@@ -39,10 +63,11 @@
 
 `CharacterInnerContext` v0 会把目标 NPC 专属的受控自我视图传入 `AgentContext.inner_context`。它不会传入其他 NPC 的 private 数据，也不会把 private 数据写入公开运行时输出。对外表达仍必须通过 Narrative Director 校验。
 
-未来 Director 应进一步检查生成台词是否：
+Director 当前已经消费 `CharacterInnerContext.fact_disclosure_strategies`，把生成前的策略约束变成生成后的执法规则。Agent 或 LLM 可以选择话术，但不能自己决定事实披露边界。
+
+后续 Director 仍应进一步检查生成台词是否：
 
 - 透露锁定的禁说事实
-- 超过 `DisclosurePolicy` 允许的披露模式
 - 在只允许回避、暗示或部分披露时引用 private 原文
 - 与案件锚点、玩家已解锁知识或剧情阶段冲突
 - 未经允许把一个 NPC 的 private 数据暴露给另一个 NPC
@@ -55,6 +80,11 @@ Rule Engine 仍负责决定 `AgentIntent.proposed_actions` 是否变成真实 `W
 
 ## 当前限制
 
-v0 只对 `AgentIntent.speech` 做基于词项的 forbidden fact 检查。
+当前事实触碰检测仍是保守的文本匹配检查，不是完整语义理解。它能防止 LLM 明确命中受控 `WorldInfo` 的 title、alias、claim pattern 或 forbidden term 却不提交声明，也能防止低披露 claim 包装直接事实台词，但还不能识别所有隐喻、多跳推断或跨事实组合泄漏。
 
-`CharacterInnerContext` 已能在生成前根据 private impressions 计算有效 allowed disclosure modes。但 Director 还没有做语义级防剧透、完整披露策略后校验、多跳矛盾检查，或除当前确定性 fallback 行为之外的通用 private-item 脱敏。
+因此真实 LLM 接入后仍需要继续增强：
+
+- 语义级事实触碰分类。
+- 多个 `WorldInfo` 组合成核心真相的检查。
+- private 原文和近似复述检测。
+- 不同剧情阶段下的动态披露上限。

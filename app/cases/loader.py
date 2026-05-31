@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import Any
 
@@ -84,6 +85,8 @@ class CaseLoader:
             [world_info.id for world_info in package.world_info],
             case_dir,
         )
+        for world_info in package.world_info:
+            self._validate_world_info_claim_patterns(world_info.id, world_info.claim_patterns)
         self._ensure_unique("clue", [clue.id for clue in package.clues], case_dir)
         self._ensure_unique("scene", [scene.id for scene in package.scenes], case_dir)
         self._ensure_unique(
@@ -369,6 +372,20 @@ class CaseLoader:
         unknown_ids = sorted(set(referenced_ids) - world_info_ids)
         if unknown_ids:
             raise CaseLoadError(f"{label} references unknown world_info: {unknown_ids}")
+
+    def _validate_world_info_claim_patterns(
+        self,
+        world_info_id: str,
+        claim_patterns: list[str],
+    ) -> None:
+        for pattern in claim_patterns:
+            try:
+                re.compile(pattern)
+            except re.error as exc:
+                raise CaseLoadError(
+                    f"WorldInfo '{world_info_id}' has invalid claim_pattern "
+                    f"'{pattern}': {exc}"
+                ) from exc
 
     def _validate_proposed_action(
         self,

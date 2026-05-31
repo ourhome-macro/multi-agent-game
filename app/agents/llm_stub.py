@@ -17,5 +17,6 @@ class LLMAgentStub:
                 "emotional_shift": {},
                 "proposed_actions": [],
                 "memory_refs": [],
+                "disclosure_claims": [],
             }
         )

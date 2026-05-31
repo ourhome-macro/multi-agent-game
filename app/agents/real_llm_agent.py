@@ -133,6 +133,7 @@ def _agent_intent_json_schema() -> dict[str, Any]:
             "emotional_shift",
             "proposed_actions",
             "memory_refs",
+            "disclosure_claims",
         ],
         "properties": {
             "speech": {"type": "string"},
@@ -199,6 +200,58 @@ def _agent_intent_json_schema() -> dict[str, Any]:
             "memory_refs": {
                 "type": "array",
                 "items": {"type": "string"},
+            },
+            "disclosure_claims": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "required": [
+                        "world_info_id",
+                        "mode",
+                        "tactic",
+                        "source_refs",
+                        "claim_refs",
+                    ],
+                    "properties": {
+                        "world_info_id": {"type": "string"},
+                        "mode": {
+                            "type": "string",
+                            "enum": [
+                                "none",
+                                "deny",
+                                "deflect",
+                                "hint",
+                                "partial",
+                                "full",
+                            ],
+                        },
+                        "tactic": {
+                            "anyOf": [
+                                {
+                                    "type": "string",
+                                    "enum": [
+                                        "answer_adjacent_truth",
+                                        "shift_focus",
+                                        "counter_question",
+                                        "qualify_certainty",
+                                        "emotional_screen",
+                                        "silence",
+                                    ],
+                                },
+                                {"type": "null"},
+                            ],
+                        },
+                        "source_refs": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                        },
+                        "claim_refs": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                        },
+                    },
+                },
             },
         },
     }

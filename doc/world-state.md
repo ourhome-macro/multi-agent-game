@@ -152,6 +152,15 @@ Loader 会校验 `max_mode_by_world_info` 中的每个 `world_info_id` 必须存
 - `ForbiddenFact` 是叙事禁说规则，把禁说词和剧情阶段绑定到某个 `WorldInfo`。
 - `SolutionClaim` 是正式指控规则，声明成立指控需要哪些证据和事实锚点。
 
+`WorldInfo` 还可以配置两个文本审计辅助字段：
+
+- `aliases`：该事实在自然语言里可能出现的常见说法。
+- `claim_patterns`：用于识别事实变体表达的正则 pattern。
+
+这两个字段不是新事实，不是运行时状态，也不会让玩家或 NPC 自动知道任何内容。它们只供 `NarrativeDirector` 在生成后审计 `speech` 是否实际触碰某个事实锚点。旧案件不配置这两个字段仍然合法，默认按空列表处理。
+
+Loader 会校验每个 `claim_patterns` 是否是合法正则。非法正则会让案件加载或 `case validate` 失败，避免运行时审计链路带着坏 pattern 启动。
+
 当前链路：
 
 ```text
@@ -383,3 +392,5 @@ Replay 直接应用 `character_impression.updated`，不得重新运行画像派
 公开摘要不得暴露角色 `secrets`、角色 `goals`、内部角色 `knowledge`、角色事实认知账本、私有角色画像、角色卡 `private` 对象、线索 `truth_status`、禁说事实原文、blocked terms、`forbidden_facts` 或 `solution_claims`。
 
 `StateSummary`、`WorldEvent` payload 和 `player_journey.md` 也不得暴露 `inner_context` 或原始 private summaries。
+
+`director.blocked` 事件可以记录 `world_info_id`、`matched_by`、`detected_directness`、`pattern_id` 等审计元数据，但公开 payload 中的 `matched_text` 必须脱敏，不能把被拦截的禁说词、private 原文或敏感事实原文再次回显给玩家。

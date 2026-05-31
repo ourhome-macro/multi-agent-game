@@ -31,6 +31,7 @@ def validate_llm_agent_output(
             raise ValueError("LLM Agent output must not propose narrative phase changes")
     if contract_input is not None:
         _reject_raw_private_echo(intent, contract_input)
+        _validate_disclosure_claims(intent, contract_input)
     return intent
 
 
@@ -124,3 +125,26 @@ def _reject_raw_private_echo(
         ]:
             if value and value in serialized_output:
                 raise ValueError("LLM Agent output must not quote raw private data")
+
+
+def _validate_disclosure_claims(
+    intent: AgentIntent,
+    contract_input: LLMAgentContractInput,
+) -> None:
+    world_info_constraints = {
+        constraint.item_id: constraint
+        for constraint in contract_input.disclosure_constraints
+        if constraint.item_kind == "world_info"
+    }
+    for claim in intent.disclosure_claims:
+        constraint = world_info_constraints.get(claim.world_info_id)
+        if constraint is None:
+            raise ValueError("LLM Agent output disclosed unconstrained world_info")
+        if claim.mode == DisclosureMode.FULL:
+            raise ValueError("LLM Agent output must not request full reveal")
+        if claim.mode not in set(constraint.allowed_modes):
+            raise ValueError("LLM Agent output disclosure mode is not allowed")
+        if claim.mode in set(constraint.forbidden_modes):
+            raise ValueError("LLM Agent output disclosure mode is forbidden")
+        if set(claim.claim_refs) & set(constraint.must_not_claim):
+            raise ValueError("LLM Agent output violates must_not_claim")

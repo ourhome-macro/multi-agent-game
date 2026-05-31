@@ -159,7 +159,8 @@
             "hostility": 1.0
           }
         }
-      ]
+      ],
+      "disclosure_claims": []
     },
     "caused_by_event_id": "event_009",
     "created_at": "timestamp"
@@ -421,7 +422,8 @@
             "hostility": 1.0
           }
         }
-      ]
+      ],
+      "disclosure_claims": []
     },
     "caused_by_event_id": "event_020",
     "created_at": "timestamp"
@@ -474,7 +476,15 @@
     "payload": {
       "target_id": "clerk",
       "blocked_fact_id": "ledger_owner",
-      "reason": "Blocked forbidden fact 'ledger_owner' in phase 'pressure'"
+      "reason": "Blocked forbidden fact 'ledger_owner' in phase 'pressure'",
+      "world_info_id": "clerk_hid_ledger_page",
+      "claimed_mode": null,
+      "detected_directness": "direct_claim",
+      "matched_by": "forbidden_term",
+      "matched_text": "[redacted]",
+      "pattern_id": null,
+      "safe_fallback_used": true,
+      "disclosure_claims": []
     },
     "caused_by_event_id": "event_023",
     "created_at": "timestamp"
@@ -778,7 +788,8 @@
             "fear": 1.0
           }
         }
-      ]
+      ],
+      "disclosure_claims": []
     },
     "caused_by_event_id": "event_040",
     "created_at": "timestamp"
@@ -1049,7 +1060,8 @@
             "suspicion": 1.0
           }
         }
-      ]
+      ],
+      "disclosure_claims": []
     },
     "caused_by_event_id": "event_051",
     "created_at": "timestamp"

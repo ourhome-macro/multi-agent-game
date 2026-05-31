@@ -159,7 +159,8 @@
             "fear": 0.2
           }
         }
-      ]
+      ],
+      "disclosure_claims": []
     },
     "caused_by_event_id": "event_009",
     "created_at": "timestamp"
@@ -330,7 +331,8 @@
             "trust": 0.2
           }
         }
-      ]
+      ],
+      "disclosure_claims": []
     },
     "caused_by_event_id": "event_016",
     "created_at": "timestamp"
@@ -604,7 +606,8 @@
             "suspicion": 1.0
           }
         }
-      ]
+      ],
+      "disclosure_claims": []
     },
     "caused_by_event_id": "event_027",
     "created_at": "timestamp"
@@ -750,7 +753,8 @@
             "suspicion": 1.0
           }
         }
-      ]
+      ],
+      "disclosure_claims": []
     },
     "caused_by_event_id": "event_035",
     "created_at": "timestamp"
@@ -803,7 +807,15 @@
     "payload": {
       "target_id": "butler",
       "blocked_fact_id": "true_killer",
-      "reason": "Blocked forbidden fact 'true_killer' in phase 'investigation'"
+      "reason": "Blocked forbidden fact 'true_killer' in phase 'investigation'",
+      "world_info_id": "killer_is_niece",
+      "claimed_mode": null,
+      "detected_directness": "direct_claim",
+      "matched_by": "forbidden_term",
+      "matched_text": "[redacted]",
+      "pattern_id": null,
+      "safe_fallback_used": true,
+      "disclosure_claims": []
     },
     "caused_by_event_id": "event_038",
     "created_at": "timestamp"

@@ -21,9 +21,23 @@
   description: 案发前后遗嘱内容被人替换。
   category: case_truth
   sensitivity: high
+  aliases:
+    - 遗嘱被换
+    - 遗嘱被调换
+    - 文件不是原来的
+    - 遗嘱内容变了
+  claim_patterns:
+    - "遗嘱.*(换|调换|替换)"
+    - "文件.*不是.*原来"
+    - "遗嘱.*内容.*变"
 
 - id: killer_is_niece
   title: 真凶是林侄女
   description: 林侄女是案件真凶。
   category: case_truth
   sensitivity: high
+  aliases:
+    - 林侄女是真凶
+    - 真凶是林侄女
+  claim_patterns:
+    - "林侄女.*(真凶|杀)"

@@ -214,6 +214,22 @@ Rule Engine 会校验：
 
 `character_impression.updated` 记录运行时派生的 NPC -> player 私有画像，不由 Agent 或 LLM 直接生成。
 
+`director.blocked` 记录 Director 拦截了某次 NPC 输出。payload 包含：
+
+- `target_id`
+- `blocked_fact_id`
+- `reason`
+- `world_info_id`
+- `claimed_mode`
+- `detected_directness`
+- `matched_by`
+- `matched_text`
+- `pattern_id`
+- `safe_fallback_used`
+- `disclosure_claims`
+
+其中 `matched_text` 是公开 API payload 中的脱敏值，不能回显 forbidden term、private 原文或被拦截的敏感事实原文。前端只能用这些字段做“回复被导演系统阻止”的 UI 和调试提示，不能把它们当作玩家已知事实。
+
 ## StateSummary
 
 `StateSummary` 是公开状态视图。它可以包含已发现线索、完成的 beats、公开关系指标和玩家已知摘要。v0 不暴露记忆快照或私有角色画像，也不暴露 `solution_claims` 或指控真相配置。

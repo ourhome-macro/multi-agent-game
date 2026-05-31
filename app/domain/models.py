@@ -402,12 +402,22 @@ class LLMDisclosureConstraint(APIModel):
     blocked: bool = True
 
 
+class DisclosureClaim(APIModel):
+    world_info_id: NonEmptyString
+    mode: DisclosureMode
+    tactic: RhetoricTactic | None = None
+    source_refs: list[NonEmptyString] = Field(default_factory=list)
+    claim_refs: list[NonEmptyString] = Field(default_factory=list)
+
+
 class WorldInfoConfig(APIModel):
     id: NonEmptyString
     title: NonEmptyString
     description: str = ""
     category: WorldInfoCategory = WorldInfoCategory.CASE_TRUTH
     sensitivity: WorldInfoSensitivity = WorldInfoSensitivity.MEDIUM
+    aliases: list[NonEmptyString] = Field(default_factory=list)
+    claim_patterns: list[NonEmptyString] = Field(default_factory=list)
 
 
 class SceneHotspotConfig(APIModel):
@@ -620,6 +630,7 @@ class AgentIntent(APIModel):
     emotional_shift: dict[str, float] = Field(default_factory=dict)
     proposed_actions: list[ProposedAction] = Field(default_factory=list)
     memory_refs: list[str] = Field(default_factory=list)
+    disclosure_claims: list[DisclosureClaim] = Field(default_factory=list)
 
     @field_validator("proposed_actions", mode="before")
     @classmethod
@@ -644,6 +655,13 @@ class DirectorDecision(APIModel):
     reason: str | None = None
     blocked_fact_id: str | None = None
     safe_speech: str | None = None
+    world_info_id: str | None = None
+    claimed_mode: DisclosureMode | None = None
+    detected_directness: str | None = None
+    matched_by: str | None = None
+    matched_text: str | None = None
+    pattern_id: str | None = None
+    safe_fallback_used: bool = False
 
 
 class RelationshipState(APIModel):

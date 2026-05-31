@@ -201,7 +201,7 @@ class ActionService:
     ) -> ActionResponse:
         context = build_agent_context(case, session, action)
         intent = self._agent_gateway.generate(context)
-        decision = self._director.validate(case, session.narrative, intent)
+        decision = self._director.validate(case, session.narrative, intent, context)
 
         speech = intent.speech
         director_blocked = not decision.allowed
@@ -217,6 +217,9 @@ class ActionService:
                     "intent": intent.intent,
                     "proposed_actions": [
                         item.model_dump(mode="json") for item in intent.proposed_actions
+                    ],
+                    "disclosure_claims": [
+                        item.model_dump(mode="json") for item in intent.disclosure_claims
                     ],
                 },
                 caused_by_event_id=player_event.id,
@@ -240,6 +243,16 @@ class ActionService:
                     "target_id": action.target_id,
                     "blocked_fact_id": decision.blocked_fact_id,
                     "reason": decision.reason,
+                    "world_info_id": decision.world_info_id,
+                    "claimed_mode": decision.claimed_mode,
+                    "detected_directness": decision.detected_directness,
+                    "matched_by": decision.matched_by,
+                    "matched_text": _redact_matched_text(decision.matched_text),
+                    "pattern_id": decision.pattern_id,
+                    "safe_fallback_used": decision.safe_fallback_used,
+                    "disclosure_claims": [
+                        item.model_dump(mode="json") for item in intent.disclosure_claims
+                    ],
                 },
                 caused_by_event_id=player_event.id,
             )
@@ -313,3 +326,9 @@ def create_runtime(case_packages: list[CasePackage]) -> RuntimeContainer:
         action_service=action_service,
         rule_engine=rule_engine,
     )
+
+
+def _redact_matched_text(matched_text: str | None) -> str | None:
+    if matched_text is None:
+        return None
+    return "[redacted]"

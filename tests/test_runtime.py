@@ -2009,6 +2009,7 @@ def test_real_llm_agent_generates_validated_intent_from_strict_json() -> None:
                     "emotional_shift": {},
                     "proposed_actions": [],
                     "memory_refs": [],
+                    "disclosure_claims": [],
                 }
             )
         }
@@ -2056,6 +2057,7 @@ def test_real_llm_agent_falls_back_when_output_violates_contract() -> None:
                         }
                     ],
                     "memory_refs": [],
+                    "disclosure_claims": [],
                 }
             )
         }
@@ -2080,6 +2082,7 @@ def test_real_llm_agent_falls_back_when_output_quotes_private_text() -> None:
                     "emotional_shift": {},
                     "proposed_actions": [],
                     "memory_refs": [],
+                    "disclosure_claims": [],
                 },
                 ensure_ascii=False,
             )
@@ -2120,6 +2123,40 @@ def test_llm_contract_rejects_raw_inner_portrait_echo() -> None:
                 "emotional_shift": {},
                 "proposed_actions": [],
                 "memory_refs": [],
+                "disclosure_claims": [],
+            },
+            contract_input,
+        )
+
+
+def test_llm_contract_rejects_disclosure_claim_beyond_constraint() -> None:
+    case = CaseLoader().load(FAKE_CASE_001_DIR)
+    runtime = create_runtime([case])
+    session = runtime.session_store.create(case)
+    context = build_agent_context(
+        case,
+        session,
+        PlayerAction(type="talk", target_id="butler", text="What do you know?"),
+    )
+    contract_input = build_llm_agent_input(context)
+
+    with pytest.raises(ValueError, match="disclosure mode is not allowed"):
+        validate_llm_agent_output(
+            {
+                "speech": "I should not reveal this fully.",
+                "intent": "answer",
+                "emotional_shift": {},
+                "proposed_actions": [],
+                "memory_refs": [],
+                "disclosure_claims": [
+                    {
+                        "world_info_id": "will_swapped",
+                        "mode": "partial",
+                        "tactic": "answer_adjacent_truth",
+                        "source_refs": [],
+                        "claim_refs": [],
+                    }
+                ],
             },
             contract_input,
         )
@@ -2330,6 +2367,14 @@ def test_director_blocks_forbidden_fact(client: TestClient) -> None:
     assert "npc.replied" not in event_types
     assert "relationship.changed" not in event_types
     assert "niece is the killer" not in serialized_events
+    director_event = next(
+        event for event in payload["new_events"] if event["type"] == "director.blocked"
+    )
+    assert director_event["payload"]["world_info_id"] == "killer_is_niece"
+    assert director_event["payload"]["detected_directness"] == "direct_claim"
+    assert director_event["payload"]["matched_by"] == "forbidden_term"
+    assert director_event["payload"]["matched_text"] == "[redacted]"
+    assert director_event["payload"]["safe_fallback_used"] is True
 
 
 def test_talk_unknown_npc_returns_404_without_writing_events(client: TestClient) -> None:
@@ -2929,6 +2974,38 @@ def test_case_loader_rejects_bad_world_info_reference_from_clue(tmp_path: Path) 
 
     with pytest.raises(CaseLoadError, match="unknown world_info"):
         CaseLoader().load(case_dir)
+
+
+def test_case_loader_rejects_invalid_world_info_claim_pattern(tmp_path: Path) -> None:
+    case_dir = tmp_path / "bad_world_info_claim_pattern_case"
+    case_dir.mkdir()
+    _write_minimal_case(case_dir)
+    (case_dir / "world_info.yaml").write_text(
+        "- id: fact\n"
+        "  title: Fact\n"
+        "  claim_patterns:\n"
+        "    - 'fact('\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(CaseLoadError, match="invalid claim_pattern"):
+        CaseLoader().load(case_dir)
+
+
+def test_case_loader_keeps_world_info_audit_fields_optional(tmp_path: Path) -> None:
+    case_dir = tmp_path / "legacy_world_info_case"
+    case_dir.mkdir()
+    _write_minimal_case(case_dir)
+    (case_dir / "world_info.yaml").write_text(
+        "- id: fact\n"
+        "  title: Fact\n",
+        encoding="utf-8",
+    )
+
+    case = CaseLoader().load(case_dir)
+
+    assert case.world_info[0].aliases == []
+    assert case.world_info[0].claim_patterns == []
 
 
 def test_case_loader_rejects_bad_world_info_reference_from_forbidden_fact(

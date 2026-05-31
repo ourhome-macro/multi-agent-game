@@ -46,12 +46,16 @@ class LLMAgentContractInput(BaseModel):
 ```python
 class LLMDisclosureConstraint(BaseModel):
     item_id: str
-    item_kind: Literal["goal", "secret", "knowledge", "forbidden_fact"]
+    item_kind: Literal["goal", "secret", "knowledge", "forbidden_fact", "world_info"]
     allowed_modes: list[DisclosureMode]
+    forbidden_modes: list[DisclosureMode]
     direct_reveal_allowed: bool
     direct_quote_allowed: bool
     related_clue_ids: list[str]
     related_world_info_ids: list[str]
+    rhetoric_tactics: list[RhetoricTactic]
+    must_not_claim: list[str]
+    safe_fact_refs: list[str]
     blocked: bool
 ```
 
@@ -65,6 +69,14 @@ class LLMDisclosureConstraint(BaseModel):
 
 该投影永远不会授予 `full` 披露，也不会允许直接引用 private 原文。
 
+`world_info` 级约束来自 `FactDisclosureStrategy`。它是 LLM 必须遵守的事实披露边界，不是提示建议：
+
+- `allowed_modes`：当前最多可以如何表达。
+- `forbidden_modes`：当前明确禁止哪些披露模式。
+- `rhetoric_tactics`：允许采用的话术类型。
+- `must_not_claim`：不得直接宣称的事实声明。
+- `safe_fact_refs`：允许围绕其表达的安全证据引用。
+
 ## 输出
 
 要求输出严格匹配 `AgentIntent` 的 JSON：
@@ -75,7 +87,8 @@ class LLMDisclosureConstraint(BaseModel):
   "intent": "answer | conceal | lie | refuse | probe | panic",
   "emotional_shift": {},
   "proposed_actions": [],
-  "memory_refs": []
+  "memory_refs": [],
+  "disclosure_claims": []
 }
 ```
 
@@ -84,6 +97,46 @@ class LLMDisclosureConstraint(BaseModel):
 当 `validate_llm_agent_output` 收到来源 `LLMAgentContractInput` 时，还会拒绝输出中逐字引用目标 private 文本的情况，除非对应 self-knowledge item 的 `DisclosurePolicy.direct_quote_allowed=true`。校验错误不会包含 private 文本。
 
 同一校验器还会拒绝逐字引用目标 `inner_portraits` 文本，例如 `personality_impression`、`perceived_motive` 或 `trust_boundary`。LLM 可以用画像选择更安全的意图，但不能把私有画像原文发布出去。
+
+## 披露声明
+
+`disclosure_claims` 是 LLM 对自己输出内容的结构化事实披露声明：
+
+```python
+class DisclosureClaim(BaseModel):
+    world_info_id: str
+    mode: DisclosureMode
+    tactic: RhetoricTactic | None
+    source_refs: list[str]
+    claim_refs: list[str]
+```
+
+语义：
+
+- `world_info_id`：这句话触碰了哪个事实锚点。
+- `mode`：本次表达属于 `deny`、`deflect`、`hint`、`partial` 或 `full` 中哪一级。
+- `tactic`：使用的话术策略，例如转移重点、反问、邻近真实或降低确定性。
+- `source_refs`：本次表达依赖的安全证据引用。
+- `claim_refs`：本次声明触碰到的结构化禁说声明引用。
+
+`validate_llm_agent_output` 会在进入 Director 前先做合同校验：
+
+- 没有 `world_info` 约束的声明会被拒绝。
+- `mode=full` 会被拒绝。
+- `mode` 不在 `allowed_modes` 会被拒绝。
+- `mode` 出现在 `forbidden_modes` 会被拒绝。
+- `claim_refs` 命中 `must_not_claim` 会被拒绝。
+
+随后 `NarrativeDirector` 会再次审计最终文本。`disclosure_claims` 只是 Agent 自报，不是授权来源。Director 会用 `WorldInfo.title`、`WorldInfo.aliases`、`WorldInfo.claim_patterns` 和禁说词映射独立检测 `speech` 实际触碰了哪些事实。
+
+Director 会阻止这些情况：
+
+- `speech` 触碰某个 `WorldInfo`，但没有对应 `disclosure_claim`。
+- claim 声明 `hint`、`deny` 或 `deflect`，但 `speech` 实际是直接事实表达。
+- claim 声明事实 A，但 `speech` 实际触碰事实 B。
+- claim 合法，但 `speech` 命中 forbidden term、`must_not_claim` 或 `full` 披露边界。
+
+因此 LLM 不能通过把 `disclosure_claims.mode` 写成 `hint`，同时在 `speech` 中直接揭露事实来绕过规则。两者不一致时，以 Director block 为准。
 
 ## Stub
 
@@ -133,6 +186,8 @@ AgentContext
 - 响应 JSON 非法
 - schema 校验失败
 - private 原文回显
+- 披露声明越过 `LLMDisclosureConstraint`
+- 披露声明与最终 speech 的事实触碰不一致
 - 尝试推进剧情阶段
 
 适配器永远不写 `WorldEvent`，不修改 `SessionState`，不直接调用 Rule Engine，也不绕过 Narrative Director。
