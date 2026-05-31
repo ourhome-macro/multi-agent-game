@@ -51,6 +51,14 @@
           - scratched_drawer
         related_world_info_ids:
           - desk_forced_open
+    disclosure_style:
+      preferred_tactics:
+        - answer_adjacent_truth
+        - shift_focus
+      forbidden_tactics:
+        - emotional_screen
+      max_mode_by_world_info:
+        will_swapped: hint
 
 - id: niece
   display_name: 林侄女
@@ -100,3 +108,9 @@
         priority: medium
         related_world_info_ids:
           - desk_forced_open
+    disclosure_style:
+      preferred_tactics:
+        - counter_question
+        - emotional_screen
+      max_mode_by_world_info:
+        secret_meeting_note_exists: deflect

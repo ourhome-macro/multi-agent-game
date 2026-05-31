@@ -247,6 +247,36 @@
     "id": "event_014",
     "case_id": "fake_case_002",
     "session_id": "session",
+    "actor_id": "character_fact_awareness_system",
+    "type": "character_fact_awareness.updated",
+    "payload": {
+      "awareness_id": "character_fact_awareness.dockmaster.warehouse_opened_after_tide",
+      "character_id": "dockmaster",
+      "world_info_id": "warehouse_opened_after_tide",
+      "stance": "conceals",
+      "confidence": 1.0,
+      "source_type": "player_asked_about",
+      "source_refs": [
+        "clue:inward_tide_mark",
+        "goal:avoid_smuggling_chain",
+        "secret:tide_record_changed"
+      ],
+      "evidence_clue_ids": [
+        "inward_tide_mark"
+      ],
+      "source_event_ids": [
+        "case_package",
+        "event_009"
+      ],
+      "last_updated_event_id": "event_014"
+    },
+    "caused_by_event_id": "event_009",
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_015",
+    "case_id": "fake_case_002",
+    "session_id": "session",
     "actor_id": "derived_event_system",
     "type": "memory_candidate.created",
     "payload": {
@@ -263,7 +293,7 @@
     "created_at": "timestamp"
   },
   {
-    "id": "event_015",
+    "id": "event_016",
     "case_id": "fake_case_002",
     "session_id": "session",
     "actor_id": "memory_snapshot_system",
@@ -278,11 +308,11 @@
       "visibility": "private",
       "operation": "created"
     },
-    "caused_by_event_id": "event_014",
+    "caused_by_event_id": "event_015",
     "created_at": "timestamp"
   },
   {
-    "id": "event_016",
+    "id": "event_017",
     "case_id": "fake_case_002",
     "session_id": "session",
     "actor_id": "character_impression_system",
@@ -316,13 +346,13 @@
         "event_009",
         "event_012"
       ],
-      "last_updated_event_id": "event_016"
+      "last_updated_event_id": "event_017"
     },
     "caused_by_event_id": "event_012",
     "created_at": "timestamp"
   },
   {
-    "id": "event_017",
+    "id": "event_018",
     "case_id": "fake_case_002",
     "session_id": "session",
     "actor_id": "derived_event_system",
@@ -341,7 +371,7 @@
     "created_at": "timestamp"
   },
   {
-    "id": "event_018",
+    "id": "event_019",
     "case_id": "fake_case_002",
     "session_id": "session",
     "actor_id": "memory_snapshot_system",
@@ -356,11 +386,11 @@
       "visibility": "private",
       "operation": "created"
     },
-    "caused_by_event_id": "event_017",
+    "caused_by_event_id": "event_018",
     "created_at": "timestamp"
   },
   {
-    "id": "event_019",
+    "id": "event_020",
     "case_id": "fake_case_002",
     "session_id": "session",
     "actor_id": "player",
@@ -373,7 +403,7 @@
     "created_at": "timestamp"
   },
   {
-    "id": "event_020",
+    "id": "event_021",
     "case_id": "fake_case_002",
     "session_id": "session",
     "actor_id": "dockmaster",
@@ -393,11 +423,11 @@
         }
       ]
     },
-    "caused_by_event_id": "event_019",
+    "caused_by_event_id": "event_020",
     "created_at": "timestamp"
   },
   {
-    "id": "event_021",
+    "id": "event_022",
     "case_id": "fake_case_002",
     "session_id": "session",
     "actor_id": "system",
@@ -419,11 +449,11 @@
         "hostility": 1.0
       }
     },
-    "caused_by_event_id": "event_020",
+    "caused_by_event_id": "event_021",
     "created_at": "timestamp"
   },
   {
-    "id": "event_022",
+    "id": "event_023",
     "case_id": "fake_case_002",
     "session_id": "session",
     "actor_id": "player",
@@ -436,7 +466,7 @@
     "created_at": "timestamp"
   },
   {
-    "id": "event_023",
+    "id": "event_024",
     "case_id": "fake_case_002",
     "session_id": "session",
     "actor_id": "director",
@@ -446,11 +476,11 @@
       "blocked_fact_id": "ledger_owner",
       "reason": "Blocked forbidden fact 'ledger_owner' in phase 'pressure'"
     },
-    "caused_by_event_id": "event_022",
+    "caused_by_event_id": "event_023",
     "created_at": "timestamp"
   },
   {
-    "id": "event_024",
+    "id": "event_025",
     "case_id": "fake_case_002",
     "session_id": "session",
     "actor_id": "character_impression_system",
@@ -475,15 +505,15 @@
       ],
       "confidence": 0.1,
       "source_event_ids": [
-        "event_023"
+        "event_024"
       ],
-      "last_updated_event_id": "event_024"
+      "last_updated_event_id": "event_025"
     },
-    "caused_by_event_id": "event_023",
+    "caused_by_event_id": "event_024",
     "created_at": "timestamp"
   },
   {
-    "id": "event_025",
+    "id": "event_026",
     "case_id": "fake_case_002",
     "session_id": "session",
     "actor_id": "derived_event_system",
@@ -492,17 +522,17 @@
       "memory_id": "memory.player.director_blocked.clerk.ledger_owner",
       "subject_id": "player",
       "content": "Conversation with 沈账房 was blocked by narrative rules.",
-      "source_event_id": "event_023",
+      "source_event_id": "event_024",
       "visibility": [
         "player"
       ],
       "salience": 0.9
     },
-    "caused_by_event_id": "event_023",
+    "caused_by_event_id": "event_024",
     "created_at": "timestamp"
   },
   {
-    "id": "event_026",
+    "id": "event_027",
     "case_id": "fake_case_002",
     "session_id": "session",
     "actor_id": "memory_snapshot_system",
@@ -511,17 +541,17 @@
       "memory_id": "memory.player.director_blocked.clerk.ledger_owner",
       "subject_id": "player",
       "source_event_ids": [
-        "event_023"
+        "event_024"
       ],
       "salience": 0.9,
       "visibility": "private",
       "operation": "created"
     },
-    "caused_by_event_id": "event_025",
+    "caused_by_event_id": "event_026",
     "created_at": "timestamp"
   },
   {
-    "id": "event_027",
+    "id": "event_028",
     "case_id": "fake_case_002",
     "session_id": "session",
     "actor_id": "player",
@@ -533,7 +563,7 @@
     "created_at": "timestamp"
   },
   {
-    "id": "event_028",
+    "id": "event_029",
     "case_id": "fake_case_002",
     "session_id": "session",
     "actor_id": "system",
@@ -542,11 +572,11 @@
       "clue_id": "inward_broken_lamp",
       "source_hotspot_id": "broken_lamp"
     },
-    "caused_by_event_id": "event_027",
+    "caused_by_event_id": "event_028",
     "created_at": "timestamp"
   },
   {
-    "id": "event_029",
+    "id": "event_030",
     "case_id": "fake_case_002",
     "session_id": "session",
     "actor_id": "derived_event_system",
@@ -558,15 +588,15 @@
       "confidence": 1.0,
       "acquisition": "discovered",
       "source_type": "clue",
-      "source_event_id": "event_028",
+      "source_event_id": "event_029",
       "title": "煤油灯因入门碰撞破裂",
       "summary": "破裂方向说明煤油灯是在有人进门后被撞倒。"
     },
-    "caused_by_event_id": "event_028",
+    "caused_by_event_id": "event_029",
     "created_at": "timestamp"
   },
   {
-    "id": "event_030",
+    "id": "event_031",
     "case_id": "fake_case_002",
     "session_id": "session",
     "actor_id": "derived_event_system",
@@ -575,17 +605,17 @@
       "memory_id": "memory.player.clue_discovered.inward_broken_lamp",
       "subject_id": "player",
       "content": "Player discovered clue '向内破裂的煤油灯'.",
-      "source_event_id": "event_028",
+      "source_event_id": "event_029",
       "visibility": [
         "player"
       ],
       "salience": 0.8
     },
-    "caused_by_event_id": "event_028",
+    "caused_by_event_id": "event_029",
     "created_at": "timestamp"
   },
   {
-    "id": "event_031",
+    "id": "event_032",
     "case_id": "fake_case_002",
     "session_id": "session",
     "actor_id": "memory_snapshot_system",
@@ -594,17 +624,17 @@
       "memory_id": "memory.player.clue_discovered.inward_broken_lamp",
       "subject_id": "player",
       "source_event_ids": [
-        "event_028"
+        "event_029"
       ],
       "salience": 0.8,
       "visibility": "private",
       "operation": "created"
     },
-    "caused_by_event_id": "event_030",
+    "caused_by_event_id": "event_031",
     "created_at": "timestamp"
   },
   {
-    "id": "event_032",
+    "id": "event_033",
     "case_id": "fake_case_002",
     "session_id": "session",
     "actor_id": "player",
@@ -616,7 +646,7 @@
     "created_at": "timestamp"
   },
   {
-    "id": "event_033",
+    "id": "event_034",
     "case_id": "fake_case_002",
     "session_id": "session",
     "actor_id": "system",
@@ -625,11 +655,11 @@
       "clue_id": "blue_ledger_page",
       "source_hotspot_id": "ledger_box"
     },
-    "caused_by_event_id": "event_032",
+    "caused_by_event_id": "event_033",
     "created_at": "timestamp"
   },
   {
-    "id": "event_034",
+    "id": "event_035",
     "case_id": "fake_case_002",
     "session_id": "session",
     "actor_id": "derived_event_system",
@@ -641,15 +671,15 @@
       "confidence": 1.0,
       "acquisition": "discovered",
       "source_type": "clue",
-      "source_event_id": "event_033",
+      "source_event_id": "event_034",
       "title": "蓝墨账页记录午夜木箱",
       "summary": "蓝墨账页记录了午夜后入库的三只木箱。"
     },
-    "caused_by_event_id": "event_033",
+    "caused_by_event_id": "event_034",
     "created_at": "timestamp"
   },
   {
-    "id": "event_035",
+    "id": "event_036",
     "case_id": "fake_case_002",
     "session_id": "session",
     "actor_id": "derived_event_system",
@@ -658,17 +688,17 @@
       "memory_id": "memory.player.clue_discovered.blue_ledger_page",
       "subject_id": "player",
       "content": "Player discovered clue '蓝墨账页'.",
-      "source_event_id": "event_033",
+      "source_event_id": "event_034",
       "visibility": [
         "player"
       ],
       "salience": 0.8
     },
-    "caused_by_event_id": "event_033",
+    "caused_by_event_id": "event_034",
     "created_at": "timestamp"
   },
   {
-    "id": "event_036",
+    "id": "event_037",
     "case_id": "fake_case_002",
     "session_id": "session",
     "actor_id": "memory_snapshot_system",
@@ -677,17 +707,17 @@
       "memory_id": "memory.player.clue_discovered.blue_ledger_page",
       "subject_id": "player",
       "source_event_ids": [
-        "event_033"
+        "event_034"
       ],
       "salience": 0.8,
       "visibility": "private",
       "operation": "created"
     },
-    "caused_by_event_id": "event_035",
+    "caused_by_event_id": "event_036",
     "created_at": "timestamp"
   },
   {
-    "id": "event_037",
+    "id": "event_038",
     "case_id": "fake_case_002",
     "session_id": "session",
     "actor_id": "rule_trigger_system",
@@ -696,11 +726,11 @@
       "beat_id": "ledger_pattern_found",
       "phase": "pressure"
     },
-    "caused_by_event_id": "event_033",
+    "caused_by_event_id": "event_034",
     "created_at": "timestamp"
   },
   {
-    "id": "event_038",
+    "id": "event_039",
     "case_id": "fake_case_002",
     "session_id": "session",
     "actor_id": "rule_trigger_system",
@@ -711,11 +741,11 @@
       "to_phase": "expose",
       "trigger_beat_id": "ledger_pattern_found"
     },
-    "caused_by_event_id": "event_033",
+    "caused_by_event_id": "event_034",
     "created_at": "timestamp"
   },
   {
-    "id": "event_039",
+    "id": "event_040",
     "case_id": "fake_case_002",
     "session_id": "session",
     "actor_id": "player",
@@ -731,7 +761,7 @@
     "created_at": "timestamp"
   },
   {
-    "id": "event_040",
+    "id": "event_041",
     "case_id": "fake_case_002",
     "session_id": "session",
     "actor_id": "clerk",
@@ -750,11 +780,11 @@
         }
       ]
     },
-    "caused_by_event_id": "event_039",
+    "caused_by_event_id": "event_040",
     "created_at": "timestamp"
   },
   {
-    "id": "event_041",
+    "id": "event_042",
     "case_id": "fake_case_002",
     "session_id": "session",
     "actor_id": "system",
@@ -775,11 +805,11 @@
         "hostility": 0.0
       }
     },
-    "caused_by_event_id": "event_040",
+    "caused_by_event_id": "event_041",
     "created_at": "timestamp"
   },
   {
-    "id": "event_042",
+    "id": "event_043",
     "case_id": "fake_case_002",
     "session_id": "session",
     "actor_id": "system",
@@ -792,11 +822,11 @@
       "state": "afraid",
       "current_value": 1.0
     },
-    "caused_by_event_id": "event_041",
+    "caused_by_event_id": "event_042",
     "created_at": "timestamp"
   },
   {
-    "id": "event_043",
+    "id": "event_044",
     "case_id": "fake_case_002",
     "session_id": "session",
     "actor_id": "character_impression_system",
@@ -828,16 +858,47 @@
       ],
       "confidence": 0.2,
       "source_event_ids": [
-        "event_023",
-        "event_039"
+        "event_024",
+        "event_040"
       ],
-      "last_updated_event_id": "event_043"
+      "last_updated_event_id": "event_044"
     },
-    "caused_by_event_id": "event_039",
+    "caused_by_event_id": "event_040",
     "created_at": "timestamp"
   },
   {
-    "id": "event_044",
+    "id": "event_045",
+    "case_id": "fake_case_002",
+    "session_id": "session",
+    "actor_id": "character_fact_awareness_system",
+    "type": "character_fact_awareness.updated",
+    "payload": {
+      "awareness_id": "character_fact_awareness.clerk.blue_ledger_records_midnight_boxes",
+      "character_id": "clerk",
+      "world_info_id": "blue_ledger_records_midnight_boxes",
+      "stance": "conceals",
+      "confidence": 1.0,
+      "source_type": "player_presented_clue",
+      "source_refs": [
+        "clue:blue_ledger_page",
+        "goal:prove_forced_bookkeeping",
+        "knowledge:blue_ledger_midnight_entry",
+        "secret:hid_missing_ledger_pages"
+      ],
+      "evidence_clue_ids": [
+        "blue_ledger_page"
+      ],
+      "source_event_ids": [
+        "case_package",
+        "event_040"
+      ],
+      "last_updated_event_id": "event_045"
+    },
+    "caused_by_event_id": "event_040",
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_046",
     "case_id": "fake_case_002",
     "session_id": "session",
     "actor_id": "derived_event_system",
@@ -846,17 +907,17 @@
       "memory_id": "memory.player.presented_clue.clerk.blue_ledger_page",
       "subject_id": "player",
       "content": "Player pressured 沈账房 with clue 'blue_ledger_page' at pressure 0.9.",
-      "source_event_id": "event_039",
+      "source_event_id": "event_040",
       "visibility": [
         "player"
       ],
       "salience": 0.9
     },
-    "caused_by_event_id": "event_039",
+    "caused_by_event_id": "event_040",
     "created_at": "timestamp"
   },
   {
-    "id": "event_045",
+    "id": "event_047",
     "case_id": "fake_case_002",
     "session_id": "session",
     "actor_id": "memory_snapshot_system",
@@ -865,17 +926,17 @@
       "memory_id": "memory.player.presented_clue.clerk.blue_ledger_page",
       "subject_id": "player",
       "source_event_ids": [
-        "event_039"
+        "event_040"
       ],
       "salience": 0.9,
       "visibility": "private",
       "operation": "created"
     },
-    "caused_by_event_id": "event_044",
+    "caused_by_event_id": "event_046",
     "created_at": "timestamp"
   },
   {
-    "id": "event_046",
+    "id": "event_048",
     "case_id": "fake_case_002",
     "session_id": "session",
     "actor_id": "character_impression_system",
@@ -910,17 +971,17 @@
       ],
       "confidence": 0.3,
       "source_event_ids": [
-        "event_023",
-        "event_039",
-        "event_042"
+        "event_024",
+        "event_040",
+        "event_043"
       ],
-      "last_updated_event_id": "event_046"
+      "last_updated_event_id": "event_048"
     },
-    "caused_by_event_id": "event_042",
+    "caused_by_event_id": "event_043",
     "created_at": "timestamp"
   },
   {
-    "id": "event_047",
+    "id": "event_049",
     "case_id": "fake_case_002",
     "session_id": "session",
     "actor_id": "derived_event_system",
@@ -929,17 +990,17 @@
       "memory_id": "memory.player.relationship_threshold.clerk.player.fear.afraid",
       "subject_id": "player",
       "content": "沈账房 became afraid toward the player (fear).",
-      "source_event_id": "event_042",
+      "source_event_id": "event_043",
       "visibility": [
         "player"
       ],
       "salience": 0.7
     },
-    "caused_by_event_id": "event_042",
+    "caused_by_event_id": "event_043",
     "created_at": "timestamp"
   },
   {
-    "id": "event_048",
+    "id": "event_050",
     "case_id": "fake_case_002",
     "session_id": "session",
     "actor_id": "memory_snapshot_system",
@@ -948,17 +1009,17 @@
       "memory_id": "memory.player.relationship_threshold.clerk.player.fear.afraid",
       "subject_id": "player",
       "source_event_ids": [
-        "event_042"
+        "event_043"
       ],
       "salience": 0.7,
       "visibility": "private",
       "operation": "created"
     },
-    "caused_by_event_id": "event_047",
+    "caused_by_event_id": "event_049",
     "created_at": "timestamp"
   },
   {
-    "id": "event_049",
+    "id": "event_051",
     "case_id": "fake_case_002",
     "session_id": "session",
     "actor_id": "player",
@@ -971,7 +1032,7 @@
     "created_at": "timestamp"
   },
   {
-    "id": "event_050",
+    "id": "event_052",
     "case_id": "fake_case_002",
     "session_id": "session",
     "actor_id": "dockmaster",
@@ -990,11 +1051,11 @@
         }
       ]
     },
-    "caused_by_event_id": "event_049",
+    "caused_by_event_id": "event_051",
     "created_at": "timestamp"
   },
   {
-    "id": "event_051",
+    "id": "event_053",
     "case_id": "fake_case_002",
     "session_id": "session",
     "actor_id": "system",
@@ -1015,11 +1076,11 @@
         "hostility": 1.0
       }
     },
-    "caused_by_event_id": "event_050",
+    "caused_by_event_id": "event_052",
     "created_at": "timestamp"
   },
   {
-    "id": "event_052",
+    "id": "event_054",
     "case_id": "fake_case_002",
     "session_id": "session",
     "actor_id": "player",
@@ -1038,7 +1099,7 @@
     "created_at": "timestamp"
   },
   {
-    "id": "event_053",
+    "id": "event_055",
     "case_id": "fake_case_002",
     "session_id": "session",
     "actor_id": "rule_engine",
@@ -1054,11 +1115,11 @@
       ],
       "missing_required_evidence": []
     },
-    "caused_by_event_id": "event_052",
+    "caused_by_event_id": "event_054",
     "created_at": "timestamp"
   },
   {
-    "id": "event_054",
+    "id": "event_056",
     "case_id": "fake_case_002",
     "session_id": "session",
     "actor_id": "character_impression_system",
@@ -1096,15 +1157,111 @@
       "source_event_ids": [
         "event_009",
         "event_012",
-        "event_052"
+        "event_054"
       ],
-      "last_updated_event_id": "event_054"
+      "last_updated_event_id": "event_056"
     },
-    "caused_by_event_id": "event_052",
+    "caused_by_event_id": "event_054",
     "created_at": "timestamp"
   },
   {
-    "id": "event_055",
+    "id": "event_057",
+    "case_id": "fake_case_002",
+    "session_id": "session",
+    "actor_id": "character_fact_awareness_system",
+    "type": "character_fact_awareness.updated",
+    "payload": {
+      "awareness_id": "character_fact_awareness.dockmaster.warehouse_opened_after_tide",
+      "character_id": "dockmaster",
+      "world_info_id": "warehouse_opened_after_tide",
+      "stance": "conceals",
+      "confidence": 1.0,
+      "source_type": "player_accused",
+      "source_refs": [
+        "claim:dockmaster_opened_warehouse",
+        "clue:inward_tide_mark",
+        "goal:avoid_smuggling_chain",
+        "secret:tide_record_changed"
+      ],
+      "evidence_clue_ids": [
+        "blue_ledger_page",
+        "inward_broken_lamp",
+        "inward_tide_mark"
+      ],
+      "source_event_ids": [
+        "case_package",
+        "event_009",
+        "event_054"
+      ],
+      "last_updated_event_id": "event_057"
+    },
+    "caused_by_event_id": "event_054",
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_058",
+    "case_id": "fake_case_002",
+    "session_id": "session",
+    "actor_id": "character_fact_awareness_system",
+    "type": "character_fact_awareness.updated",
+    "payload": {
+      "awareness_id": "character_fact_awareness.dockmaster.lamp_broken_from_inside_entry",
+      "character_id": "dockmaster",
+      "world_info_id": "lamp_broken_from_inside_entry",
+      "stance": "knows",
+      "confidence": 1.0,
+      "source_type": "player_accused",
+      "source_refs": [
+        "claim:dockmaster_opened_warehouse",
+        "knowledge:broken_lamp_not_wind"
+      ],
+      "evidence_clue_ids": [
+        "blue_ledger_page",
+        "inward_broken_lamp",
+        "inward_tide_mark"
+      ],
+      "source_event_ids": [
+        "case_package",
+        "event_054"
+      ],
+      "last_updated_event_id": "event_058"
+    },
+    "caused_by_event_id": "event_054",
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_059",
+    "case_id": "fake_case_002",
+    "session_id": "session",
+    "actor_id": "character_fact_awareness_system",
+    "type": "character_fact_awareness.updated",
+    "payload": {
+      "awareness_id": "character_fact_awareness.dockmaster.blue_ledger_records_midnight_boxes",
+      "character_id": "dockmaster",
+      "world_info_id": "blue_ledger_records_midnight_boxes",
+      "stance": "conceals",
+      "confidence": 0.95,
+      "source_type": "player_accused",
+      "source_refs": [
+        "claim:dockmaster_opened_warehouse",
+        "goal:avoid_smuggling_chain"
+      ],
+      "evidence_clue_ids": [
+        "blue_ledger_page",
+        "inward_broken_lamp",
+        "inward_tide_mark"
+      ],
+      "source_event_ids": [
+        "case_package",
+        "event_054"
+      ],
+      "last_updated_event_id": "event_059"
+    },
+    "caused_by_event_id": "event_054",
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_060",
     "case_id": "fake_case_002",
     "session_id": "session",
     "actor_id": "derived_event_system",
@@ -1113,17 +1270,17 @@
       "memory_id": "memory.player.accused.dockmaster.dockmaster_opened_warehouse",
       "subject_id": "player",
       "content": "Player formally accused 赵码头长 with claim 'dockmaster_opened_warehouse' using evidence ['inward_tide_mark', 'inward_broken_lamp', 'blue_ledger_page'].",
-      "source_event_id": "event_052",
+      "source_event_id": "event_054",
       "visibility": [
         "player"
       ],
       "salience": 1.0
     },
-    "caused_by_event_id": "event_052",
+    "caused_by_event_id": "event_054",
     "created_at": "timestamp"
   },
   {
-    "id": "event_056",
+    "id": "event_061",
     "case_id": "fake_case_002",
     "session_id": "session",
     "actor_id": "memory_snapshot_system",
@@ -1132,17 +1289,17 @@
       "memory_id": "memory.player.accused.dockmaster.dockmaster_opened_warehouse",
       "subject_id": "player",
       "source_event_ids": [
-        "event_052"
+        "event_054"
       ],
       "salience": 1.0,
       "visibility": "private",
       "operation": "created"
     },
-    "caused_by_event_id": "event_055",
+    "caused_by_event_id": "event_060",
     "created_at": "timestamp"
   },
   {
-    "id": "event_057",
+    "id": "event_062",
     "case_id": "fake_case_002",
     "session_id": "session",
     "actor_id": "character_impression_system",
@@ -1182,16 +1339,16 @@
       "source_event_ids": [
         "event_009",
         "event_012",
-        "event_052",
-        "event_053"
+        "event_054",
+        "event_055"
       ],
-      "last_updated_event_id": "event_057"
+      "last_updated_event_id": "event_062"
     },
-    "caused_by_event_id": "event_053",
+    "caused_by_event_id": "event_055",
     "created_at": "timestamp"
   },
   {
-    "id": "event_058",
+    "id": "event_063",
     "case_id": "fake_case_002",
     "session_id": "session",
     "actor_id": "derived_event_system",
@@ -1200,17 +1357,17 @@
       "memory_id": "memory.player.accusation_evaluated.dockmaster.dockmaster_opened_warehouse.correct",
       "subject_id": "player",
       "content": "Rule Engine evaluated the accusation against 赵码头长 for claim 'dockmaster_opened_warehouse' as correct.",
-      "source_event_id": "event_053",
+      "source_event_id": "event_055",
       "visibility": [
         "player"
       ],
       "salience": 1.0
     },
-    "caused_by_event_id": "event_053",
+    "caused_by_event_id": "event_055",
     "created_at": "timestamp"
   },
   {
-    "id": "event_059",
+    "id": "event_064",
     "case_id": "fake_case_002",
     "session_id": "session",
     "actor_id": "memory_snapshot_system",
@@ -1219,17 +1376,17 @@
       "memory_id": "memory.player.accusation_evaluated.dockmaster.dockmaster_opened_warehouse.correct",
       "subject_id": "player",
       "source_event_ids": [
-        "event_053"
+        "event_055"
       ],
       "salience": 1.0,
       "visibility": "private",
       "operation": "created"
     },
-    "caused_by_event_id": "event_058",
+    "caused_by_event_id": "event_063",
     "created_at": "timestamp"
   },
   {
-    "id": "event_060",
+    "id": "event_065",
     "case_id": "fake_case_002",
     "session_id": "session",
     "actor_id": "rule_trigger_system",
@@ -1238,11 +1395,11 @@
       "beat_id": "case_solved",
       "phase": "expose"
     },
-    "caused_by_event_id": "event_053",
+    "caused_by_event_id": "event_055",
     "created_at": "timestamp"
   },
   {
-    "id": "event_061",
+    "id": "event_066",
     "case_id": "fake_case_002",
     "session_id": "session",
     "actor_id": "rule_trigger_system",
@@ -1253,11 +1410,11 @@
       "to_phase": "resolved",
       "trigger_beat_id": "case_solved"
     },
-    "caused_by_event_id": "event_053",
+    "caused_by_event_id": "event_055",
     "created_at": "timestamp"
   },
   {
-    "id": "event_062",
+    "id": "event_067",
     "case_id": "fake_case_002",
     "session_id": "session",
     "actor_id": "rule_engine",
@@ -1269,7 +1426,7 @@
         "phase": "opening"
       }
     },
-    "caused_by_event_id": "event_061",
+    "caused_by_event_id": "event_066",
     "created_at": "timestamp"
   }
 ]

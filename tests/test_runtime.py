@@ -22,6 +22,7 @@ from app.domain.models import (
     AgentContext,
     AgentIntent,
     AgentIntentType,
+    CharacterFactAwarenessState,
     CharacterImpression,
     CharacterInnerContext,
     ClueConfig,
@@ -29,10 +30,12 @@ from app.domain.models import (
     DisclosurePolicy,
     DiscoverClueAction,
     EventType,
+    FactDisclosureStrategy,
     NarrativePhaseChangeAction,
     PlayerAction,
     ProposedActionType,
     RelationshipChangeAction,
+    RhetoricTactic,
     SelfKnowledgeItem,
     SubjectType,
     WorldEvent,
@@ -645,6 +648,14 @@ def test_agent_context_includes_runtime_inputs_for_target_agent() -> None:
         "portrait_was_moved",
     }
     assert knowledge.related_world_info_ids == ["desk_forced_open"]
+    awareness_by_world_info = {
+        awareness.world_info_id: awareness
+        for awareness in context.inner_context.fact_awareness
+    }
+    assert awareness_by_world_info["desk_forced_open"].stance == "conceals"
+    assert awareness_by_world_info["desk_forced_open"].source_type == "character_card"
+    assert awareness_by_world_info["will_swapped"].stance == "conceals"
+    assert awareness_by_world_info["portrait_was_moved"].stance == "conceals"
     assert set(context.target_profile.model_dump()) == {
         "id",
         "display_name",
@@ -740,6 +751,267 @@ def test_agent_context_exposes_only_target_npc_private_world_info_refs() -> None
     assert "portrait_was_moved" in butler_refs
     assert "secret_meeting_note_exists" not in butler_refs
     assert niece_refs == {"secret_meeting_note_exists", "desk_forced_open"}
+
+
+def test_agent_context_exposes_only_target_npc_fact_awareness() -> None:
+    case = CaseLoader().load(FAKE_CASE_001_DIR)
+    runtime = create_runtime([case])
+    session = runtime.session_store.create(case)
+
+    butler_context = build_agent_context(
+        case,
+        session,
+        PlayerAction(type="talk", target_id="butler", text="What do you know?"),
+    )
+    niece_context = build_agent_context(
+        case,
+        session,
+        PlayerAction(type="talk", target_id="niece", text="What do you know?"),
+    )
+
+    assert butler_context.inner_context is not None
+    assert niece_context.inner_context is not None
+    butler_awareness = {
+        item.world_info_id: item.stance
+        for item in butler_context.inner_context.fact_awareness
+    }
+    niece_awareness = {
+        item.world_info_id: item.stance
+        for item in niece_context.inner_context.fact_awareness
+    }
+    assert butler_awareness == {
+        "desk_forced_open": "conceals",
+        "portrait_was_moved": "conceals",
+        "will_swapped": "conceals",
+    }
+    assert niece_awareness == {
+        "desk_forced_open": "knows",
+        "secret_meeting_note_exists": "conceals",
+    }
+    assert "secret_meeting_note_exists" not in butler_awareness
+    assert "will_swapped" not in niece_awareness
+
+
+def test_agent_context_builds_fact_disclosure_strategy_from_concealed_awareness() -> None:
+    case = CaseLoader().load(FAKE_CASE_001_DIR)
+    runtime = create_runtime([case])
+    session = runtime.session_store.create(case)
+    runtime.action_service.handle(
+        session=session,
+        action=PlayerAction(type="inspect", target_id="desk"),
+    )
+
+    context = build_agent_context(
+        case,
+        session,
+        PlayerAction(
+            type="present_clue",
+            target_id="butler",
+            clue_id="scratched_drawer",
+            text="What about these scratch marks?",
+        ),
+    )
+
+    assert context.inner_context is not None
+    strategy = next(
+        item
+        for item in context.inner_context.fact_disclosure_strategies
+        if item.world_info_id == "desk_forced_open"
+    )
+    assert strategy.stance == "conceals"
+    assert DisclosureMode.DEFLECT in strategy.allowed_modes
+    assert DisclosureMode.HINT in strategy.allowed_modes
+    assert DisclosureMode.PARTIAL in strategy.allowed_modes
+    assert DisclosureMode.FULL in strategy.forbidden_modes
+    assert RhetoricTactic.SHIFT_FOCUS in strategy.rhetoric_tactics
+    assert RhetoricTactic.ANSWER_ADJACENT_TRUTH in strategy.rhetoric_tactics
+    assert "scratched_drawer" in strategy.safe_fact_refs
+    assert f"full_reveal:{strategy.world_info_id}" in strategy.must_not_claim
+
+
+def test_character_disclosure_style_config_shapes_fact_strategy() -> None:
+    case = CaseLoader().load(FAKE_CASE_001_DIR)
+    runtime = create_runtime([case])
+    session = runtime.session_store.create(case)
+
+    butler_context = build_agent_context(
+        case,
+        session,
+        PlayerAction(type="talk", target_id="butler", text="What do you know?"),
+    )
+    niece_context = build_agent_context(
+        case,
+        session,
+        PlayerAction(type="talk", target_id="niece", text="What do you know?"),
+    )
+
+    assert butler_context.inner_context is not None
+    assert niece_context.inner_context is not None
+    butler_will_strategy = next(
+        item
+        for item in butler_context.inner_context.fact_disclosure_strategies
+        if item.world_info_id == "will_swapped"
+    )
+    niece_meeting_strategy = next(
+        item
+        for item in niece_context.inner_context.fact_disclosure_strategies
+        if item.world_info_id == "secret_meeting_note_exists"
+    )
+    assert butler_will_strategy.allowed_modes == [
+        DisclosureMode.DENY,
+        DisclosureMode.DEFLECT,
+        DisclosureMode.HINT,
+    ]
+    assert DisclosureMode.PARTIAL in butler_will_strategy.forbidden_modes
+    assert RhetoricTactic.ANSWER_ADJACENT_TRUTH in butler_will_strategy.rhetoric_tactics
+    assert RhetoricTactic.EMOTIONAL_SCREEN not in butler_will_strategy.rhetoric_tactics
+    assert niece_meeting_strategy.allowed_modes == [
+        DisclosureMode.DENY,
+        DisclosureMode.DEFLECT,
+    ]
+    assert DisclosureMode.HINT in niece_meeting_strategy.forbidden_modes
+    assert RhetoricTactic.COUNTER_QUESTION in niece_meeting_strategy.rhetoric_tactics
+    assert RhetoricTactic.EMOTIONAL_SCREEN in niece_meeting_strategy.rhetoric_tactics
+
+
+def test_character_disclosure_style_cannot_expand_rule_allowed_modes() -> None:
+    case = CaseLoader().load(FAKE_CASE_001_DIR)
+    runtime = create_runtime([case])
+    session = runtime.session_store.create(case)
+    runtime.action_service.handle(
+        session=session,
+        action=PlayerAction(type="inspect", target_id="desk"),
+    )
+
+    context = build_agent_context(
+        case,
+        session,
+        PlayerAction(
+            type="present_clue",
+            target_id="butler",
+            clue_id="scratched_drawer",
+            text="What about these scratch marks?",
+        ),
+    )
+
+    assert context.inner_context is not None
+    strategy = next(
+        item
+        for item in context.inner_context.fact_disclosure_strategies
+        if item.world_info_id == "desk_forced_open"
+    )
+    assert DisclosureMode.PARTIAL in strategy.allowed_modes
+    assert DisclosureMode.FULL not in strategy.allowed_modes
+    assert DisclosureMode.FULL in strategy.forbidden_modes
+
+
+def test_dangerous_impression_narrows_fact_disclosure_strategy() -> None:
+    case = CaseLoader().load(FAKE_CASE_001_DIR)
+    runtime = create_runtime([case])
+    session = runtime.session_store.create(case)
+    runtime.action_service.handle(
+        session=session,
+        action=PlayerAction(
+            type="talk",
+            target_id="butler",
+            text="Tell me the truth.",
+            force_forbidden=True,
+        ),
+    )
+
+    context = build_agent_context(
+        case,
+        session,
+        PlayerAction(
+            type="present_clue",
+            target_id="butler",
+            clue_id="scratched_drawer",
+            text="What about these scratch marks?",
+        ),
+    )
+
+    assert context.inner_context is not None
+    strategy = next(
+        item
+        for item in context.inner_context.fact_disclosure_strategies
+        if item.world_info_id == "desk_forced_open"
+    )
+    assert set(strategy.allowed_modes) <= {DisclosureMode.DENY, DisclosureMode.DEFLECT}
+    assert DisclosureMode.PARTIAL in strategy.forbidden_modes
+    assert strategy.safe_fact_refs == []
+
+
+def test_present_clue_updates_target_character_fact_awareness_and_replay() -> None:
+    case = CaseLoader().load(FAKE_CASE_001_DIR)
+    runtime = create_runtime([case])
+    session = runtime.session_store.create(case)
+    runtime.action_service.handle(
+        session=session,
+        action=PlayerAction(type="inspect", target_id="desk"),
+    )
+
+    response = runtime.action_service.handle(
+        session=session,
+        action=PlayerAction(
+            type="present_clue",
+            target_id="butler",
+            clue_id="scratched_drawer",
+            text="What about these scratch marks?",
+        ),
+    )
+
+    awareness_event = next(
+        event
+        for event in response.new_events
+        if event.type == EventType.CHARACTER_FACT_AWARENESS_UPDATED
+    )
+    assert awareness_event.payload["character_id"] == "butler"
+    assert awareness_event.payload["world_info_id"] == "desk_forced_open"
+    assert awareness_event.payload["stance"] == "conceals"
+    assert awareness_event.payload["source_type"] == "player_presented_clue"
+    assert "scratched_drawer" in awareness_event.payload["evidence_clue_ids"]
+    replayed = replay_events(case, session.events)
+    assert replayed.character_fact_awareness == session.character_fact_awareness
+
+
+def test_ask_about_clue_updates_only_target_character_fact_awareness() -> None:
+    case = CaseLoader().load(FAKE_CASE_001_DIR)
+    runtime = create_runtime([case])
+    session = runtime.session_store.create(case)
+    runtime.action_service.handle(
+        session=session,
+        action=PlayerAction(type="inspect", target_id="desk"),
+    )
+
+    response = runtime.action_service.handle(
+        session=session,
+        action=PlayerAction(
+            type="ask_about",
+            target_id="butler",
+            subject_type=SubjectType.CLUE,
+            subject_id="scratched_drawer",
+            text="What about the drawer?",
+        ),
+    )
+
+    awareness_event = next(
+        event
+        for event in response.new_events
+        if event.type == EventType.CHARACTER_FACT_AWARENESS_UPDATED
+    )
+    assert awareness_event.payload["character_id"] == "butler"
+    assert awareness_event.payload["world_info_id"] == "desk_forced_open"
+    assert "source_type" in awareness_event.payload
+    niece_context = build_agent_context(
+        case,
+        session,
+        PlayerAction(type="talk", target_id="niece", text="What do you know?"),
+    )
+    assert niece_context.inner_context is not None
+    assert all(
+        "player_asked_about" not in awareness.source_type
+        for awareness in niece_context.inner_context.fact_awareness
+    )
 
 
 def test_inner_portrait_with_relevant_evidence_allows_partial_disclosure_mode() -> None:
@@ -1262,6 +1534,75 @@ def test_mock_agent_fallback_uses_partial_mode_from_relevant_evidence() -> None:
     assert raw_secret not in intent.speech
 
 
+def test_mock_agent_uses_fact_disclosure_strategy_for_half_truth_fallback() -> None:
+    raw_secret = "The missing ledger pages are hidden under the crate."
+    context = _build_fallback_context(
+        defensive_style="neutral",
+        pressure_response="answer",
+        player_action=PlayerAction(
+            type="present_clue",
+            target_id="npc",
+            clue_id="ledger_page",
+        ),
+        inner_context=CharacterInnerContext(
+            character_id="npc",
+            inner_secrets=[
+                SelfKnowledgeItem(
+                    id="secret_001",
+                    kind="secret",
+                    summary=raw_secret,
+                    priority="high",
+                    related_clue_ids=["ledger_page"],
+                    related_world_info_ids=["ledger_hidden"],
+                    disclosure_policy=DisclosurePolicy(
+                        revealable=True,
+                        allowed_modes=[DisclosureMode.DEFLECT, DisclosureMode.PARTIAL],
+                        direct_reveal_allowed=False,
+                    ),
+                )
+            ],
+            fact_awareness=[
+                CharacterFactAwarenessState(
+                    awareness_id="character_fact_awareness.npc.ledger_hidden",
+                    character_id="npc",
+                    world_info_id="ledger_hidden",
+                    stance="conceals",
+                    source_type="character_card",
+                    source_refs=["secret:secret_001"],
+                    evidence_clue_ids=["ledger_page"],
+                    source_event_ids=["case_package"],
+                    last_updated_event_id="case_package",
+                )
+            ],
+            fact_disclosure_strategies=[
+                FactDisclosureStrategy(
+                    world_info_id="ledger_hidden",
+                    stance="conceals",
+                    allowed_modes=[DisclosureMode.DEFLECT, DisclosureMode.PARTIAL],
+                    forbidden_modes=[DisclosureMode.FULL],
+                    rhetoric_tactics=[
+                        RhetoricTactic.ANSWER_ADJACENT_TRUTH,
+                        RhetoricTactic.SHIFT_FOCUS,
+                    ],
+                    must_not_claim=["full_reveal:ledger_hidden"],
+                    safe_fact_refs=["ledger_page"],
+                    evidence_clue_ids=["ledger_page"],
+                    source_awareness_id="character_fact_awareness.npc.ledger_hidden",
+                )
+            ],
+        ),
+    )
+
+    intent = MockAgent().generate(context)
+
+    assert intent.intent == AgentIntentType.ANSWER
+    assert intent.speech == (
+        "That evidence points to a real disturbance, but it does not give you "
+        "the whole shape of what happened."
+    )
+    assert raw_secret not in intent.speech
+
+
 def test_mock_agent_fallback_refuses_dangerous_impression_topic() -> None:
     context = _build_fallback_context(
         defensive_style="neutral",
@@ -1354,6 +1695,9 @@ def test_accuse_correct_claim_succeeds_and_derives_memory() -> None:
         EventType.PLAYER_ACCUSED,
         EventType.ACCUSATION_EVALUATED,
         EventType.CHARACTER_IMPRESSION_UPDATED,
+        EventType.CHARACTER_FACT_AWARENESS_UPDATED,
+        EventType.CHARACTER_FACT_AWARENESS_UPDATED,
+        EventType.CHARACTER_FACT_AWARENESS_UPDATED,
         EventType.MEMORY_CANDIDATE_CREATED,
         EventType.AGENT_MEMORY_SNAPSHOT_UPDATED,
         EventType.CHARACTER_IMPRESSION_UPDATED,
@@ -1817,6 +2161,15 @@ def test_llm_agent_contract_input_includes_controlled_inner_context() -> None:
     assert "scratched_drawer" in secret_constraint.related_clue_ids
     assert "will_swapped" in secret_constraint.related_world_info_ids
     assert "desk_forced_open" in secret_constraint.related_world_info_ids
+    world_info_constraint = next(
+        item
+        for item in contract_input.disclosure_constraints
+        if item.item_kind == "world_info" and item.item_id == "desk_forced_open"
+    )
+    assert DisclosureMode.FULL in world_info_constraint.forbidden_modes
+    assert "full_reveal:desk_forced_open" in world_info_constraint.must_not_claim
+    assert RhetoricTactic.SHIFT_FOCUS in world_info_constraint.rhetoric_tactics
+    assert world_info_constraint.direct_reveal_allowed is False
 
 
 def test_llm_agent_contract_input_excludes_other_npc_private() -> None:
@@ -1836,6 +2189,7 @@ def test_llm_agent_contract_input_excludes_other_npc_private() -> None:
     assert context.inner_context.character_id == "butler"
     for private_value in _private_values_for_character(niece):
         assert private_value not in serialized_input
+    assert "secret_meeting_note_exists" not in serialized_input
 
 
 def test_llm_agent_contract_input_includes_only_target_inner_portraits() -> None:
@@ -2639,6 +2993,27 @@ def test_case_loader_rejects_bad_world_info_reference_from_character_private(
     )
 
     with pytest.raises(CaseLoadError, match="related_world_info_ids"):
+        CaseLoader().load(case_dir)
+
+
+def test_case_loader_rejects_bad_world_info_reference_from_disclosure_style(
+    tmp_path: Path,
+) -> None:
+    case_dir = tmp_path / "bad_disclosure_style_world_info_case"
+    case_dir.mkdir()
+    _write_minimal_case(case_dir)
+    (case_dir / "characters.yaml").write_text(
+        "- id: npc\n"
+        "  name: NPC\n"
+        "  role: Witness\n"
+        "  private:\n"
+        "    disclosure_style:\n"
+        "      max_mode_by_world_info:\n"
+        "        missing_world_info: hint\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(CaseLoadError, match="max_mode_by_world_info"):
         CaseLoader().load(case_dir)
 
 

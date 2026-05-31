@@ -212,6 +212,8 @@ def _timeline_text(event: WorldEvent, id_map: dict[str, str]) -> str:
         )
     if event.type == EventType.CHARACTER_IMPRESSION_UPDATED:
         return "Private character impression updated."
+    if event.type == EventType.CHARACTER_FACT_AWARENESS_UPDATED:
+        return "Private character fact awareness updated."
     if event.type == EventType.PLAYER_TALKED:
         return f"Player talked to `{payload['target_id']}`."
     if event.type == EventType.PLAYER_ASKED_ABOUT:

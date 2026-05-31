@@ -153,6 +153,11 @@ class CaseLoader:
                     )
 
         for character in package.characters:
+            self._ensure_known_world_info(
+                world_info_ids,
+                list(character.private.disclosure_style.max_mode_by_world_info),
+                f"Character '{character.id}' private disclosure_style max_mode_by_world_info",
+            )
             for goal in character.private.goals:
                 self._ensure_known_world_info(
                     world_info_ids,

@@ -5,6 +5,8 @@ from typing import Any
 from app.domain.models import (
     AgentContext,
     AgentIntent,
+    DisclosureMode,
+    FactDisclosureStrategy,
     LLMAgentContractInput,
     LLMDisclosureConstraint,
     ProposedActionType,
@@ -42,12 +44,17 @@ def _build_disclosure_constraints(context: AgentContext) -> list[LLMDisclosureCo
             *inner_context.inner_knowledge,
         ]:
             constraints.append(_constraint_from_self_knowledge(item))
+        constraints.extend(
+            _constraint_from_fact_disclosure_strategy(strategy)
+            for strategy in inner_context.fact_disclosure_strategies
+        )
 
     constraints.extend(
         LLMDisclosureConstraint(
             item_id=fact_id,
             item_kind="forbidden_fact",
             allowed_modes=[],
+            forbidden_modes=[],
             direct_reveal_allowed=False,
             direct_quote_allowed=False,
             blocked=True,
@@ -63,11 +70,31 @@ def _constraint_from_self_knowledge(item: SelfKnowledgeItem) -> LLMDisclosureCon
         item_id=item.id,
         item_kind=item.kind,
         allowed_modes=policy.allowed_modes,
+        forbidden_modes=[],
         direct_reveal_allowed=policy.direct_reveal_allowed,
         direct_quote_allowed=policy.direct_quote_allowed,
         related_clue_ids=item.related_clue_ids,
         related_world_info_ids=item.related_world_info_ids,
         blocked=not policy.revealable,
+    )
+
+
+def _constraint_from_fact_disclosure_strategy(
+    strategy: FactDisclosureStrategy,
+) -> LLMDisclosureConstraint:
+    return LLMDisclosureConstraint(
+        item_id=strategy.world_info_id,
+        item_kind="world_info",
+        allowed_modes=strategy.allowed_modes,
+        forbidden_modes=strategy.forbidden_modes,
+        direct_reveal_allowed=False,
+        direct_quote_allowed=False,
+        related_clue_ids=strategy.evidence_clue_ids,
+        related_world_info_ids=[strategy.world_info_id],
+        rhetoric_tactics=strategy.rhetoric_tactics,
+        must_not_claim=strategy.must_not_claim,
+        safe_fact_refs=strategy.safe_fact_refs,
+        blocked=DisclosureMode.FULL in strategy.forbidden_modes,
     )
 
 

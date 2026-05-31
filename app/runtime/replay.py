@@ -3,6 +3,7 @@ from __future__ import annotations
 from app.domain.models import (
     AgentMemorySnapshot,
     CasePackage,
+    CharacterFactAwarenessState,
     CharacterImpression,
     EventType,
     MemoryCandidateState,
@@ -15,6 +16,7 @@ from app.domain.models import (
     WorldEvent,
 )
 from app.rules.engine import relationship_key, relationship_threshold_key
+from app.runtime.character_fact_awareness import build_initial_character_fact_awareness
 
 
 def replay_events(case: CasePackage, events: list[WorldEvent]) -> SessionState:
@@ -30,6 +32,7 @@ def replay_events(case: CasePackage, events: list[WorldEvent]) -> SessionState:
             relationship_key(item.source_id, item.target_id): RelationshipState(**item.model_dump())
             for item in case.relationships
         },
+        character_fact_awareness=build_initial_character_fact_awareness(case),
     )
 
     for event in events:
@@ -98,6 +101,11 @@ def _apply_event(session: SessionState, event: WorldEvent) -> None:
             source_event_id=str(event.payload["source_event_id"]),
         )
         session.player_knowledge[knowledge.knowledge_id] = knowledge
+        return
+
+    if event.type == EventType.CHARACTER_FACT_AWARENESS_UPDATED:
+        awareness = CharacterFactAwarenessState.model_validate(event.payload)
+        session.character_fact_awareness[awareness.awareness_id] = awareness
         return
 
     if event.type == EventType.MEMORY_CANDIDATE_CREATED:

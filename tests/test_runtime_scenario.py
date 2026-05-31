@@ -82,6 +82,7 @@ def _assert_full_scenario_state(case: object, session: object, expected_final_ph
         EventType.RELATIONSHIP_CHANGED,
         EventType.RELATIONSHIP_THRESHOLD_CROSSED,
         EventType.PLAYER_KNOWLEDGE_UPDATED,
+        EventType.CHARACTER_FACT_AWARENESS_UPDATED,
         EventType.MEMORY_CANDIDATE_CREATED,
         EventType.AGENT_MEMORY_SNAPSHOT_UPDATED,
         EventType.CHARACTER_IMPRESSION_UPDATED,
@@ -105,6 +106,7 @@ def _assert_full_scenario_state(case: object, session: object, expected_final_ph
     assert "case_solved" in session.narrative.completed_beats
     assert replayed.discovered_clues == session.discovered_clues
     assert replayed.player_knowledge == session.player_knowledge
+    assert replayed.character_fact_awareness == session.character_fact_awareness
     assert replayed.relationships == session.relationships
     assert replayed.character_impressions == session.character_impressions
     assert len(replayed.events) == len(session.events)
@@ -262,6 +264,7 @@ def _summary_does_not_leak(serialized_summary: str) -> bool:
         '"knowledge":',
         '"private":',
         '"character_impressions":',
+        '"character_fact_awareness":',
         '"inner_portraits":',
         '"truth_status":',
         '"forbidden_facts":',

@@ -106,6 +106,14 @@ cases/{case_id}/
           - scratched_drawer
         related_world_info_ids:
           - desk_forced_open
+    disclosure_style:
+      preferred_tactics:
+        - answer_adjacent_truth
+        - shift_focus
+      forbidden_tactics:
+        - emotional_screen
+      max_mode_by_world_info:
+        will_swapped: hint
 ```
 
 `defensive_style` 可用值：`evasive`、`hostile`、`anxious`、`neutral`。
@@ -119,10 +127,19 @@ Loader 仍兼容旧字段 `name`、`role`、`personality`、`speech_style`、`se
 - `private.goals`：内部动机，影响行为、偏好、回避和压力反应。
 - `private.secrets`：NPC 默认有理由隐藏的信息。
 - `private.knowledge`：NPC 自己视角中知道的事实。
+- `private.disclosure_style`：角色表达风格偏好，只影响事实披露策略投影，不写入世界状态。
 
 `private` 不等于 `forbidden_facts`，也不是永久禁言。它不能自动暴露给玩家、其他 NPC、`StateSummary`、玩家旅程 Markdown 或运行时事件。
 
 新案件应给 private 项配置 `related_world_info_ids`，旧的 `related_clue_ids` 保留用于证据触发兼容。
+
+`disclosure_style` 可配置：
+
+- `preferred_tactics`：角色偏好的话术战术，例如 `answer_adjacent_truth`、`shift_focus`、`counter_question`、`qualify_certainty`、`emotional_screen`、`silence`。
+- `forbidden_tactics`：该角色不应使用的话术战术，会从当前策略候选中移除。
+- `max_mode_by_world_info`：按 `WorldInfo` 限制最高披露等级，取值为 `none`、`deny`、`deflect`、`hint`、`partial`、`full`。
+
+关键边界：`max_mode_by_world_info` 只能收紧，不能放宽。配置 `will_swapped: hint` 表示这个角色最多暗示该事实；配置 `desk_forced_open: full` 也不会绕过通用策略、Narrative Director 或 Rule Engine 的禁令。Loader 会校验 `max_mode_by_world_info` 中的每个事实 ID 必须存在于 `world_info.yaml`。
 
 ## clues.yaml
 

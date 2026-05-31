@@ -15,12 +15,13 @@
 - `relationship_thresholds_crossed`
 - `discovered_clues`
 - `player_knowledge`
+- `character_fact_awareness`
 - `memory_candidates`
 - `memory_snapshots`
 - `character_impressions`
 - `events`
 
-`StateSummary` 是对该状态的公开投影，不是权威状态。运行时记忆快照和私有角色画像刻意不通过 `StateSummary` 暴露。
+`StateSummary` 是对该状态的公开投影，不是权威状态。运行时记忆快照、角色事实认知账本和私有角色画像刻意不通过 `StateSummary` 暴露。
 
 ## 角色卡
 
@@ -38,6 +39,106 @@
 `private.goals` 表示 NPC 想要什么。`private.secrets` 表示 NPC 正在隐藏什么。`private.knowledge` 表示 NPC 从自身视角知道什么。运行时 `inner_portraits` 表示 NPC 如何看待别人。
 
 Private 数据是角色认知，不是自动公开事实，也不是直接修改状态的通道。
+
+## 角色事实认知账本
+
+`CharacterFactAwarenessState` 是 NPC 视角下的事实认知账本。它解决的问题不是“角色卡里写了什么”，而是“运行时当前这个 NPC 对某个 `WorldInfo` 处于什么认知姿态”。
+
+当前字段包括：
+
+- `character_id`：认知所属 NPC。
+- `world_info_id`：对齐的事实锚点。
+- `stance`：`knows`、`suspects`、`conceals`、`misbelieves`。
+- `confidence`：该认知姿态的置信度。
+- `source_type`：来源类型，例如 `character_card`、`player_asked_about`、`player_presented_clue`、`player_accused`。
+- `source_refs`：来源引用，例如 `secret:xxx`、`knowledge:xxx`、`clue:xxx`、`claim:xxx`。
+- `evidence_clue_ids`：关联证据线索。
+- `source_event_ids`：运行时事件来源。
+- `last_updated_event_id`：最后一次更新事件。
+
+初始化时，系统会从角色 `private.goals`、`private.secrets`、`private.knowledge` 的 `related_world_info_ids` 静默构造初始账本：
+
+- goal / secret 默认表示 `conceals`
+- private knowledge 默认表示 `knows`
+- 同一 NPC 对同一 `WorldInfo` 同时有 secret 和 knowledge 时，`conceals` 优先，因为表达策略必须按更保守边界处理
+
+静默初始化不会写入 `WorldEvent`，因此不会污染玩家时间线。玩家交互导致认知变化时才写入 `character_fact_awareness.updated`：
+
+```text
+player asks about discovered clue
+  -> character_fact_awareness.updated(source_type=player_asked_about)
+
+player presents clue
+  -> character_fact_awareness.updated(source_type=player_presented_clue)
+
+player accuses with evidence
+  -> character_fact_awareness.updated(source_type=player_accused)
+```
+
+安全边界：
+
+- 只有运行时派生系统和 Rule Engine 链路能写角色事实认知事件。
+- LLM 不能创建、修改或删除角色事实认知。
+- `StateSummary` 不暴露 `character_fact_awareness`。
+- `player_journey.md` 只记录“私有角色事实认知更新”，不打印具体 payload。
+- `AgentContext.inner_context.fact_awareness` 只给目标 NPC 自己，不给其他 NPC。
+- 这不是 NPC-NPC 社交模拟，也不会把某 NPC 的认知传播给另一 NPC。
+
+## 事实披露策略
+
+`FactDisclosureStrategy` 是从角色事实认知账本派生出的 Agent 输入投影。它不进入 `SessionState`，也不写事件。它的职责是把“这个 NPC 对某个事实处于什么认知姿态”翻译成“当前对外表达允许到什么程度”。
+
+核心字段：
+
+- `world_info_id`：策略约束的事实锚点。
+- `stance`：来自 `CharacterFactAwarenessState`。
+- `allowed_modes`：允许表达模式，例如 `deny`、`deflect`、`hint`、`partial`。
+- `forbidden_modes`：禁止表达模式，默认始终禁止 `full`。
+- `rhetoric_tactics`：允许的话术战术，例如 `answer_adjacent_truth`、`shift_focus`、`counter_question`、`qualify_certainty`、`emotional_screen`。
+- `must_not_claim`：禁止 LLM 直接宣称的内容，例如 `full_reveal:<world_info_id>`。
+- `safe_fact_refs`：当前允许围绕其说话的证据线索引用。
+- `source_awareness_id`：来源认知账本条目。
+
+它不是“撒谎许可”。`stance=conceals` 只表示 NPC 正在隐藏或规避某个事实；实际表达可以是沉默、回避、暗示、半真半假的蒙太奇话术或部分承认。直接撒谎仍应被单独配置和审查，不能由 LLM 自由决定。
+
+当前策略原则：
+
+- `conceals`：默认允许 `deny` / `deflect` / `hint`，有相关证据压力时可允许 `partial`。
+- `knows`：默认允许 `hint` / `partial`。
+- `suspects`：默认允许 `deflect` / `hint`，强调不确定性。
+- `misbelieves`：默认只允许保守回避，保留给后续误导和反转。
+- 高威胁或危险话题会收窄到 `deny` / `deflect`。
+- 结盟潜力高可以增加 `hint`，但不能授予 `full`。
+
+MockAgent 和未来 LLM 都读取同一个策略层。LLM 负责把策略写成自然台词，但不能突破 `allowed_modes`、`forbidden_modes` 和 `must_not_claim`。
+
+## 案件可配置披露风格
+
+案件作者可以在 `characters.yaml` 的 `private.disclosure_style` 下配置角色级表达偏好。它只影响策略投影，不修改事实、玩家已知、角色认知或剧情阶段。
+
+最小配置：
+
+```yaml
+private:
+  disclosure_style:
+    preferred_tactics:
+      - answer_adjacent_truth
+      - shift_focus
+    forbidden_tactics:
+      - emotional_screen
+    max_mode_by_world_info:
+      will_swapped: hint
+```
+
+语义：
+
+- `preferred_tactics`：角色偏好的话术战术，会加入策略候选。
+- `forbidden_tactics`：该角色不使用的话术战术，会从策略中移除。
+- `max_mode_by_world_info`：指定某个 `WorldInfo` 的最高披露等级，只能收紧，不能放宽。
+
+例如 `will_swapped: hint` 表示即使玩家有证据压力，管家对 `will_swapped` 也最多只能暗示，不能 partial 或 full。反过来，配置 `desk_forced_open: full` 也不会让系统允许 full，因为通用策略和 Director 仍然禁止未授权 full reveal。
+
+Loader 会校验 `max_mode_by_world_info` 中的每个 `world_info_id` 必须存在；悬空引用会导致案件加载失败。
 
 ## WorldInfo 事实锚点
 
@@ -233,6 +334,13 @@ session.character_impressions[npc_id]["player"]
 
 Replay 直接应用 `character_impression.updated`，不得重新运行画像派生。
 
+角色事实认知账本 replay 分两步：
+
+1. 从案件包静默重建初始认知。
+2. 按事件日志应用 `character_fact_awareness.updated`。
+
+这样 replay 后的 `session.character_fact_awareness` 必须与原 session 一致，同时不会要求 session 创建事件显式存储私有角色卡内容。
+
 ## WorldEvent 类型
 
 - `session.created`
@@ -249,6 +357,7 @@ Replay 直接应用 `character_impression.updated`，不得重新运行画像派
 - `relationship.changed`
 - `relationship.threshold.crossed`
 - `player_knowledge.updated`
+- `character_fact_awareness.updated`
 - `memory_candidate.created`
 - `agent_memory_snapshot.updated`
 - `character_impression.updated`
@@ -266,10 +375,11 @@ Replay 直接应用 `character_impression.updated`，不得重新运行画像派
 - 所有被接受的状态变化都必须表示为 `WorldEvent`。
 - `replay_events(case, events)` 必须重建等价关键状态并保持事件数量。
 - `agent_memory_snapshot.updated` 从事件日志 replay，不重新运行记忆派生。
+- `character_fact_awareness.updated` 从事件日志 replay，不让 LLM 或 Agent 直接写入。
 - `character_impression.updated` 从事件日志 replay，不重新运行画像派生。
 
 ## 泄漏边界
 
-公开摘要不得暴露角色 `secrets`、角色 `goals`、内部角色 `knowledge`、私有角色画像、角色卡 `private` 对象、线索 `truth_status`、禁说事实原文、blocked terms、`forbidden_facts` 或 `solution_claims`。
+公开摘要不得暴露角色 `secrets`、角色 `goals`、内部角色 `knowledge`、角色事实认知账本、私有角色画像、角色卡 `private` 对象、线索 `truth_status`、禁说事实原文、blocked terms、`forbidden_facts` 或 `solution_claims`。
 
 `StateSummary`、`WorldEvent` payload 和 `player_journey.md` 也不得暴露 `inner_context` 或原始 private summaries。

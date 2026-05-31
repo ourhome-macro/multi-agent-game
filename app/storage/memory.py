@@ -14,6 +14,7 @@ from app.domain.models import (
     StateSummary,
 )
 from app.rules.engine import relationship_key
+from app.runtime.character_fact_awareness import build_initial_character_fact_awareness
 from app.runtime.events import EventRecorder
 
 
@@ -56,6 +57,7 @@ class InMemorySessionStore:
                 for item in package.relationships
             },
         )
+        session.character_fact_awareness = build_initial_character_fact_awareness(package)
         self._recorder.append(
             session,
             actor_id="system",

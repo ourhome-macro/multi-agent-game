@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+from app.agents.disclosure_strategy import (
+    DISCLOSURE_MODE_ORDER,
+    build_fact_disclosure_strategies,
+)
 from app.domain.models import (
     AgentCharacterView,
     AgentContext,
@@ -18,14 +22,6 @@ from app.rules.engine import player_knowledge_id_for_clue, relationship_key
 from app.runtime.pressure import calculate_interaction_pressure, subject_is_sensitive
 
 RECENT_EVENT_LIMIT = 10
-DISCLOSURE_MODE_ORDER = [
-    DisclosureMode.NONE,
-    DisclosureMode.DENY,
-    DisclosureMode.DEFLECT,
-    DisclosureMode.HINT,
-    DisclosureMode.PARTIAL,
-    DisclosureMode.FULL,
-]
 
 
 def build_agent_context(
@@ -153,6 +149,14 @@ def build_character_inner_context(
         (portrait for portrait in portraits if portrait.target_id == "player"),
         None,
     )
+    fact_awareness = sorted(
+        (
+            awareness
+            for awareness in session.character_fact_awareness.values()
+            if awareness.character_id == target_character.id
+        ),
+        key=lambda value: value.awareness_id,
+    )
     return CharacterInnerContext(
         character_id=target_character.id,
         inner_goals=[
@@ -211,6 +215,16 @@ def build_character_inner_context(
             )
             for knowledge in target_character.private.knowledge
         ],
+        fact_awareness=fact_awareness,
+        fact_disclosure_strategies=build_fact_disclosure_strategies(
+            fact_awareness=fact_awareness,
+            player_impression=player_impression,
+            action=action,
+            disclosure_style=target_character.private.disclosure_style,
+            player_known_world_info_ids={
+                knowledge.world_info_id for knowledge in session.player_knowledge.values()
+            },
+        ),
         inner_portraits=portraits,
     )
 

@@ -76,6 +76,18 @@ LLM_BACKEND=real + OPENAI_API_KEY=... -> OpenAILLMAgent
 
 `inner_context` 是当前目标 NPC 专属的 `CharacterInnerContext`。它来自该 NPC 自己的 private goals/secrets/knowledge 和 private portraits，不通过公开 API 返回，也不能包含其他 NPC 的私有数据。
 
+`inner_context.fact_awareness` 是目标 NPC 自己的运行时事实认知账本投影。它只包含该 NPC 对 `WorldInfo` 的 stance、confidence、来源引用和证据引用，不包含其他 NPC 的事实认知。Agent 可以用它决定回答、回避、暗示或紧张程度，但不能通过输出直接修改它。
+
+`inner_context.fact_disclosure_strategies` 是从 `fact_awareness` 派生出的可说边界。它把 `knows / suspects / conceals / misbelieves` 翻译成：
+
+- 当前允许的 `allowed_modes`
+- 当前禁止的 `forbidden_modes`
+- 可用话术战术 `rhetoric_tactics`
+- 禁止直接宣称的 `must_not_claim`
+- 可围绕表达的 `safe_fact_refs`
+
+这层的重点是支持“半真半假但不越权”的蒙太奇话术：LLM 可以负责语言表现，但不能自己决定是否 full reveal、是否直接承认或是否新增事实。
+
 `AgentCharacterView` 只包含安全的公开角色卡字段：
 
 - `id`
@@ -139,6 +151,7 @@ CharacterInnerContext
 
 - 原始 `CharacterPrivateConfig`
 - 其他 NPC 的 `secrets`、`goals` 或内部 `knowledge`
+- 其他 NPC 的 `character_fact_awareness`
 - 其他 NPC 的 private impressions
 - 线索 `truth_status`
 - 带原文或 blocked terms 的 `forbidden_facts`
@@ -168,6 +181,10 @@ Agent 输出必须始终是结构化结果：
 
 `AgentIntent.proposed_actions` 不是真实状态变化，只是请求。它必须经过白名单和 Rule Engine 校验后才能改变状态。Agent intent 不能创建 `memory_candidate.created`、`agent_memory_snapshot.updated` 或 `character_impression.updated`；这些事件都由运行时派生。
 
+同理，Agent intent 不能创建或修改 `character_fact_awareness.updated`。角色事实认知只由运行时根据案件初始配置和玩家交互事件派生。
+
+Agent 也不能写 `FactDisclosureStrategy`。策略是上下文投影，不是状态；每次构造 `AgentContext` 时由后端重新计算。
+
 允许的 proposed action 类型：
 
 - `clue.discover`
@@ -191,6 +208,7 @@ Agent 输出必须始终是结构化结果：
 - `has_relevant_evidence` 加有效 `partial` 可产生部分真相式回复
 - 高结盟潜力加有效 `hint` 可产生谨慎提示
 - `dangerous_topic_triggered` 可强制拒绝或回避
+- `FactDisclosureStrategy` 可让 fallback 使用 `answer_adjacent_truth`、`shift_focus` 等战术生成半真半假的安全表达
 
 `mock_dialogues.yaml` 当前支持这些条件：
 
@@ -213,6 +231,8 @@ Agent 输出必须始终是结构化结果：
 `LLMAgentStub` 返回合法 `AgentIntent`，不调用外部模型，也不修改 `SessionState`。它用于在接入真实模型前锁定 LLM 合同。
 
 `OpenAILLMAgent` 是最小真实后端适配器。它构造 `LLMAgentContractInput`，请求符合 `AgentIntent` 的严格 JSON，运行 `validate_llm_agent_output`，返回校验后的 intent。任何失败都会返回无 `proposed_actions` 的安全拒答。失败包括缺少 API key、HTTP 错误、JSON 错误、schema 错误、private 原文回显、直接提议剧情阶段变化。
+
+`LLMAgentContractInput.disclosure_constraints` 会同时包含 private self-knowledge 约束和 `world_info` 级事实披露策略约束。`world_info` 约束会带 `allowed_modes`、`forbidden_modes`、`rhetoric_tactics`、`must_not_claim` 和 `safe_fact_refs`，用于告诉 LLM：你可以怎么说，但不能说到哪里。
 
 真实适配器不改变状态权威模型。它的输出仍经过 Narrative Director，所有 `proposed_actions` 仍经过 Rule Engine。除非显式环境变量启用，否则它不参与完整场景快照。
 

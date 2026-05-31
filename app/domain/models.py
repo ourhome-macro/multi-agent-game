@@ -65,6 +65,15 @@ class DisclosureMode(StrEnum):
     FULL = "full"
 
 
+class RhetoricTactic(StrEnum):
+    ANSWER_ADJACENT_TRUTH = "answer_adjacent_truth"
+    SHIFT_FOCUS = "shift_focus"
+    COUNTER_QUESTION = "counter_question"
+    QUALIFY_CERTAINTY = "qualify_certainty"
+    EMOTIONAL_SCREEN = "emotional_screen"
+    SILENCE = "silence"
+
+
 class WorldInfoCategory(StrEnum):
     PHYSICAL_FACT = "physical_fact"
     CHARACTER_ACTION = "character_action"
@@ -93,6 +102,20 @@ class PlayerKnowledgeSourceType(StrEnum):
     ACCUSATION = "accusation"
 
 
+class CharacterFactStance(StrEnum):
+    KNOWS = "knows"
+    SUSPECTS = "suspects"
+    CONCEALS = "conceals"
+    MISBELIEVES = "misbelieves"
+
+
+class CharacterFactAwarenessSourceType(StrEnum):
+    CHARACTER_CARD = "character_card"
+    PLAYER_ASKED_ABOUT = "player_asked_about"
+    PLAYER_PRESENTED_CLUE = "player_presented_clue"
+    PLAYER_ACCUSED = "player_accused"
+
+
 class EventType(StrEnum):
     SESSION_CREATED = "session.created"
     PLAYER_INSPECTED = "player.inspected"
@@ -108,6 +131,7 @@ class EventType(StrEnum):
     RELATIONSHIP_CHANGED = "relationship.changed"
     RELATIONSHIP_THRESHOLD_CROSSED = "relationship.threshold.crossed"
     PLAYER_KNOWLEDGE_UPDATED = "player_knowledge.updated"
+    CHARACTER_FACT_AWARENESS_UPDATED = "character_fact_awareness.updated"
     MEMORY_CANDIDATE_CREATED = "memory_candidate.created"
     AGENT_MEMORY_SNAPSHOT_UPDATED = "agent_memory_snapshot.updated"
     CHARACTER_IMPRESSION_UPDATED = "character_impression.updated"
@@ -191,10 +215,19 @@ class PrivateKnowledge(APIModel):
     disclosure_policy: DisclosurePolicy = Field(default_factory=DisclosurePolicy)
 
 
+class CharacterDisclosureStyleConfig(APIModel):
+    preferred_tactics: list[RhetoricTactic] = Field(default_factory=list)
+    forbidden_tactics: list[RhetoricTactic] = Field(default_factory=list)
+    max_mode_by_world_info: dict[NonEmptyString, DisclosureMode] = Field(default_factory=dict)
+
+
 class CharacterPrivateConfig(APIModel):
     goals: list[PrivateGoal] = Field(default_factory=list)
     secrets: list[PrivateSecret] = Field(default_factory=list)
     knowledge: list[PrivateKnowledge] = Field(default_factory=list)
+    disclosure_style: CharacterDisclosureStyleConfig = Field(
+        default_factory=CharacterDisclosureStyleConfig
+    )
 
     @field_validator("goals", mode="before")
     @classmethod
@@ -318,22 +351,54 @@ class CharacterImpression(APIModel):
     last_updated_event_id: NonEmptyString
 
 
+class CharacterFactAwarenessState(APIModel):
+    awareness_id: NonEmptyString
+    character_id: NonEmptyString
+    world_info_id: NonEmptyString
+    stance: CharacterFactStance
+    confidence: float = Field(default=1.0, ge=0.0, le=1.0)
+    source_type: CharacterFactAwarenessSourceType
+    source_refs: list[NonEmptyString] = Field(default_factory=list)
+    evidence_clue_ids: list[NonEmptyString] = Field(default_factory=list)
+    source_event_ids: list[NonEmptyString] = Field(default_factory=list)
+    last_updated_event_id: NonEmptyString
+
+
+class FactDisclosureStrategy(APIModel):
+    world_info_id: NonEmptyString
+    stance: CharacterFactStance
+    allowed_modes: list[DisclosureMode] = Field(default_factory=list)
+    forbidden_modes: list[DisclosureMode] = Field(default_factory=list)
+    rhetoric_tactics: list[RhetoricTactic] = Field(default_factory=list)
+    must_not_claim: list[NonEmptyString] = Field(default_factory=list)
+    safe_fact_refs: list[NonEmptyString] = Field(default_factory=list)
+    evidence_clue_ids: list[NonEmptyString] = Field(default_factory=list)
+    confidence: float = Field(default=1.0, ge=0.0, le=1.0)
+    source_awareness_id: NonEmptyString
+
+
 class CharacterInnerContext(APIModel):
     character_id: NonEmptyString
     inner_goals: list[SelfKnowledgeItem] = Field(default_factory=list)
     inner_secrets: list[SelfKnowledgeItem] = Field(default_factory=list)
     inner_knowledge: list[SelfKnowledgeItem] = Field(default_factory=list)
+    fact_awareness: list[CharacterFactAwarenessState] = Field(default_factory=list)
+    fact_disclosure_strategies: list[FactDisclosureStrategy] = Field(default_factory=list)
     inner_portraits: list[CharacterImpression] = Field(default_factory=list)
 
 
 class LLMDisclosureConstraint(APIModel):
     item_id: NonEmptyString
-    item_kind: Literal["goal", "secret", "knowledge", "forbidden_fact"]
+    item_kind: Literal["goal", "secret", "knowledge", "forbidden_fact", "world_info"]
     allowed_modes: list[DisclosureMode] = Field(default_factory=list)
+    forbidden_modes: list[DisclosureMode] = Field(default_factory=list)
     direct_reveal_allowed: bool = False
     direct_quote_allowed: bool = False
     related_clue_ids: list[NonEmptyString] = Field(default_factory=list)
     related_world_info_ids: list[NonEmptyString] = Field(default_factory=list)
+    rhetoric_tactics: list[RhetoricTactic] = Field(default_factory=list)
+    must_not_claim: list[NonEmptyString] = Field(default_factory=list)
+    safe_fact_refs: list[NonEmptyString] = Field(default_factory=list)
     blocked: bool = True
 
 
@@ -690,6 +755,9 @@ class SessionState(APIModel):
     relationship_thresholds_crossed: set[str] = Field(default_factory=set)
     discovered_clues: set[str] = Field(default_factory=set)
     player_knowledge: dict[str, PlayerKnowledgeState] = Field(default_factory=dict)
+    character_fact_awareness: dict[str, CharacterFactAwarenessState] = Field(
+        default_factory=dict
+    )
     memory_candidates: dict[str, MemoryCandidateState] = Field(default_factory=dict)
     memory_snapshots: dict[str, AgentMemorySnapshot] = Field(default_factory=dict)
     character_impressions: dict[str, dict[str, CharacterImpression]] = Field(

@@ -37,10 +37,33 @@ class CharacterInnerContext(BaseModel):
     inner_goals: list[SelfKnowledgeItem]
     inner_secrets: list[SelfKnowledgeItem]
     inner_knowledge: list[SelfKnowledgeItem]
+    fact_awareness: list[CharacterFactAwarenessState]
+    fact_disclosure_strategies: list[FactDisclosureStrategy]
     inner_portraits: list[CharacterImpression]
 ```
 
 `CharacterInnerContext` 不是权威状态。它是运行时构造的输入视图，不能写事实、线索、关系、记忆或剧情阶段。任何对外状态变化仍必须通过 `AgentIntent` 提议，并由 Rule Engine 接受。
+
+`fact_awareness` 是目标 NPC 自己的事实认知账本投影。它来自 `session.character_fact_awareness`，只包含该 NPC 的条目，不包含其他 NPC 的事实认知。它可以告诉 Agent“这个 NPC 是知道、怀疑、误解，还是正在隐瞒某个 `WorldInfo`”，但它本身不授权披露。
+
+当前 stance：
+
+- `knows`：NPC 知道该事实。
+- `suspects`：NPC 怀疑该事实，但证据压力较低。
+- `conceals`：NPC 知道或意识到该事实，并有隐藏动机。
+- `misbelieves`：NPC 误信某个事实；当前案件包尚未使用，保留给后续反转与误导。
+
+角色事实认知更新必须来自运行时事件，例如玩家询问线索、展示线索或正式指控。LLM 不得直接写这个账本。
+
+`fact_disclosure_strategies` 是事实认知的表达策略投影，不是新状态。它把每个 `WorldInfo` 的认知姿态翻译成当前可用的话术边界：
+
+- `allowed_modes`：可以沉默、回避、暗示或部分披露到哪一步。
+- `forbidden_modes`：当前禁止什么，尤其禁止 `full`。
+- `rhetoric_tactics`：允许使用的表达战术，例如邻近真实、转移重点、反问、降低确定性、情绪遮挡。
+- `must_not_claim`：不能让 LLM 直接宣称的内容。
+- `safe_fact_refs`：当前可围绕表达的证据引用。
+
+它的意义是允许“半真半假的蒙太奇话术”，而不是允许 LLM 自由撒谎。比如 NPC 可以说“这证据说明当晚确实有异常，但还拼不出全部形状”，但不能在未允许时直接说“我调换了遗嘱”。
 
 ## SelfKnowledgeItem
 
@@ -112,6 +135,8 @@ PlayerAction(talk | ask_about | present_clue)
 - 高优先级且带 `avoid_suspicion` tag 的 goal 会让 fallback 偏向 `conceal`
 - 被询问或展示的 clue 命中 `inner_secrets.related_clue_ids` 时，fallback 偏向 `conceal`
 - private item 的 `related_world_info_ids` 可与玩家已知 WorldInfo 对齐，用于相关证据判断
+- `fact_awareness` 可让 fallback 知道目标 NPC 对同一 WorldInfo 当前是 `knows` 还是 `conceals`
+- `fact_disclosure_strategies` 可让 fallback 用半真、回避、反问、转移重点等方式表达，而不直接泄露 private summary
 - 如果 `direct_reveal_allowed=false`，fallback 不得直接引用 secret summary
 - 高威胁 `inner_portraits` 会让回复更谨慎，但不引用画像文本
 
@@ -124,9 +149,12 @@ PlayerAction(talk | ask_about | present_clue)
 - 公开 API 响应
 - `WorldEvent` payload
 - 其他 NPC 的上下文
+- 其他 NPC 的事实认知账本
 - 记忆快照，除非它来自允许的公开事件
 
 `character_impression.updated` payload 是用于 replay 的私有运行时事件。玩家旅程 Markdown 可以说明“私有画像更新了”，但不能打印画像正文。
+
+`character_fact_awareness.updated` payload 也是用于 replay 的私有运行时事件。玩家旅程 Markdown 只能说明“私有角色事实认知更新了”，不能打印具体事实认知 payload。
 
 `AgentContext.inner_context` 可以包含目标 NPC 自己的 self summaries，但不能包含其他 NPC 的 private 数据，也不能序列化进公开运行时产物。
 
@@ -143,6 +171,7 @@ Rule Engine 仍是以下状态的权威：
 - 玩家已知
 - 记忆候选和快照
 - 私有角色画像派生
+- 私有角色事实认知派生
 - 剧情阶段变化
 - 指控评估
 

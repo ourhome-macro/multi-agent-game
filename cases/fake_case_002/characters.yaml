@@ -49,6 +49,14 @@
           - inward_broken_lamp
         related_world_info_ids:
           - lamp_broken_from_inside_entry
+    disclosure_style:
+      preferred_tactics:
+        - shift_focus
+        - qualify_certainty
+      forbidden_tactics:
+        - emotional_screen
+      max_mode_by_world_info:
+        blue_ledger_records_midnight_boxes: hint
 
 - id: clerk
   display_name: 沈账房
@@ -99,3 +107,9 @@
           - blue_ledger_page
         related_world_info_ids:
           - blue_ledger_records_midnight_boxes
+    disclosure_style:
+      preferred_tactics:
+        - emotional_screen
+        - qualify_certainty
+      max_mode_by_world_info:
+        clerk_hid_ledger_page: deflect

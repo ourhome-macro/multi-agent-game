@@ -230,6 +230,37 @@
     "id": "event_013",
     "case_id": "fake_case_001",
     "session_id": "session",
+    "actor_id": "character_fact_awareness_system",
+    "type": "character_fact_awareness.updated",
+    "payload": {
+      "awareness_id": "character_fact_awareness.butler.desk_forced_open",
+      "character_id": "butler",
+      "world_info_id": "desk_forced_open",
+      "stance": "conceals",
+      "confidence": 1.0,
+      "source_type": "player_asked_about",
+      "source_refs": [
+        "clue:scratched_drawer",
+        "knowledge:drawer_opened_last_night",
+        "secret:swapped_will_awareness"
+      ],
+      "evidence_clue_ids": [
+        "dustless_frame",
+        "scratched_drawer"
+      ],
+      "source_event_ids": [
+        "case_package",
+        "event_009"
+      ],
+      "last_updated_event_id": "event_013"
+    },
+    "caused_by_event_id": "event_009",
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_014",
+    "case_id": "fake_case_001",
+    "session_id": "session",
     "actor_id": "derived_event_system",
     "type": "memory_candidate.created",
     "payload": {
@@ -246,7 +277,7 @@
     "created_at": "timestamp"
   },
   {
-    "id": "event_014",
+    "id": "event_015",
     "case_id": "fake_case_001",
     "session_id": "session",
     "actor_id": "memory_snapshot_system",
@@ -261,11 +292,11 @@
       "visibility": "private",
       "operation": "created"
     },
-    "caused_by_event_id": "event_013",
+    "caused_by_event_id": "event_014",
     "created_at": "timestamp"
   },
   {
-    "id": "event_015",
+    "id": "event_016",
     "case_id": "fake_case_001",
     "session_id": "session",
     "actor_id": "player",
@@ -281,7 +312,7 @@
     "created_at": "timestamp"
   },
   {
-    "id": "event_016",
+    "id": "event_017",
     "case_id": "fake_case_001",
     "session_id": "session",
     "actor_id": "butler",
@@ -301,11 +332,11 @@
         }
       ]
     },
-    "caused_by_event_id": "event_015",
+    "caused_by_event_id": "event_016",
     "created_at": "timestamp"
   },
   {
-    "id": "event_017",
+    "id": "event_018",
     "case_id": "fake_case_001",
     "session_id": "session",
     "actor_id": "system",
@@ -327,11 +358,11 @@
         "hostility": 0.0
       }
     },
-    "caused_by_event_id": "event_016",
+    "caused_by_event_id": "event_017",
     "created_at": "timestamp"
   },
   {
-    "id": "event_018",
+    "id": "event_019",
     "case_id": "fake_case_001",
     "session_id": "session",
     "actor_id": "system",
@@ -344,11 +375,11 @@
       "state": "guarded",
       "current_value": 1.0
     },
-    "caused_by_event_id": "event_017",
+    "caused_by_event_id": "event_018",
     "created_at": "timestamp"
   },
   {
-    "id": "event_019",
+    "id": "event_020",
     "case_id": "fake_case_001",
     "session_id": "session",
     "actor_id": "character_impression_system",
@@ -381,15 +412,47 @@
       "confidence": 0.2,
       "source_event_ids": [
         "event_009",
-        "event_015"
+        "event_016"
       ],
-      "last_updated_event_id": "event_019"
+      "last_updated_event_id": "event_020"
     },
-    "caused_by_event_id": "event_015",
+    "caused_by_event_id": "event_016",
     "created_at": "timestamp"
   },
   {
-    "id": "event_020",
+    "id": "event_021",
+    "case_id": "fake_case_001",
+    "session_id": "session",
+    "actor_id": "character_fact_awareness_system",
+    "type": "character_fact_awareness.updated",
+    "payload": {
+      "awareness_id": "character_fact_awareness.butler.desk_forced_open",
+      "character_id": "butler",
+      "world_info_id": "desk_forced_open",
+      "stance": "conceals",
+      "confidence": 1.0,
+      "source_type": "player_presented_clue",
+      "source_refs": [
+        "clue:scratched_drawer",
+        "knowledge:drawer_opened_last_night",
+        "secret:swapped_will_awareness"
+      ],
+      "evidence_clue_ids": [
+        "dustless_frame",
+        "scratched_drawer"
+      ],
+      "source_event_ids": [
+        "case_package",
+        "event_009",
+        "event_016"
+      ],
+      "last_updated_event_id": "event_021"
+    },
+    "caused_by_event_id": "event_016",
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_022",
     "case_id": "fake_case_001",
     "session_id": "session",
     "actor_id": "derived_event_system",
@@ -398,17 +461,17 @@
       "memory_id": "memory.player.presented_clue.butler.scratched_drawer",
       "subject_id": "player",
       "content": "Player pressured 韩管家 with clue 'scratched_drawer' at pressure 0.9.",
-      "source_event_id": "event_015",
+      "source_event_id": "event_016",
       "visibility": [
         "player"
       ],
       "salience": 0.9
     },
-    "caused_by_event_id": "event_015",
+    "caused_by_event_id": "event_016",
     "created_at": "timestamp"
   },
   {
-    "id": "event_021",
+    "id": "event_023",
     "case_id": "fake_case_001",
     "session_id": "session",
     "actor_id": "memory_snapshot_system",
@@ -417,17 +480,17 @@
       "memory_id": "memory.player.presented_clue.butler.scratched_drawer",
       "subject_id": "player",
       "source_event_ids": [
-        "event_015"
+        "event_016"
       ],
       "salience": 0.9,
       "visibility": "private",
       "operation": "created"
     },
-    "caused_by_event_id": "event_020",
+    "caused_by_event_id": "event_022",
     "created_at": "timestamp"
   },
   {
-    "id": "event_022",
+    "id": "event_024",
     "case_id": "fake_case_001",
     "session_id": "session",
     "actor_id": "character_impression_system",
@@ -463,16 +526,16 @@
       "confidence": 0.3,
       "source_event_ids": [
         "event_009",
-        "event_015",
-        "event_018"
+        "event_016",
+        "event_019"
       ],
-      "last_updated_event_id": "event_022"
+      "last_updated_event_id": "event_024"
     },
-    "caused_by_event_id": "event_018",
+    "caused_by_event_id": "event_019",
     "created_at": "timestamp"
   },
   {
-    "id": "event_023",
+    "id": "event_025",
     "case_id": "fake_case_001",
     "session_id": "session",
     "actor_id": "derived_event_system",
@@ -481,17 +544,17 @@
       "memory_id": "memory.player.relationship_threshold.butler.player.suspicion.guarded",
       "subject_id": "player",
       "content": "韩管家 became guarded toward the player (suspicion).",
-      "source_event_id": "event_018",
+      "source_event_id": "event_019",
       "visibility": [
         "player"
       ],
       "salience": 0.7
     },
-    "caused_by_event_id": "event_018",
+    "caused_by_event_id": "event_019",
     "created_at": "timestamp"
   },
   {
-    "id": "event_024",
+    "id": "event_026",
     "case_id": "fake_case_001",
     "session_id": "session",
     "actor_id": "memory_snapshot_system",
@@ -500,17 +563,17 @@
       "memory_id": "memory.player.relationship_threshold.butler.player.suspicion.guarded",
       "subject_id": "player",
       "source_event_ids": [
-        "event_018"
+        "event_019"
       ],
       "salience": 0.7,
       "visibility": "private",
       "operation": "created"
     },
-    "caused_by_event_id": "event_023",
+    "caused_by_event_id": "event_025",
     "created_at": "timestamp"
   },
   {
-    "id": "event_025",
+    "id": "event_027",
     "case_id": "fake_case_001",
     "session_id": "session",
     "actor_id": "player",
@@ -523,7 +586,7 @@
     "created_at": "timestamp"
   },
   {
-    "id": "event_026",
+    "id": "event_028",
     "case_id": "fake_case_001",
     "session_id": "session",
     "actor_id": "butler",
@@ -543,11 +606,11 @@
         }
       ]
     },
-    "caused_by_event_id": "event_025",
+    "caused_by_event_id": "event_027",
     "created_at": "timestamp"
   },
   {
-    "id": "event_027",
+    "id": "event_029",
     "case_id": "fake_case_001",
     "session_id": "session",
     "actor_id": "system",
@@ -569,11 +632,11 @@
         "hostility": 0.0
       }
     },
-    "caused_by_event_id": "event_026",
+    "caused_by_event_id": "event_028",
     "created_at": "timestamp"
   },
   {
-    "id": "event_028",
+    "id": "event_030",
     "case_id": "fake_case_001",
     "session_id": "session",
     "actor_id": "player",
@@ -585,7 +648,7 @@
     "created_at": "timestamp"
   },
   {
-    "id": "event_029",
+    "id": "event_031",
     "case_id": "fake_case_001",
     "session_id": "session",
     "actor_id": "system",
@@ -594,11 +657,11 @@
       "clue_id": "dustless_frame",
       "source_hotspot_id": "portrait"
     },
-    "caused_by_event_id": "event_028",
+    "caused_by_event_id": "event_030",
     "created_at": "timestamp"
   },
   {
-    "id": "event_030",
+    "id": "event_032",
     "case_id": "fake_case_001",
     "session_id": "session",
     "actor_id": "derived_event_system",
@@ -610,15 +673,15 @@
       "confidence": 1.0,
       "acquisition": "discovered",
       "source_type": "clue",
-      "source_event_id": "event_029",
+      "source_event_id": "event_031",
       "title": "肖像画近期被移动过",
       "summary": "肖像画背后的无尘痕迹说明它最近被移动过，可能遮挡过隐藏物。"
     },
-    "caused_by_event_id": "event_029",
+    "caused_by_event_id": "event_031",
     "created_at": "timestamp"
   },
   {
-    "id": "event_031",
+    "id": "event_033",
     "case_id": "fake_case_001",
     "session_id": "session",
     "actor_id": "derived_event_system",
@@ -627,17 +690,17 @@
       "memory_id": "memory.player.clue_discovered.dustless_frame",
       "subject_id": "player",
       "content": "Player discovered clue '无尘画框印'.",
-      "source_event_id": "event_029",
+      "source_event_id": "event_031",
       "visibility": [
         "player"
       ],
       "salience": 0.8
     },
-    "caused_by_event_id": "event_029",
+    "caused_by_event_id": "event_031",
     "created_at": "timestamp"
   },
   {
-    "id": "event_032",
+    "id": "event_034",
     "case_id": "fake_case_001",
     "session_id": "session",
     "actor_id": "memory_snapshot_system",
@@ -646,17 +709,17 @@
       "memory_id": "memory.player.clue_discovered.dustless_frame",
       "subject_id": "player",
       "source_event_ids": [
-        "event_029"
+        "event_031"
       ],
       "salience": 0.8,
       "visibility": "private",
       "operation": "created"
     },
-    "caused_by_event_id": "event_031",
+    "caused_by_event_id": "event_033",
     "created_at": "timestamp"
   },
   {
-    "id": "event_033",
+    "id": "event_035",
     "case_id": "fake_case_001",
     "session_id": "session",
     "actor_id": "player",
@@ -669,7 +732,7 @@
     "created_at": "timestamp"
   },
   {
-    "id": "event_034",
+    "id": "event_036",
     "case_id": "fake_case_001",
     "session_id": "session",
     "actor_id": "butler",
@@ -689,11 +752,11 @@
         }
       ]
     },
-    "caused_by_event_id": "event_033",
+    "caused_by_event_id": "event_035",
     "created_at": "timestamp"
   },
   {
-    "id": "event_035",
+    "id": "event_037",
     "case_id": "fake_case_001",
     "session_id": "session",
     "actor_id": "system",
@@ -715,11 +778,11 @@
         "hostility": 0.0
       }
     },
-    "caused_by_event_id": "event_034",
+    "caused_by_event_id": "event_036",
     "created_at": "timestamp"
   },
   {
-    "id": "event_036",
+    "id": "event_038",
     "case_id": "fake_case_001",
     "session_id": "session",
     "actor_id": "player",
@@ -732,7 +795,7 @@
     "created_at": "timestamp"
   },
   {
-    "id": "event_037",
+    "id": "event_039",
     "case_id": "fake_case_001",
     "session_id": "session",
     "actor_id": "director",
@@ -742,11 +805,11 @@
       "blocked_fact_id": "true_killer",
       "reason": "Blocked forbidden fact 'true_killer' in phase 'investigation'"
     },
-    "caused_by_event_id": "event_036",
+    "caused_by_event_id": "event_038",
     "created_at": "timestamp"
   },
   {
-    "id": "event_038",
+    "id": "event_040",
     "case_id": "fake_case_001",
     "session_id": "session",
     "actor_id": "character_impression_system",
@@ -785,17 +848,17 @@
       "confidence": 0.4,
       "source_event_ids": [
         "event_009",
-        "event_015",
-        "event_018",
-        "event_037"
+        "event_016",
+        "event_019",
+        "event_039"
       ],
-      "last_updated_event_id": "event_038"
+      "last_updated_event_id": "event_040"
     },
-    "caused_by_event_id": "event_037",
+    "caused_by_event_id": "event_039",
     "created_at": "timestamp"
   },
   {
-    "id": "event_039",
+    "id": "event_041",
     "case_id": "fake_case_001",
     "session_id": "session",
     "actor_id": "derived_event_system",
@@ -804,17 +867,17 @@
       "memory_id": "memory.player.director_blocked.butler.true_killer",
       "subject_id": "player",
       "content": "Conversation with 韩管家 was blocked by narrative rules.",
-      "source_event_id": "event_037",
+      "source_event_id": "event_039",
       "visibility": [
         "player"
       ],
       "salience": 0.9
     },
-    "caused_by_event_id": "event_037",
+    "caused_by_event_id": "event_039",
     "created_at": "timestamp"
   },
   {
-    "id": "event_040",
+    "id": "event_042",
     "case_id": "fake_case_001",
     "session_id": "session",
     "actor_id": "memory_snapshot_system",
@@ -823,17 +886,17 @@
       "memory_id": "memory.player.director_blocked.butler.true_killer",
       "subject_id": "player",
       "source_event_ids": [
-        "event_037"
+        "event_039"
       ],
       "salience": 0.9,
       "visibility": "private",
       "operation": "created"
     },
-    "caused_by_event_id": "event_039",
+    "caused_by_event_id": "event_041",
     "created_at": "timestamp"
   },
   {
-    "id": "event_041",
+    "id": "event_043",
     "case_id": "fake_case_001",
     "session_id": "session",
     "actor_id": "player",
@@ -845,7 +908,7 @@
     "created_at": "timestamp"
   },
   {
-    "id": "event_042",
+    "id": "event_044",
     "case_id": "fake_case_001",
     "session_id": "session",
     "actor_id": "system",
@@ -854,11 +917,11 @@
       "clue_id": "torn_note",
       "source_hotspot_id": "carpet"
     },
-    "caused_by_event_id": "event_041",
+    "caused_by_event_id": "event_043",
     "created_at": "timestamp"
   },
   {
-    "id": "event_043",
+    "id": "event_045",
     "case_id": "fake_case_001",
     "session_id": "session",
     "actor_id": "derived_event_system",
@@ -870,47 +933,9 @@
       "confidence": 1.0,
       "acquisition": "discovered",
       "source_type": "clue",
-      "source_event_id": "event_042",
+      "source_event_id": "event_044",
       "title": "存在十点书房会面便签",
       "summary": "被撕碎的便签显示，有人在今晚十点约定于书房见面。"
-    },
-    "caused_by_event_id": "event_042",
-    "created_at": "timestamp"
-  },
-  {
-    "id": "event_044",
-    "case_id": "fake_case_001",
-    "session_id": "session",
-    "actor_id": "derived_event_system",
-    "type": "memory_candidate.created",
-    "payload": {
-      "memory_id": "memory.player.clue_discovered.torn_note",
-      "subject_id": "player",
-      "content": "Player discovered clue '被撕碎的便签'.",
-      "source_event_id": "event_042",
-      "visibility": [
-        "player"
-      ],
-      "salience": 0.8
-    },
-    "caused_by_event_id": "event_042",
-    "created_at": "timestamp"
-  },
-  {
-    "id": "event_045",
-    "case_id": "fake_case_001",
-    "session_id": "session",
-    "actor_id": "memory_snapshot_system",
-    "type": "agent_memory_snapshot.updated",
-    "payload": {
-      "memory_id": "memory.player.clue_discovered.torn_note",
-      "subject_id": "player",
-      "source_event_ids": [
-        "event_042"
-      ],
-      "salience": 0.8,
-      "visibility": "private",
-      "operation": "created"
     },
     "caused_by_event_id": "event_044",
     "created_at": "timestamp"
@@ -919,17 +944,55 @@
     "id": "event_046",
     "case_id": "fake_case_001",
     "session_id": "session",
+    "actor_id": "derived_event_system",
+    "type": "memory_candidate.created",
+    "payload": {
+      "memory_id": "memory.player.clue_discovered.torn_note",
+      "subject_id": "player",
+      "content": "Player discovered clue '被撕碎的便签'.",
+      "source_event_id": "event_044",
+      "visibility": [
+        "player"
+      ],
+      "salience": 0.8
+    },
+    "caused_by_event_id": "event_044",
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_047",
+    "case_id": "fake_case_001",
+    "session_id": "session",
+    "actor_id": "memory_snapshot_system",
+    "type": "agent_memory_snapshot.updated",
+    "payload": {
+      "memory_id": "memory.player.clue_discovered.torn_note",
+      "subject_id": "player",
+      "source_event_ids": [
+        "event_044"
+      ],
+      "salience": 0.8,
+      "visibility": "private",
+      "operation": "created"
+    },
+    "caused_by_event_id": "event_046",
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_048",
+    "case_id": "fake_case_001",
+    "session_id": "session",
     "actor_id": "rule_trigger_system",
     "type": "narrative.beat.completed",
     "payload": {
       "beat_id": "hidden_meeting_connected",
       "phase": "investigation"
     },
-    "caused_by_event_id": "event_042",
+    "caused_by_event_id": "event_044",
     "created_at": "timestamp"
   },
   {
-    "id": "event_047",
+    "id": "event_049",
     "case_id": "fake_case_001",
     "session_id": "session",
     "actor_id": "rule_trigger_system",
@@ -940,11 +1003,11 @@
       "to_phase": "reveal",
       "trigger_beat_id": "hidden_meeting_connected"
     },
-    "caused_by_event_id": "event_042",
+    "caused_by_event_id": "event_044",
     "created_at": "timestamp"
   },
   {
-    "id": "event_048",
+    "id": "event_050",
     "case_id": "fake_case_001",
     "session_id": "session",
     "actor_id": "player",
@@ -963,7 +1026,7 @@
     "created_at": "timestamp"
   },
   {
-    "id": "event_049",
+    "id": "event_051",
     "case_id": "fake_case_001",
     "session_id": "session",
     "actor_id": "rule_engine",
@@ -979,11 +1042,11 @@
       ],
       "missing_required_evidence": []
     },
-    "caused_by_event_id": "event_048",
+    "caused_by_event_id": "event_050",
     "created_at": "timestamp"
   },
   {
-    "id": "event_050",
+    "id": "event_052",
     "case_id": "fake_case_001",
     "session_id": "session",
     "actor_id": "character_impression_system",
@@ -1026,18 +1089,113 @@
       "confidence": 0.5,
       "source_event_ids": [
         "event_009",
-        "event_015",
-        "event_018",
-        "event_037",
-        "event_048"
+        "event_016",
+        "event_019",
+        "event_039",
+        "event_050"
       ],
-      "last_updated_event_id": "event_050"
+      "last_updated_event_id": "event_052"
     },
-    "caused_by_event_id": "event_048",
+    "caused_by_event_id": "event_050",
     "created_at": "timestamp"
   },
   {
-    "id": "event_051",
+    "id": "event_053",
+    "case_id": "fake_case_001",
+    "session_id": "session",
+    "actor_id": "character_fact_awareness_system",
+    "type": "character_fact_awareness.updated",
+    "payload": {
+      "awareness_id": "character_fact_awareness.butler.desk_forced_open",
+      "character_id": "butler",
+      "world_info_id": "desk_forced_open",
+      "stance": "conceals",
+      "confidence": 1.0,
+      "source_type": "player_accused",
+      "source_refs": [
+        "claim:butler_moved_key",
+        "clue:scratched_drawer",
+        "knowledge:drawer_opened_last_night",
+        "secret:swapped_will_awareness"
+      ],
+      "evidence_clue_ids": [
+        "dustless_frame",
+        "scratched_drawer",
+        "torn_note"
+      ],
+      "source_event_ids": [
+        "case_package",
+        "event_009",
+        "event_016",
+        "event_050"
+      ],
+      "last_updated_event_id": "event_053"
+    },
+    "caused_by_event_id": "event_050",
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_054",
+    "case_id": "fake_case_001",
+    "session_id": "session",
+    "actor_id": "character_fact_awareness_system",
+    "type": "character_fact_awareness.updated",
+    "payload": {
+      "awareness_id": "character_fact_awareness.butler.portrait_was_moved",
+      "character_id": "butler",
+      "world_info_id": "portrait_was_moved",
+      "stance": "conceals",
+      "confidence": 1.0,
+      "source_type": "player_accused",
+      "source_refs": [
+        "claim:butler_moved_key",
+        "secret:swapped_will_awareness"
+      ],
+      "evidence_clue_ids": [
+        "dustless_frame",
+        "scratched_drawer",
+        "torn_note"
+      ],
+      "source_event_ids": [
+        "case_package",
+        "event_050"
+      ],
+      "last_updated_event_id": "event_054"
+    },
+    "caused_by_event_id": "event_050",
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_055",
+    "case_id": "fake_case_001",
+    "session_id": "session",
+    "actor_id": "character_fact_awareness_system",
+    "type": "character_fact_awareness.updated",
+    "payload": {
+      "awareness_id": "character_fact_awareness.butler.secret_meeting_note_exists",
+      "character_id": "butler",
+      "world_info_id": "secret_meeting_note_exists",
+      "stance": "knows",
+      "confidence": 0.95,
+      "source_type": "player_accused",
+      "source_refs": [
+        "claim:butler_moved_key"
+      ],
+      "evidence_clue_ids": [
+        "dustless_frame",
+        "scratched_drawer",
+        "torn_note"
+      ],
+      "source_event_ids": [
+        "event_050"
+      ],
+      "last_updated_event_id": "event_055"
+    },
+    "caused_by_event_id": "event_050",
+    "created_at": "timestamp"
+  },
+  {
+    "id": "event_056",
     "case_id": "fake_case_001",
     "session_id": "session",
     "actor_id": "derived_event_system",
@@ -1046,17 +1204,17 @@
       "memory_id": "memory.player.accused.butler.butler_moved_key",
       "subject_id": "player",
       "content": "Player formally accused 韩管家 with claim 'butler_moved_key' using evidence ['scratched_drawer', 'dustless_frame', 'torn_note'].",
-      "source_event_id": "event_048",
+      "source_event_id": "event_050",
       "visibility": [
         "player"
       ],
       "salience": 1.0
     },
-    "caused_by_event_id": "event_048",
+    "caused_by_event_id": "event_050",
     "created_at": "timestamp"
   },
   {
-    "id": "event_052",
+    "id": "event_057",
     "case_id": "fake_case_001",
     "session_id": "session",
     "actor_id": "memory_snapshot_system",
@@ -1065,17 +1223,17 @@
       "memory_id": "memory.player.accused.butler.butler_moved_key",
       "subject_id": "player",
       "source_event_ids": [
-        "event_048"
+        "event_050"
       ],
       "salience": 1.0,
       "visibility": "private",
       "operation": "created"
     },
-    "caused_by_event_id": "event_051",
+    "caused_by_event_id": "event_056",
     "created_at": "timestamp"
   },
   {
-    "id": "event_053",
+    "id": "event_058",
     "case_id": "fake_case_001",
     "session_id": "session",
     "actor_id": "character_impression_system",
@@ -1120,19 +1278,19 @@
       "confidence": 0.6,
       "source_event_ids": [
         "event_009",
-        "event_015",
-        "event_018",
-        "event_037",
-        "event_048",
-        "event_049"
+        "event_016",
+        "event_019",
+        "event_039",
+        "event_050",
+        "event_051"
       ],
-      "last_updated_event_id": "event_053"
+      "last_updated_event_id": "event_058"
     },
-    "caused_by_event_id": "event_049",
+    "caused_by_event_id": "event_051",
     "created_at": "timestamp"
   },
   {
-    "id": "event_054",
+    "id": "event_059",
     "case_id": "fake_case_001",
     "session_id": "session",
     "actor_id": "derived_event_system",
@@ -1141,17 +1299,17 @@
       "memory_id": "memory.player.accusation_evaluated.butler.butler_moved_key.correct",
       "subject_id": "player",
       "content": "Rule Engine evaluated the accusation against 韩管家 for claim 'butler_moved_key' as correct.",
-      "source_event_id": "event_049",
+      "source_event_id": "event_051",
       "visibility": [
         "player"
       ],
       "salience": 1.0
     },
-    "caused_by_event_id": "event_049",
+    "caused_by_event_id": "event_051",
     "created_at": "timestamp"
   },
   {
-    "id": "event_055",
+    "id": "event_060",
     "case_id": "fake_case_001",
     "session_id": "session",
     "actor_id": "memory_snapshot_system",
@@ -1160,17 +1318,17 @@
       "memory_id": "memory.player.accusation_evaluated.butler.butler_moved_key.correct",
       "subject_id": "player",
       "source_event_ids": [
-        "event_049"
+        "event_051"
       ],
       "salience": 1.0,
       "visibility": "private",
       "operation": "created"
     },
-    "caused_by_event_id": "event_054",
+    "caused_by_event_id": "event_059",
     "created_at": "timestamp"
   },
   {
-    "id": "event_056",
+    "id": "event_061",
     "case_id": "fake_case_001",
     "session_id": "session",
     "actor_id": "rule_trigger_system",
@@ -1179,11 +1337,11 @@
       "beat_id": "case_solved",
       "phase": "reveal"
     },
-    "caused_by_event_id": "event_049",
+    "caused_by_event_id": "event_051",
     "created_at": "timestamp"
   },
   {
-    "id": "event_057",
+    "id": "event_062",
     "case_id": "fake_case_001",
     "session_id": "session",
     "actor_id": "rule_trigger_system",
@@ -1194,11 +1352,11 @@
       "to_phase": "resolved",
       "trigger_beat_id": "case_solved"
     },
-    "caused_by_event_id": "event_049",
+    "caused_by_event_id": "event_051",
     "created_at": "timestamp"
   },
   {
-    "id": "event_058",
+    "id": "event_063",
     "case_id": "fake_case_001",
     "session_id": "session",
     "actor_id": "rule_engine",
@@ -1210,7 +1368,7 @@
         "phase": "opening"
       }
     },
-    "caused_by_event_id": "event_057",
+    "caused_by_event_id": "event_062",
     "created_at": "timestamp"
   }
 ]

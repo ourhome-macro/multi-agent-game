@@ -9,6 +9,7 @@ from app.domain.models import (
     CharacterResponseStyle,
     DefensiveStyle,
     DisclosureMode,
+    FactDisclosureStrategy,
     MockReplyConfig,
     PrivatePriority,
     ProposedActionType,
@@ -163,7 +164,11 @@ class MockAgent:
         impression = self._player_impression(context)
         matching_secret = self._matching_secret(context)
         if matching_secret is not None:
-            return self._secret_fallback_intent(matching_secret, impression)
+            return self._secret_fallback_intent(
+                matching_secret,
+                impression,
+                self._matching_strategy(context, matching_secret),
+            )
         if self._has_high_priority_avoid_suspicion_goal(context):
             return AgentIntentType.CONCEAL
         if self._dangerous_topic_triggered(impression):
@@ -191,7 +196,11 @@ class MockAgent:
         impression = self._player_impression(context)
         matching_secret = self._matching_secret(context)
         if matching_secret is not None:
-            return self._secret_fallback_speech(matching_secret, impression)
+            return self._secret_fallback_speech(
+                matching_secret,
+                impression,
+                self._matching_strategy(context, matching_secret),
+            )
         if self._has_high_priority_avoid_suspicion_goal(context):
             return "I would rather not be treated as the center of this."
         if self._dangerous_topic_triggered(impression):
@@ -229,11 +238,15 @@ class MockAgent:
         self,
         secret: SelfKnowledgeItem,
         impression: CharacterImpression | None,
+        strategy: FactDisclosureStrategy | None,
     ) -> AgentIntentType:
-        modes = set(secret.disclosure_policy.allowed_modes)
+        modes = self._merged_allowed_modes(secret, strategy)
         if self._dangerous_topic_triggered(impression):
             return AgentIntentType.REFUSE
-        if DisclosureMode.PARTIAL in modes and self._has_relevant_evidence(impression):
+        if DisclosureMode.PARTIAL in modes and (
+            self._has_relevant_evidence(impression)
+            or self._strategy_has_evidence(strategy)
+        ):
             return AgentIntentType.ANSWER
         if DisclosureMode.HINT in modes and self._alliance_ready(impression):
             return AgentIntentType.ANSWER
@@ -245,14 +258,76 @@ class MockAgent:
         self,
         secret: SelfKnowledgeItem,
         impression: CharacterImpression | None,
+        strategy: FactDisclosureStrategy | None,
     ) -> str:
-        modes = set(secret.disclosure_policy.allowed_modes)
+        modes = self._merged_allowed_modes(secret, strategy)
         if self._dangerous_topic_triggered(impression):
             return "I am not going to discuss that topic."
-        if DisclosureMode.PARTIAL in modes and self._has_relevant_evidence(impression):
-            return "That evidence points toward something real, but I will not spell it out."
+        if DisclosureMode.PARTIAL in modes and (
+            self._has_relevant_evidence(impression)
+            or self._strategy_has_evidence(strategy)
+        ):
+            return self._partial_strategy_speech(strategy)
         if DisclosureMode.HINT in modes and self._alliance_ready(impression):
-            return "Look at what changed around that evidence, not only what was said."
+            return self._hint_strategy_speech(strategy)
+        if DisclosureMode.DEFLECT in modes:
+            return self._deflect_strategy_speech(strategy)
+        if DisclosureMode.DENY in modes:
+            return "That clue does not prove what you think it proves."
+        return "I cannot help you with that."
+
+    def _matching_strategy(
+        self,
+        context: AgentContext,
+        secret: SelfKnowledgeItem,
+    ) -> FactDisclosureStrategy | None:
+        inner_context = context.inner_context
+        if inner_context is None:
+            return None
+        related_world_info_ids = set(secret.related_world_info_ids)
+        if not related_world_info_ids:
+            return None
+        return next(
+            (
+                strategy
+                for strategy in inner_context.fact_disclosure_strategies
+                if strategy.world_info_id in related_world_info_ids
+            ),
+            None,
+        )
+
+    def _merged_allowed_modes(
+        self,
+        secret: SelfKnowledgeItem,
+        strategy: FactDisclosureStrategy | None,
+    ) -> set[DisclosureMode]:
+        modes = set(secret.disclosure_policy.allowed_modes)
+        if strategy is not None:
+            modes = modes & set(strategy.allowed_modes)
+            if not modes:
+                modes = set(strategy.allowed_modes)
+        modes.discard(DisclosureMode.FULL)
+        return modes
+
+    def _strategy_has_evidence(self, strategy: FactDisclosureStrategy | None) -> bool:
+        return strategy is not None and bool(strategy.safe_fact_refs)
+
+    def _partial_strategy_speech(self, strategy: FactDisclosureStrategy | None) -> str:
+        if strategy is not None:
+            return (
+                "That evidence points to a real disturbance, but it does not give you "
+                "the whole shape of what happened."
+            )
+        return "That evidence points toward something real, but I will not spell it out."
+
+    def _hint_strategy_speech(self, strategy: FactDisclosureStrategy | None) -> str:
+        if strategy is not None:
+            return "Look at what the evidence changes, and what it carefully leaves out."
+        return "Look at what changed around that evidence, not only what was said."
+
+    def _deflect_strategy_speech(self, strategy: FactDisclosureStrategy | None) -> str:
+        if strategy is not None:
+            return "You are arranging the facts into a shape before you have all of them."
         return "That clue does not prove what you think it proves."
 
     def _has_high_priority_avoid_suspicion_goal(self, context: AgentContext) -> bool:
