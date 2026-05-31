@@ -2,6 +2,8 @@
   title: 抽屉划痕
   description: 书桌抽屉锁孔旁有新鲜划痕，像是被细金属工具撬开过。
   truth_status: "true"
+  reveals_world_info:
+    - desk_forced_open
   related_characters:
     - butler
   related_events:
@@ -12,6 +14,8 @@
   title: 被撕碎的便签
   description: 便签只剩半截，上面写着“今晚十点，书房见”。
   truth_status: "unknown"
+  reveals_world_info:
+    - secret_meeting_note_exists
   related_characters:
     - niece
   related_events:
@@ -22,6 +26,8 @@
   title: 无尘画框印
   description: 肖像画背后的墙面有一圈无尘痕迹，说明它最近被移动过。
   truth_status: "true"
+  reveals_world_info:
+    - portrait_was_moved
   related_characters:
     - butler
     - niece

@@ -95,15 +95,34 @@ class DerivedEventSystem:
         clue = next((item for item in case.clues if item.id == clue_id), None)
         if clue is None:
             return None
-        knowledge_id = f"player_knowledge.{clue_id}"
+
+        world_info_by_id = {item.id: item for item in case.world_info}
+        world_info_id = next(
+            (
+                item_id
+                for item_id in clue.reveals_world_info
+                if item_id in world_info_by_id
+            ),
+            None,
+        )
+        knowledge_id = (
+            f"player_knowledge.{world_info_id}"
+            if world_info_id is not None
+            else f"player_knowledge.{clue_id}"
+        )
         if knowledge_id in session.player_knowledge:
             return None
+
+        world_info = world_info_by_id.get(world_info_id) if world_info_id is not None else None
+        title = world_info.title if world_info is not None else clue.title
+        summary = world_info.description if world_info is not None else clue.description
 
         session.player_knowledge[knowledge_id] = PlayerKnowledgeState(
             knowledge_id=knowledge_id,
             clue_id=clue_id,
-            title=clue.title,
-            summary=clue.description,
+            world_info_id=world_info_id,
+            title=title,
+            summary=summary,
             source_event_id=source_event.id,
         )
         return self._recorder.append(
@@ -112,10 +131,11 @@ class DerivedEventSystem:
             event_type=EventType.PLAYER_KNOWLEDGE_UPDATED,
             payload={
                 "clue_id": clue_id,
+                "world_info_id": world_info_id,
                 "knowledge_id": knowledge_id,
                 "source_event_id": source_event.id,
-                "title": clue.title,
-                "summary": clue.description,
+                "title": title,
+                "summary": summary,
             },
             caused_by_event_id=source_event.id,
         )
@@ -370,6 +390,7 @@ class DerivedEventSystem:
             impression.perceived_motive = "Testing boundaries around restricted facts."
             _append_unique(impression.suspicious_points, "director_blocked")
             _append_unique(impression.tags, "unsafe_boundary_probe")
+            _append_unique(impression.tags, "dangerous_topic_triggered")
             impression.threat_level = _clamp01(impression.threat_level + 0.2)
             impression.manipulation_risk = _clamp01(impression.manipulation_risk + 0.1)
             impression.trust_boundary = "Avoid unsafe disclosures and stay within public facts."
@@ -386,7 +407,8 @@ class DerivedEventSystem:
         impression.perceived_motive = "Testing what the NPC knows about case references."
         _append_unique(impression.suspicious_points, f"asked_about.{subject_type}.{subject_id}")
         _append_unique(impression.tags, "targeted_questioning")
-        self._append_optional_knowledge_ref(impression, source_event)
+        if self._append_optional_knowledge_ref(impression, source_event):
+            _append_unique(impression.tags, "has_relevant_evidence")
         impression.threat_level = _clamp01(impression.threat_level + 0.1 + pressure * 0.2)
         impression.usefulness = _clamp01(impression.usefulness + 0.1)
         if pressure >= 0.6:
@@ -407,7 +429,8 @@ class DerivedEventSystem:
         impression.perceived_motive = "Testing contradictions with discovered evidence."
         _append_unique(impression.suspicious_points, f"presented_clue.{clue_id}")
         _append_unique(impression.tags, "evidence_pressure")
-        self._append_optional_knowledge_ref(impression, source_event)
+        if self._append_optional_knowledge_ref(impression, source_event):
+            _append_unique(impression.tags, "has_relevant_evidence")
         impression.threat_level = _clamp01(impression.threat_level + 0.2 + pressure * 0.2)
         impression.manipulation_risk = _clamp01(impression.manipulation_risk + 0.15)
         impression.usefulness = _clamp01(impression.usefulness + 0.15)
@@ -423,6 +446,7 @@ class DerivedEventSystem:
         impression.perceived_motive = "Trying to force a formal case judgment."
         _append_unique(impression.suspicious_points, f"accused.{claim_id}")
         _append_unique(impression.tags, "formal_accusation")
+        _append_unique(impression.tags, "has_relevant_evidence")
         for clue_id in source_event.payload.get("evidence_clue_ids", []):
             _append_unique(impression.suspected_knowledge_refs, str(clue_id))
         impression.threat_level = _clamp01(impression.threat_level + 0.35)
@@ -477,14 +501,22 @@ class DerivedEventSystem:
         self,
         impression: CharacterImpression,
         source_event: WorldEvent,
-    ) -> None:
+    ) -> bool:
+        appended = False
         knowledge_id = source_event.payload.get("knowledge_id")
         if isinstance(knowledge_id, str):
             _append_unique(impression.suspected_knowledge_refs, knowledge_id)
-            return
+            appended = True
         clue_id = source_event.payload.get("clue_id")
         if isinstance(clue_id, str):
             _append_unique(impression.suspected_knowledge_refs, clue_id)
+            _append_unique(impression.suspected_knowledge_refs, f"player_knowledge.{clue_id}")
+            appended = True
+        world_info_id = source_event.payload.get("world_info_id")
+        if isinstance(world_info_id, str):
+            _append_unique(impression.suspected_knowledge_refs, world_info_id)
+            appended = True
+        return appended
 
     def _store_memory_candidate(
         self,

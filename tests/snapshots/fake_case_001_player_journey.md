@@ -13,7 +13,7 @@
 - `event_001` `session.created`: Session created for `fake_case_001` in phase `opening`.
 - `event_002` `player.inspected`: Player inspected `desk`.
 - `event_003` `clue.discovered`: Clue `scratched_drawer` discovered.
-- `event_004` `player_knowledge.updated`: Player knowledge `player_knowledge.scratched_drawer` updated.
+- `event_004` `player_knowledge.updated`: Player knowledge `player_knowledge.desk_forced_open` updated.
 - `event_005` `memory_candidate.created`: Memory candidate `memory.player.clue_discovered.scratched_drawer` created.
 - `event_006` `agent_memory_snapshot.updated`: Memory snapshot `memory.player.clue_discovered.scratched_drawer` created from `event_005`.
 - `event_007` `narrative.beat.completed`: Narrative beat `drawer_found` completed.
@@ -39,7 +39,7 @@
 - `event_027` `relationship.changed`: Relationship `butler->player` changed.
 - `event_028` `player.inspected`: Player inspected `portrait`.
 - `event_029` `clue.discovered`: Clue `dustless_frame` discovered.
-- `event_030` `player_knowledge.updated`: Player knowledge `player_knowledge.dustless_frame` updated.
+- `event_030` `player_knowledge.updated`: Player knowledge `player_knowledge.portrait_was_moved` updated.
 - `event_031` `memory_candidate.created`: Memory candidate `memory.player.clue_discovered.dustless_frame` created.
 - `event_032` `agent_memory_snapshot.updated`: Memory snapshot `memory.player.clue_discovered.dustless_frame` created from `event_031`.
 - `event_033` `player.talked`: Player talked to `butler`.
@@ -52,7 +52,7 @@
 - `event_040` `agent_memory_snapshot.updated`: Memory snapshot `memory.player.director_blocked.butler.redacted_fact` created from `event_039`.
 - `event_041` `player.inspected`: Player inspected `carpet`.
 - `event_042` `clue.discovered`: Clue `torn_note` discovered.
-- `event_043` `player_knowledge.updated`: Player knowledge `player_knowledge.torn_note` updated.
+- `event_043` `player_knowledge.updated`: Player knowledge `player_knowledge.secret_meeting_note_exists` updated.
 - `event_044` `memory_candidate.created`: Memory candidate `memory.player.clue_discovered.torn_note` created.
 - `event_045` `agent_memory_snapshot.updated`: Memory snapshot `memory.player.clue_discovered.torn_note` created from `event_044`.
 - `event_046` `narrative.beat.completed`: Narrative beat `hidden_meeting_connected` completed.
@@ -77,9 +77,9 @@
 
 ## Player knowledge
 
-- `player_knowledge.scratched_drawer` from clue `scratched_drawer`: 抽屉划痕 - 书桌抽屉锁孔旁有新鲜划痕，像是被细金属工具撬开过。
-- `player_knowledge.dustless_frame` from clue `dustless_frame`: 无尘画框印 - 肖像画背后的墙面有一圈无尘痕迹，说明它最近被移动过。
-- `player_knowledge.torn_note` from clue `torn_note`: 被撕碎的便签 - 便签只剩半截，上面写着“今晚十点，书房见”。
+- `player_knowledge.desk_forced_open` from clue `scratched_drawer`: 书桌抽屉被撬开 - 书桌抽屉锁孔旁的新鲜划痕表明，抽屉在案发前后被非正常打开过。
+- `player_knowledge.portrait_was_moved` from clue `dustless_frame`: 肖像画近期被移动过 - 肖像画背后的无尘痕迹说明它最近被移动过，可能遮挡过隐藏物。
+- `player_knowledge.secret_meeting_note_exists` from clue `torn_note`: 存在十点书房会面便签 - 被撕碎的便签显示，有人在今晚十点约定于书房见面。
 
 ## Relationship changes
 
@@ -110,7 +110,7 @@
 - Narrative phase: `resolved`
 - Completed beats: `drawer_found, hidden_meeting_connected, case_solved`
 - Discovered clues: `scratched_drawer, dustless_frame, torn_note`
-- Player knowledge: `player_knowledge.scratched_drawer, player_knowledge.dustless_frame, player_knowledge.torn_note`
+- Player knowledge: `player_knowledge.desk_forced_open, player_knowledge.portrait_was_moved, player_knowledge.secret_meeting_note_exists`
 - Memory snapshots: `memory.player.clue_discovered.scratched_drawer, memory.player.asked_about.butler.clue.scratched_drawer, memory.player.presented_clue.butler.scratched_drawer, memory.player.relationship_threshold.butler.player.suspicion.guarded, memory.player.clue_discovered.dustless_frame, memory.player.director_blocked.butler.redacted_fact, memory.player.clue_discovered.torn_note, memory.player.accused.butler.butler_moved_key, memory.player.accusation_evaluated.butler.butler_moved_key.correct`
 - Relationship records: `5`
 - Event count: `58`

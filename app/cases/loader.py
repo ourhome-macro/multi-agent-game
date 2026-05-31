@@ -26,6 +26,7 @@ class CaseLoader:
 
         data = {
             "meta": self._read_yaml(case_dir / "case.yaml"),
+            "world_info": self._read_yaml(case_dir / "world_info.yaml", default=[]),
             "characters": self._read_yaml(case_dir / "characters.yaml"),
             "scenes": self._read_yaml(case_dir / "scenes.yaml"),
             "clues": self._read_yaml(case_dir / "clues.yaml"),
@@ -66,6 +67,7 @@ class CaseLoader:
 
     def _validate_references(self, package: CasePackage, case_dir: Path) -> None:
         character_ids = {character.id for character in package.characters}
+        world_info_ids = {world_info.id for world_info in package.world_info}
         clue_ids = {clue.id for clue in package.clues}
         scene_ids = {scene.id for scene in package.scenes}
         dialogue_character_ids = {dialogue.character_id for dialogue in package.mock_dialogues}
@@ -75,6 +77,11 @@ class CaseLoader:
         self._ensure_unique(
             "character",
             [character.id for character in package.characters],
+            case_dir,
+        )
+        self._ensure_unique(
+            "world info",
+            [world_info.id for world_info in package.world_info],
             case_dir,
         )
         self._ensure_unique("clue", [clue.id for clue in package.clues], case_dir)
@@ -134,6 +141,11 @@ class CaseLoader:
         }
 
         for clue in package.clues:
+            self._ensure_known_world_info(
+                world_info_ids,
+                clue.reveals_world_info,
+                f"Clue '{clue.id}' reveals_world_info",
+            )
             for character_id in clue.related_characters:
                 if character_id not in character_ids:
                     raise CaseLoadError(
@@ -251,6 +263,11 @@ class CaseLoader:
                 claim.required_evidence,
                 f"Solution claim '{claim.id}' required_evidence",
             )
+            self._ensure_known_world_info(
+                world_info_ids,
+                claim.required_world_info,
+                f"Solution claim '{claim.id}' required_world_info",
+            )
             unknown_phases = sorted(set(claim.allowed_phases) - phase_ids)
             if unknown_phases:
                 raise CaseLoadError(
@@ -259,6 +276,11 @@ class CaseLoader:
                 )
 
         for fact in package.forbidden_facts:
+            if fact.world_info_id is not None and fact.world_info_id not in world_info_ids:
+                raise CaseLoadError(
+                    f"Forbidden fact '{fact.id}' references unknown world_info_id "
+                    f"'{fact.world_info_id}'"
+                )
             if fact.reveal_phase is not None and fact.reveal_phase not in phase_ids:
                 raise CaseLoadError(
                     f"Forbidden fact '{fact.id}' references unknown reveal_phase "
@@ -313,6 +335,16 @@ class CaseLoader:
         unknown_ids = sorted(set(referenced_ids) - clue_ids)
         if unknown_ids:
             raise CaseLoadError(f"{label} references unknown clues: {unknown_ids}")
+
+    def _ensure_known_world_info(
+        self,
+        world_info_ids: set[str],
+        referenced_ids: list[str],
+        label: str,
+    ) -> None:
+        unknown_ids = sorted(set(referenced_ids) - world_info_ids)
+        if unknown_ids:
+            raise CaseLoadError(f"{label} references unknown world_info: {unknown_ids}")
 
     def _validate_proposed_action(
         self,

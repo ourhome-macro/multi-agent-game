@@ -13,7 +13,7 @@
 - `event_001` `session.created`: Session created for `fake_case_002` in phase `opening`.
 - `event_002` `player.inspected`: Player inspected `tide_mark`.
 - `event_003` `clue.discovered`: Clue `inward_tide_mark` discovered.
-- `event_004` `player_knowledge.updated`: Player knowledge `player_knowledge.inward_tide_mark` updated.
+- `event_004` `player_knowledge.updated`: Player knowledge `player_knowledge.warehouse_opened_after_tide` updated.
 - `event_005` `memory_candidate.created`: Memory candidate `memory.player.clue_discovered.inward_tide_mark` created.
 - `event_006` `agent_memory_snapshot.updated`: Memory snapshot `memory.player.clue_discovered.inward_tide_mark` created from `event_005`.
 - `event_007` `narrative.beat.completed`: Narrative beat `tide_trace_found` completed.
@@ -38,12 +38,12 @@
 - `event_026` `agent_memory_snapshot.updated`: Memory snapshot `memory.player.director_blocked.clerk.redacted_fact` created from `event_025`.
 - `event_027` `player.inspected`: Player inspected `broken_lamp`.
 - `event_028` `clue.discovered`: Clue `inward_broken_lamp` discovered.
-- `event_029` `player_knowledge.updated`: Player knowledge `player_knowledge.inward_broken_lamp` updated.
+- `event_029` `player_knowledge.updated`: Player knowledge `player_knowledge.lamp_broken_from_inside_entry` updated.
 - `event_030` `memory_candidate.created`: Memory candidate `memory.player.clue_discovered.inward_broken_lamp` created.
 - `event_031` `agent_memory_snapshot.updated`: Memory snapshot `memory.player.clue_discovered.inward_broken_lamp` created from `event_030`.
 - `event_032` `player.inspected`: Player inspected `ledger_box`.
 - `event_033` `clue.discovered`: Clue `blue_ledger_page` discovered.
-- `event_034` `player_knowledge.updated`: Player knowledge `player_knowledge.blue_ledger_page` updated.
+- `event_034` `player_knowledge.updated`: Player knowledge `player_knowledge.blue_ledger_records_midnight_boxes` updated.
 - `event_035` `memory_candidate.created`: Memory candidate `memory.player.clue_discovered.blue_ledger_page` created.
 - `event_036` `agent_memory_snapshot.updated`: Memory snapshot `memory.player.clue_discovered.blue_ledger_page` created from `event_035`.
 - `event_037` `narrative.beat.completed`: Narrative beat `ledger_pattern_found` completed.
@@ -81,9 +81,9 @@
 
 ## Player knowledge
 
-- `player_knowledge.inward_tide_mark` from clue `inward_tide_mark`: 向内延伸的潮痕 - 潮痕从门缝向仓库内延伸，和码头长说的“门一直关着”不一致。
-- `player_knowledge.inward_broken_lamp` from clue `inward_broken_lamp`: 向内破裂的煤油灯 - 碎片位置说明灯是在有人进门后被撞倒，不像外力吹倒。
-- `player_knowledge.blue_ledger_page` from clue `blue_ledger_page`: 蓝墨账页 - 账页记录了午夜后入库的三只木箱，墨色与账房常用笔一致。
+- `player_knowledge.warehouse_opened_after_tide` from clue `inward_tide_mark`: 仓库门在涨潮后被打开 - 向内延伸的潮痕说明仓库门曾在涨潮后被打开。
+- `player_knowledge.lamp_broken_from_inside_entry` from clue `inward_broken_lamp`: 煤油灯因入门碰撞破裂 - 破裂方向说明煤油灯是在有人进门后被撞倒。
+- `player_knowledge.blue_ledger_records_midnight_boxes` from clue `blue_ledger_page`: 蓝墨账页记录午夜木箱 - 蓝墨账页记录了午夜后入库的三只木箱。
 
 ## Relationship changes
 
@@ -116,7 +116,7 @@
 - Narrative phase: `resolved`
 - Completed beats: `tide_trace_found, ledger_pattern_found, case_solved`
 - Discovered clues: `inward_tide_mark, inward_broken_lamp, blue_ledger_page`
-- Player knowledge: `player_knowledge.inward_tide_mark, player_knowledge.inward_broken_lamp, player_knowledge.blue_ledger_page`
+- Player knowledge: `player_knowledge.warehouse_opened_after_tide, player_knowledge.lamp_broken_from_inside_entry, player_knowledge.blue_ledger_records_midnight_boxes`
 - Memory snapshots: `memory.player.clue_discovered.inward_tide_mark, memory.player.asked_about.dockmaster.clue.inward_tide_mark, memory.player.relationship_threshold.dockmaster.player.suspicion.guarded, memory.player.director_blocked.clerk.redacted_fact, memory.player.clue_discovered.inward_broken_lamp, memory.player.clue_discovered.blue_ledger_page, memory.player.presented_clue.clerk.blue_ledger_page, memory.player.relationship_threshold.clerk.player.fear.afraid, memory.player.accused.dockmaster.dockmaster_opened_warehouse, memory.player.accusation_evaluated.dockmaster.dockmaster_opened_warehouse.correct`
 - Relationship records: `6`
 - Event count: `62`

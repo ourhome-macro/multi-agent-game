@@ -87,6 +87,30 @@ LLM agents may consume `inner_portraits`, but they cannot directly modify
 `SessionState`. Any future impression write must still be a runtime-derived
 `character_impression.updated` event.
 
+## Impression-Aware Disclosure v0
+
+`inner_portraits` now influence the effective disclosure policy built into the
+target NPC's `CharacterInnerContext`. This is a runtime input projection, not a
+state mutation.
+
+When the target NPC's player impression has:
+
+- high `threat_level`: effective disclosure narrows toward `deny` and `deflect`
+- high `alliance_potential`: effective disclosure may allow `hint`
+- `has_relevant_evidence`: matching self-knowledge may allow `partial`
+- `dangerous_topic_triggered`: effective disclosure narrows to `deny` and
+  `deflect`
+
+V0 never grants `full` disclosure from an impression. It also never grants direct
+quotation of raw private text.
+
+MockAgent fallback consumes the effective modes:
+
+- `partial` with relevant evidence gives a partial-truth style answer
+- `hint` with alliance potential gives a cautious hint
+- dangerous topics tend to refusal
+- high threat tends to guarded concealment
+
 ## Output Safety
 
 Impressions are private cognition. They must not be exposed through:

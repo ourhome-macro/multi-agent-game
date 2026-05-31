@@ -1,0 +1,29 @@
+﻿- id: desk_forced_open
+  title: 书桌抽屉被撬开
+  description: 书桌抽屉锁孔旁的新鲜划痕表明，抽屉在案发前后被非正常打开过。
+  category: physical_fact
+  sensitivity: low
+
+- id: secret_meeting_note_exists
+  title: 存在十点书房会面便签
+  description: 被撕碎的便签显示，有人在今晚十点约定于书房见面。
+  category: physical_fact
+  sensitivity: medium
+
+- id: portrait_was_moved
+  title: 肖像画近期被移动过
+  description: 肖像画背后的无尘痕迹说明它最近被移动过，可能遮挡过隐藏物。
+  category: physical_fact
+  sensitivity: medium
+
+- id: will_swapped
+  title: 遗嘱被调换
+  description: 案发前后遗嘱内容被人替换。
+  category: case_truth
+  sensitivity: high
+
+- id: killer_is_niece
+  title: 真凶是林侄女
+  description: 林侄女是案件真凶。
+  category: case_truth
+  sensitivity: high

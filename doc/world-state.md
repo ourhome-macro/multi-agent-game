@@ -211,6 +211,12 @@ Each change writes `character_impression.updated`. Agents and LLMs may consume
 the current target NPC's impressions through `CharacterInnerContext`, but they
 cannot directly write or mutate impression state.
 
+Impressions also influence effective disclosure modes inside
+`CharacterInnerContext`: high threat or dangerous topics narrow expression,
+alliance can allow hints, and relevant evidence can allow partial disclosure for
+matching self-knowledge. This projection does not mutate `SessionState` and does
+not grant full reveal.
+
 Replay applies `character_impression.updated` directly. It must not re-run
 impression derivation.
 
@@ -262,3 +268,42 @@ blocked terms, `forbidden_facts`, or `solution_claims`.
 
 `StateSummary`, `WorldEvent` payloads, and `player_journey.md` must also not
 expose `inner_context` or raw private summaries.
+# WorldInfo 事实锚点收束
+
+当前运行时将 `WorldInfo` 作为核心事实锚点使用。`WorldInfo` 不是替代线索、记忆或关系，而是为“可被发现、隐藏、禁说、推断、指控”的事实提供稳定 ID。
+
+## 边界
+
+- `Clue` 是证据，负责描述玩家在场景中发现了什么。
+- `WorldInfo` 是事实锚点，负责描述这条证据指向哪个世界事实。
+- `PlayerKnowledge` 是玩家已知账本，负责记录玩家通过哪个线索掌握了哪个 `WorldInfo`。
+- `ForbiddenFact` 是叙事禁说规则，负责把禁说词和剧情阶段绑定到某个 `WorldInfo`。
+- `SolutionClaim` 是正式指控规则，负责声明成立一个指控需要哪些证据和事实锚点。
+
+## 当前链路
+
+```text
+inspect hotspot
+  -> clue.discovered
+  -> clue.reveals_world_info
+  -> player_knowledge.updated(world_info_id)
+  -> StateSummary.player_knowledge
+  -> replay restores same PlayerKnowledge
+```
+
+如果某个旧线索没有配置 `reveals_world_info`，运行时会回退到 `player_knowledge.<clue_id>`，用于兼容历史案件包。新案件应显式配置 `reveals_world_info`。
+
+## 配置要求
+
+- `world_info.yaml` 定义稳定事实 ID。
+- `clues.yaml` 通过 `reveals_world_info` 引用事实锚点。
+- `forbidden_facts.yaml` 通过 `world_info_id` 绑定禁说事实。
+- `solution_claims.yaml` 通过 `required_world_info` 绑定指控所需事实。
+- Loader 会校验所有引用，悬空引用会导致服务启动失败。
+
+## 设计原则
+
+- 不允许 LLM 创造新的 `WorldInfo`。
+- 玩家发现线索不等于掌握全部真相，只能获得线索所揭示的事实锚点。
+- 指控必须同时满足证据条件和事实锚点条件。
+- 事件日志必须记录 `world_info_id`，保证 replay 后玩家已知账本一致。

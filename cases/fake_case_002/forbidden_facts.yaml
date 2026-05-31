@@ -1,4 +1,5 @@
 - id: ledger_owner
+  world_info_id: clerk_hid_ledger_page
   text: 蓝墨账页是沈账房亲手藏的。
   blocked_terms:
     - 沈账房亲手藏的

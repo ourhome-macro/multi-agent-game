@@ -146,10 +146,18 @@ assessment, and branch conditions.
 - partial disclosure
 - full disclosure
 
-The policy should consider narrative phase, player-known evidence,
-relationship thresholds, interaction pressure, forbidden fact references, and
-whether verbatim disclosure is allowed. Raw private strings should not become
-public speech by default.
+The effective policy considers narrative phase, player-known evidence,
+relationship thresholds, interaction pressure, forbidden fact references,
+whether verbatim disclosure is allowed, and the target NPC's private impression
+of the player. Raw private strings should not become public speech by default.
+
+Impression-aware disclosure v0 applies only inside `CharacterInnerContext`:
+
+- high threat narrows allowed modes toward `deny` and `deflect`
+- high alliance potential may allow `hint`
+- `has_relevant_evidence` may allow `partial` for matching related clues
+- `dangerous_topic_triggered` narrows allowed modes to `deny` and `deflect`
+- impressions never grant `full` disclosure or direct quotation
 
 Even with `CharacterInnerContext`, outward speech remains governed by Narrative
 Director, and `proposed_actions` remain governed by Rule Engine. Private
@@ -229,6 +237,10 @@ reply matches, MockAgent falls back to the safe character card:
 - `speech_style` and `default_tone` may shape the fallback wording.
 - a high-threat `inner_portraits` entry can make fallback speech more guarded
   without quoting portrait text
+- `has_relevant_evidence` plus an effective `partial` mode can produce a
+  partial-truth style answer without full reveal
+- high alliance plus an effective `hint` mode can produce a cautious hint
+- `dangerous_topic_triggered` can force refusal or deflection
 
 `mock_dialogues.yaml` reply conditions currently support:
 

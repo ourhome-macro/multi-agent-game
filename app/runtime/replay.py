@@ -74,7 +74,16 @@ def _apply_event(session: SessionState, event: WorldEvent) -> None:
     if event.type == EventType.PLAYER_KNOWLEDGE_UPDATED:
         knowledge = PlayerKnowledgeState(
             knowledge_id=str(event.payload["knowledge_id"]),
-            clue_id=str(event.payload["clue_id"]),
+            clue_id=(
+                str(event.payload["clue_id"])
+                if event.payload.get("clue_id") is not None
+                else None
+            ),
+            world_info_id=(
+                str(event.payload["world_info_id"])
+                if event.payload.get("world_info_id") is not None
+                else None
+            ),
             title=str(event.payload["title"]),
             summary=str(event.payload["summary"]),
             source_event_id=str(event.payload["source_event_id"]),

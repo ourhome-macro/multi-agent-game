@@ -154,7 +154,7 @@ class RuleEngine:
                     caused_by_event_id=None,
                 )
             ]
-        knowledge_id = f"player_knowledge.{clue_id}"
+        knowledge_id = player_knowledge_id_for_clue(case, clue_id)
         if knowledge_id not in session.player_knowledge:
             return [
                 self._reject(
@@ -228,7 +228,7 @@ class RuleEngine:
                         caused_by_event_id=None,
                     )
             ]
-            knowledge_id = f"player_knowledge.{subject_id}"
+            knowledge_id = player_knowledge_id_for_clue(case, subject_id)
             if (
                 subject_id not in session.discovered_clues
                 and knowledge_id not in session.player_knowledge
@@ -376,7 +376,7 @@ class RuleEngine:
         missing_knowledge = sorted(
             clue_id
             for clue_id in evidence_ids
-            if f"player_knowledge.{clue_id}" not in session.player_knowledge
+            if player_knowledge_id_for_clue(case, clue_id) not in session.player_knowledge
         )
         if missing_knowledge:
             return [
@@ -400,6 +400,24 @@ class RuleEngine:
                     caused_by_event_id=None,
                 )
             ]
+
+        if claim.required_world_info:
+            known_world_info_ids = {
+                item.world_info_id
+                for item in session.player_knowledge.values()
+                if item.world_info_id is not None
+            }
+            missing_world_info = sorted(set(claim.required_world_info) - known_world_info_ids)
+            if missing_world_info:
+                return [
+                    self._reject(
+                        session=session,
+                        action_type="player.accuse",
+                        reason="player knowledge does not cover required world info",
+                        payload={**payload, "missing_required_world_info": missing_world_info},
+                        caused_by_event_id=None,
+                    )
+                ]
 
         accused_event = self._recorder.append(
             session,
@@ -608,3 +626,17 @@ def relationship_threshold_key(
     state_name: str,
 ) -> str:
     return f"{source_id}->{target_id}:{metric}:{state_name}"
+
+
+def player_knowledge_id_for_clue(case: CasePackage, clue_id: str) -> str:
+    clue = next((item for item in case.clues if item.id == clue_id), None)
+    if clue is None:
+        return f"player_knowledge.{clue_id}"
+    world_info_ids = {item.id for item in case.world_info}
+    world_info_id = next(
+        (item_id for item_id in clue.reveals_world_info if item_id in world_info_ids),
+        None,
+    )
+    if world_info_id is None:
+        return f"player_knowledge.{clue_id}"
+    return f"player_knowledge.{world_info_id}"

@@ -75,7 +75,8 @@ state, relationship state, memory snapshots, or narrative phase.
 Current v0 only performs term-based forbidden fact checks over
 `AgentIntent.speech`.
 
-It does not yet perform semantic spoiler detection, full disclosure policy
-evaluation, multi-hop contradiction checks, or private-item redaction beyond the
-current deterministic fallback behavior. Those belong to future
-`DisclosurePolicy` enforcement work.
+Character Inner Context now computes effective allowed disclosure modes from
+private impressions before generation. The Director still does not perform
+semantic spoiler detection, full post-generation disclosure policy evaluation,
+multi-hop contradiction checks, or general private-item redaction beyond the
+current deterministic fallback behavior.

@@ -2,6 +2,8 @@
   title: 向内延伸的潮痕
   description: 潮痕从门缝向仓库内延伸，和码头长说的“门一直关着”不一致。
   truth_status: "true"
+  reveals_world_info:
+    - warehouse_opened_after_tide
   related_characters:
     - dockmaster
   related_events:
@@ -12,6 +14,8 @@
   title: 向内破裂的煤油灯
   description: 碎片位置说明灯是在有人进门后被撞倒，不像外力吹倒。
   truth_status: "true"
+  reveals_world_info:
+    - lamp_broken_from_inside_entry
   related_characters:
     - dockmaster
   related_events:
@@ -22,6 +26,8 @@
   title: 蓝墨账页
   description: 账页记录了午夜后入库的三只木箱，墨色与账房常用笔一致。
   truth_status: "unknown"
+  reveals_world_info:
+    - blue_ledger_records_midnight_boxes
   related_characters:
     - clerk
   related_events:

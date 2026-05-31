@@ -5,6 +5,10 @@ claims:
       - inward_tide_mark
       - inward_broken_lamp
       - blue_ledger_page
+    required_world_info:
+      - warehouse_opened_after_tide
+      - lamp_broken_from_inside_entry
+      - blue_ledger_records_midnight_boxes
     allowed_phases:
       - expose
     result: correct
@@ -13,6 +17,8 @@ claims:
     target_id: clerk
     required_evidence:
       - blue_ledger_page
+    required_world_info:
+      - blue_ledger_records_midnight_boxes
     allowed_phases:
       - expose
     result: incorrect

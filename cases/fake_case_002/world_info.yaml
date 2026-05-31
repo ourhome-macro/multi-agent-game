@@ -1,0 +1,23 @@
+﻿- id: warehouse_opened_after_tide
+  title: 仓库门在涨潮后被打开
+  description: 向内延伸的潮痕说明仓库门曾在涨潮后被打开。
+  category: physical_fact
+  sensitivity: medium
+
+- id: lamp_broken_from_inside_entry
+  title: 煤油灯因入门碰撞破裂
+  description: 破裂方向说明煤油灯是在有人进门后被撞倒。
+  category: physical_fact
+  sensitivity: low
+
+- id: blue_ledger_records_midnight_boxes
+  title: 蓝墨账页记录午夜木箱
+  description: 蓝墨账页记录了午夜后入库的三只木箱。
+  category: physical_fact
+  sensitivity: high
+
+- id: clerk_hid_ledger_page
+  title: 沈账房藏起蓝墨账页
+  description: 蓝墨账页是沈账房亲手藏起的。
+  category: case_truth
+  sensitivity: high

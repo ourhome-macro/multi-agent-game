@@ -1,4 +1,5 @@
 - id: true_killer
+  world_info_id: killer_is_niece
   text: 真凶是林侄女。
   blocked_terms:
     - 真凶是林侄女
@@ -7,6 +8,7 @@
   reveal_phase: reveal
 
 - id: swapped_will
+  world_info_id: will_swapped
   text: 遗嘱被调换过。
   blocked_terms:
     - 遗嘱被调换

@@ -114,6 +114,26 @@ Disclosure policy must be evaluated before generation and after generation:
   exceed allowed disclosure, does not reveal locked forbidden facts, and does
   not contradict case anchors
 
+## Impression-Aware Disclosure
+
+Character Inner Context v0 now computes an effective `DisclosurePolicy` for each
+self-knowledge item by combining the authored policy with the target NPC's own
+`inner_portraits`.
+
+This effective policy is only an Agent input view. It does not modify the case
+package and does not write `WorldEvent`.
+
+The current projection rules are conservative:
+
+- high player threat narrows allowed modes to `deny` / `deflect`
+- `dangerous_topic_triggered` narrows allowed modes to `deny` / `deflect`
+- high alliance potential may add `hint`
+- `has_relevant_evidence` may add `partial` only for matching related clues
+- `full`, direct reveal, and direct quote are not granted by impressions
+
+This lets portraits influence later expression strategy while preserving
+NarrativeDirector and RuleEngine authority.
+
 ## Runtime Flow
 
 ```text

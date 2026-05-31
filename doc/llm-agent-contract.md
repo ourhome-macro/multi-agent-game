@@ -64,6 +64,16 @@ class LLMDisclosureConstraint(BaseModel):
 These constraints control expression, not cognition. A target NPC may know its
 own private data, but the LLM must obey the allowed disclosure mode.
 
+The `allowed_modes` values are the effective modes for this AgentContext, not
+just the authored character-card defaults. Runtime may narrow or expand them
+based on the target NPC's private impression of the player:
+
+- threat or dangerous-topic impressions narrow toward `deny` / `deflect`
+- alliance impressions may permit `hint`
+- relevant-evidence impressions may permit `partial`
+
+The projection never grants `full` disclosure or raw private quotation.
+
 ## Output
 
 The required output is strict JSON matching `AgentIntent`:

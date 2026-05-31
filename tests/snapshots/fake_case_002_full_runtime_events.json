@@ -45,10 +45,11 @@
     "type": "player_knowledge.updated",
     "payload": {
       "clue_id": "inward_tide_mark",
-      "knowledge_id": "player_knowledge.inward_tide_mark",
+      "world_info_id": "warehouse_opened_after_tide",
+      "knowledge_id": "player_knowledge.warehouse_opened_after_tide",
       "source_event_id": "event_003",
-      "title": "向内延伸的潮痕",
-      "summary": "潮痕从门缝向仓库内延伸，和码头长说的“门一直关着”不一致。"
+      "title": "仓库门在涨潮后被打开",
+      "summary": "向内延伸的潮痕说明仓库门曾在涨潮后被打开。"
     },
     "caused_by_event_id": "event_003",
     "created_at": "timestamp"
@@ -131,7 +132,7 @@
       "subject_id": "inward_tide_mark",
       "text": "What about the tide mark?",
       "interaction_pressure": 0.6,
-      "knowledge_id": "player_knowledge.inward_tide_mark"
+      "knowledge_id": "player_knowledge.warehouse_opened_after_tide"
     },
     "caused_by_event_id": null,
     "created_at": "timestamp"
@@ -215,7 +216,7 @@
       "personality_impression": "The player asks targeted investigative questions.",
       "perceived_motive": "Testing what the NPC knows about case references.",
       "suspected_knowledge_refs": [
-        "player_knowledge.inward_tide_mark"
+        "player_knowledge.warehouse_opened_after_tide"
       ],
       "suspicious_points": [
         "asked_about.clue.inward_tide_mark"
@@ -227,6 +228,7 @@
       "usefulness": 0.1,
       "tags": [
         "targeted_questioning",
+        "has_relevant_evidence",
         "applies_pressure"
       ],
       "confidence": 0.1,
@@ -288,7 +290,7 @@
       "personality_impression": "The player asks targeted investigative questions.",
       "perceived_motive": "Testing what the NPC knows about case references.",
       "suspected_knowledge_refs": [
-        "player_knowledge.inward_tide_mark"
+        "player_knowledge.warehouse_opened_after_tide"
       ],
       "suspicious_points": [
         "asked_about.clue.inward_tide_mark",
@@ -301,6 +303,7 @@
       "usefulness": 0.1,
       "tags": [
         "targeted_questioning",
+        "has_relevant_evidence",
         "applies_pressure",
         "relationship_threshold",
         "suspicion_guarded"
@@ -464,7 +467,8 @@
       "manipulation_risk": 0.1,
       "usefulness": 0.0,
       "tags": [
-        "unsafe_boundary_probe"
+        "unsafe_boundary_probe",
+        "dangerous_topic_triggered"
       ],
       "confidence": 0.1,
       "source_event_ids": [
@@ -546,10 +550,11 @@
     "type": "player_knowledge.updated",
     "payload": {
       "clue_id": "inward_broken_lamp",
-      "knowledge_id": "player_knowledge.inward_broken_lamp",
+      "world_info_id": "lamp_broken_from_inside_entry",
+      "knowledge_id": "player_knowledge.lamp_broken_from_inside_entry",
       "source_event_id": "event_028",
-      "title": "向内破裂的煤油灯",
-      "summary": "碎片位置说明灯是在有人进门后被撞倒，不像外力吹倒。"
+      "title": "煤油灯因入门碰撞破裂",
+      "summary": "破裂方向说明煤油灯是在有人进门后被撞倒。"
     },
     "caused_by_event_id": "event_028",
     "created_at": "timestamp"
@@ -625,10 +630,11 @@
     "type": "player_knowledge.updated",
     "payload": {
       "clue_id": "blue_ledger_page",
-      "knowledge_id": "player_knowledge.blue_ledger_page",
+      "world_info_id": "blue_ledger_records_midnight_boxes",
+      "knowledge_id": "player_knowledge.blue_ledger_records_midnight_boxes",
       "source_event_id": "event_033",
-      "title": "蓝墨账页",
-      "summary": "账页记录了午夜后入库的三只木箱，墨色与账房常用笔一致。"
+      "title": "蓝墨账页记录午夜木箱",
+      "summary": "蓝墨账页记录了午夜后入库的三只木箱。"
     },
     "caused_by_event_id": "event_033",
     "created_at": "timestamp"
@@ -708,7 +714,7 @@
     "payload": {
       "target_id": "clerk",
       "clue_id": "blue_ledger_page",
-      "knowledge_id": "player_knowledge.blue_ledger_page",
+      "knowledge_id": "player_knowledge.blue_ledger_records_midnight_boxes",
       "text": "Explain this ledger page.",
       "interaction_pressure": 0.9
     },
@@ -792,6 +798,8 @@
       "personality_impression": "The player is evidence-driven and willing to pressure NPCs.",
       "perceived_motive": "Testing contradictions with discovered evidence.",
       "suspected_knowledge_refs": [
+        "player_knowledge.blue_ledger_records_midnight_boxes",
+        "blue_ledger_page",
         "player_knowledge.blue_ledger_page"
       ],
       "suspicious_points": [
@@ -805,7 +813,9 @@
       "usefulness": 0.15,
       "tags": [
         "unsafe_boundary_probe",
-        "evidence_pressure"
+        "dangerous_topic_triggered",
+        "evidence_pressure",
+        "has_relevant_evidence"
       ],
       "confidence": 0.2,
       "source_event_ids": [
@@ -867,6 +877,8 @@
       "personality_impression": "The player is evidence-driven and willing to pressure NPCs.",
       "perceived_motive": "Testing contradictions with discovered evidence.",
       "suspected_knowledge_refs": [
+        "player_knowledge.blue_ledger_records_midnight_boxes",
+        "blue_ledger_page",
         "player_knowledge.blue_ledger_page"
       ],
       "suspicious_points": [
@@ -881,7 +893,9 @@
       "usefulness": 0.15,
       "tags": [
         "unsafe_boundary_probe",
+        "dangerous_topic_triggered",
         "evidence_pressure",
+        "has_relevant_evidence",
         "relationship_threshold",
         "fear_afraid"
       ],
@@ -1046,7 +1060,7 @@
       "personality_impression": "The player is willing to make formal accusations.",
       "perceived_motive": "Trying to force a formal case judgment.",
       "suspected_knowledge_refs": [
-        "player_knowledge.inward_tide_mark",
+        "player_knowledge.warehouse_opened_after_tide",
         "inward_tide_mark",
         "inward_broken_lamp",
         "blue_ledger_page"
@@ -1063,6 +1077,7 @@
       "usefulness": 0.3,
       "tags": [
         "targeted_questioning",
+        "has_relevant_evidence",
         "applies_pressure",
         "relationship_threshold",
         "suspicion_guarded",
@@ -1129,7 +1144,7 @@
       "personality_impression": "The player can assemble decisive evidence.",
       "perceived_motive": "Seeking case resolution through formal claims.",
       "suspected_knowledge_refs": [
-        "player_knowledge.inward_tide_mark",
+        "player_knowledge.warehouse_opened_after_tide",
         "inward_tide_mark",
         "inward_broken_lamp",
         "blue_ledger_page"
@@ -1147,6 +1162,7 @@
       "usefulness": 0.55,
       "tags": [
         "targeted_questioning",
+        "has_relevant_evidence",
         "applies_pressure",
         "relationship_threshold",
         "suspicion_guarded",

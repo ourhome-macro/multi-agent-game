@@ -8,6 +8,7 @@ from app.domain.models import (
     CharacterImpression,
     CharacterResponseStyle,
     DefensiveStyle,
+    DisclosureMode,
     MockReplyConfig,
     PrivatePriority,
     ProposedActionType,
@@ -159,11 +160,14 @@ class MockAgent:
         context: AgentContext,
         profile: AgentCharacterView,
     ) -> AgentIntentType:
-        if self._matching_blocked_secret(context) is not None:
-            return AgentIntentType.CONCEAL
+        impression = self._player_impression(context)
+        matching_secret = self._matching_secret(context)
+        if matching_secret is not None:
+            return self._secret_fallback_intent(matching_secret, impression)
         if self._has_high_priority_avoid_suspicion_goal(context):
             return AgentIntentType.CONCEAL
-        impression = self._player_impression(context)
+        if self._dangerous_topic_triggered(impression):
+            return AgentIntentType.REFUSE
         if impression is not None and impression.threat_level >= 0.75:
             return AgentIntentType.CONCEAL
         if impression is not None and impression.alliance_potential >= 0.7:
@@ -184,15 +188,18 @@ class MockAgent:
         return fallback_by_style[profile.defensive_style]
 
     def _fallback_speech(self, context: AgentContext, profile: AgentCharacterView) -> str:
-        if self._matching_blocked_secret(context) is not None:
-            return "That clue does not prove what you think it proves."
+        impression = self._player_impression(context)
+        matching_secret = self._matching_secret(context)
+        if matching_secret is not None:
+            return self._secret_fallback_speech(matching_secret, impression)
         if self._has_high_priority_avoid_suspicion_goal(context):
             return "I would rather not be treated as the center of this."
-        impression = self._player_impression(context)
+        if self._dangerous_topic_triggered(impression):
+            return "I am not going to discuss that topic."
         if impression is not None and impression.threat_level >= 0.75:
             return "I need to be careful about what I say to you."
         if impression is not None and impression.alliance_potential >= 0.7:
-            return "You may be useful, but I will choose my words carefully."
+            return "I can offer a careful hint, but I will choose my words precisely."
         if profile.defensive_style == DefensiveStyle.HOSTILE:
             return "You have no authority to question me like that."
         if profile.defensive_style == DefensiveStyle.ANXIOUS:
@@ -203,7 +210,7 @@ class MockAgent:
             return "I am not certain what you mean, and I should not guess."
         return "I am not certain what you mean."
 
-    def _matching_blocked_secret(self, context: AgentContext) -> SelfKnowledgeItem | None:
+    def _matching_secret(self, context: AgentContext) -> SelfKnowledgeItem | None:
         inner_context = context.inner_context
         if inner_context is None:
             return None
@@ -215,9 +222,38 @@ class MockAgent:
         for secret in inner_context.inner_secrets:
             if clue_id not in secret.related_clue_ids:
                 continue
-            if not secret.disclosure_policy.direct_reveal_allowed:
-                return secret
+            return secret
         return None
+
+    def _secret_fallback_intent(
+        self,
+        secret: SelfKnowledgeItem,
+        impression: CharacterImpression | None,
+    ) -> AgentIntentType:
+        modes = set(secret.disclosure_policy.allowed_modes)
+        if self._dangerous_topic_triggered(impression):
+            return AgentIntentType.REFUSE
+        if DisclosureMode.PARTIAL in modes and self._has_relevant_evidence(impression):
+            return AgentIntentType.ANSWER
+        if DisclosureMode.HINT in modes and self._alliance_ready(impression):
+            return AgentIntentType.ANSWER
+        if DisclosureMode.DENY in modes or DisclosureMode.DEFLECT in modes:
+            return AgentIntentType.CONCEAL
+        return AgentIntentType.REFUSE
+
+    def _secret_fallback_speech(
+        self,
+        secret: SelfKnowledgeItem,
+        impression: CharacterImpression | None,
+    ) -> str:
+        modes = set(secret.disclosure_policy.allowed_modes)
+        if self._dangerous_topic_triggered(impression):
+            return "I am not going to discuss that topic."
+        if DisclosureMode.PARTIAL in modes and self._has_relevant_evidence(impression):
+            return "That evidence points toward something real, but I will not spell it out."
+        if DisclosureMode.HINT in modes and self._alliance_ready(impression):
+            return "Look at what changed around that evidence, not only what was said."
+        return "That clue does not prove what you think it proves."
 
     def _has_high_priority_avoid_suspicion_goal(self, context: AgentContext) -> bool:
         inner_context = context.inner_context
@@ -240,6 +276,15 @@ class MockAgent:
             ),
             None,
         )
+
+    def _dangerous_topic_triggered(self, impression: CharacterImpression | None) -> bool:
+        return impression is not None and "dangerous_topic_triggered" in impression.tags
+
+    def _has_relevant_evidence(self, impression: CharacterImpression | None) -> bool:
+        return impression is not None and "has_relevant_evidence" in impression.tags
+
+    def _alliance_ready(self, impression: CharacterImpression | None) -> bool:
+        return impression is not None and impression.alliance_potential >= 0.7
 
     def _forbidden_probe_speech(self, blocked_fact_ids: list[str]) -> str:
         probes = {

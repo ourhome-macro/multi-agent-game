@@ -5,6 +5,10 @@ claims:
       - scratched_drawer
       - dustless_frame
       - torn_note
+    required_world_info:
+      - desk_forced_open
+      - portrait_was_moved
+      - secret_meeting_note_exists
     allowed_phases:
       - reveal
     result: correct
@@ -13,6 +17,8 @@ claims:
     target_id: niece
     required_evidence:
       - torn_note
+    required_world_info:
+      - secret_meeting_note_exists
     allowed_phases:
       - reveal
     result: incorrect

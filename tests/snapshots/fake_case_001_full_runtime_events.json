@@ -45,10 +45,11 @@
     "type": "player_knowledge.updated",
     "payload": {
       "clue_id": "scratched_drawer",
-      "knowledge_id": "player_knowledge.scratched_drawer",
+      "world_info_id": "desk_forced_open",
+      "knowledge_id": "player_knowledge.desk_forced_open",
       "source_event_id": "event_003",
-      "title": "抽屉划痕",
-      "summary": "书桌抽屉锁孔旁有新鲜划痕，像是被细金属工具撬开过。"
+      "title": "书桌抽屉被撬开",
+      "summary": "书桌抽屉锁孔旁的新鲜划痕表明，抽屉在案发前后被非正常打开过。"
     },
     "caused_by_event_id": "event_003",
     "created_at": "timestamp"
@@ -131,7 +132,7 @@
       "subject_id": "scratched_drawer",
       "text": "What about the drawer?",
       "interaction_pressure": 0.6,
-      "knowledge_id": "player_knowledge.scratched_drawer"
+      "knowledge_id": "player_knowledge.desk_forced_open"
     },
     "caused_by_event_id": null,
     "created_at": "timestamp"
@@ -198,7 +199,7 @@
       "personality_impression": "The player asks targeted investigative questions.",
       "perceived_motive": "Testing what the NPC knows about case references.",
       "suspected_knowledge_refs": [
-        "player_knowledge.scratched_drawer"
+        "player_knowledge.desk_forced_open"
       ],
       "suspicious_points": [
         "asked_about.clue.scratched_drawer"
@@ -210,6 +211,7 @@
       "usefulness": 0.1,
       "tags": [
         "targeted_questioning",
+        "has_relevant_evidence",
         "applies_pressure"
       ],
       "confidence": 0.1,
@@ -268,7 +270,7 @@
     "payload": {
       "target_id": "butler",
       "clue_id": "scratched_drawer",
-      "knowledge_id": "player_knowledge.scratched_drawer",
+      "knowledge_id": "player_knowledge.desk_forced_open",
       "text": "What about these scratch marks?",
       "interaction_pressure": 0.9
     },
@@ -354,6 +356,8 @@
       "personality_impression": "The player is evidence-driven and willing to pressure NPCs.",
       "perceived_motive": "Testing contradictions with discovered evidence.",
       "suspected_knowledge_refs": [
+        "player_knowledge.desk_forced_open",
+        "scratched_drawer",
         "player_knowledge.scratched_drawer"
       ],
       "suspicious_points": [
@@ -367,6 +371,7 @@
       "usefulness": 0.25,
       "tags": [
         "targeted_questioning",
+        "has_relevant_evidence",
         "applies_pressure",
         "evidence_pressure"
       ],
@@ -430,6 +435,8 @@
       "personality_impression": "The player is evidence-driven and willing to pressure NPCs.",
       "perceived_motive": "Testing contradictions with discovered evidence.",
       "suspected_knowledge_refs": [
+        "player_knowledge.desk_forced_open",
+        "scratched_drawer",
         "player_knowledge.scratched_drawer"
       ],
       "suspicious_points": [
@@ -444,6 +451,7 @@
       "usefulness": 0.25,
       "tags": [
         "targeted_questioning",
+        "has_relevant_evidence",
         "applies_pressure",
         "evidence_pressure",
         "relationship_threshold",
@@ -594,10 +602,11 @@
     "type": "player_knowledge.updated",
     "payload": {
       "clue_id": "dustless_frame",
-      "knowledge_id": "player_knowledge.dustless_frame",
+      "world_info_id": "portrait_was_moved",
+      "knowledge_id": "player_knowledge.portrait_was_moved",
       "source_event_id": "event_029",
-      "title": "无尘画框印",
-      "summary": "肖像画背后的墙面有一圈无尘痕迹，说明它最近被移动过。"
+      "title": "肖像画近期被移动过",
+      "summary": "肖像画背后的无尘痕迹说明它最近被移动过，可能遮挡过隐藏物。"
     },
     "caused_by_event_id": "event_029",
     "created_at": "timestamp"
@@ -742,6 +751,8 @@
       "personality_impression": "The player can push the conversation into unsafe territory.",
       "perceived_motive": "Testing boundaries around restricted facts.",
       "suspected_knowledge_refs": [
+        "player_knowledge.desk_forced_open",
+        "scratched_drawer",
         "player_knowledge.scratched_drawer"
       ],
       "suspicious_points": [
@@ -757,11 +768,13 @@
       "usefulness": 0.25,
       "tags": [
         "targeted_questioning",
+        "has_relevant_evidence",
         "applies_pressure",
         "evidence_pressure",
         "relationship_threshold",
         "suspicion_guarded",
-        "unsafe_boundary_probe"
+        "unsafe_boundary_probe",
+        "dangerous_topic_triggered"
       ],
       "confidence": 0.4,
       "source_event_ids": [
@@ -846,10 +859,11 @@
     "type": "player_knowledge.updated",
     "payload": {
       "clue_id": "torn_note",
-      "knowledge_id": "player_knowledge.torn_note",
+      "world_info_id": "secret_meeting_note_exists",
+      "knowledge_id": "player_knowledge.secret_meeting_note_exists",
       "source_event_id": "event_042",
-      "title": "被撕碎的便签",
-      "summary": "便签只剩半截，上面写着“今晚十点，书房见”。"
+      "title": "存在十点书房会面便签",
+      "summary": "被撕碎的便签显示，有人在今晚十点约定于书房见面。"
     },
     "caused_by_event_id": "event_042",
     "created_at": "timestamp"
@@ -971,8 +985,9 @@
       "personality_impression": "The player is willing to make formal accusations.",
       "perceived_motive": "Trying to force a formal case judgment.",
       "suspected_knowledge_refs": [
-        "player_knowledge.scratched_drawer",
+        "player_knowledge.desk_forced_open",
         "scratched_drawer",
+        "player_knowledge.scratched_drawer",
         "dustless_frame",
         "torn_note"
       ],
@@ -990,11 +1005,13 @@
       "usefulness": 0.45,
       "tags": [
         "targeted_questioning",
+        "has_relevant_evidence",
         "applies_pressure",
         "evidence_pressure",
         "relationship_threshold",
         "suspicion_guarded",
         "unsafe_boundary_probe",
+        "dangerous_topic_triggered",
         "formal_accusation"
       ],
       "confidence": 0.5,
@@ -1060,8 +1077,9 @@
       "personality_impression": "The player can assemble decisive evidence.",
       "perceived_motive": "Seeking case resolution through formal claims.",
       "suspected_knowledge_refs": [
-        "player_knowledge.scratched_drawer",
+        "player_knowledge.desk_forced_open",
         "scratched_drawer",
+        "player_knowledge.scratched_drawer",
         "dustless_frame",
         "torn_note"
       ],
@@ -1080,11 +1098,13 @@
       "usefulness": 0.7,
       "tags": [
         "targeted_questioning",
+        "has_relevant_evidence",
         "applies_pressure",
         "evidence_pressure",
         "relationship_threshold",
         "suspicion_guarded",
         "unsafe_boundary_probe",
+        "dangerous_topic_triggered",
         "formal_accusation",
         "accusation_correct"
       ],

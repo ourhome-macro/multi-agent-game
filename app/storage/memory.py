@@ -105,6 +105,7 @@ def build_state_summary(package: CasePackage, session: SessionState) -> StateSum
             PlayerKnowledgeSummary(
                 knowledge_id=item.knowledge_id,
                 clue_id=item.clue_id,
+                world_info_id=item.world_info_id,
                 title=item.title,
                 summary=item.summary,
             )

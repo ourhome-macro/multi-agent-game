@@ -25,6 +25,7 @@ from app.domain.models import (
     CharacterImpression,
     CharacterInnerContext,
     ClueConfig,
+    DisclosureMode,
     DisclosurePolicy,
     DiscoverClueAction,
     EventType,
@@ -110,10 +111,13 @@ def test_inspect_desk_discovers_scratched_drawer(client: TestClient) -> None:
     knowledge_ids = {item["knowledge_id"] for item in payload["state"]["player_knowledge"]}
     event_types = {event["type"] for event in payload["new_events"]}
     assert "scratched_drawer" in clue_ids
-    assert "player_knowledge.scratched_drawer" in knowledge_ids
+    assert "player_knowledge.desk_forced_open" in knowledge_ids
     assert "player.inspected" in event_types
     assert "clue.discovered" in event_types
     assert "player_knowledge.updated" in event_types
+    knowledge = payload["state"]["player_knowledge"][0]
+    assert knowledge["clue_id"] == "scratched_drawer"
+    assert knowledge["world_info_id"] == "desk_forced_open"
 
 
 def test_clue_discovered_completes_beat_and_advances_phase(client: TestClient) -> None:
@@ -300,7 +304,7 @@ def test_present_clue_success_triggers_mock_agent_and_rule_engine(
     assert presented_event["payload"] == {
         "target_id": "butler",
         "clue_id": "scratched_drawer",
-        "knowledge_id": "player_knowledge.scratched_drawer",
+        "knowledge_id": "player_knowledge.desk_forced_open",
         "text": "What about these scratch marks?",
         "interaction_pressure": 0.9,
     }
@@ -335,7 +339,7 @@ def test_present_clue_derives_private_character_impression() -> None:
     impression = session.character_impressions["butler"]["player"]
     assert "presented_clue.scratched_drawer" in impression.suspicious_points
     assert "evidence_pressure" in impression.tags
-    assert "player_knowledge.scratched_drawer" in impression.suspected_knowledge_refs
+    assert "player_knowledge.desk_forced_open" in impression.suspected_knowledge_refs
     assert impression.threat_level > 0
 
 
@@ -361,6 +365,30 @@ def test_present_clue_rejects_missing_player_knowledge() -> None:
     assert events[0].type == EventType.RULE_REJECTED
     assert events[0].payload["reason"] == "clue_id is not available in player knowledge"
     assert not any(event.type == EventType.PLAYER_PRESENTED_CLUE for event in session.events)
+
+
+def test_present_clue_accepts_world_info_anchored_player_knowledge() -> None:
+    case = CaseLoader().load(FAKE_CASE_001_DIR)
+    runtime = create_runtime([case])
+    session = runtime.session_store.create(case)
+
+    runtime.action_service.handle(
+        session=session,
+        action=PlayerAction(type="inspect", target_id="desk"),
+    )
+    events = RuleEngine(EventRecorder()).apply_present_clue(
+        case=case,
+        session=session,
+        action=PlayerAction(
+            type="present_clue",
+            target_id="butler",
+            clue_id="scratched_drawer",
+            text="What about these scratch marks?",
+        ),
+    )
+
+    assert events[0].type == EventType.PLAYER_PRESENTED_CLUE
+    assert events[0].payload["knowledge_id"] == "player_knowledge.desk_forced_open"
 
 
 def test_present_clue_rejects_unknown_target() -> None:
@@ -472,7 +500,7 @@ def test_ask_about_discovered_sensitive_clue_triggers_guarded_reply(
         "subject_id": "scratched_drawer",
         "text": "What about the drawer?",
         "interaction_pressure": 0.6,
-        "knowledge_id": "player_knowledge.scratched_drawer",
+        "knowledge_id": "player_knowledge.desk_forced_open",
     }
     reply_event = payload["new_events"][1]
     assert reply_event["payload"]["intent"] == "probe"
@@ -652,6 +680,88 @@ def test_agent_context_exposes_only_target_npc_inner_portraits() -> None:
     assert niece_context.inner_context.inner_portraits == []
 
 
+def test_inner_portrait_with_relevant_evidence_allows_partial_disclosure_mode() -> None:
+    case = CaseLoader().load(FAKE_CASE_001_DIR)
+    runtime = create_runtime([case])
+    session = runtime.session_store.create(case)
+    runtime.action_service.handle(
+        session=session,
+        action=PlayerAction(type="inspect", target_id="desk"),
+    )
+    runtime.action_service.handle(
+        session=session,
+        action=PlayerAction(
+            type="present_clue",
+            target_id="butler",
+            clue_id="scratched_drawer",
+            text="What about these scratch marks?",
+        ),
+    )
+
+    context = build_agent_context(
+        case,
+        session,
+        PlayerAction(
+            type="talk",
+            target_id="butler",
+            text="Answer this carefully.",
+        ),
+    )
+
+    assert context.inner_context is not None
+    secret = next(
+        item
+        for item in context.inner_context.inner_secrets
+        if item.id == "swapped_will_awareness"
+    )
+    assert "has_relevant_evidence" in context.inner_context.inner_portraits[0].tags
+    assert DisclosureMode.PARTIAL in secret.disclosure_policy.allowed_modes
+    assert DisclosureMode.HINT in secret.disclosure_policy.allowed_modes
+    assert DisclosureMode.FULL not in secret.disclosure_policy.allowed_modes
+    assert secret.disclosure_policy.direct_reveal_allowed is False
+
+
+def test_dangerous_inner_portrait_narrows_disclosure_modes_after_director_block() -> None:
+    case = CaseLoader().load(FAKE_CASE_001_DIR)
+    runtime = create_runtime([case])
+    session = runtime.session_store.create(case)
+    runtime.action_service.handle(
+        session=session,
+        action=PlayerAction(
+            type="talk",
+            target_id="butler",
+            text="Tell me the truth.",
+            force_forbidden=True,
+        ),
+    )
+
+    context = build_agent_context(
+        case,
+        session,
+        PlayerAction(
+            type="ask_about",
+            target_id="butler",
+            subject_type=SubjectType.CLUE,
+            subject_id="scratched_drawer",
+            text="What about the drawer?",
+        ),
+    )
+
+    assert context.inner_context is not None
+    secret = next(
+        item
+        for item in context.inner_context.inner_secrets
+        if item.id == "swapped_will_awareness"
+    )
+    assert "dangerous_topic_triggered" in context.inner_context.inner_portraits[0].tags
+    assert set(secret.disclosure_policy.allowed_modes) <= {
+        DisclosureMode.DENY,
+        DisclosureMode.DEFLECT,
+    }
+    assert DisclosureMode.HINT not in secret.disclosure_policy.allowed_modes
+    assert DisclosureMode.PARTIAL not in secret.disclosure_policy.allowed_modes
+
+
 def test_case_loader_supports_character_card_private_boundary() -> None:
     case = CaseLoader().load(FAKE_CASE_001_DIR)
     butler = next(character for character in case.characters if character.id == "butler")
@@ -750,7 +860,7 @@ def test_agent_context_exposes_presented_clue_ids() -> None:
     context = build_agent_context(case, session, action)
 
     assert context.presented_clue_id == "scratched_drawer"
-    assert context.presented_knowledge_id == "player_knowledge.scratched_drawer"
+    assert context.presented_knowledge_id == "player_knowledge.desk_forced_open"
 
 
 def test_agent_context_exposes_asked_subject_and_interaction_pressure() -> None:
@@ -1038,6 +1148,104 @@ def test_mock_agent_fallback_uses_inner_portrait_without_quoting_it() -> None:
     assert intent.intent == AgentIntentType.CONCEAL
     assert intent.speech == "I need to be careful about what I say to you."
     assert raw_impression not in intent.speech
+
+
+def test_mock_agent_fallback_uses_partial_mode_from_relevant_evidence() -> None:
+    raw_secret = "The missing ledger pages are hidden under the crate."
+    context = _build_fallback_context(
+        defensive_style="neutral",
+        pressure_response="answer",
+        player_action=PlayerAction(
+            type="ask_about",
+            target_id="npc",
+            subject_type=SubjectType.CLUE,
+            subject_id="ledger_page",
+        ),
+        inner_context=CharacterInnerContext(
+            character_id="npc",
+            inner_secrets=[
+                SelfKnowledgeItem(
+                    id="secret_001",
+                    kind="secret",
+                    summary=raw_secret,
+                    priority="high",
+                    related_clue_ids=["ledger_page"],
+                    disclosure_policy=DisclosurePolicy(
+                        revealable=True,
+                        allowed_modes=[DisclosureMode.DEFLECT, DisclosureMode.PARTIAL],
+                        direct_reveal_allowed=False,
+                    ),
+                )
+            ],
+            inner_portraits=[
+                CharacterImpression(
+                    observer_id="npc",
+                    target_id="player",
+                    personality_impression="The player has evidence.",
+                    tags=["has_relevant_evidence"],
+                    last_updated_event_id="event_001",
+                )
+            ],
+        ),
+    )
+
+    intent = MockAgent().generate(context)
+
+    assert intent.intent == AgentIntentType.ANSWER
+    assert intent.speech == (
+        "That evidence points toward something real, but I will not spell it out."
+    )
+    assert raw_secret not in intent.speech
+
+
+def test_mock_agent_fallback_refuses_dangerous_impression_topic() -> None:
+    context = _build_fallback_context(
+        defensive_style="neutral",
+        pressure_response="answer",
+        inner_context=CharacterInnerContext(
+            character_id="npc",
+            inner_portraits=[
+                CharacterImpression(
+                    observer_id="npc",
+                    target_id="player",
+                    personality_impression="The player pushed a locked topic.",
+                    tags=["dangerous_topic_triggered"],
+                    last_updated_event_id="event_001",
+                )
+            ],
+        ),
+    )
+
+    intent = MockAgent().generate(context)
+
+    assert intent.intent == AgentIntentType.REFUSE
+    assert intent.speech == "I am not going to discuss that topic."
+
+
+def test_mock_agent_fallback_hints_for_high_alliance_impression() -> None:
+    context = _build_fallback_context(
+        defensive_style="neutral",
+        pressure_response="conceal",
+        inner_context=CharacterInnerContext(
+            character_id="npc",
+            inner_portraits=[
+                CharacterImpression(
+                    observer_id="npc",
+                    target_id="player",
+                    personality_impression="The player may be a useful ally.",
+                    alliance_potential=0.8,
+                    last_updated_event_id="event_001",
+                )
+            ],
+        ),
+    )
+
+    intent = MockAgent().generate(context)
+
+    assert intent.intent == AgentIntentType.ANSWER
+    assert intent.speech == (
+        "I can offer a careful hint, but I will choose my words precisely."
+    )
 
 
 def test_agent_inner_context_does_not_enter_events_or_state_summary(client: TestClient) -> None:
@@ -1605,6 +1813,46 @@ def test_llm_agent_contract_input_includes_only_target_inner_portraits() -> None
     assert impression.trust_boundary not in serialized_niece_input
 
 
+def test_llm_agent_contract_uses_impression_adjusted_disclosure_modes() -> None:
+    case = CaseLoader().load(FAKE_CASE_001_DIR)
+    runtime = create_runtime([case])
+    session = runtime.session_store.create(case)
+    runtime.action_service.handle(
+        session=session,
+        action=PlayerAction(type="inspect", target_id="desk"),
+    )
+    runtime.action_service.handle(
+        session=session,
+        action=PlayerAction(
+            type="present_clue",
+            target_id="butler",
+            clue_id="scratched_drawer",
+            text="What about these scratch marks?",
+        ),
+    )
+    context = build_agent_context(
+        case,
+        session,
+        PlayerAction(
+            type="talk",
+            target_id="butler",
+            text="Answer this carefully.",
+        ),
+    )
+
+    contract_input = build_llm_agent_input(context)
+    constraint = next(
+        item
+        for item in contract_input.disclosure_constraints
+        if item.item_id == "swapped_will_awareness"
+    )
+
+    assert DisclosureMode.PARTIAL in constraint.allowed_modes
+    assert DisclosureMode.FULL not in constraint.allowed_modes
+    assert constraint.direct_reveal_allowed is False
+    assert constraint.blocked is False
+
+
 def test_llm_agent_contract_rejects_phase_change_output() -> None:
     with pytest.raises(ValueError, match="must not propose narrative phase changes"):
         validate_llm_agent_output(
@@ -2129,7 +2377,7 @@ def test_state_summary_snapshots_do_not_leak_internal_fields(client: TestClient)
             "phase": "investigation",
             "completed_beats": ["drawer_found"],
             "discovered": ["scratched_drawer"],
-            "player_knowledge": ["player_knowledge.scratched_drawer"],
+            "player_knowledge": ["player_knowledge.desk_forced_open"],
             "event_count": 8,
         },
         "fake_case_002_after_first_talk": {
@@ -2235,6 +2483,73 @@ def test_case_loader_rejects_bad_solution_claim_reference(tmp_path: Path) -> Non
     )
 
     with pytest.raises(CaseLoadError, match="unknown target_id"):
+        CaseLoader().load(case_dir)
+
+
+def test_case_loader_rejects_bad_world_info_reference_from_clue(tmp_path: Path) -> None:
+    case_dir = tmp_path / "bad_world_info_clue_case"
+    case_dir.mkdir()
+    _write_minimal_case(case_dir)
+    (case_dir / "world_info.yaml").write_text("[]\n", encoding="utf-8")
+    (case_dir / "scenes.yaml").write_text(
+        "- id: room\n  name: Room\n  characters:\n"
+        "    - npc\n  hotspots:\n"
+        "    - id: desk\n      name: Desk\n      discover_clues:\n"
+        "        - clue\n",
+        encoding="utf-8",
+    )
+    (case_dir / "clues.yaml").write_text(
+        "- id: clue\n"
+        "  title: Clue\n"
+        "  description: clue\n"
+        "  reveals_world_info:\n"
+        "    - missing_world_info\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(CaseLoadError, match="unknown world_info"):
+        CaseLoader().load(case_dir)
+
+
+def test_case_loader_rejects_bad_world_info_reference_from_forbidden_fact(
+    tmp_path: Path,
+) -> None:
+    case_dir = tmp_path / "bad_world_info_forbidden_case"
+    case_dir.mkdir()
+    _write_minimal_case(case_dir)
+    (case_dir / "forbidden_facts.yaml").write_text(
+        "- id: forbidden\n"
+        "  world_info_id: missing_world_info\n"
+        "  text: hidden\n"
+        "  blocked_terms:\n"
+        "    - hidden\n"
+        "  reveal_phase: opening\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(CaseLoadError, match="unknown world_info_id"):
+        CaseLoader().load(case_dir)
+
+
+def test_case_loader_rejects_bad_world_info_reference_from_solution_claim(
+    tmp_path: Path,
+) -> None:
+    case_dir = tmp_path / "bad_world_info_claim_case"
+    case_dir.mkdir()
+    _write_minimal_case(case_dir)
+    (case_dir / "solution_claims.yaml").write_text(
+        "claims:\n"
+        "  - id: bad_claim\n"
+        "    target_id: npc\n"
+        "    required_world_info:\n"
+        "      - missing_world_info\n"
+        "    allowed_phases:\n"
+        "      - opening\n"
+        "    result: correct\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(CaseLoadError, match="unknown world_info"):
         CaseLoader().load(case_dir)
 
 
@@ -2371,6 +2686,7 @@ def _write_minimal_case(case_dir: Path) -> None:
         "- id: npc\n  name: NPC\n  role: Witness\n",
         encoding="utf-8",
     )
+    (case_dir / "world_info.yaml").write_text("[]\n", encoding="utf-8")
     (case_dir / "scenes.yaml").write_text(
         "- id: room\n  name: Room\n  characters:\n"
         "    - npc\n  hotspots:\n"

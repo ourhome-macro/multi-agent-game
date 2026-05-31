@@ -125,6 +125,11 @@ and written through `character_impression.updated`, not through AgentIntent.
 `AgentContext.recent_events` excludes `character_impression.updated` so another
 NPC cannot see the portrait event as recent context.
 
+Impression-aware disclosure v0 adjusts the effective `DisclosurePolicy` in the
+target NPC's inner context. High threat and dangerous-topic tags narrow
+disclosure; alliance can allow hints; relevant evidence can allow partial
+truth. This remains input shaping only and does not alter Rule Engine authority.
+
 `AgentContext.memory_snapshots` contains only safe player-scoped structured
 snapshots produced by the runtime. It is not vector memory, RAG, a database, or a
 real LLM integration point.

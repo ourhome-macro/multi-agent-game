@@ -174,6 +174,12 @@ It is created from safe event signals such as `player.asked_about`,
 `director.blocked`, and `accusation.evaluated`. LLMs can consume the current
 target NPC's impression view, but they cannot directly write impression state.
 
+Impression-aware disclosure v0 uses those private portraits to compute effective
+`DisclosurePolicy.allowed_modes` for the target NPC's self-knowledge view. It can
+narrow dangerous or high-threat topics, allow cautious hints for alliance, and
+allow partial truth when the player has relevant evidence. It cannot grant full
+reveal or direct private quotation.
+
 `LLMAgentContractInput` wraps `AgentContext` with explicit disclosure
 constraints for future real LLM use. `validate_llm_agent_output` requires strict
 `AgentIntent` JSON and rejects LLM-proposed narrative phase changes before Rule

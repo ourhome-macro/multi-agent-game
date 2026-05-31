@@ -65,6 +65,20 @@ class DisclosureMode(StrEnum):
     FULL = "full"
 
 
+class WorldInfoCategory(StrEnum):
+    PHYSICAL_FACT = "physical_fact"
+    CHARACTER_ACTION = "character_action"
+    CHARACTER_KNOWLEDGE = "character_knowledge"
+    CASE_TRUTH = "case_truth"
+    SOCIAL_FACT = "social_fact"
+
+
+class WorldInfoSensitivity(StrEnum):
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+
+
 class EventType(StrEnum):
     SESSION_CREATED = "session.created"
     PLAYER_INSPECTED = "player.inspected"
@@ -304,6 +318,14 @@ class LLMDisclosureConstraint(APIModel):
     blocked: bool = True
 
 
+class WorldInfoConfig(APIModel):
+    id: NonEmptyString
+    title: NonEmptyString
+    description: str = ""
+    category: WorldInfoCategory = WorldInfoCategory.CASE_TRUTH
+    sensitivity: WorldInfoSensitivity = WorldInfoSensitivity.MEDIUM
+
+
 class SceneHotspotConfig(APIModel):
     id: NonEmptyString
     name: NonEmptyString
@@ -324,6 +346,7 @@ class ClueConfig(APIModel):
     title: NonEmptyString
     description: str
     truth_status: Literal["true", "false", "unknown"] = "unknown"
+    reveals_world_info: list[NonEmptyString] = Field(default_factory=list)
     related_characters: list[str] = Field(default_factory=list)
     related_events: list[str] = Field(default_factory=list)
     key: bool = False
@@ -360,6 +383,7 @@ class ForbiddenFactConfig(APIModel):
     text: NonEmptyString
     blocked_terms: list[NonEmptyString]
     reveal_phase: NonEmptyString | None = None
+    world_info_id: NonEmptyString | None = None
 
 
 class DiscoverClueAction(APIModel):
@@ -438,6 +462,7 @@ class SolutionClaimConfig(APIModel):
     id: NonEmptyString
     target_id: NonEmptyString
     required_evidence: list[NonEmptyString] = Field(default_factory=list)
+    required_world_info: list[NonEmptyString] = Field(default_factory=list)
     allowed_phases: list[NonEmptyString] = Field(default_factory=list)
     result: Literal["correct", "incorrect"]
 
@@ -448,6 +473,7 @@ class SolutionClaimsConfig(APIModel):
 
 class CasePackage(APIModel):
     meta: CaseMeta
+    world_info: list[WorldInfoConfig] = Field(default_factory=list)
     characters: list[CharacterConfig]
     scenes: list[SceneConfig]
     clues: list[ClueConfig]
@@ -553,7 +579,8 @@ class RelationshipState(APIModel):
 
 class PlayerKnowledgeState(APIModel):
     knowledge_id: NonEmptyString
-    clue_id: NonEmptyString
+    clue_id: NonEmptyString | None = None
+    world_info_id: NonEmptyString | None = None
     title: NonEmptyString
     summary: str
     source_event_id: NonEmptyString
@@ -674,7 +701,8 @@ class ClueSummary(APIModel):
 
 class PlayerKnowledgeSummary(APIModel):
     knowledge_id: NonEmptyString
-    clue_id: NonEmptyString
+    clue_id: NonEmptyString | None = None
+    world_info_id: NonEmptyString | None = None
     title: NonEmptyString
     summary: str
 
