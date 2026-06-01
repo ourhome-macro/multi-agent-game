@@ -1,10 +1,10 @@
 {
   "case_id": "mist_clock_manor",
   "case_title": "雾钟山庄",
-  "generated_at": "2026-06-01T09:46:07.906935+00:00",
+  "generated_at": "2026-06-01T15:01:37.534862+00:00",
   "scenario_path": "cases\\mist_clock_manor\\scenarios\\standard_path.yaml",
   "case_dir": "cases\\mist_clock_manor",
-  "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+  "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
   "standard_path": [
     {
       "step": 1,
@@ -52,34 +52,34 @@
       "new_director_blocks": [],
       "new_events": [
         {
-          "id": "b7083a37-6cb4-4487-bfc0-c2397ea3a9fd",
+          "id": "2d7ecef8-bfe5-4c40-9915-c49ab1f00da8",
           "case_id": "mist_clock_manor",
-          "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+          "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
           "actor_id": "player",
           "type": "player.inspected",
           "payload": {
             "target_id": "wine_table"
           },
           "caused_by_event_id": null,
-          "created_at": "2026-06-01T09:46:07.897525+00:00"
+          "created_at": "2026-06-01T15:01:37.527573+00:00"
         },
         {
-          "id": "9cc2c64d-d046-4ff5-a344-36fb30b6b67c",
+          "id": "46a9b1b8-b4a0-4adc-a126-d946338e69fb",
           "case_id": "mist_clock_manor",
-          "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+          "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
           "actor_id": "system",
           "type": "clue.discovered",
           "payload": {
             "clue_id": "bitter_wine",
             "source_hotspot_id": "wine_table"
           },
-          "caused_by_event_id": "b7083a37-6cb4-4487-bfc0-c2397ea3a9fd",
-          "created_at": "2026-06-01T09:46:07.897525+00:00"
+          "caused_by_event_id": "2d7ecef8-bfe5-4c40-9915-c49ab1f00da8",
+          "created_at": "2026-06-01T15:01:37.527573+00:00"
         },
         {
-          "id": "a286a3f1-c091-4b9c-b391-80a50539fcab",
+          "id": "b2fd16ef-0354-4217-855a-1d64bafa7ee0",
           "case_id": "mist_clock_manor",
-          "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+          "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
           "actor_id": "derived_event_system",
           "type": "player_knowledge.updated",
           "payload": {
@@ -89,68 +89,68 @@
             "confidence": 1.0,
             "acquisition": "discovered",
             "source_type": "clue",
-            "source_event_id": "9cc2c64d-d046-4ff5-a344-36fb30b6b67c",
+            "source_event_id": "46a9b1b8-b4a0-4adc-a126-d946338e69fb",
             "title": "红酒中含有镇静剂",
             "summary": "林栖迟送入书房的红酒含有安眠药成分，削弱了陆澜生的反应能力。"
           },
-          "caused_by_event_id": "9cc2c64d-d046-4ff5-a344-36fb30b6b67c",
-          "created_at": "2026-06-01T09:46:07.897525+00:00"
+          "caused_by_event_id": "46a9b1b8-b4a0-4adc-a126-d946338e69fb",
+          "created_at": "2026-06-01T15:01:37.527573+00:00"
         },
         {
-          "id": "edae414a-bfb2-46d8-bf33-6597d13656ef",
+          "id": "50ab1568-5e9a-477b-94d2-c0fcbbe18730",
           "case_id": "mist_clock_manor",
-          "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+          "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
           "actor_id": "derived_event_system",
           "type": "memory_candidate.created",
           "payload": {
             "memory_id": "memory.player.clue_discovered.bitter_wine",
             "subject_id": "player",
             "content": "Player discovered clue '带苦味的红酒残液'.",
-            "source_event_id": "9cc2c64d-d046-4ff5-a344-36fb30b6b67c",
+            "source_event_id": "46a9b1b8-b4a0-4adc-a126-d946338e69fb",
             "visibility": [
               "player"
             ],
             "salience": 0.8
           },
-          "caused_by_event_id": "9cc2c64d-d046-4ff5-a344-36fb30b6b67c",
-          "created_at": "2026-06-01T09:46:07.897525+00:00"
+          "caused_by_event_id": "46a9b1b8-b4a0-4adc-a126-d946338e69fb",
+          "created_at": "2026-06-01T15:01:37.527573+00:00"
         },
         {
-          "id": "933a9811-5cef-470e-864e-56d71cc817d6",
+          "id": "523752f9-8e19-4cca-88ba-879b6b7bb20c",
           "case_id": "mist_clock_manor",
-          "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+          "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
           "actor_id": "memory_snapshot_system",
           "type": "agent_memory_snapshot.updated",
           "payload": {
             "memory_id": "memory.player.clue_discovered.bitter_wine",
             "subject_id": "player",
             "source_event_ids": [
-              "9cc2c64d-d046-4ff5-a344-36fb30b6b67c"
+              "46a9b1b8-b4a0-4adc-a126-d946338e69fb"
             ],
             "salience": 0.8,
             "visibility": "private",
             "operation": "created"
           },
-          "caused_by_event_id": "edae414a-bfb2-46d8-bf33-6597d13656ef",
-          "created_at": "2026-06-01T09:46:07.897525+00:00"
+          "caused_by_event_id": "50ab1568-5e9a-477b-94d2-c0fcbbe18730",
+          "created_at": "2026-06-01T15:01:37.527573+00:00"
         },
         {
-          "id": "af166234-9565-43a4-a83a-fe917fc3d5c6",
+          "id": "41cf7bbe-0bc9-45f7-a6e2-264ea84ed92f",
           "case_id": "mist_clock_manor",
-          "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+          "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
           "actor_id": "rule_trigger_system",
           "type": "narrative.beat.completed",
           "payload": {
             "beat_id": "sedative_found",
             "phase": "opening"
           },
-          "caused_by_event_id": "9cc2c64d-d046-4ff5-a344-36fb30b6b67c",
-          "created_at": "2026-06-01T09:46:07.897525+00:00"
+          "caused_by_event_id": "46a9b1b8-b4a0-4adc-a126-d946338e69fb",
+          "created_at": "2026-06-01T15:01:37.527573+00:00"
         },
         {
-          "id": "dc63fb1c-e109-4c00-b9b6-0a108214311b",
+          "id": "735491e8-da74-4bcb-b032-267d124c4dfa",
           "case_id": "mist_clock_manor",
-          "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+          "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
           "actor_id": "rule_trigger_system",
           "type": "narrative.phase.changed",
           "payload": {
@@ -159,8 +159,8 @@
             "to_phase": "investigation",
             "trigger_beat_id": "sedative_found"
           },
-          "caused_by_event_id": "9cc2c64d-d046-4ff5-a344-36fb30b6b67c",
-          "created_at": "2026-06-01T09:46:07.897525+00:00"
+          "caused_by_event_id": "46a9b1b8-b4a0-4adc-a126-d946338e69fb",
+          "created_at": "2026-06-01T15:01:37.527573+00:00"
         }
       ],
       "known_world_info_after": [
@@ -237,9 +237,9 @@
       "new_director_blocks": [],
       "new_events": [
         {
-          "id": "f6fb9b21-4d18-48ad-9db8-3825c48925ed",
+          "id": "a3f35e63-2649-4175-994d-1e1b0cf06d44",
           "case_id": "mist_clock_manor",
-          "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+          "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
           "actor_id": "player",
           "type": "player.asked_about",
           "payload": {
@@ -251,12 +251,12 @@
             "knowledge_id": "player_knowledge.sedative_wine"
           },
           "caused_by_event_id": null,
-          "created_at": "2026-06-01T09:46:07.897525+00:00"
+          "created_at": "2026-06-01T15:01:37.527573+00:00"
         },
         {
-          "id": "dceb6335-a758-4bb9-92fc-da765167e2fc",
+          "id": "8f6bfe37-78b6-4e8e-ac62-40995df41bb0",
           "case_id": "mist_clock_manor",
-          "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+          "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
           "actor_id": "lin_qichi",
           "type": "npc.replied",
           "payload": {
@@ -275,13 +275,13 @@
             ],
             "disclosure_claims": []
           },
-          "caused_by_event_id": "f6fb9b21-4d18-48ad-9db8-3825c48925ed",
-          "created_at": "2026-06-01T09:46:07.900586+00:00"
+          "caused_by_event_id": "a3f35e63-2649-4175-994d-1e1b0cf06d44",
+          "created_at": "2026-06-01T15:01:37.530293+00:00"
         },
         {
-          "id": "ab22b17f-4629-4043-b9a8-8bdd6e9cc9a6",
+          "id": "e2378237-b176-4cce-b16f-903393eb1668",
           "case_id": "mist_clock_manor",
-          "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+          "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
           "actor_id": "system",
           "type": "relationship.changed",
           "payload": {
@@ -301,13 +301,13 @@
               "hostility": 0.0
             }
           },
-          "caused_by_event_id": "dceb6335-a758-4bb9-92fc-da765167e2fc",
-          "created_at": "2026-06-01T09:46:07.902205+00:00"
+          "caused_by_event_id": "8f6bfe37-78b6-4e8e-ac62-40995df41bb0",
+          "created_at": "2026-06-01T15:01:37.530293+00:00"
         },
         {
-          "id": "6f30d248-dce1-4c9f-ae7d-7fde5ea691a8",
+          "id": "d2719edb-016c-4a06-9372-881a489551a2",
           "case_id": "mist_clock_manor",
-          "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+          "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
           "actor_id": "system",
           "type": "relationship.threshold.crossed",
           "payload": {
@@ -318,13 +318,13 @@
             "state": "afraid",
             "current_value": 0.8
           },
-          "caused_by_event_id": "ab22b17f-4629-4043-b9a8-8bdd6e9cc9a6",
-          "created_at": "2026-06-01T09:46:07.902205+00:00"
+          "caused_by_event_id": "e2378237-b176-4cce-b16f-903393eb1668",
+          "created_at": "2026-06-01T15:01:37.530293+00:00"
         },
         {
-          "id": "8cf0240b-b1c1-438a-94bf-15cb8f75869f",
+          "id": "9d3abb36-3e6f-4561-a36f-d3d030c60a12",
           "case_id": "mist_clock_manor",
-          "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+          "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
           "actor_id": "character_impression_system",
           "type": "character_impression.updated",
           "payload": {
@@ -350,17 +350,17 @@
             ],
             "confidence": 0.1,
             "source_event_ids": [
-              "f6fb9b21-4d18-48ad-9db8-3825c48925ed"
+              "a3f35e63-2649-4175-994d-1e1b0cf06d44"
             ],
-            "last_updated_event_id": "8cf0240b-b1c1-438a-94bf-15cb8f75869f"
+            "last_updated_event_id": "9d3abb36-3e6f-4561-a36f-d3d030c60a12"
           },
-          "caused_by_event_id": "f6fb9b21-4d18-48ad-9db8-3825c48925ed",
-          "created_at": "2026-06-01T09:46:07.902205+00:00"
+          "caused_by_event_id": "a3f35e63-2649-4175-994d-1e1b0cf06d44",
+          "created_at": "2026-06-01T15:01:37.530293+00:00"
         },
         {
-          "id": "8db22b5e-de53-466b-a50e-07feaf23a2d3",
+          "id": "c67a3503-ddba-4050-948d-81d391e8feb2",
           "case_id": "mist_clock_manor",
-          "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+          "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
           "actor_id": "character_fact_awareness_system",
           "type": "character_fact_awareness.updated",
           "payload": {
@@ -380,55 +380,55 @@
             ],
             "source_event_ids": [
               "case_package",
-              "f6fb9b21-4d18-48ad-9db8-3825c48925ed"
+              "a3f35e63-2649-4175-994d-1e1b0cf06d44"
             ],
-            "last_updated_event_id": "8db22b5e-de53-466b-a50e-07feaf23a2d3"
+            "last_updated_event_id": "c67a3503-ddba-4050-948d-81d391e8feb2"
           },
-          "caused_by_event_id": "f6fb9b21-4d18-48ad-9db8-3825c48925ed",
-          "created_at": "2026-06-01T09:46:07.902205+00:00"
+          "caused_by_event_id": "a3f35e63-2649-4175-994d-1e1b0cf06d44",
+          "created_at": "2026-06-01T15:01:37.531816+00:00"
         },
         {
-          "id": "99ad7ca7-18da-4a54-9122-a37387265106",
+          "id": "607fe092-d8f6-4c1d-bbc6-c8f921cb06af",
           "case_id": "mist_clock_manor",
-          "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+          "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
           "actor_id": "derived_event_system",
           "type": "memory_candidate.created",
           "payload": {
             "memory_id": "memory.player.asked_about.lin_qichi.clue.bitter_wine",
             "subject_id": "player",
             "content": "Player asked 林栖迟 about clue 'bitter_wine' with pressure 0.6.",
-            "source_event_id": "f6fb9b21-4d18-48ad-9db8-3825c48925ed",
+            "source_event_id": "a3f35e63-2649-4175-994d-1e1b0cf06d44",
             "visibility": [
               "player"
             ],
             "salience": 0.6
           },
-          "caused_by_event_id": "f6fb9b21-4d18-48ad-9db8-3825c48925ed",
-          "created_at": "2026-06-01T09:46:07.902205+00:00"
+          "caused_by_event_id": "a3f35e63-2649-4175-994d-1e1b0cf06d44",
+          "created_at": "2026-06-01T15:01:37.531816+00:00"
         },
         {
-          "id": "0e722687-455e-4b7d-bc64-85041fa5818b",
+          "id": "30a6a7b3-d4ae-4cdb-954b-70f7041048cf",
           "case_id": "mist_clock_manor",
-          "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+          "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
           "actor_id": "memory_snapshot_system",
           "type": "agent_memory_snapshot.updated",
           "payload": {
             "memory_id": "memory.player.asked_about.lin_qichi.clue.bitter_wine",
             "subject_id": "player",
             "source_event_ids": [
-              "f6fb9b21-4d18-48ad-9db8-3825c48925ed"
+              "a3f35e63-2649-4175-994d-1e1b0cf06d44"
             ],
             "salience": 0.6,
             "visibility": "private",
             "operation": "created"
           },
-          "caused_by_event_id": "99ad7ca7-18da-4a54-9122-a37387265106",
-          "created_at": "2026-06-01T09:46:07.902205+00:00"
+          "caused_by_event_id": "607fe092-d8f6-4c1d-bbc6-c8f921cb06af",
+          "created_at": "2026-06-01T15:01:37.531816+00:00"
         },
         {
-          "id": "21b119b5-f807-47ae-a6a6-053a9a456b1c",
+          "id": "2399c77a-0ac4-4ed1-9d5e-4aab0ea16b2c",
           "case_id": "mist_clock_manor",
-          "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+          "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
           "actor_id": "character_impression_system",
           "type": "character_impression.updated",
           "payload": {
@@ -457,51 +457,51 @@
             ],
             "confidence": 0.2,
             "source_event_ids": [
-              "f6fb9b21-4d18-48ad-9db8-3825c48925ed",
-              "6f30d248-dce1-4c9f-ae7d-7fde5ea691a8"
+              "a3f35e63-2649-4175-994d-1e1b0cf06d44",
+              "d2719edb-016c-4a06-9372-881a489551a2"
             ],
-            "last_updated_event_id": "21b119b5-f807-47ae-a6a6-053a9a456b1c"
+            "last_updated_event_id": "2399c77a-0ac4-4ed1-9d5e-4aab0ea16b2c"
           },
-          "caused_by_event_id": "6f30d248-dce1-4c9f-ae7d-7fde5ea691a8",
-          "created_at": "2026-06-01T09:46:07.902205+00:00"
+          "caused_by_event_id": "d2719edb-016c-4a06-9372-881a489551a2",
+          "created_at": "2026-06-01T15:01:37.531816+00:00"
         },
         {
-          "id": "e1d87274-87c1-4a66-a988-05793a6ffec4",
+          "id": "2e1dac31-1500-4c80-a740-f21a9037bfa4",
           "case_id": "mist_clock_manor",
-          "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+          "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
           "actor_id": "derived_event_system",
           "type": "memory_candidate.created",
           "payload": {
             "memory_id": "memory.player.relationship_threshold.lin_qichi.player.fear.afraid",
             "subject_id": "player",
             "content": "林栖迟 became afraid toward the player (fear).",
-            "source_event_id": "6f30d248-dce1-4c9f-ae7d-7fde5ea691a8",
+            "source_event_id": "d2719edb-016c-4a06-9372-881a489551a2",
             "visibility": [
               "player"
             ],
             "salience": 0.7
           },
-          "caused_by_event_id": "6f30d248-dce1-4c9f-ae7d-7fde5ea691a8",
-          "created_at": "2026-06-01T09:46:07.902205+00:00"
+          "caused_by_event_id": "d2719edb-016c-4a06-9372-881a489551a2",
+          "created_at": "2026-06-01T15:01:37.531816+00:00"
         },
         {
-          "id": "8721c0e1-c258-4dd3-8970-9b1ce32b664d",
+          "id": "e6b987d5-f1ef-47e3-bb3d-3328690d7034",
           "case_id": "mist_clock_manor",
-          "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+          "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
           "actor_id": "memory_snapshot_system",
           "type": "agent_memory_snapshot.updated",
           "payload": {
             "memory_id": "memory.player.relationship_threshold.lin_qichi.player.fear.afraid",
             "subject_id": "player",
             "source_event_ids": [
-              "6f30d248-dce1-4c9f-ae7d-7fde5ea691a8"
+              "d2719edb-016c-4a06-9372-881a489551a2"
             ],
             "salience": 0.7,
             "visibility": "private",
             "operation": "created"
           },
-          "caused_by_event_id": "e1d87274-87c1-4a66-a988-05793a6ffec4",
-          "created_at": "2026-06-01T09:46:07.902205+00:00"
+          "caused_by_event_id": "2e1dac31-1500-4c80-a740-f21a9037bfa4",
+          "created_at": "2026-06-01T15:01:37.531816+00:00"
         }
       ],
       "known_world_info_after": [
@@ -570,9 +570,9 @@
       "new_director_blocks": [],
       "new_events": [
         {
-          "id": "753d37f5-ffc1-4e65-93e7-da8d955649b2",
+          "id": "47984950-9bc0-444e-98c9-45a6f103ceff",
           "case_id": "mist_clock_manor",
-          "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+          "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
           "actor_id": "player",
           "type": "player.presented_clue",
           "payload": {
@@ -583,12 +583,12 @@
             "interaction_pressure": 0.9
           },
           "caused_by_event_id": null,
-          "created_at": "2026-06-01T09:46:07.902205+00:00"
+          "created_at": "2026-06-01T15:01:37.531816+00:00"
         },
         {
-          "id": "e290be41-ddff-42f6-a1d1-5724629c4d89",
+          "id": "cf9695e4-d30c-4fd5-92c6-9fd4eaadf0bb",
           "case_id": "mist_clock_manor",
-          "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+          "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
           "actor_id": "lin_qichi",
           "type": "npc.replied",
           "payload": {
@@ -607,13 +607,13 @@
             ],
             "disclosure_claims": []
           },
-          "caused_by_event_id": "753d37f5-ffc1-4e65-93e7-da8d955649b2",
-          "created_at": "2026-06-01T09:46:07.902205+00:00"
+          "caused_by_event_id": "47984950-9bc0-444e-98c9-45a6f103ceff",
+          "created_at": "2026-06-01T15:01:37.531816+00:00"
         },
         {
-          "id": "f9e91d11-5645-4db4-bad3-982ad3fa8ce5",
+          "id": "65c4e8d9-0c64-4b26-90b4-9b30e43d1e9d",
           "case_id": "mist_clock_manor",
-          "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+          "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
           "actor_id": "system",
           "type": "relationship.changed",
           "payload": {
@@ -633,13 +633,13 @@
               "hostility": 0.0
             }
           },
-          "caused_by_event_id": "e290be41-ddff-42f6-a1d1-5724629c4d89",
-          "created_at": "2026-06-01T09:46:07.902205+00:00"
+          "caused_by_event_id": "cf9695e4-d30c-4fd5-92c6-9fd4eaadf0bb",
+          "created_at": "2026-06-01T15:01:37.531816+00:00"
         },
         {
-          "id": "1cdebc3b-cf15-4d4b-851c-23d81aef71b3",
+          "id": "6fb2179b-da0e-4bf0-bb6e-690d5e9935b3",
           "case_id": "mist_clock_manor",
-          "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+          "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
           "actor_id": "character_impression_system",
           "type": "character_impression.updated",
           "payload": {
@@ -672,19 +672,19 @@
             ],
             "confidence": 0.3,
             "source_event_ids": [
-              "f6fb9b21-4d18-48ad-9db8-3825c48925ed",
-              "6f30d248-dce1-4c9f-ae7d-7fde5ea691a8",
-              "753d37f5-ffc1-4e65-93e7-da8d955649b2"
+              "a3f35e63-2649-4175-994d-1e1b0cf06d44",
+              "d2719edb-016c-4a06-9372-881a489551a2",
+              "47984950-9bc0-444e-98c9-45a6f103ceff"
             ],
-            "last_updated_event_id": "1cdebc3b-cf15-4d4b-851c-23d81aef71b3"
+            "last_updated_event_id": "6fb2179b-da0e-4bf0-bb6e-690d5e9935b3"
           },
-          "caused_by_event_id": "753d37f5-ffc1-4e65-93e7-da8d955649b2",
-          "created_at": "2026-06-01T09:46:07.902205+00:00"
+          "caused_by_event_id": "47984950-9bc0-444e-98c9-45a6f103ceff",
+          "created_at": "2026-06-01T15:01:37.531816+00:00"
         },
         {
-          "id": "0b49abf5-3f0c-48e5-8255-68c5da2027fb",
+          "id": "46991a27-250f-4157-8a3f-4dd94dcb20d2",
           "case_id": "mist_clock_manor",
-          "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+          "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
           "actor_id": "character_fact_awareness_system",
           "type": "character_fact_awareness.updated",
           "payload": {
@@ -704,51 +704,51 @@
             ],
             "source_event_ids": [
               "case_package",
-              "f6fb9b21-4d18-48ad-9db8-3825c48925ed",
-              "753d37f5-ffc1-4e65-93e7-da8d955649b2"
+              "a3f35e63-2649-4175-994d-1e1b0cf06d44",
+              "47984950-9bc0-444e-98c9-45a6f103ceff"
             ],
-            "last_updated_event_id": "0b49abf5-3f0c-48e5-8255-68c5da2027fb"
+            "last_updated_event_id": "46991a27-250f-4157-8a3f-4dd94dcb20d2"
           },
-          "caused_by_event_id": "753d37f5-ffc1-4e65-93e7-da8d955649b2",
-          "created_at": "2026-06-01T09:46:07.902205+00:00"
+          "caused_by_event_id": "47984950-9bc0-444e-98c9-45a6f103ceff",
+          "created_at": "2026-06-01T15:01:37.531816+00:00"
         },
         {
-          "id": "c2bd2621-8b2e-4c76-bf1b-2c04fd2e1560",
+          "id": "6233f9af-c3fe-442d-a4fc-52ea5a518765",
           "case_id": "mist_clock_manor",
-          "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+          "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
           "actor_id": "derived_event_system",
           "type": "memory_candidate.created",
           "payload": {
             "memory_id": "memory.player.presented_clue.lin_qichi.bitter_wine",
             "subject_id": "player",
             "content": "Player pressured 林栖迟 with clue 'bitter_wine' at pressure 0.9.",
-            "source_event_id": "753d37f5-ffc1-4e65-93e7-da8d955649b2",
+            "source_event_id": "47984950-9bc0-444e-98c9-45a6f103ceff",
             "visibility": [
               "player"
             ],
             "salience": 0.9
           },
-          "caused_by_event_id": "753d37f5-ffc1-4e65-93e7-da8d955649b2",
-          "created_at": "2026-06-01T09:46:07.902205+00:00"
+          "caused_by_event_id": "47984950-9bc0-444e-98c9-45a6f103ceff",
+          "created_at": "2026-06-01T15:01:37.531816+00:00"
         },
         {
-          "id": "6df08e9e-0949-47f8-b748-4da6c4541626",
+          "id": "98548a3c-4b15-4d72-b2d0-61e880b1c215",
           "case_id": "mist_clock_manor",
-          "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+          "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
           "actor_id": "memory_snapshot_system",
           "type": "agent_memory_snapshot.updated",
           "payload": {
             "memory_id": "memory.player.presented_clue.lin_qichi.bitter_wine",
             "subject_id": "player",
             "source_event_ids": [
-              "753d37f5-ffc1-4e65-93e7-da8d955649b2"
+              "47984950-9bc0-444e-98c9-45a6f103ceff"
             ],
             "salience": 0.9,
             "visibility": "private",
             "operation": "created"
           },
-          "caused_by_event_id": "c2bd2621-8b2e-4c76-bf1b-2c04fd2e1560",
-          "created_at": "2026-06-01T09:46:07.902205+00:00"
+          "caused_by_event_id": "6233f9af-c3fe-442d-a4fc-52ea5a518765",
+          "created_at": "2026-06-01T15:01:37.531816+00:00"
         }
       ],
       "known_world_info_after": [
@@ -803,34 +803,34 @@
       "new_director_blocks": [],
       "new_events": [
         {
-          "id": "4be7420f-a24b-4c41-bd0d-842fc0ac1ba1",
+          "id": "65e2426e-3cdd-4947-92b7-50f593006ecc",
           "case_id": "mist_clock_manor",
-          "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+          "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
           "actor_id": "player",
           "type": "player.inspected",
           "payload": {
             "target_id": "study_lock"
           },
           "caused_by_event_id": null,
-          "created_at": "2026-06-01T09:46:07.902205+00:00"
+          "created_at": "2026-06-01T15:01:37.531816+00:00"
         },
         {
-          "id": "4901cf8d-bfab-4119-bdff-6f538c492147",
+          "id": "01679c69-e122-45aa-a660-154c165dce43",
           "case_id": "mist_clock_manor",
-          "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+          "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
           "actor_id": "system",
           "type": "clue.discovered",
           "payload": {
             "clue_id": "delayed_lock_marks",
             "source_hotspot_id": "study_lock"
           },
-          "caused_by_event_id": "4be7420f-a24b-4c41-bd0d-842fc0ac1ba1",
-          "created_at": "2026-06-01T09:46:07.902205+00:00"
+          "caused_by_event_id": "65e2426e-3cdd-4947-92b7-50f593006ecc",
+          "created_at": "2026-06-01T15:01:37.531816+00:00"
         },
         {
-          "id": "e8954c55-2e37-42bc-bb6a-2a77f6851956",
+          "id": "a6bf9fc7-41d4-4ca2-b798-5cf4d3302c93",
           "case_id": "mist_clock_manor",
-          "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+          "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
           "actor_id": "derived_event_system",
           "type": "player_knowledge.updated",
           "payload": {
@@ -840,50 +840,50 @@
             "confidence": 1.0,
             "acquisition": "discovered",
             "source_type": "clue",
-            "source_event_id": "4901cf8d-bfab-4119-bdff-6f538c492147",
+            "source_event_id": "01679c69-e122-45aa-a660-154c165dce43",
             "title": "书房门锁被改成延时落锁",
             "summary": "门锁内侧的新划痕和润滑油说明，有人提前做了延时卡榫，制造密室假象。"
           },
-          "caused_by_event_id": "4901cf8d-bfab-4119-bdff-6f538c492147",
-          "created_at": "2026-06-01T09:46:07.902205+00:00"
+          "caused_by_event_id": "01679c69-e122-45aa-a660-154c165dce43",
+          "created_at": "2026-06-01T15:01:37.531816+00:00"
         },
         {
-          "id": "0644e5cc-0d97-460d-9c80-3e30c412542f",
+          "id": "35178258-7838-42c0-8358-065669e5ff82",
           "case_id": "mist_clock_manor",
-          "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+          "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
           "actor_id": "derived_event_system",
           "type": "memory_candidate.created",
           "payload": {
             "memory_id": "memory.player.clue_discovered.delayed_lock_marks",
             "subject_id": "player",
             "content": "Player discovered clue '门锁内侧的新划痕'.",
-            "source_event_id": "4901cf8d-bfab-4119-bdff-6f538c492147",
+            "source_event_id": "01679c69-e122-45aa-a660-154c165dce43",
             "visibility": [
               "player"
             ],
             "salience": 0.8
           },
-          "caused_by_event_id": "4901cf8d-bfab-4119-bdff-6f538c492147",
-          "created_at": "2026-06-01T09:46:07.902205+00:00"
+          "caused_by_event_id": "01679c69-e122-45aa-a660-154c165dce43",
+          "created_at": "2026-06-01T15:01:37.531816+00:00"
         },
         {
-          "id": "1c997122-dce7-453c-aa9e-10e4a2f272ab",
+          "id": "0a2d506c-ab4e-4196-935a-2e23a6fc781b",
           "case_id": "mist_clock_manor",
-          "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+          "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
           "actor_id": "memory_snapshot_system",
           "type": "agent_memory_snapshot.updated",
           "payload": {
             "memory_id": "memory.player.clue_discovered.delayed_lock_marks",
             "subject_id": "player",
             "source_event_ids": [
-              "4901cf8d-bfab-4119-bdff-6f538c492147"
+              "01679c69-e122-45aa-a660-154c165dce43"
             ],
             "salience": 0.8,
             "visibility": "private",
             "operation": "created"
           },
-          "caused_by_event_id": "0644e5cc-0d97-460d-9c80-3e30c412542f",
-          "created_at": "2026-06-01T09:46:07.902205+00:00"
+          "caused_by_event_id": "35178258-7838-42c0-8358-065669e5ff82",
+          "created_at": "2026-06-01T15:01:37.531816+00:00"
         }
       ],
       "known_world_info_after": [
@@ -953,47 +953,47 @@
       "new_director_blocks": [],
       "new_events": [
         {
-          "id": "da73e7cb-e992-46ef-a274-6d79fe06c7f7",
+          "id": "129f0c1f-3170-4691-ac7b-7c05744f7171",
           "case_id": "mist_clock_manor",
-          "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+          "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
           "actor_id": "player",
           "type": "player.inspected",
           "payload": {
             "target_id": "tape_recorder"
           },
           "caused_by_event_id": null,
-          "created_at": "2026-06-01T09:46:07.902205+00:00"
+          "created_at": "2026-06-01T15:01:37.531816+00:00"
         },
         {
-          "id": "71283d84-8e99-457e-80d9-2d5fe933d90b",
+          "id": "1faa6aae-0406-4b8b-b630-f0c811e33fbb",
           "case_id": "mist_clock_manor",
-          "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+          "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
           "actor_id": "system",
           "type": "clue.discovered",
           "payload": {
             "clue_id": "echo_tape",
             "source_hotspot_id": "tape_recorder"
           },
-          "caused_by_event_id": "da73e7cb-e992-46ef-a274-6d79fe06c7f7",
-          "created_at": "2026-06-01T09:46:07.902205+00:00"
+          "caused_by_event_id": "129f0c1f-3170-4691-ac7b-7c05744f7171",
+          "created_at": "2026-06-01T15:01:37.531816+00:00"
         },
         {
-          "id": "c6fb0aa9-06cc-4648-8f27-074dc7046b10",
+          "id": "27bbb14a-3578-45f6-bcbd-cfe1a4b873db",
           "case_id": "mist_clock_manor",
-          "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+          "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
           "actor_id": "system",
           "type": "clue.discovered",
           "payload": {
             "clue_id": "ruolan_voice_tape",
             "source_hotspot_id": "tape_recorder"
           },
-          "caused_by_event_id": "da73e7cb-e992-46ef-a274-6d79fe06c7f7",
-          "created_at": "2026-06-01T09:46:07.902205+00:00"
+          "caused_by_event_id": "129f0c1f-3170-4691-ac7b-7c05744f7171",
+          "created_at": "2026-06-01T15:01:37.531816+00:00"
         },
         {
-          "id": "7083bbc2-d038-448b-979a-f5d8c04d4f36",
+          "id": "ab61941a-ac2f-4a0c-830d-8542fadd449a",
           "case_id": "mist_clock_manor",
-          "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+          "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
           "actor_id": "derived_event_system",
           "type": "player_knowledge.updated",
           "payload": {
@@ -1003,55 +1003,55 @@
             "confidence": 1.0,
             "acquisition": "discovered",
             "source_type": "clue",
-            "source_event_id": "71283d84-8e99-457e-80d9-2d5fe933d90b",
+            "source_event_id": "1faa6aae-0406-4b8b-b630-f0c811e33fbb",
             "title": "书房录音带被替换",
             "summary": "十一点十七分响起的钟声来自书房录音机，而不是山庄钟楼。"
           },
-          "caused_by_event_id": "71283d84-8e99-457e-80d9-2d5fe933d90b",
-          "created_at": "2026-06-01T09:46:07.902205+00:00"
+          "caused_by_event_id": "1faa6aae-0406-4b8b-b630-f0c811e33fbb",
+          "created_at": "2026-06-01T15:01:37.531816+00:00"
         },
         {
-          "id": "22722769-dad2-4b3a-a389-2abba357c991",
+          "id": "43e7903a-4960-42e3-a6b7-e480dcc26fed",
           "case_id": "mist_clock_manor",
-          "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+          "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
           "actor_id": "derived_event_system",
           "type": "memory_candidate.created",
           "payload": {
             "memory_id": "memory.player.clue_discovered.echo_tape",
             "subject_id": "player",
             "content": "Player discovered clue '标着“回声钟终稿”的磁带'.",
-            "source_event_id": "71283d84-8e99-457e-80d9-2d5fe933d90b",
+            "source_event_id": "1faa6aae-0406-4b8b-b630-f0c811e33fbb",
             "visibility": [
               "player"
             ],
             "salience": 0.8
           },
-          "caused_by_event_id": "71283d84-8e99-457e-80d9-2d5fe933d90b",
-          "created_at": "2026-06-01T09:46:07.902205+00:00"
+          "caused_by_event_id": "1faa6aae-0406-4b8b-b630-f0c811e33fbb",
+          "created_at": "2026-06-01T15:01:37.531816+00:00"
         },
         {
-          "id": "2b67826a-909f-45aa-92f1-426bb7493494",
+          "id": "0f5aac4b-74cb-48a4-86b6-0b8069a33f67",
           "case_id": "mist_clock_manor",
-          "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+          "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
           "actor_id": "memory_snapshot_system",
           "type": "agent_memory_snapshot.updated",
           "payload": {
             "memory_id": "memory.player.clue_discovered.echo_tape",
             "subject_id": "player",
             "source_event_ids": [
-              "71283d84-8e99-457e-80d9-2d5fe933d90b"
+              "1faa6aae-0406-4b8b-b630-f0c811e33fbb"
             ],
             "salience": 0.8,
             "visibility": "private",
             "operation": "created"
           },
-          "caused_by_event_id": "22722769-dad2-4b3a-a389-2abba357c991",
-          "created_at": "2026-06-01T09:46:07.902205+00:00"
+          "caused_by_event_id": "43e7903a-4960-42e3-a6b7-e480dcc26fed",
+          "created_at": "2026-06-01T15:01:37.531816+00:00"
         },
         {
-          "id": "833115a0-0ec6-46d7-b3b4-f917ec305ffc",
+          "id": "f0681af7-04dd-4a86-bea6-720254102be4",
           "case_id": "mist_clock_manor",
-          "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+          "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
           "actor_id": "derived_event_system",
           "type": "player_knowledge.updated",
           "payload": {
@@ -1061,68 +1061,68 @@
             "confidence": 1.0,
             "acquisition": "discovered",
             "source_type": "clue",
-            "source_event_id": "c6fb0aa9-06cc-4648-8f27-074dc7046b10",
+            "source_event_id": "27bbb14a-3578-45f6-bcbd-cfe1a4b873db",
             "title": "江若岚旧录音存在",
             "summary": "磁带中保存了江若岚生前指责陆澜生盗用与操控的录音。"
           },
-          "caused_by_event_id": "c6fb0aa9-06cc-4648-8f27-074dc7046b10",
-          "created_at": "2026-06-01T09:46:07.902205+00:00"
+          "caused_by_event_id": "27bbb14a-3578-45f6-bcbd-cfe1a4b873db",
+          "created_at": "2026-06-01T15:01:37.531816+00:00"
         },
         {
-          "id": "23e8ddff-5a3c-42a9-ae20-e620546a5e60",
+          "id": "18e50a13-2668-4bfb-a39f-90ed2a586a1b",
           "case_id": "mist_clock_manor",
-          "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+          "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
           "actor_id": "derived_event_system",
           "type": "memory_candidate.created",
           "payload": {
             "memory_id": "memory.player.clue_discovered.ruolan_voice_tape",
             "subject_id": "player",
             "content": "Player discovered clue '江若岚的录音片段'.",
-            "source_event_id": "c6fb0aa9-06cc-4648-8f27-074dc7046b10",
+            "source_event_id": "27bbb14a-3578-45f6-bcbd-cfe1a4b873db",
             "visibility": [
               "player"
             ],
             "salience": 0.8
           },
-          "caused_by_event_id": "c6fb0aa9-06cc-4648-8f27-074dc7046b10",
-          "created_at": "2026-06-01T09:46:07.902205+00:00"
+          "caused_by_event_id": "27bbb14a-3578-45f6-bcbd-cfe1a4b873db",
+          "created_at": "2026-06-01T15:01:37.531816+00:00"
         },
         {
-          "id": "4b0dca06-3b25-4a9a-b130-d47f3eea6831",
+          "id": "11b4df9c-2dbc-4fc6-b9d2-99941383354a",
           "case_id": "mist_clock_manor",
-          "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+          "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
           "actor_id": "memory_snapshot_system",
           "type": "agent_memory_snapshot.updated",
           "payload": {
             "memory_id": "memory.player.clue_discovered.ruolan_voice_tape",
             "subject_id": "player",
             "source_event_ids": [
-              "c6fb0aa9-06cc-4648-8f27-074dc7046b10"
+              "27bbb14a-3578-45f6-bcbd-cfe1a4b873db"
             ],
             "salience": 0.8,
             "visibility": "private",
             "operation": "created"
           },
-          "caused_by_event_id": "23e8ddff-5a3c-42a9-ae20-e620546a5e60",
-          "created_at": "2026-06-01T09:46:07.902205+00:00"
+          "caused_by_event_id": "18e50a13-2668-4bfb-a39f-90ed2a586a1b",
+          "created_at": "2026-06-01T15:01:37.531816+00:00"
         },
         {
-          "id": "74e6417a-d21c-443d-ad2c-043f34b4db88",
+          "id": "ce8ffa8d-bfcc-456e-a645-0eac6c705deb",
           "case_id": "mist_clock_manor",
-          "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+          "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
           "actor_id": "rule_trigger_system",
           "type": "narrative.beat.completed",
           "payload": {
             "beat_id": "mechanism_exposed",
             "phase": "investigation"
           },
-          "caused_by_event_id": "c6fb0aa9-06cc-4648-8f27-074dc7046b10",
-          "created_at": "2026-06-01T09:46:07.902205+00:00"
+          "caused_by_event_id": "27bbb14a-3578-45f6-bcbd-cfe1a4b873db",
+          "created_at": "2026-06-01T15:01:37.531816+00:00"
         },
         {
-          "id": "ea33d02b-f708-4f5f-a901-577f14ab734c",
+          "id": "20536453-5756-46c8-beaa-f8e196203aa0",
           "case_id": "mist_clock_manor",
-          "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+          "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
           "actor_id": "rule_trigger_system",
           "type": "narrative.phase.changed",
           "payload": {
@@ -1131,8 +1131,8 @@
             "to_phase": "confrontation",
             "trigger_beat_id": "mechanism_exposed"
           },
-          "caused_by_event_id": "c6fb0aa9-06cc-4648-8f27-074dc7046b10",
-          "created_at": "2026-06-01T09:46:07.902205+00:00"
+          "caused_by_event_id": "27bbb14a-3578-45f6-bcbd-cfe1a4b873db",
+          "created_at": "2026-06-01T15:01:37.531816+00:00"
         }
       ],
       "known_world_info_after": [
@@ -1210,9 +1210,9 @@
       ],
       "new_events": [
         {
-          "id": "ac99b99f-0117-4d2a-844a-38384e4a6d4e",
+          "id": "52bcaeba-7c3a-422f-be8c-6fd28c3951b9",
           "case_id": "mist_clock_manor",
-          "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+          "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
           "actor_id": "player",
           "type": "player.talked",
           "payload": {
@@ -1220,12 +1220,12 @@
             "text": "Tell me what you hid."
           },
           "caused_by_event_id": null,
-          "created_at": "2026-06-01T09:46:07.902205+00:00"
+          "created_at": "2026-06-01T15:01:37.531816+00:00"
         },
         {
-          "id": "41e214ea-ac23-469d-b732-80c0d3f3ba2d",
+          "id": "a0948a2c-f860-425f-b819-18706135bab9",
           "case_id": "mist_clock_manor",
-          "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+          "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
           "actor_id": "director",
           "type": "director.blocked",
           "payload": {
@@ -1241,13 +1241,13 @@
             "safe_fallback_used": true,
             "disclosure_claims": []
           },
-          "caused_by_event_id": "ac99b99f-0117-4d2a-844a-38384e4a6d4e",
-          "created_at": "2026-06-01T09:46:07.903802+00:00"
+          "caused_by_event_id": "52bcaeba-7c3a-422f-be8c-6fd28c3951b9",
+          "created_at": "2026-06-01T15:01:37.531816+00:00"
         },
         {
-          "id": "0b4b4738-c9d4-41c3-9560-1a92230572e4",
+          "id": "31a6750c-3942-4b4c-b67a-f0f8b3c6ef59",
           "case_id": "mist_clock_manor",
-          "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+          "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
           "actor_id": "character_impression_system",
           "type": "character_impression.updated",
           "payload": {
@@ -1270,50 +1270,50 @@
             ],
             "confidence": 0.1,
             "source_event_ids": [
-              "41e214ea-ac23-469d-b732-80c0d3f3ba2d"
+              "a0948a2c-f860-425f-b819-18706135bab9"
             ],
-            "last_updated_event_id": "0b4b4738-c9d4-41c3-9560-1a92230572e4"
+            "last_updated_event_id": "31a6750c-3942-4b4c-b67a-f0f8b3c6ef59"
           },
-          "caused_by_event_id": "41e214ea-ac23-469d-b732-80c0d3f3ba2d",
-          "created_at": "2026-06-01T09:46:07.903802+00:00"
+          "caused_by_event_id": "a0948a2c-f860-425f-b819-18706135bab9",
+          "created_at": "2026-06-01T15:01:37.531816+00:00"
         },
         {
-          "id": "0846791d-bf3c-4684-86e5-b7e20074376d",
+          "id": "8516d8e5-bcde-4435-96ae-30cd74d37305",
           "case_id": "mist_clock_manor",
-          "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+          "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
           "actor_id": "derived_event_system",
           "type": "memory_candidate.created",
           "payload": {
             "memory_id": "memory.player.director_blocked.jiang_yanhui.jiang_yanhui_mechanism",
             "subject_id": "player",
             "content": "Conversation with 江雁回 was blocked by narrative rules.",
-            "source_event_id": "41e214ea-ac23-469d-b732-80c0d3f3ba2d",
+            "source_event_id": "a0948a2c-f860-425f-b819-18706135bab9",
             "visibility": [
               "player"
             ],
             "salience": 0.9
           },
-          "caused_by_event_id": "41e214ea-ac23-469d-b732-80c0d3f3ba2d",
-          "created_at": "2026-06-01T09:46:07.903802+00:00"
+          "caused_by_event_id": "a0948a2c-f860-425f-b819-18706135bab9",
+          "created_at": "2026-06-01T15:01:37.531816+00:00"
         },
         {
-          "id": "9a8c7800-83fb-47f4-aded-798d53a16bbb",
+          "id": "d7137156-4b07-4374-91da-1829f17c4f86",
           "case_id": "mist_clock_manor",
-          "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+          "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
           "actor_id": "memory_snapshot_system",
           "type": "agent_memory_snapshot.updated",
           "payload": {
             "memory_id": "memory.player.director_blocked.jiang_yanhui.jiang_yanhui_mechanism",
             "subject_id": "player",
             "source_event_ids": [
-              "41e214ea-ac23-469d-b732-80c0d3f3ba2d"
+              "a0948a2c-f860-425f-b819-18706135bab9"
             ],
             "salience": 0.9,
             "visibility": "private",
             "operation": "created"
           },
-          "caused_by_event_id": "0846791d-bf3c-4684-86e5-b7e20074376d",
-          "created_at": "2026-06-01T09:46:07.903802+00:00"
+          "caused_by_event_id": "8516d8e5-bcde-4435-96ae-30cd74d37305",
+          "created_at": "2026-06-01T15:01:37.531816+00:00"
         }
       ],
       "known_world_info_after": [
@@ -1399,9 +1399,9 @@
       "new_director_blocks": [],
       "new_events": [
         {
-          "id": "1f3bd68e-3ce9-48af-b689-e7696d25b360",
+          "id": "bda743e9-dea0-4d9e-844a-7457dcbf56d3",
           "case_id": "mist_clock_manor",
-          "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+          "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
           "actor_id": "player",
           "type": "player.presented_clue",
           "payload": {
@@ -1412,12 +1412,12 @@
             "interaction_pressure": 0.9
           },
           "caused_by_event_id": null,
-          "created_at": "2026-06-01T09:46:07.903802+00:00"
+          "created_at": "2026-06-01T15:01:37.531816+00:00"
         },
         {
-          "id": "820cbf93-ecea-4f43-889a-e9a47f158b9f",
+          "id": "72aa1bfc-24d2-4493-9579-2ab447c39e85",
           "case_id": "mist_clock_manor",
-          "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+          "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
           "actor_id": "jiang_yanhui",
           "type": "npc.replied",
           "payload": {
@@ -1436,13 +1436,13 @@
             ],
             "disclosure_claims": []
           },
-          "caused_by_event_id": "1f3bd68e-3ce9-48af-b689-e7696d25b360",
-          "created_at": "2026-06-01T09:46:07.903802+00:00"
+          "caused_by_event_id": "bda743e9-dea0-4d9e-844a-7457dcbf56d3",
+          "created_at": "2026-06-01T15:01:37.533338+00:00"
         },
         {
-          "id": "c8462799-4c58-42cc-9357-f73a55845ffd",
+          "id": "e04c084b-8448-48b5-a99e-e96e5f8b9b83",
           "case_id": "mist_clock_manor",
-          "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+          "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
           "actor_id": "system",
           "type": "relationship.changed",
           "payload": {
@@ -1462,13 +1462,13 @@
               "hostility": 0.0
             }
           },
-          "caused_by_event_id": "820cbf93-ecea-4f43-889a-e9a47f158b9f",
-          "created_at": "2026-06-01T09:46:07.903802+00:00"
+          "caused_by_event_id": "72aa1bfc-24d2-4493-9579-2ab447c39e85",
+          "created_at": "2026-06-01T15:01:37.533338+00:00"
         },
         {
-          "id": "d0e88932-1f7e-4744-8d82-3e46033fda17",
+          "id": "27ea7f62-8abf-4d2d-b6bf-982f02e745c2",
           "case_id": "mist_clock_manor",
-          "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+          "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
           "actor_id": "system",
           "type": "relationship.threshold.crossed",
           "payload": {
@@ -1479,13 +1479,13 @@
             "state": "guarded",
             "current_value": 0.7
           },
-          "caused_by_event_id": "c8462799-4c58-42cc-9357-f73a55845ffd",
-          "created_at": "2026-06-01T09:46:07.903802+00:00"
+          "caused_by_event_id": "e04c084b-8448-48b5-a99e-e96e5f8b9b83",
+          "created_at": "2026-06-01T15:01:37.533338+00:00"
         },
         {
-          "id": "0620f7e5-bb35-43f3-ad32-e583f8480183",
+          "id": "3995ca70-ad0d-4dfe-b0f4-4fee0696aca4",
           "case_id": "mist_clock_manor",
-          "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+          "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
           "actor_id": "character_impression_system",
           "type": "character_impression.updated",
           "payload": {
@@ -1515,18 +1515,18 @@
             ],
             "confidence": 0.2,
             "source_event_ids": [
-              "41e214ea-ac23-469d-b732-80c0d3f3ba2d",
-              "1f3bd68e-3ce9-48af-b689-e7696d25b360"
+              "a0948a2c-f860-425f-b819-18706135bab9",
+              "bda743e9-dea0-4d9e-844a-7457dcbf56d3"
             ],
-            "last_updated_event_id": "0620f7e5-bb35-43f3-ad32-e583f8480183"
+            "last_updated_event_id": "3995ca70-ad0d-4dfe-b0f4-4fee0696aca4"
           },
-          "caused_by_event_id": "1f3bd68e-3ce9-48af-b689-e7696d25b360",
-          "created_at": "2026-06-01T09:46:07.903802+00:00"
+          "caused_by_event_id": "bda743e9-dea0-4d9e-844a-7457dcbf56d3",
+          "created_at": "2026-06-01T15:01:37.533338+00:00"
         },
         {
-          "id": "98ac081d-6630-4e82-9a6c-bc01a138367d",
+          "id": "950a638e-84a5-491a-97ac-e9b7be18722a",
           "case_id": "mist_clock_manor",
-          "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+          "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
           "actor_id": "character_fact_awareness_system",
           "type": "character_fact_awareness.updated",
           "payload": {
@@ -1546,55 +1546,55 @@
             ],
             "source_event_ids": [
               "case_package",
-              "1f3bd68e-3ce9-48af-b689-e7696d25b360"
+              "bda743e9-dea0-4d9e-844a-7457dcbf56d3"
             ],
-            "last_updated_event_id": "98ac081d-6630-4e82-9a6c-bc01a138367d"
+            "last_updated_event_id": "950a638e-84a5-491a-97ac-e9b7be18722a"
           },
-          "caused_by_event_id": "1f3bd68e-3ce9-48af-b689-e7696d25b360",
-          "created_at": "2026-06-01T09:46:07.903802+00:00"
+          "caused_by_event_id": "bda743e9-dea0-4d9e-844a-7457dcbf56d3",
+          "created_at": "2026-06-01T15:01:37.533338+00:00"
         },
         {
-          "id": "ec50f4f0-cc02-4a46-aeb7-989494152664",
+          "id": "bd566c86-d695-4a1c-9c14-3ece6141bfc0",
           "case_id": "mist_clock_manor",
-          "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+          "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
           "actor_id": "derived_event_system",
           "type": "memory_candidate.created",
           "payload": {
             "memory_id": "memory.player.presented_clue.jiang_yanhui.delayed_lock_marks",
             "subject_id": "player",
             "content": "Player pressured 江雁回 with clue 'delayed_lock_marks' at pressure 0.9.",
-            "source_event_id": "1f3bd68e-3ce9-48af-b689-e7696d25b360",
+            "source_event_id": "bda743e9-dea0-4d9e-844a-7457dcbf56d3",
             "visibility": [
               "player"
             ],
             "salience": 0.9
           },
-          "caused_by_event_id": "1f3bd68e-3ce9-48af-b689-e7696d25b360",
-          "created_at": "2026-06-01T09:46:07.903802+00:00"
+          "caused_by_event_id": "bda743e9-dea0-4d9e-844a-7457dcbf56d3",
+          "created_at": "2026-06-01T15:01:37.533338+00:00"
         },
         {
-          "id": "41e02cf3-d1c2-4d82-98f2-2a803e9f55bb",
+          "id": "58835d05-3801-4743-bc47-7ee9e212cd51",
           "case_id": "mist_clock_manor",
-          "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+          "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
           "actor_id": "memory_snapshot_system",
           "type": "agent_memory_snapshot.updated",
           "payload": {
             "memory_id": "memory.player.presented_clue.jiang_yanhui.delayed_lock_marks",
             "subject_id": "player",
             "source_event_ids": [
-              "1f3bd68e-3ce9-48af-b689-e7696d25b360"
+              "bda743e9-dea0-4d9e-844a-7457dcbf56d3"
             ],
             "salience": 0.9,
             "visibility": "private",
             "operation": "created"
           },
-          "caused_by_event_id": "ec50f4f0-cc02-4a46-aeb7-989494152664",
-          "created_at": "2026-06-01T09:46:07.903802+00:00"
+          "caused_by_event_id": "bd566c86-d695-4a1c-9c14-3ece6141bfc0",
+          "created_at": "2026-06-01T15:01:37.533338+00:00"
         },
         {
-          "id": "3f41ec97-f45a-443d-a13d-6fb93386b17b",
+          "id": "6182da7d-602b-4d02-b777-534a500e5d79",
           "case_id": "mist_clock_manor",
-          "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+          "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
           "actor_id": "character_impression_system",
           "type": "character_impression.updated",
           "payload": {
@@ -1627,52 +1627,52 @@
             ],
             "confidence": 0.3,
             "source_event_ids": [
-              "41e214ea-ac23-469d-b732-80c0d3f3ba2d",
-              "1f3bd68e-3ce9-48af-b689-e7696d25b360",
-              "d0e88932-1f7e-4744-8d82-3e46033fda17"
+              "a0948a2c-f860-425f-b819-18706135bab9",
+              "bda743e9-dea0-4d9e-844a-7457dcbf56d3",
+              "27ea7f62-8abf-4d2d-b6bf-982f02e745c2"
             ],
-            "last_updated_event_id": "3f41ec97-f45a-443d-a13d-6fb93386b17b"
+            "last_updated_event_id": "6182da7d-602b-4d02-b777-534a500e5d79"
           },
-          "caused_by_event_id": "d0e88932-1f7e-4744-8d82-3e46033fda17",
-          "created_at": "2026-06-01T09:46:07.903802+00:00"
+          "caused_by_event_id": "27ea7f62-8abf-4d2d-b6bf-982f02e745c2",
+          "created_at": "2026-06-01T15:01:37.533338+00:00"
         },
         {
-          "id": "dcd8b7e6-61ed-4d55-bcc0-f7ada3aafb78",
+          "id": "7fed06a0-b2fa-4614-b878-62d013493fb5",
           "case_id": "mist_clock_manor",
-          "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+          "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
           "actor_id": "derived_event_system",
           "type": "memory_candidate.created",
           "payload": {
             "memory_id": "memory.player.relationship_threshold.jiang_yanhui.player.suspicion.guarded",
             "subject_id": "player",
             "content": "江雁回 became guarded toward the player (suspicion).",
-            "source_event_id": "d0e88932-1f7e-4744-8d82-3e46033fda17",
+            "source_event_id": "27ea7f62-8abf-4d2d-b6bf-982f02e745c2",
             "visibility": [
               "player"
             ],
             "salience": 0.7
           },
-          "caused_by_event_id": "d0e88932-1f7e-4744-8d82-3e46033fda17",
-          "created_at": "2026-06-01T09:46:07.903802+00:00"
+          "caused_by_event_id": "27ea7f62-8abf-4d2d-b6bf-982f02e745c2",
+          "created_at": "2026-06-01T15:01:37.533338+00:00"
         },
         {
-          "id": "26e35ca9-a4b1-4c0a-aa3c-5ab60488cfc2",
+          "id": "167e2433-0c60-4079-8aad-f1f642c2403f",
           "case_id": "mist_clock_manor",
-          "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+          "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
           "actor_id": "memory_snapshot_system",
           "type": "agent_memory_snapshot.updated",
           "payload": {
             "memory_id": "memory.player.relationship_threshold.jiang_yanhui.player.suspicion.guarded",
             "subject_id": "player",
             "source_event_ids": [
-              "d0e88932-1f7e-4744-8d82-3e46033fda17"
+              "27ea7f62-8abf-4d2d-b6bf-982f02e745c2"
             ],
             "salience": 0.7,
             "visibility": "private",
             "operation": "created"
           },
-          "caused_by_event_id": "dcd8b7e6-61ed-4d55-bcc0-f7ada3aafb78",
-          "created_at": "2026-06-01T09:46:07.903802+00:00"
+          "caused_by_event_id": "7fed06a0-b2fa-4614-b878-62d013493fb5",
+          "created_at": "2026-06-01T15:01:37.533338+00:00"
         }
       ],
       "known_world_info_after": [
@@ -1736,34 +1736,34 @@
       "new_director_blocks": [],
       "new_events": [
         {
-          "id": "4a7f06c8-b3fc-4572-ab68-5d8e50c6e550",
+          "id": "f90e9a7e-4477-4c33-892f-21e5cf0eb78d",
           "case_id": "mist_clock_manor",
-          "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+          "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
           "actor_id": "player",
           "type": "player.inspected",
           "payload": {
             "target_id": "burned_letter"
           },
           "caused_by_event_id": null,
-          "created_at": "2026-06-01T09:46:07.903802+00:00"
+          "created_at": "2026-06-01T15:01:37.533338+00:00"
         },
         {
-          "id": "adbf7038-59f4-4e55-aea8-57054ee84a3b",
+          "id": "bba6fc08-12b1-4730-82e0-8492d39e2f28",
           "case_id": "mist_clock_manor",
-          "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+          "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
           "actor_id": "system",
           "type": "clue.discovered",
           "payload": {
             "clue_id": "burned_confession",
             "source_hotspot_id": "burned_letter"
           },
-          "caused_by_event_id": "4a7f06c8-b3fc-4572-ab68-5d8e50c6e550",
-          "created_at": "2026-06-01T09:46:07.903802+00:00"
+          "caused_by_event_id": "f90e9a7e-4477-4c33-892f-21e5cf0eb78d",
+          "created_at": "2026-06-01T15:01:37.533338+00:00"
         },
         {
-          "id": "a021ce19-a144-4751-91e4-16a6db717609",
+          "id": "60092e04-3ad5-43f1-89b6-ae49107d3693",
           "case_id": "mist_clock_manor",
-          "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+          "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
           "actor_id": "derived_event_system",
           "type": "player_knowledge.updated",
           "payload": {
@@ -1773,50 +1773,50 @@
             "confidence": 1.0,
             "acquisition": "discovered",
             "source_type": "clue",
-            "source_event_id": "adbf7038-59f4-4e55-aea8-57054ee84a3b",
+            "source_event_id": "bba6fc08-12b1-4730-82e0-8492d39e2f28",
             "title": "陆澜生准备伪造忏悔信洗白旧案",
             "summary": "陆澜生计划用伪造忏悔信和信托条款，把江若岚之死包装成个人情绪导致的意外。"
           },
-          "caused_by_event_id": "adbf7038-59f4-4e55-aea8-57054ee84a3b",
-          "created_at": "2026-06-01T09:46:07.903802+00:00"
+          "caused_by_event_id": "bba6fc08-12b1-4730-82e0-8492d39e2f28",
+          "created_at": "2026-06-01T15:01:37.533338+00:00"
         },
         {
-          "id": "f2b09a08-bf4b-441b-86f5-404ad2252e61",
+          "id": "62606fe1-fa09-4ce7-92d1-1748f5b43add",
           "case_id": "mist_clock_manor",
-          "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+          "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
           "actor_id": "derived_event_system",
           "type": "memory_candidate.created",
           "payload": {
             "memory_id": "memory.player.clue_discovered.burned_confession",
             "subject_id": "player",
             "content": "Player discovered clue '烧毁半截的忏悔信附录'.",
-            "source_event_id": "adbf7038-59f4-4e55-aea8-57054ee84a3b",
+            "source_event_id": "bba6fc08-12b1-4730-82e0-8492d39e2f28",
             "visibility": [
               "player"
             ],
             "salience": 0.8
           },
-          "caused_by_event_id": "adbf7038-59f4-4e55-aea8-57054ee84a3b",
-          "created_at": "2026-06-01T09:46:07.903802+00:00"
+          "caused_by_event_id": "bba6fc08-12b1-4730-82e0-8492d39e2f28",
+          "created_at": "2026-06-01T15:01:37.533338+00:00"
         },
         {
-          "id": "cef0d9ce-00b9-4a6e-900c-44f21aa79a68",
+          "id": "94573a21-bfd4-4312-bdd3-71f7e9c7c644",
           "case_id": "mist_clock_manor",
-          "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+          "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
           "actor_id": "memory_snapshot_system",
           "type": "agent_memory_snapshot.updated",
           "payload": {
             "memory_id": "memory.player.clue_discovered.burned_confession",
             "subject_id": "player",
             "source_event_ids": [
-              "adbf7038-59f4-4e55-aea8-57054ee84a3b"
+              "bba6fc08-12b1-4730-82e0-8492d39e2f28"
             ],
             "salience": 0.8,
             "visibility": "private",
             "operation": "created"
           },
-          "caused_by_event_id": "f2b09a08-bf4b-441b-86f5-404ad2252e61",
-          "created_at": "2026-06-01T09:46:07.903802+00:00"
+          "caused_by_event_id": "62606fe1-fa09-4ce7-92d1-1748f5b43add",
+          "created_at": "2026-06-01T15:01:37.533338+00:00"
         }
       ],
       "known_world_info_after": [
@@ -1883,34 +1883,34 @@
       "new_director_blocks": [],
       "new_events": [
         {
-          "id": "c5423e1d-562d-41dd-bcf3-08223570f7ed",
+          "id": "8e03777b-e587-42b2-b478-c4691af688de",
           "case_id": "mist_clock_manor",
-          "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+          "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
           "actor_id": "player",
           "type": "player.inspected",
           "payload": {
             "target_id": "medicine_box"
           },
           "caused_by_event_id": null,
-          "created_at": "2026-06-01T09:46:07.903802+00:00"
+          "created_at": "2026-06-01T15:01:37.533338+00:00"
         },
         {
-          "id": "638ba3df-89a3-486b-b2bb-c814fc2649a5",
+          "id": "95e4fc77-9205-4a92-9be2-62eb3a045fe0",
           "case_id": "mist_clock_manor",
-          "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+          "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
           "actor_id": "system",
           "type": "clue.discovered",
           "payload": {
             "clue_id": "empty_capsules",
             "source_hotspot_id": "medicine_box"
           },
-          "caused_by_event_id": "c5423e1d-562d-41dd-bcf3-08223570f7ed",
-          "created_at": "2026-06-01T09:46:07.905374+00:00"
+          "caused_by_event_id": "8e03777b-e587-42b2-b478-c4691af688de",
+          "created_at": "2026-06-01T15:01:37.533338+00:00"
         },
         {
-          "id": "787b5281-0d74-40d5-a698-73e3b7d3d186",
+          "id": "a2abbb49-20fd-4265-a2c2-b4f44f42574a",
           "case_id": "mist_clock_manor",
-          "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+          "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
           "actor_id": "derived_event_system",
           "type": "player_knowledge.updated",
           "payload": {
@@ -1920,50 +1920,50 @@
             "confidence": 1.0,
             "acquisition": "discovered",
             "source_type": "clue",
-            "source_event_id": "638ba3df-89a3-486b-b2bb-c814fc2649a5",
+            "source_event_id": "95e4fc77-9205-4a92-9be2-62eb3a045fe0",
             "title": "陆澜生的心脏病药被换成空胶囊",
             "summary": "书房药盒中有外观相同的空胶囊，导致陆澜生发病时没有得到有效药物。"
           },
-          "caused_by_event_id": "638ba3df-89a3-486b-b2bb-c814fc2649a5",
-          "created_at": "2026-06-01T09:46:07.905374+00:00"
+          "caused_by_event_id": "95e4fc77-9205-4a92-9be2-62eb3a045fe0",
+          "created_at": "2026-06-01T15:01:37.533338+00:00"
         },
         {
-          "id": "6ab4f2cf-a091-40f0-bdca-782e28f14b12",
+          "id": "056d8c80-82fb-43db-80ee-4a3785635761",
           "case_id": "mist_clock_manor",
-          "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+          "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
           "actor_id": "derived_event_system",
           "type": "memory_candidate.created",
           "payload": {
             "memory_id": "memory.player.clue_discovered.empty_capsules",
             "subject_id": "player",
             "content": "Player discovered clue '重量异常的心脏病胶囊'.",
-            "source_event_id": "638ba3df-89a3-486b-b2bb-c814fc2649a5",
+            "source_event_id": "95e4fc77-9205-4a92-9be2-62eb3a045fe0",
             "visibility": [
               "player"
             ],
             "salience": 0.8
           },
-          "caused_by_event_id": "638ba3df-89a3-486b-b2bb-c814fc2649a5",
-          "created_at": "2026-06-01T09:46:07.905374+00:00"
+          "caused_by_event_id": "95e4fc77-9205-4a92-9be2-62eb3a045fe0",
+          "created_at": "2026-06-01T15:01:37.533338+00:00"
         },
         {
-          "id": "a4542972-bfc8-449c-a0ab-570b1b001f82",
+          "id": "d5c2eb72-03fe-4198-b4c1-a940220c815a",
           "case_id": "mist_clock_manor",
-          "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+          "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
           "actor_id": "memory_snapshot_system",
           "type": "agent_memory_snapshot.updated",
           "payload": {
             "memory_id": "memory.player.clue_discovered.empty_capsules",
             "subject_id": "player",
             "source_event_ids": [
-              "638ba3df-89a3-486b-b2bb-c814fc2649a5"
+              "95e4fc77-9205-4a92-9be2-62eb3a045fe0"
             ],
             "salience": 0.8,
             "visibility": "private",
             "operation": "created"
           },
-          "caused_by_event_id": "6ab4f2cf-a091-40f0-bdca-782e28f14b12",
-          "created_at": "2026-06-01T09:46:07.905374+00:00"
+          "caused_by_event_id": "056d8c80-82fb-43db-80ee-4a3785635761",
+          "created_at": "2026-06-01T15:01:37.533338+00:00"
         }
       ],
       "known_world_info_after": [
@@ -2037,34 +2037,34 @@
       "new_director_blocks": [],
       "new_events": [
         {
-          "id": "9ac663f2-1373-4327-b0dd-2a43afc8f772",
+          "id": "cadb8193-32f0-4942-a855-58cff1546473",
           "case_id": "mist_clock_manor",
-          "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+          "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
           "actor_id": "player",
           "type": "player.inspected",
           "payload": {
             "target_id": "breaker_box"
           },
           "caused_by_event_id": null,
-          "created_at": "2026-06-01T09:46:07.905374+00:00"
+          "created_at": "2026-06-01T15:01:37.533338+00:00"
         },
         {
-          "id": "21351cae-ddcf-4680-9c85-5a8508fb9efa",
+          "id": "820ea6ac-f631-4046-90b1-fb9796f1894a",
           "case_id": "mist_clock_manor",
-          "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+          "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
           "actor_id": "system",
           "type": "clue.discovered",
           "payload": {
             "clue_id": "cut_power_trace",
             "source_hotspot_id": "breaker_box"
           },
-          "caused_by_event_id": "9ac663f2-1373-4327-b0dd-2a43afc8f772",
-          "created_at": "2026-06-01T09:46:07.905374+00:00"
+          "caused_by_event_id": "cadb8193-32f0-4942-a855-58cff1546473",
+          "created_at": "2026-06-01T15:01:37.533338+00:00"
         },
         {
-          "id": "820c3b5a-981a-4b8b-9068-158bd1bcf74b",
+          "id": "6d2f1254-44ff-4ac5-9562-a7e19642a587",
           "case_id": "mist_clock_manor",
-          "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+          "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
           "actor_id": "derived_event_system",
           "type": "player_knowledge.updated",
           "payload": {
@@ -2074,68 +2074,68 @@
             "confidence": 1.0,
             "acquisition": "discovered",
             "source_type": "clue",
-            "source_event_id": "21351cae-ddcf-4680-9c85-5a8508fb9efa",
+            "source_event_id": "820ea6ac-f631-4046-90b1-fb9796f1894a",
             "title": "沈照夜切断主电源",
             "summary": "沈照夜在案发前切断主电源，想迫使陆澜生无法按原计划播放公开视频。"
           },
-          "caused_by_event_id": "21351cae-ddcf-4680-9c85-5a8508fb9efa",
-          "created_at": "2026-06-01T09:46:07.905374+00:00"
+          "caused_by_event_id": "820ea6ac-f631-4046-90b1-fb9796f1894a",
+          "created_at": "2026-06-01T15:01:37.533338+00:00"
         },
         {
-          "id": "77455df1-531b-4638-9b7a-b5feb3d369f0",
+          "id": "48e878d2-353e-4d12-b2f9-ba96db80f896",
           "case_id": "mist_clock_manor",
-          "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+          "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
           "actor_id": "derived_event_system",
           "type": "memory_candidate.created",
           "payload": {
             "memory_id": "memory.player.clue_discovered.cut_power_trace",
             "subject_id": "player",
             "content": "Player discovered clue '被人为拉下的主电闸'.",
-            "source_event_id": "21351cae-ddcf-4680-9c85-5a8508fb9efa",
+            "source_event_id": "820ea6ac-f631-4046-90b1-fb9796f1894a",
             "visibility": [
               "player"
             ],
             "salience": 0.8
           },
-          "caused_by_event_id": "21351cae-ddcf-4680-9c85-5a8508fb9efa",
-          "created_at": "2026-06-01T09:46:07.905374+00:00"
+          "caused_by_event_id": "820ea6ac-f631-4046-90b1-fb9796f1894a",
+          "created_at": "2026-06-01T15:01:37.533338+00:00"
         },
         {
-          "id": "f5d23141-c6d4-41a7-960d-ed26f277166d",
+          "id": "fd70b757-5574-4e80-b7b4-bbe72d8ffba1",
           "case_id": "mist_clock_manor",
-          "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+          "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
           "actor_id": "memory_snapshot_system",
           "type": "agent_memory_snapshot.updated",
           "payload": {
             "memory_id": "memory.player.clue_discovered.cut_power_trace",
             "subject_id": "player",
             "source_event_ids": [
-              "21351cae-ddcf-4680-9c85-5a8508fb9efa"
+              "820ea6ac-f631-4046-90b1-fb9796f1894a"
             ],
             "salience": 0.8,
             "visibility": "private",
             "operation": "created"
           },
-          "caused_by_event_id": "77455df1-531b-4638-9b7a-b5feb3d369f0",
-          "created_at": "2026-06-01T09:46:07.905374+00:00"
+          "caused_by_event_id": "48e878d2-353e-4d12-b2f9-ba96db80f896",
+          "created_at": "2026-06-01T15:01:37.533338+00:00"
         },
         {
-          "id": "04be89e6-1957-45cf-a863-0c11dfb1a24e",
+          "id": "d535dd7f-0026-4c93-9183-730e8768054c",
           "case_id": "mist_clock_manor",
-          "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+          "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
           "actor_id": "rule_trigger_system",
           "type": "narrative.beat.completed",
           "payload": {
             "beat_id": "motive_chain_exposed",
             "phase": "confrontation"
           },
-          "caused_by_event_id": "21351cae-ddcf-4680-9c85-5a8508fb9efa",
-          "created_at": "2026-06-01T09:46:07.905374+00:00"
+          "caused_by_event_id": "820ea6ac-f631-4046-90b1-fb9796f1894a",
+          "created_at": "2026-06-01T15:01:37.533338+00:00"
         },
         {
-          "id": "a1a06499-c678-460b-90de-4ae4de08d863",
+          "id": "11925087-86e0-42f3-8de7-e3a2c9ec3b8a",
           "case_id": "mist_clock_manor",
-          "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+          "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
           "actor_id": "rule_trigger_system",
           "type": "narrative.phase.changed",
           "payload": {
@@ -2144,8 +2144,8 @@
             "to_phase": "reconstruction",
             "trigger_beat_id": "motive_chain_exposed"
           },
-          "caused_by_event_id": "21351cae-ddcf-4680-9c85-5a8508fb9efa",
-          "created_at": "2026-06-01T09:46:07.905374+00:00"
+          "caused_by_event_id": "820ea6ac-f631-4046-90b1-fb9796f1894a",
+          "created_at": "2026-06-01T15:01:37.533338+00:00"
         }
       ],
       "known_world_info_after": [
@@ -2297,9 +2297,9 @@
       "new_director_blocks": [],
       "new_events": [
         {
-          "id": "f2407797-f925-42c7-b7b7-4e64dc64f977",
+          "id": "8007224c-d00c-4fac-9257-67db89855e22",
           "case_id": "mist_clock_manor",
-          "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+          "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
           "actor_id": "player",
           "type": "player.accused",
           "payload": {
@@ -2316,12 +2316,12 @@
             "text": "The death was caused by a chain of actions."
           },
           "caused_by_event_id": null,
-          "created_at": "2026-06-01T09:46:07.905374+00:00"
+          "created_at": "2026-06-01T15:01:37.533338+00:00"
         },
         {
-          "id": "f8d02c43-af27-4a08-90b6-e0589f51a3a8",
+          "id": "15a89cd0-3221-43ae-99f5-e04123f5f2b6",
           "case_id": "mist_clock_manor",
-          "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+          "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
           "actor_id": "rule_engine",
           "type": "accusation.evaluated",
           "payload": {
@@ -2338,13 +2338,13 @@
             ],
             "missing_required_evidence": []
           },
-          "caused_by_event_id": "f2407797-f925-42c7-b7b7-4e64dc64f977",
-          "created_at": "2026-06-01T09:46:07.905374+00:00"
+          "caused_by_event_id": "8007224c-d00c-4fac-9257-67db89855e22",
+          "created_at": "2026-06-01T15:01:37.533338+00:00"
         },
         {
-          "id": "735efa4e-9d8c-46e5-91d0-c03292463972",
+          "id": "bf60b561-b8e7-4de8-b0c8-950c4905b89c",
           "case_id": "mist_clock_manor",
-          "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+          "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
           "actor_id": "character_impression_system",
           "type": "character_impression.updated",
           "payload": {
@@ -2384,20 +2384,20 @@
             ],
             "confidence": 0.4,
             "source_event_ids": [
-              "41e214ea-ac23-469d-b732-80c0d3f3ba2d",
-              "1f3bd68e-3ce9-48af-b689-e7696d25b360",
-              "d0e88932-1f7e-4744-8d82-3e46033fda17",
-              "f2407797-f925-42c7-b7b7-4e64dc64f977"
+              "a0948a2c-f860-425f-b819-18706135bab9",
+              "bda743e9-dea0-4d9e-844a-7457dcbf56d3",
+              "27ea7f62-8abf-4d2d-b6bf-982f02e745c2",
+              "8007224c-d00c-4fac-9257-67db89855e22"
             ],
-            "last_updated_event_id": "735efa4e-9d8c-46e5-91d0-c03292463972"
+            "last_updated_event_id": "bf60b561-b8e7-4de8-b0c8-950c4905b89c"
           },
-          "caused_by_event_id": "f2407797-f925-42c7-b7b7-4e64dc64f977",
-          "created_at": "2026-06-01T09:46:07.905374+00:00"
+          "caused_by_event_id": "8007224c-d00c-4fac-9257-67db89855e22",
+          "created_at": "2026-06-01T15:01:37.533338+00:00"
         },
         {
-          "id": "c73bf453-0eea-4791-9c99-f72f9f822c8e",
+          "id": "3d731bee-03de-4e10-8fe1-c5526d255645",
           "case_id": "mist_clock_manor",
-          "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+          "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
           "actor_id": "character_fact_awareness_system",
           "type": "character_fact_awareness.updated",
           "payload": {
@@ -2419,17 +2419,17 @@
               "empty_capsules"
             ],
             "source_event_ids": [
-              "f2407797-f925-42c7-b7b7-4e64dc64f977"
+              "8007224c-d00c-4fac-9257-67db89855e22"
             ],
-            "last_updated_event_id": "c73bf453-0eea-4791-9c99-f72f9f822c8e"
+            "last_updated_event_id": "3d731bee-03de-4e10-8fe1-c5526d255645"
           },
-          "caused_by_event_id": "f2407797-f925-42c7-b7b7-4e64dc64f977",
-          "created_at": "2026-06-01T09:46:07.905374+00:00"
+          "caused_by_event_id": "8007224c-d00c-4fac-9257-67db89855e22",
+          "created_at": "2026-06-01T15:01:37.533338+00:00"
         },
         {
-          "id": "83fec33c-efb9-4038-a83d-d21cb158a3c1",
+          "id": "1a0a9a22-1da4-4f4f-a0ae-6d6ca7bc74fa",
           "case_id": "mist_clock_manor",
-          "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+          "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
           "actor_id": "character_fact_awareness_system",
           "type": "character_fact_awareness.updated",
           "payload": {
@@ -2454,18 +2454,18 @@
             ],
             "source_event_ids": [
               "case_package",
-              "1f3bd68e-3ce9-48af-b689-e7696d25b360",
-              "f2407797-f925-42c7-b7b7-4e64dc64f977"
+              "bda743e9-dea0-4d9e-844a-7457dcbf56d3",
+              "8007224c-d00c-4fac-9257-67db89855e22"
             ],
-            "last_updated_event_id": "83fec33c-efb9-4038-a83d-d21cb158a3c1"
+            "last_updated_event_id": "1a0a9a22-1da4-4f4f-a0ae-6d6ca7bc74fa"
           },
-          "caused_by_event_id": "f2407797-f925-42c7-b7b7-4e64dc64f977",
-          "created_at": "2026-06-01T09:46:07.905374+00:00"
+          "caused_by_event_id": "8007224c-d00c-4fac-9257-67db89855e22",
+          "created_at": "2026-06-01T15:01:37.533338+00:00"
         },
         {
-          "id": "22c82800-f30b-4123-aeeb-848e34440a66",
+          "id": "59ebe4b0-d1bf-49a4-822e-f2feec31f17a",
           "case_id": "mist_clock_manor",
-          "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+          "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
           "actor_id": "character_fact_awareness_system",
           "type": "character_fact_awareness.updated",
           "payload": {
@@ -2490,17 +2490,17 @@
             ],
             "source_event_ids": [
               "case_package",
-              "f2407797-f925-42c7-b7b7-4e64dc64f977"
+              "8007224c-d00c-4fac-9257-67db89855e22"
             ],
-            "last_updated_event_id": "22c82800-f30b-4123-aeeb-848e34440a66"
+            "last_updated_event_id": "59ebe4b0-d1bf-49a4-822e-f2feec31f17a"
           },
-          "caused_by_event_id": "f2407797-f925-42c7-b7b7-4e64dc64f977",
-          "created_at": "2026-06-01T09:46:07.905374+00:00"
+          "caused_by_event_id": "8007224c-d00c-4fac-9257-67db89855e22",
+          "created_at": "2026-06-01T15:01:37.533338+00:00"
         },
         {
-          "id": "707a6894-90ac-4ad8-b62e-0e12322f3457",
+          "id": "3560943e-c650-4f14-8337-4a4ba21032d7",
           "case_id": "mist_clock_manor",
-          "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+          "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
           "actor_id": "character_fact_awareness_system",
           "type": "character_fact_awareness.updated",
           "payload": {
@@ -2525,17 +2525,17 @@
             ],
             "source_event_ids": [
               "case_package",
-              "f2407797-f925-42c7-b7b7-4e64dc64f977"
+              "8007224c-d00c-4fac-9257-67db89855e22"
             ],
-            "last_updated_event_id": "707a6894-90ac-4ad8-b62e-0e12322f3457"
+            "last_updated_event_id": "3560943e-c650-4f14-8337-4a4ba21032d7"
           },
-          "caused_by_event_id": "f2407797-f925-42c7-b7b7-4e64dc64f977",
-          "created_at": "2026-06-01T09:46:07.905374+00:00"
+          "caused_by_event_id": "8007224c-d00c-4fac-9257-67db89855e22",
+          "created_at": "2026-06-01T15:01:37.533338+00:00"
         },
         {
-          "id": "7db401d3-fbb8-4c01-9b45-e38319761273",
+          "id": "bfcb0eee-34d7-40d1-8a2d-c0bcfaed124c",
           "case_id": "mist_clock_manor",
-          "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+          "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
           "actor_id": "character_fact_awareness_system",
           "type": "character_fact_awareness.updated",
           "payload": {
@@ -2559,17 +2559,17 @@
             ],
             "source_event_ids": [
               "case_package",
-              "f2407797-f925-42c7-b7b7-4e64dc64f977"
+              "8007224c-d00c-4fac-9257-67db89855e22"
             ],
-            "last_updated_event_id": "7db401d3-fbb8-4c01-9b45-e38319761273"
+            "last_updated_event_id": "bfcb0eee-34d7-40d1-8a2d-c0bcfaed124c"
           },
-          "caused_by_event_id": "f2407797-f925-42c7-b7b7-4e64dc64f977",
-          "created_at": "2026-06-01T09:46:07.905374+00:00"
+          "caused_by_event_id": "8007224c-d00c-4fac-9257-67db89855e22",
+          "created_at": "2026-06-01T15:01:37.533338+00:00"
         },
         {
-          "id": "0bd2e5e9-3613-45c6-bcae-cb478c8dd445",
+          "id": "fc9f7386-3ad0-4228-9fdf-1d956c66e6f7",
           "case_id": "mist_clock_manor",
-          "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+          "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
           "actor_id": "character_fact_awareness_system",
           "type": "character_fact_awareness.updated",
           "payload": {
@@ -2591,55 +2591,55 @@
               "empty_capsules"
             ],
             "source_event_ids": [
-              "f2407797-f925-42c7-b7b7-4e64dc64f977"
+              "8007224c-d00c-4fac-9257-67db89855e22"
             ],
-            "last_updated_event_id": "0bd2e5e9-3613-45c6-bcae-cb478c8dd445"
+            "last_updated_event_id": "fc9f7386-3ad0-4228-9fdf-1d956c66e6f7"
           },
-          "caused_by_event_id": "f2407797-f925-42c7-b7b7-4e64dc64f977",
-          "created_at": "2026-06-01T09:46:07.905374+00:00"
+          "caused_by_event_id": "8007224c-d00c-4fac-9257-67db89855e22",
+          "created_at": "2026-06-01T15:01:37.533338+00:00"
         },
         {
-          "id": "7e119306-34f6-4fc4-b5a1-4c1228634313",
+          "id": "e38c73e1-5c28-4b86-82a8-f5b1b0c68932",
           "case_id": "mist_clock_manor",
-          "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+          "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
           "actor_id": "derived_event_system",
           "type": "memory_candidate.created",
           "payload": {
             "memory_id": "memory.player.accused.jiang_yanhui.shared_death_chain",
             "subject_id": "player",
             "content": "Player formally accused 江雁回 with claim 'shared_death_chain' using evidence ['bitter_wine', 'delayed_lock_marks', 'echo_tape', 'burned_confession', 'empty_capsules', 'cut_power_trace'].",
-            "source_event_id": "f2407797-f925-42c7-b7b7-4e64dc64f977",
+            "source_event_id": "8007224c-d00c-4fac-9257-67db89855e22",
             "visibility": [
               "player"
             ],
             "salience": 1.0
           },
-          "caused_by_event_id": "f2407797-f925-42c7-b7b7-4e64dc64f977",
-          "created_at": "2026-06-01T09:46:07.905374+00:00"
+          "caused_by_event_id": "8007224c-d00c-4fac-9257-67db89855e22",
+          "created_at": "2026-06-01T15:01:37.533338+00:00"
         },
         {
-          "id": "236a537a-bd48-4593-a780-a1f434e388bc",
+          "id": "4a9579c0-92e3-4faf-98ff-615a37dcbd82",
           "case_id": "mist_clock_manor",
-          "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+          "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
           "actor_id": "memory_snapshot_system",
           "type": "agent_memory_snapshot.updated",
           "payload": {
             "memory_id": "memory.player.accused.jiang_yanhui.shared_death_chain",
             "subject_id": "player",
             "source_event_ids": [
-              "f2407797-f925-42c7-b7b7-4e64dc64f977"
+              "8007224c-d00c-4fac-9257-67db89855e22"
             ],
             "salience": 1.0,
             "visibility": "private",
             "operation": "created"
           },
-          "caused_by_event_id": "7e119306-34f6-4fc4-b5a1-4c1228634313",
-          "created_at": "2026-06-01T09:46:07.905374+00:00"
+          "caused_by_event_id": "e38c73e1-5c28-4b86-82a8-f5b1b0c68932",
+          "created_at": "2026-06-01T15:01:37.533338+00:00"
         },
         {
-          "id": "03d99ccc-fe04-4405-8e16-c9cd52db9be8",
+          "id": "35ec9d78-b5e8-413c-837f-5f0af361fddc",
           "case_id": "mist_clock_manor",
-          "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+          "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
           "actor_id": "character_impression_system",
           "type": "character_impression.updated",
           "payload": {
@@ -2681,72 +2681,72 @@
             ],
             "confidence": 0.5,
             "source_event_ids": [
-              "41e214ea-ac23-469d-b732-80c0d3f3ba2d",
-              "1f3bd68e-3ce9-48af-b689-e7696d25b360",
-              "d0e88932-1f7e-4744-8d82-3e46033fda17",
-              "f2407797-f925-42c7-b7b7-4e64dc64f977",
-              "f8d02c43-af27-4a08-90b6-e0589f51a3a8"
+              "a0948a2c-f860-425f-b819-18706135bab9",
+              "bda743e9-dea0-4d9e-844a-7457dcbf56d3",
+              "27ea7f62-8abf-4d2d-b6bf-982f02e745c2",
+              "8007224c-d00c-4fac-9257-67db89855e22",
+              "15a89cd0-3221-43ae-99f5-e04123f5f2b6"
             ],
-            "last_updated_event_id": "03d99ccc-fe04-4405-8e16-c9cd52db9be8"
+            "last_updated_event_id": "35ec9d78-b5e8-413c-837f-5f0af361fddc"
           },
-          "caused_by_event_id": "f8d02c43-af27-4a08-90b6-e0589f51a3a8",
-          "created_at": "2026-06-01T09:46:07.905374+00:00"
+          "caused_by_event_id": "15a89cd0-3221-43ae-99f5-e04123f5f2b6",
+          "created_at": "2026-06-01T15:01:37.533338+00:00"
         },
         {
-          "id": "3f1f05eb-fed0-4e55-815f-3eb86b7a24d7",
+          "id": "a567bf16-1aff-40e5-b326-3e34ce6280da",
           "case_id": "mist_clock_manor",
-          "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+          "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
           "actor_id": "derived_event_system",
           "type": "memory_candidate.created",
           "payload": {
             "memory_id": "memory.player.accusation_evaluated.jiang_yanhui.shared_death_chain.correct",
             "subject_id": "player",
             "content": "Rule Engine evaluated the accusation against 江雁回 for claim 'shared_death_chain' as correct.",
-            "source_event_id": "f8d02c43-af27-4a08-90b6-e0589f51a3a8",
+            "source_event_id": "15a89cd0-3221-43ae-99f5-e04123f5f2b6",
             "visibility": [
               "player"
             ],
             "salience": 1.0
           },
-          "caused_by_event_id": "f8d02c43-af27-4a08-90b6-e0589f51a3a8",
-          "created_at": "2026-06-01T09:46:07.905374+00:00"
+          "caused_by_event_id": "15a89cd0-3221-43ae-99f5-e04123f5f2b6",
+          "created_at": "2026-06-01T15:01:37.533338+00:00"
         },
         {
-          "id": "f56e5af6-5c41-429b-b16a-c072b6808d7f",
+          "id": "14d8aa62-5358-452e-a280-4513bcdf9c25",
           "case_id": "mist_clock_manor",
-          "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+          "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
           "actor_id": "memory_snapshot_system",
           "type": "agent_memory_snapshot.updated",
           "payload": {
             "memory_id": "memory.player.accusation_evaluated.jiang_yanhui.shared_death_chain.correct",
             "subject_id": "player",
             "source_event_ids": [
-              "f8d02c43-af27-4a08-90b6-e0589f51a3a8"
+              "15a89cd0-3221-43ae-99f5-e04123f5f2b6"
             ],
             "salience": 1.0,
             "visibility": "private",
             "operation": "created"
           },
-          "caused_by_event_id": "3f1f05eb-fed0-4e55-815f-3eb86b7a24d7",
-          "created_at": "2026-06-01T09:46:07.905374+00:00"
+          "caused_by_event_id": "a567bf16-1aff-40e5-b326-3e34ce6280da",
+          "created_at": "2026-06-01T15:01:37.533338+00:00"
         },
         {
-          "id": "1c2721f0-24e8-4e42-857b-4ef0a70e7660",
+          "id": "7139c039-c4d6-4a35-8e00-885495a7c7b6",
           "case_id": "mist_clock_manor",
-          "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+          "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
           "actor_id": "rule_trigger_system",
           "type": "narrative.beat.completed",
           "payload": {
             "beat_id": "case_solved",
             "phase": "reconstruction"
           },
-          "caused_by_event_id": "f8d02c43-af27-4a08-90b6-e0589f51a3a8",
-          "created_at": "2026-06-01T09:46:07.905374+00:00"
+          "caused_by_event_id": "15a89cd0-3221-43ae-99f5-e04123f5f2b6",
+          "created_at": "2026-06-01T15:01:37.533338+00:00"
         },
         {
-          "id": "29d126ac-e773-4810-b20d-17f4eef65241",
+          "id": "4f3d0027-3380-4899-9d19-9cac920f53a5",
           "case_id": "mist_clock_manor",
-          "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+          "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
           "actor_id": "rule_trigger_system",
           "type": "narrative.phase.changed",
           "payload": {
@@ -2755,8 +2755,8 @@
             "to_phase": "resolved",
             "trigger_beat_id": "case_solved"
           },
-          "caused_by_event_id": "f8d02c43-af27-4a08-90b6-e0589f51a3a8",
-          "created_at": "2026-06-01T09:46:07.905374+00:00"
+          "caused_by_event_id": "15a89cd0-3221-43ae-99f5-e04123f5f2b6",
+          "created_at": "2026-06-01T15:01:37.533338+00:00"
         }
       ],
       "known_world_info_after": [
@@ -2789,7 +2789,7 @@
     }
   ],
   "final_state_summary": {
-    "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+    "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
     "case_id": "mist_clock_manor",
     "case_title": "雾钟山庄",
     "narrative_phase": "resolved",
@@ -2982,7 +2982,7 @@
       "source_type": "clue",
       "title": "陆澜生准备伪造忏悔信洗白旧案",
       "summary": "陆澜生计划用伪造忏悔信和信托条款，把江若岚之死包装成个人情绪导致的意外。",
-      "source_event_id": "adbf7038-59f4-4e55-aea8-57054ee84a3b"
+      "source_event_id": "bba6fc08-12b1-4730-82e0-8492d39e2f28"
     },
     "player_knowledge.heart_medicine_replaced": {
       "knowledge_id": "player_knowledge.heart_medicine_replaced",
@@ -2993,7 +2993,7 @@
       "source_type": "clue",
       "title": "陆澜生的心脏病药被换成空胶囊",
       "summary": "书房药盒中有外观相同的空胶囊，导致陆澜生发病时没有得到有效药物。",
-      "source_event_id": "638ba3df-89a3-486b-b2bb-c814fc2649a5"
+      "source_event_id": "95e4fc77-9205-4a92-9be2-62eb3a045fe0"
     },
     "player_knowledge.jiang_ruolan_recording_exists": {
       "knowledge_id": "player_knowledge.jiang_ruolan_recording_exists",
@@ -3004,7 +3004,7 @@
       "source_type": "clue",
       "title": "江若岚旧录音存在",
       "summary": "磁带中保存了江若岚生前指责陆澜生盗用与操控的录音。",
-      "source_event_id": "c6fb0aa9-06cc-4648-8f27-074dc7046b10"
+      "source_event_id": "27bbb14a-3578-45f6-bcbd-cfe1a4b873db"
     },
     "player_knowledge.power_cut_by_shen": {
       "knowledge_id": "player_knowledge.power_cut_by_shen",
@@ -3015,7 +3015,7 @@
       "source_type": "clue",
       "title": "沈照夜切断主电源",
       "summary": "沈照夜在案发前切断主电源，想迫使陆澜生无法按原计划播放公开视频。",
-      "source_event_id": "21351cae-ddcf-4680-9c85-5a8508fb9efa"
+      "source_event_id": "820ea6ac-f631-4046-90b1-fb9796f1894a"
     },
     "player_knowledge.recording_tape_swapped": {
       "knowledge_id": "player_knowledge.recording_tape_swapped",
@@ -3026,7 +3026,7 @@
       "source_type": "clue",
       "title": "书房录音带被替换",
       "summary": "十一点十七分响起的钟声来自书房录音机，而不是山庄钟楼。",
-      "source_event_id": "71283d84-8e99-457e-80d9-2d5fe933d90b"
+      "source_event_id": "1faa6aae-0406-4b8b-b630-f0c811e33fbb"
     },
     "player_knowledge.sedative_wine": {
       "knowledge_id": "player_knowledge.sedative_wine",
@@ -3037,7 +3037,7 @@
       "source_type": "clue",
       "title": "红酒中含有镇静剂",
       "summary": "林栖迟送入书房的红酒含有安眠药成分，削弱了陆澜生的反应能力。",
-      "source_event_id": "9cc2c64d-d046-4ff5-a344-36fb30b6b67c"
+      "source_event_id": "46a9b1b8-b4a0-4adc-a126-d946338e69fb"
     },
     "player_knowledge.timed_lock_modified": {
       "knowledge_id": "player_knowledge.timed_lock_modified",
@@ -3048,7 +3048,7 @@
       "source_type": "clue",
       "title": "书房门锁被改成延时落锁",
       "summary": "门锁内侧的新划痕和润滑油说明，有人提前做了延时卡榫，制造密室假象。",
-      "source_event_id": "4901cf8d-bfab-4119-bdff-6f538c492147"
+      "source_event_id": "01679c69-e122-45aa-a660-154c165dce43"
     }
   },
   "final_character_fact_awareness": {
@@ -3093,9 +3093,9 @@
       ],
       "source_event_ids": [
         "case_package",
-        "f2407797-f925-42c7-b7b7-4e64dc64f977"
+        "8007224c-d00c-4fac-9257-67db89855e22"
       ],
-      "last_updated_event_id": "707a6894-90ac-4ad8-b62e-0e12322f3457"
+      "last_updated_event_id": "3560943e-c650-4f14-8337-4a4ba21032d7"
     },
     "character_fact_awareness.jiang_yanhui.heart_medicine_replaced": {
       "awareness_id": "character_fact_awareness.jiang_yanhui.heart_medicine_replaced",
@@ -3118,9 +3118,9 @@
       ],
       "source_event_ids": [
         "case_package",
-        "f2407797-f925-42c7-b7b7-4e64dc64f977"
+        "8007224c-d00c-4fac-9257-67db89855e22"
       ],
-      "last_updated_event_id": "7db401d3-fbb8-4c01-9b45-e38319761273"
+      "last_updated_event_id": "bfcb0eee-34d7-40d1-8a2d-c0bcfaed124c"
     },
     "character_fact_awareness.jiang_yanhui.jiang_ruolan_death_coverup": {
       "awareness_id": "character_fact_awareness.jiang_yanhui.jiang_ruolan_death_coverup",
@@ -3181,9 +3181,9 @@
         "empty_capsules"
       ],
       "source_event_ids": [
-        "f2407797-f925-42c7-b7b7-4e64dc64f977"
+        "8007224c-d00c-4fac-9257-67db89855e22"
       ],
-      "last_updated_event_id": "0bd2e5e9-3613-45c6-bcae-cb478c8dd445"
+      "last_updated_event_id": "fc9f7386-3ad0-4228-9fdf-1d956c66e6f7"
     },
     "character_fact_awareness.jiang_yanhui.recording_tape_swapped": {
       "awareness_id": "character_fact_awareness.jiang_yanhui.recording_tape_swapped",
@@ -3207,9 +3207,9 @@
       ],
       "source_event_ids": [
         "case_package",
-        "f2407797-f925-42c7-b7b7-4e64dc64f977"
+        "8007224c-d00c-4fac-9257-67db89855e22"
       ],
-      "last_updated_event_id": "22c82800-f30b-4123-aeeb-848e34440a66"
+      "last_updated_event_id": "59ebe4b0-d1bf-49a4-822e-f2feec31f17a"
     },
     "character_fact_awareness.jiang_yanhui.sedative_wine": {
       "awareness_id": "character_fact_awareness.jiang_yanhui.sedative_wine",
@@ -3230,9 +3230,9 @@
         "empty_capsules"
       ],
       "source_event_ids": [
-        "f2407797-f925-42c7-b7b7-4e64dc64f977"
+        "8007224c-d00c-4fac-9257-67db89855e22"
       ],
-      "last_updated_event_id": "c73bf453-0eea-4791-9c99-f72f9f822c8e"
+      "last_updated_event_id": "3d731bee-03de-4e10-8fe1-c5526d255645"
     },
     "character_fact_awareness.jiang_yanhui.timed_lock_modified": {
       "awareness_id": "character_fact_awareness.jiang_yanhui.timed_lock_modified",
@@ -3256,10 +3256,10 @@
       ],
       "source_event_ids": [
         "case_package",
-        "1f3bd68e-3ce9-48af-b689-e7696d25b360",
-        "f2407797-f925-42c7-b7b7-4e64dc64f977"
+        "bda743e9-dea0-4d9e-844a-7457dcbf56d3",
+        "8007224c-d00c-4fac-9257-67db89855e22"
       ],
-      "last_updated_event_id": "83fec33c-efb9-4038-a83d-d21cb158a3c1"
+      "last_updated_event_id": "1a0a9a22-1da4-4f4f-a0ae-6d6ca7bc74fa"
     },
     "character_fact_awareness.lin_qichi.fake_confession_plan": {
       "awareness_id": "character_fact_awareness.lin_qichi.fake_confession_plan",
@@ -3296,10 +3296,10 @@
       ],
       "source_event_ids": [
         "case_package",
-        "f6fb9b21-4d18-48ad-9db8-3825c48925ed",
-        "753d37f5-ffc1-4e65-93e7-da8d955649b2"
+        "a3f35e63-2649-4175-994d-1e1b0cf06d44",
+        "47984950-9bc0-444e-98c9-45a6f103ceff"
       ],
-      "last_updated_event_id": "0b49abf5-3f0c-48e5-8255-68c5da2027fb"
+      "last_updated_event_id": "46991a27-250f-4157-8a3f-4dd94dcb20d2"
     },
     "character_fact_awareness.qi_yan.fake_confession_plan": {
       "awareness_id": "character_fact_awareness.qi_yan.fake_confession_plan",
@@ -3452,13 +3452,13 @@
         ],
         "confidence": 0.5,
         "source_event_ids": [
-          "41e214ea-ac23-469d-b732-80c0d3f3ba2d",
-          "1f3bd68e-3ce9-48af-b689-e7696d25b360",
-          "d0e88932-1f7e-4744-8d82-3e46033fda17",
-          "f2407797-f925-42c7-b7b7-4e64dc64f977",
-          "f8d02c43-af27-4a08-90b6-e0589f51a3a8"
+          "a0948a2c-f860-425f-b819-18706135bab9",
+          "bda743e9-dea0-4d9e-844a-7457dcbf56d3",
+          "27ea7f62-8abf-4d2d-b6bf-982f02e745c2",
+          "8007224c-d00c-4fac-9257-67db89855e22",
+          "15a89cd0-3221-43ae-99f5-e04123f5f2b6"
         ],
-        "last_updated_event_id": "03d99ccc-fe04-4405-8e16-c9cd52db9be8"
+        "last_updated_event_id": "35ec9d78-b5e8-413c-837f-5f0af361fddc"
       }
     },
     "lin_qichi": {
@@ -3492,11 +3492,11 @@
         ],
         "confidence": 0.3,
         "source_event_ids": [
-          "f6fb9b21-4d18-48ad-9db8-3825c48925ed",
-          "6f30d248-dce1-4c9f-ae7d-7fde5ea691a8",
-          "753d37f5-ffc1-4e65-93e7-da8d955649b2"
+          "a3f35e63-2649-4175-994d-1e1b0cf06d44",
+          "d2719edb-016c-4a06-9372-881a489551a2",
+          "47984950-9bc0-444e-98c9-45a6f103ceff"
         ],
-        "last_updated_event_id": "1cdebc3b-cf15-4d4b-851c-23d81aef71b3"
+        "last_updated_event_id": "6fb2179b-da0e-4bf0-bb6e-690d5e9935b3"
       }
     }
   },
@@ -3505,7 +3505,7 @@
       "memory_id": "memory.player.accusation_evaluated.jiang_yanhui.shared_death_chain.correct",
       "subject_id": "player",
       "content": "Rule Engine evaluated the accusation against 江雁回 for claim 'shared_death_chain' as correct.",
-      "source_event_id": "f8d02c43-af27-4a08-90b6-e0589f51a3a8",
+      "source_event_id": "15a89cd0-3221-43ae-99f5-e04123f5f2b6",
       "visibility": [
         "player"
       ],
@@ -3515,7 +3515,7 @@
       "memory_id": "memory.player.accused.jiang_yanhui.shared_death_chain",
       "subject_id": "player",
       "content": "Player formally accused 江雁回 with claim 'shared_death_chain' using evidence ['bitter_wine', 'delayed_lock_marks', 'echo_tape', 'burned_confession', 'empty_capsules', 'cut_power_trace'].",
-      "source_event_id": "f2407797-f925-42c7-b7b7-4e64dc64f977",
+      "source_event_id": "8007224c-d00c-4fac-9257-67db89855e22",
       "visibility": [
         "player"
       ],
@@ -3525,7 +3525,7 @@
       "memory_id": "memory.player.asked_about.lin_qichi.clue.bitter_wine",
       "subject_id": "player",
       "content": "Player asked 林栖迟 about clue 'bitter_wine' with pressure 0.6.",
-      "source_event_id": "f6fb9b21-4d18-48ad-9db8-3825c48925ed",
+      "source_event_id": "a3f35e63-2649-4175-994d-1e1b0cf06d44",
       "visibility": [
         "player"
       ],
@@ -3535,7 +3535,7 @@
       "memory_id": "memory.player.clue_discovered.bitter_wine",
       "subject_id": "player",
       "content": "Player discovered clue '带苦味的红酒残液'.",
-      "source_event_id": "9cc2c64d-d046-4ff5-a344-36fb30b6b67c",
+      "source_event_id": "46a9b1b8-b4a0-4adc-a126-d946338e69fb",
       "visibility": [
         "player"
       ],
@@ -3545,7 +3545,7 @@
       "memory_id": "memory.player.clue_discovered.burned_confession",
       "subject_id": "player",
       "content": "Player discovered clue '烧毁半截的忏悔信附录'.",
-      "source_event_id": "adbf7038-59f4-4e55-aea8-57054ee84a3b",
+      "source_event_id": "bba6fc08-12b1-4730-82e0-8492d39e2f28",
       "visibility": [
         "player"
       ],
@@ -3555,7 +3555,7 @@
       "memory_id": "memory.player.clue_discovered.cut_power_trace",
       "subject_id": "player",
       "content": "Player discovered clue '被人为拉下的主电闸'.",
-      "source_event_id": "21351cae-ddcf-4680-9c85-5a8508fb9efa",
+      "source_event_id": "820ea6ac-f631-4046-90b1-fb9796f1894a",
       "visibility": [
         "player"
       ],
@@ -3565,7 +3565,7 @@
       "memory_id": "memory.player.clue_discovered.delayed_lock_marks",
       "subject_id": "player",
       "content": "Player discovered clue '门锁内侧的新划痕'.",
-      "source_event_id": "4901cf8d-bfab-4119-bdff-6f538c492147",
+      "source_event_id": "01679c69-e122-45aa-a660-154c165dce43",
       "visibility": [
         "player"
       ],
@@ -3575,7 +3575,7 @@
       "memory_id": "memory.player.clue_discovered.echo_tape",
       "subject_id": "player",
       "content": "Player discovered clue '标着“回声钟终稿”的磁带'.",
-      "source_event_id": "71283d84-8e99-457e-80d9-2d5fe933d90b",
+      "source_event_id": "1faa6aae-0406-4b8b-b630-f0c811e33fbb",
       "visibility": [
         "player"
       ],
@@ -3585,7 +3585,7 @@
       "memory_id": "memory.player.clue_discovered.empty_capsules",
       "subject_id": "player",
       "content": "Player discovered clue '重量异常的心脏病胶囊'.",
-      "source_event_id": "638ba3df-89a3-486b-b2bb-c814fc2649a5",
+      "source_event_id": "95e4fc77-9205-4a92-9be2-62eb3a045fe0",
       "visibility": [
         "player"
       ],
@@ -3595,7 +3595,7 @@
       "memory_id": "memory.player.clue_discovered.ruolan_voice_tape",
       "subject_id": "player",
       "content": "Player discovered clue '江若岚的录音片段'.",
-      "source_event_id": "c6fb0aa9-06cc-4648-8f27-074dc7046b10",
+      "source_event_id": "27bbb14a-3578-45f6-bcbd-cfe1a4b873db",
       "visibility": [
         "player"
       ],
@@ -3605,7 +3605,7 @@
       "memory_id": "memory.player.director_blocked.jiang_yanhui.jiang_yanhui_mechanism",
       "subject_id": "player",
       "content": "Conversation with 江雁回 was blocked by narrative rules.",
-      "source_event_id": "41e214ea-ac23-469d-b732-80c0d3f3ba2d",
+      "source_event_id": "a0948a2c-f860-425f-b819-18706135bab9",
       "visibility": [
         "player"
       ],
@@ -3615,7 +3615,7 @@
       "memory_id": "memory.player.presented_clue.jiang_yanhui.delayed_lock_marks",
       "subject_id": "player",
       "content": "Player pressured 江雁回 with clue 'delayed_lock_marks' at pressure 0.9.",
-      "source_event_id": "1f3bd68e-3ce9-48af-b689-e7696d25b360",
+      "source_event_id": "bda743e9-dea0-4d9e-844a-7457dcbf56d3",
       "visibility": [
         "player"
       ],
@@ -3625,7 +3625,7 @@
       "memory_id": "memory.player.presented_clue.lin_qichi.bitter_wine",
       "subject_id": "player",
       "content": "Player pressured 林栖迟 with clue 'bitter_wine' at pressure 0.9.",
-      "source_event_id": "753d37f5-ffc1-4e65-93e7-da8d955649b2",
+      "source_event_id": "47984950-9bc0-444e-98c9-45a6f103ceff",
       "visibility": [
         "player"
       ],
@@ -3635,7 +3635,7 @@
       "memory_id": "memory.player.relationship_threshold.jiang_yanhui.player.suspicion.guarded",
       "subject_id": "player",
       "content": "江雁回 became guarded toward the player (suspicion).",
-      "source_event_id": "d0e88932-1f7e-4744-8d82-3e46033fda17",
+      "source_event_id": "27ea7f62-8abf-4d2d-b6bf-982f02e745c2",
       "visibility": [
         "player"
       ],
@@ -3645,7 +3645,7 @@
       "memory_id": "memory.player.relationship_threshold.lin_qichi.player.fear.afraid",
       "subject_id": "player",
       "content": "林栖迟 became afraid toward the player (fear).",
-      "source_event_id": "6f30d248-dce1-4c9f-ae7d-7fde5ea691a8",
+      "source_event_id": "d2719edb-016c-4a06-9372-881a489551a2",
       "visibility": [
         "player"
       ],
@@ -3658,195 +3658,195 @@
       "subject_id": "player",
       "content": "Rule Engine evaluated the accusation against 江雁回 for claim 'shared_death_chain' as correct.",
       "source_event_ids": [
-        "f8d02c43-af27-4a08-90b6-e0589f51a3a8"
+        "15a89cd0-3221-43ae-99f5-e04123f5f2b6"
       ],
       "salience": 1.0,
       "visibility": "private",
-      "last_updated_event_id": "f56e5af6-5c41-429b-b16a-c072b6808d7f",
-      "created_at": "2026-06-01T09:46:07.905374+00:00",
-      "updated_at": "2026-06-01T09:46:07.905374+00:00"
+      "last_updated_event_id": "14d8aa62-5358-452e-a280-4513bcdf9c25",
+      "created_at": "2026-06-01T15:01:37.533338+00:00",
+      "updated_at": "2026-06-01T15:01:37.533338+00:00"
     },
     "memory.player.accused.jiang_yanhui.shared_death_chain": {
       "memory_id": "memory.player.accused.jiang_yanhui.shared_death_chain",
       "subject_id": "player",
       "content": "Player formally accused 江雁回 with claim 'shared_death_chain' using evidence ['bitter_wine', 'delayed_lock_marks', 'echo_tape', 'burned_confession', 'empty_capsules', 'cut_power_trace'].",
       "source_event_ids": [
-        "f2407797-f925-42c7-b7b7-4e64dc64f977"
+        "8007224c-d00c-4fac-9257-67db89855e22"
       ],
       "salience": 1.0,
       "visibility": "private",
-      "last_updated_event_id": "236a537a-bd48-4593-a780-a1f434e388bc",
-      "created_at": "2026-06-01T09:46:07.905374+00:00",
-      "updated_at": "2026-06-01T09:46:07.905374+00:00"
+      "last_updated_event_id": "4a9579c0-92e3-4faf-98ff-615a37dcbd82",
+      "created_at": "2026-06-01T15:01:37.533338+00:00",
+      "updated_at": "2026-06-01T15:01:37.533338+00:00"
     },
     "memory.player.asked_about.lin_qichi.clue.bitter_wine": {
       "memory_id": "memory.player.asked_about.lin_qichi.clue.bitter_wine",
       "subject_id": "player",
       "content": "Player asked 林栖迟 about clue 'bitter_wine' with pressure 0.6.",
       "source_event_ids": [
-        "f6fb9b21-4d18-48ad-9db8-3825c48925ed"
+        "a3f35e63-2649-4175-994d-1e1b0cf06d44"
       ],
       "salience": 0.6,
       "visibility": "private",
-      "last_updated_event_id": "0e722687-455e-4b7d-bc64-85041fa5818b",
-      "created_at": "2026-06-01T09:46:07.902205+00:00",
-      "updated_at": "2026-06-01T09:46:07.902205+00:00"
+      "last_updated_event_id": "30a6a7b3-d4ae-4cdb-954b-70f7041048cf",
+      "created_at": "2026-06-01T15:01:37.531816+00:00",
+      "updated_at": "2026-06-01T15:01:37.531816+00:00"
     },
     "memory.player.clue_discovered.bitter_wine": {
       "memory_id": "memory.player.clue_discovered.bitter_wine",
       "subject_id": "player",
       "content": "Player discovered clue '带苦味的红酒残液'.",
       "source_event_ids": [
-        "9cc2c64d-d046-4ff5-a344-36fb30b6b67c"
+        "46a9b1b8-b4a0-4adc-a126-d946338e69fb"
       ],
       "salience": 0.8,
       "visibility": "private",
-      "last_updated_event_id": "933a9811-5cef-470e-864e-56d71cc817d6",
-      "created_at": "2026-06-01T09:46:07.897525+00:00",
-      "updated_at": "2026-06-01T09:46:07.897525+00:00"
+      "last_updated_event_id": "523752f9-8e19-4cca-88ba-879b6b7bb20c",
+      "created_at": "2026-06-01T15:01:37.527573+00:00",
+      "updated_at": "2026-06-01T15:01:37.527573+00:00"
     },
     "memory.player.clue_discovered.burned_confession": {
       "memory_id": "memory.player.clue_discovered.burned_confession",
       "subject_id": "player",
       "content": "Player discovered clue '烧毁半截的忏悔信附录'.",
       "source_event_ids": [
-        "adbf7038-59f4-4e55-aea8-57054ee84a3b"
+        "bba6fc08-12b1-4730-82e0-8492d39e2f28"
       ],
       "salience": 0.8,
       "visibility": "private",
-      "last_updated_event_id": "cef0d9ce-00b9-4a6e-900c-44f21aa79a68",
-      "created_at": "2026-06-01T09:46:07.903802+00:00",
-      "updated_at": "2026-06-01T09:46:07.903802+00:00"
+      "last_updated_event_id": "94573a21-bfd4-4312-bdd3-71f7e9c7c644",
+      "created_at": "2026-06-01T15:01:37.533338+00:00",
+      "updated_at": "2026-06-01T15:01:37.533338+00:00"
     },
     "memory.player.clue_discovered.cut_power_trace": {
       "memory_id": "memory.player.clue_discovered.cut_power_trace",
       "subject_id": "player",
       "content": "Player discovered clue '被人为拉下的主电闸'.",
       "source_event_ids": [
-        "21351cae-ddcf-4680-9c85-5a8508fb9efa"
+        "820ea6ac-f631-4046-90b1-fb9796f1894a"
       ],
       "salience": 0.8,
       "visibility": "private",
-      "last_updated_event_id": "f5d23141-c6d4-41a7-960d-ed26f277166d",
-      "created_at": "2026-06-01T09:46:07.905374+00:00",
-      "updated_at": "2026-06-01T09:46:07.905374+00:00"
+      "last_updated_event_id": "fd70b757-5574-4e80-b7b4-bbe72d8ffba1",
+      "created_at": "2026-06-01T15:01:37.533338+00:00",
+      "updated_at": "2026-06-01T15:01:37.533338+00:00"
     },
     "memory.player.clue_discovered.delayed_lock_marks": {
       "memory_id": "memory.player.clue_discovered.delayed_lock_marks",
       "subject_id": "player",
       "content": "Player discovered clue '门锁内侧的新划痕'.",
       "source_event_ids": [
-        "4901cf8d-bfab-4119-bdff-6f538c492147"
+        "01679c69-e122-45aa-a660-154c165dce43"
       ],
       "salience": 0.8,
       "visibility": "private",
-      "last_updated_event_id": "1c997122-dce7-453c-aa9e-10e4a2f272ab",
-      "created_at": "2026-06-01T09:46:07.902205+00:00",
-      "updated_at": "2026-06-01T09:46:07.902205+00:00"
+      "last_updated_event_id": "0a2d506c-ab4e-4196-935a-2e23a6fc781b",
+      "created_at": "2026-06-01T15:01:37.531816+00:00",
+      "updated_at": "2026-06-01T15:01:37.531816+00:00"
     },
     "memory.player.clue_discovered.echo_tape": {
       "memory_id": "memory.player.clue_discovered.echo_tape",
       "subject_id": "player",
       "content": "Player discovered clue '标着“回声钟终稿”的磁带'.",
       "source_event_ids": [
-        "71283d84-8e99-457e-80d9-2d5fe933d90b"
+        "1faa6aae-0406-4b8b-b630-f0c811e33fbb"
       ],
       "salience": 0.8,
       "visibility": "private",
-      "last_updated_event_id": "2b67826a-909f-45aa-92f1-426bb7493494",
-      "created_at": "2026-06-01T09:46:07.902205+00:00",
-      "updated_at": "2026-06-01T09:46:07.902205+00:00"
+      "last_updated_event_id": "0f5aac4b-74cb-48a4-86b6-0b8069a33f67",
+      "created_at": "2026-06-01T15:01:37.531816+00:00",
+      "updated_at": "2026-06-01T15:01:37.531816+00:00"
     },
     "memory.player.clue_discovered.empty_capsules": {
       "memory_id": "memory.player.clue_discovered.empty_capsules",
       "subject_id": "player",
       "content": "Player discovered clue '重量异常的心脏病胶囊'.",
       "source_event_ids": [
-        "638ba3df-89a3-486b-b2bb-c814fc2649a5"
+        "95e4fc77-9205-4a92-9be2-62eb3a045fe0"
       ],
       "salience": 0.8,
       "visibility": "private",
-      "last_updated_event_id": "a4542972-bfc8-449c-a0ab-570b1b001f82",
-      "created_at": "2026-06-01T09:46:07.905374+00:00",
-      "updated_at": "2026-06-01T09:46:07.905374+00:00"
+      "last_updated_event_id": "d5c2eb72-03fe-4198-b4c1-a940220c815a",
+      "created_at": "2026-06-01T15:01:37.533338+00:00",
+      "updated_at": "2026-06-01T15:01:37.533338+00:00"
     },
     "memory.player.clue_discovered.ruolan_voice_tape": {
       "memory_id": "memory.player.clue_discovered.ruolan_voice_tape",
       "subject_id": "player",
       "content": "Player discovered clue '江若岚的录音片段'.",
       "source_event_ids": [
-        "c6fb0aa9-06cc-4648-8f27-074dc7046b10"
+        "27bbb14a-3578-45f6-bcbd-cfe1a4b873db"
       ],
       "salience": 0.8,
       "visibility": "private",
-      "last_updated_event_id": "4b0dca06-3b25-4a9a-b130-d47f3eea6831",
-      "created_at": "2026-06-01T09:46:07.902205+00:00",
-      "updated_at": "2026-06-01T09:46:07.902205+00:00"
+      "last_updated_event_id": "11b4df9c-2dbc-4fc6-b9d2-99941383354a",
+      "created_at": "2026-06-01T15:01:37.531816+00:00",
+      "updated_at": "2026-06-01T15:01:37.531816+00:00"
     },
     "memory.player.director_blocked.jiang_yanhui.jiang_yanhui_mechanism": {
       "memory_id": "memory.player.director_blocked.jiang_yanhui.jiang_yanhui_mechanism",
       "subject_id": "player",
       "content": "Conversation with 江雁回 was blocked by narrative rules.",
       "source_event_ids": [
-        "41e214ea-ac23-469d-b732-80c0d3f3ba2d"
+        "a0948a2c-f860-425f-b819-18706135bab9"
       ],
       "salience": 0.9,
       "visibility": "private",
-      "last_updated_event_id": "9a8c7800-83fb-47f4-aded-798d53a16bbb",
-      "created_at": "2026-06-01T09:46:07.903802+00:00",
-      "updated_at": "2026-06-01T09:46:07.903802+00:00"
+      "last_updated_event_id": "d7137156-4b07-4374-91da-1829f17c4f86",
+      "created_at": "2026-06-01T15:01:37.531816+00:00",
+      "updated_at": "2026-06-01T15:01:37.531816+00:00"
     },
     "memory.player.presented_clue.jiang_yanhui.delayed_lock_marks": {
       "memory_id": "memory.player.presented_clue.jiang_yanhui.delayed_lock_marks",
       "subject_id": "player",
       "content": "Player pressured 江雁回 with clue 'delayed_lock_marks' at pressure 0.9.",
       "source_event_ids": [
-        "1f3bd68e-3ce9-48af-b689-e7696d25b360"
+        "bda743e9-dea0-4d9e-844a-7457dcbf56d3"
       ],
       "salience": 0.9,
       "visibility": "private",
-      "last_updated_event_id": "41e02cf3-d1c2-4d82-98f2-2a803e9f55bb",
-      "created_at": "2026-06-01T09:46:07.903802+00:00",
-      "updated_at": "2026-06-01T09:46:07.903802+00:00"
+      "last_updated_event_id": "58835d05-3801-4743-bc47-7ee9e212cd51",
+      "created_at": "2026-06-01T15:01:37.533338+00:00",
+      "updated_at": "2026-06-01T15:01:37.533338+00:00"
     },
     "memory.player.presented_clue.lin_qichi.bitter_wine": {
       "memory_id": "memory.player.presented_clue.lin_qichi.bitter_wine",
       "subject_id": "player",
       "content": "Player pressured 林栖迟 with clue 'bitter_wine' at pressure 0.9.",
       "source_event_ids": [
-        "753d37f5-ffc1-4e65-93e7-da8d955649b2"
+        "47984950-9bc0-444e-98c9-45a6f103ceff"
       ],
       "salience": 0.9,
       "visibility": "private",
-      "last_updated_event_id": "6df08e9e-0949-47f8-b748-4da6c4541626",
-      "created_at": "2026-06-01T09:46:07.902205+00:00",
-      "updated_at": "2026-06-01T09:46:07.902205+00:00"
+      "last_updated_event_id": "98548a3c-4b15-4d72-b2d0-61e880b1c215",
+      "created_at": "2026-06-01T15:01:37.531816+00:00",
+      "updated_at": "2026-06-01T15:01:37.531816+00:00"
     },
     "memory.player.relationship_threshold.jiang_yanhui.player.suspicion.guarded": {
       "memory_id": "memory.player.relationship_threshold.jiang_yanhui.player.suspicion.guarded",
       "subject_id": "player",
       "content": "江雁回 became guarded toward the player (suspicion).",
       "source_event_ids": [
-        "d0e88932-1f7e-4744-8d82-3e46033fda17"
+        "27ea7f62-8abf-4d2d-b6bf-982f02e745c2"
       ],
       "salience": 0.7,
       "visibility": "private",
-      "last_updated_event_id": "26e35ca9-a4b1-4c0a-aa3c-5ab60488cfc2",
-      "created_at": "2026-06-01T09:46:07.903802+00:00",
-      "updated_at": "2026-06-01T09:46:07.903802+00:00"
+      "last_updated_event_id": "167e2433-0c60-4079-8aad-f1f642c2403f",
+      "created_at": "2026-06-01T15:01:37.533338+00:00",
+      "updated_at": "2026-06-01T15:01:37.533338+00:00"
     },
     "memory.player.relationship_threshold.lin_qichi.player.fear.afraid": {
       "memory_id": "memory.player.relationship_threshold.lin_qichi.player.fear.afraid",
       "subject_id": "player",
       "content": "林栖迟 became afraid toward the player (fear).",
       "source_event_ids": [
-        "6f30d248-dce1-4c9f-ae7d-7fde5ea691a8"
+        "d2719edb-016c-4a06-9372-881a489551a2"
       ],
       "salience": 0.7,
       "visibility": "private",
-      "last_updated_event_id": "8721c0e1-c258-4dd3-8970-9b1ce32b664d",
-      "created_at": "2026-06-01T09:46:07.902205+00:00",
-      "updated_at": "2026-06-01T09:46:07.902205+00:00"
+      "last_updated_event_id": "e6b987d5-f1ef-47e3-bb3d-3328690d7034",
+      "created_at": "2026-06-01T15:01:37.531816+00:00",
+      "updated_at": "2026-06-01T15:01:37.531816+00:00"
     }
   },
   "completed_beats": [
@@ -3872,9 +3872,9 @@
   ],
   "event_log": [
     {
-      "id": "bb226e38-65ae-44f5-ace1-37df176fc9bd",
+      "id": "ed6dacc7-f101-4be1-9e82-344a1b1a8ec3",
       "case_id": "mist_clock_manor",
-      "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+      "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
       "actor_id": "system",
       "type": "session.created",
       "payload": {
@@ -3882,37 +3882,37 @@
         "initial_phase": "opening"
       },
       "caused_by_event_id": null,
-      "created_at": "2026-06-01T09:46:07.897525+00:00"
+      "created_at": "2026-06-01T15:01:37.527573+00:00"
     },
     {
-      "id": "b7083a37-6cb4-4487-bfc0-c2397ea3a9fd",
+      "id": "2d7ecef8-bfe5-4c40-9915-c49ab1f00da8",
       "case_id": "mist_clock_manor",
-      "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+      "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
       "actor_id": "player",
       "type": "player.inspected",
       "payload": {
         "target_id": "wine_table"
       },
       "caused_by_event_id": null,
-      "created_at": "2026-06-01T09:46:07.897525+00:00"
+      "created_at": "2026-06-01T15:01:37.527573+00:00"
     },
     {
-      "id": "9cc2c64d-d046-4ff5-a344-36fb30b6b67c",
+      "id": "46a9b1b8-b4a0-4adc-a126-d946338e69fb",
       "case_id": "mist_clock_manor",
-      "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+      "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
       "actor_id": "system",
       "type": "clue.discovered",
       "payload": {
         "clue_id": "bitter_wine",
         "source_hotspot_id": "wine_table"
       },
-      "caused_by_event_id": "b7083a37-6cb4-4487-bfc0-c2397ea3a9fd",
-      "created_at": "2026-06-01T09:46:07.897525+00:00"
+      "caused_by_event_id": "2d7ecef8-bfe5-4c40-9915-c49ab1f00da8",
+      "created_at": "2026-06-01T15:01:37.527573+00:00"
     },
     {
-      "id": "a286a3f1-c091-4b9c-b391-80a50539fcab",
+      "id": "b2fd16ef-0354-4217-855a-1d64bafa7ee0",
       "case_id": "mist_clock_manor",
-      "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+      "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
       "actor_id": "derived_event_system",
       "type": "player_knowledge.updated",
       "payload": {
@@ -3922,68 +3922,68 @@
         "confidence": 1.0,
         "acquisition": "discovered",
         "source_type": "clue",
-        "source_event_id": "9cc2c64d-d046-4ff5-a344-36fb30b6b67c",
+        "source_event_id": "46a9b1b8-b4a0-4adc-a126-d946338e69fb",
         "title": "红酒中含有镇静剂",
         "summary": "林栖迟送入书房的红酒含有安眠药成分，削弱了陆澜生的反应能力。"
       },
-      "caused_by_event_id": "9cc2c64d-d046-4ff5-a344-36fb30b6b67c",
-      "created_at": "2026-06-01T09:46:07.897525+00:00"
+      "caused_by_event_id": "46a9b1b8-b4a0-4adc-a126-d946338e69fb",
+      "created_at": "2026-06-01T15:01:37.527573+00:00"
     },
     {
-      "id": "edae414a-bfb2-46d8-bf33-6597d13656ef",
+      "id": "50ab1568-5e9a-477b-94d2-c0fcbbe18730",
       "case_id": "mist_clock_manor",
-      "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+      "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
       "actor_id": "derived_event_system",
       "type": "memory_candidate.created",
       "payload": {
         "memory_id": "memory.player.clue_discovered.bitter_wine",
         "subject_id": "player",
         "content": "Player discovered clue '带苦味的红酒残液'.",
-        "source_event_id": "9cc2c64d-d046-4ff5-a344-36fb30b6b67c",
+        "source_event_id": "46a9b1b8-b4a0-4adc-a126-d946338e69fb",
         "visibility": [
           "player"
         ],
         "salience": 0.8
       },
-      "caused_by_event_id": "9cc2c64d-d046-4ff5-a344-36fb30b6b67c",
-      "created_at": "2026-06-01T09:46:07.897525+00:00"
+      "caused_by_event_id": "46a9b1b8-b4a0-4adc-a126-d946338e69fb",
+      "created_at": "2026-06-01T15:01:37.527573+00:00"
     },
     {
-      "id": "933a9811-5cef-470e-864e-56d71cc817d6",
+      "id": "523752f9-8e19-4cca-88ba-879b6b7bb20c",
       "case_id": "mist_clock_manor",
-      "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+      "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
       "actor_id": "memory_snapshot_system",
       "type": "agent_memory_snapshot.updated",
       "payload": {
         "memory_id": "memory.player.clue_discovered.bitter_wine",
         "subject_id": "player",
         "source_event_ids": [
-          "9cc2c64d-d046-4ff5-a344-36fb30b6b67c"
+          "46a9b1b8-b4a0-4adc-a126-d946338e69fb"
         ],
         "salience": 0.8,
         "visibility": "private",
         "operation": "created"
       },
-      "caused_by_event_id": "edae414a-bfb2-46d8-bf33-6597d13656ef",
-      "created_at": "2026-06-01T09:46:07.897525+00:00"
+      "caused_by_event_id": "50ab1568-5e9a-477b-94d2-c0fcbbe18730",
+      "created_at": "2026-06-01T15:01:37.527573+00:00"
     },
     {
-      "id": "af166234-9565-43a4-a83a-fe917fc3d5c6",
+      "id": "41cf7bbe-0bc9-45f7-a6e2-264ea84ed92f",
       "case_id": "mist_clock_manor",
-      "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+      "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
       "actor_id": "rule_trigger_system",
       "type": "narrative.beat.completed",
       "payload": {
         "beat_id": "sedative_found",
         "phase": "opening"
       },
-      "caused_by_event_id": "9cc2c64d-d046-4ff5-a344-36fb30b6b67c",
-      "created_at": "2026-06-01T09:46:07.897525+00:00"
+      "caused_by_event_id": "46a9b1b8-b4a0-4adc-a126-d946338e69fb",
+      "created_at": "2026-06-01T15:01:37.527573+00:00"
     },
     {
-      "id": "dc63fb1c-e109-4c00-b9b6-0a108214311b",
+      "id": "735491e8-da74-4bcb-b032-267d124c4dfa",
       "case_id": "mist_clock_manor",
-      "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+      "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
       "actor_id": "rule_trigger_system",
       "type": "narrative.phase.changed",
       "payload": {
@@ -3992,13 +3992,13 @@
         "to_phase": "investigation",
         "trigger_beat_id": "sedative_found"
       },
-      "caused_by_event_id": "9cc2c64d-d046-4ff5-a344-36fb30b6b67c",
-      "created_at": "2026-06-01T09:46:07.897525+00:00"
+      "caused_by_event_id": "46a9b1b8-b4a0-4adc-a126-d946338e69fb",
+      "created_at": "2026-06-01T15:01:37.527573+00:00"
     },
     {
-      "id": "f6fb9b21-4d18-48ad-9db8-3825c48925ed",
+      "id": "a3f35e63-2649-4175-994d-1e1b0cf06d44",
       "case_id": "mist_clock_manor",
-      "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+      "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
       "actor_id": "player",
       "type": "player.asked_about",
       "payload": {
@@ -4010,12 +4010,12 @@
         "knowledge_id": "player_knowledge.sedative_wine"
       },
       "caused_by_event_id": null,
-      "created_at": "2026-06-01T09:46:07.897525+00:00"
+      "created_at": "2026-06-01T15:01:37.527573+00:00"
     },
     {
-      "id": "dceb6335-a758-4bb9-92fc-da765167e2fc",
+      "id": "8f6bfe37-78b6-4e8e-ac62-40995df41bb0",
       "case_id": "mist_clock_manor",
-      "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+      "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
       "actor_id": "lin_qichi",
       "type": "npc.replied",
       "payload": {
@@ -4034,13 +4034,13 @@
         ],
         "disclosure_claims": []
       },
-      "caused_by_event_id": "f6fb9b21-4d18-48ad-9db8-3825c48925ed",
-      "created_at": "2026-06-01T09:46:07.900586+00:00"
+      "caused_by_event_id": "a3f35e63-2649-4175-994d-1e1b0cf06d44",
+      "created_at": "2026-06-01T15:01:37.530293+00:00"
     },
     {
-      "id": "ab22b17f-4629-4043-b9a8-8bdd6e9cc9a6",
+      "id": "e2378237-b176-4cce-b16f-903393eb1668",
       "case_id": "mist_clock_manor",
-      "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+      "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
       "actor_id": "system",
       "type": "relationship.changed",
       "payload": {
@@ -4060,13 +4060,13 @@
           "hostility": 0.0
         }
       },
-      "caused_by_event_id": "dceb6335-a758-4bb9-92fc-da765167e2fc",
-      "created_at": "2026-06-01T09:46:07.902205+00:00"
+      "caused_by_event_id": "8f6bfe37-78b6-4e8e-ac62-40995df41bb0",
+      "created_at": "2026-06-01T15:01:37.530293+00:00"
     },
     {
-      "id": "6f30d248-dce1-4c9f-ae7d-7fde5ea691a8",
+      "id": "d2719edb-016c-4a06-9372-881a489551a2",
       "case_id": "mist_clock_manor",
-      "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+      "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
       "actor_id": "system",
       "type": "relationship.threshold.crossed",
       "payload": {
@@ -4077,13 +4077,13 @@
         "state": "afraid",
         "current_value": 0.8
       },
-      "caused_by_event_id": "ab22b17f-4629-4043-b9a8-8bdd6e9cc9a6",
-      "created_at": "2026-06-01T09:46:07.902205+00:00"
+      "caused_by_event_id": "e2378237-b176-4cce-b16f-903393eb1668",
+      "created_at": "2026-06-01T15:01:37.530293+00:00"
     },
     {
-      "id": "8cf0240b-b1c1-438a-94bf-15cb8f75869f",
+      "id": "9d3abb36-3e6f-4561-a36f-d3d030c60a12",
       "case_id": "mist_clock_manor",
-      "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+      "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
       "actor_id": "character_impression_system",
       "type": "character_impression.updated",
       "payload": {
@@ -4109,17 +4109,17 @@
         ],
         "confidence": 0.1,
         "source_event_ids": [
-          "f6fb9b21-4d18-48ad-9db8-3825c48925ed"
+          "a3f35e63-2649-4175-994d-1e1b0cf06d44"
         ],
-        "last_updated_event_id": "8cf0240b-b1c1-438a-94bf-15cb8f75869f"
+        "last_updated_event_id": "9d3abb36-3e6f-4561-a36f-d3d030c60a12"
       },
-      "caused_by_event_id": "f6fb9b21-4d18-48ad-9db8-3825c48925ed",
-      "created_at": "2026-06-01T09:46:07.902205+00:00"
+      "caused_by_event_id": "a3f35e63-2649-4175-994d-1e1b0cf06d44",
+      "created_at": "2026-06-01T15:01:37.530293+00:00"
     },
     {
-      "id": "8db22b5e-de53-466b-a50e-07feaf23a2d3",
+      "id": "c67a3503-ddba-4050-948d-81d391e8feb2",
       "case_id": "mist_clock_manor",
-      "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+      "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
       "actor_id": "character_fact_awareness_system",
       "type": "character_fact_awareness.updated",
       "payload": {
@@ -4139,55 +4139,55 @@
         ],
         "source_event_ids": [
           "case_package",
-          "f6fb9b21-4d18-48ad-9db8-3825c48925ed"
+          "a3f35e63-2649-4175-994d-1e1b0cf06d44"
         ],
-        "last_updated_event_id": "8db22b5e-de53-466b-a50e-07feaf23a2d3"
+        "last_updated_event_id": "c67a3503-ddba-4050-948d-81d391e8feb2"
       },
-      "caused_by_event_id": "f6fb9b21-4d18-48ad-9db8-3825c48925ed",
-      "created_at": "2026-06-01T09:46:07.902205+00:00"
+      "caused_by_event_id": "a3f35e63-2649-4175-994d-1e1b0cf06d44",
+      "created_at": "2026-06-01T15:01:37.531816+00:00"
     },
     {
-      "id": "99ad7ca7-18da-4a54-9122-a37387265106",
+      "id": "607fe092-d8f6-4c1d-bbc6-c8f921cb06af",
       "case_id": "mist_clock_manor",
-      "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+      "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
       "actor_id": "derived_event_system",
       "type": "memory_candidate.created",
       "payload": {
         "memory_id": "memory.player.asked_about.lin_qichi.clue.bitter_wine",
         "subject_id": "player",
         "content": "Player asked 林栖迟 about clue 'bitter_wine' with pressure 0.6.",
-        "source_event_id": "f6fb9b21-4d18-48ad-9db8-3825c48925ed",
+        "source_event_id": "a3f35e63-2649-4175-994d-1e1b0cf06d44",
         "visibility": [
           "player"
         ],
         "salience": 0.6
       },
-      "caused_by_event_id": "f6fb9b21-4d18-48ad-9db8-3825c48925ed",
-      "created_at": "2026-06-01T09:46:07.902205+00:00"
+      "caused_by_event_id": "a3f35e63-2649-4175-994d-1e1b0cf06d44",
+      "created_at": "2026-06-01T15:01:37.531816+00:00"
     },
     {
-      "id": "0e722687-455e-4b7d-bc64-85041fa5818b",
+      "id": "30a6a7b3-d4ae-4cdb-954b-70f7041048cf",
       "case_id": "mist_clock_manor",
-      "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+      "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
       "actor_id": "memory_snapshot_system",
       "type": "agent_memory_snapshot.updated",
       "payload": {
         "memory_id": "memory.player.asked_about.lin_qichi.clue.bitter_wine",
         "subject_id": "player",
         "source_event_ids": [
-          "f6fb9b21-4d18-48ad-9db8-3825c48925ed"
+          "a3f35e63-2649-4175-994d-1e1b0cf06d44"
         ],
         "salience": 0.6,
         "visibility": "private",
         "operation": "created"
       },
-      "caused_by_event_id": "99ad7ca7-18da-4a54-9122-a37387265106",
-      "created_at": "2026-06-01T09:46:07.902205+00:00"
+      "caused_by_event_id": "607fe092-d8f6-4c1d-bbc6-c8f921cb06af",
+      "created_at": "2026-06-01T15:01:37.531816+00:00"
     },
     {
-      "id": "21b119b5-f807-47ae-a6a6-053a9a456b1c",
+      "id": "2399c77a-0ac4-4ed1-9d5e-4aab0ea16b2c",
       "case_id": "mist_clock_manor",
-      "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+      "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
       "actor_id": "character_impression_system",
       "type": "character_impression.updated",
       "payload": {
@@ -4216,56 +4216,56 @@
         ],
         "confidence": 0.2,
         "source_event_ids": [
-          "f6fb9b21-4d18-48ad-9db8-3825c48925ed",
-          "6f30d248-dce1-4c9f-ae7d-7fde5ea691a8"
+          "a3f35e63-2649-4175-994d-1e1b0cf06d44",
+          "d2719edb-016c-4a06-9372-881a489551a2"
         ],
-        "last_updated_event_id": "21b119b5-f807-47ae-a6a6-053a9a456b1c"
+        "last_updated_event_id": "2399c77a-0ac4-4ed1-9d5e-4aab0ea16b2c"
       },
-      "caused_by_event_id": "6f30d248-dce1-4c9f-ae7d-7fde5ea691a8",
-      "created_at": "2026-06-01T09:46:07.902205+00:00"
+      "caused_by_event_id": "d2719edb-016c-4a06-9372-881a489551a2",
+      "created_at": "2026-06-01T15:01:37.531816+00:00"
     },
     {
-      "id": "e1d87274-87c1-4a66-a988-05793a6ffec4",
+      "id": "2e1dac31-1500-4c80-a740-f21a9037bfa4",
       "case_id": "mist_clock_manor",
-      "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+      "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
       "actor_id": "derived_event_system",
       "type": "memory_candidate.created",
       "payload": {
         "memory_id": "memory.player.relationship_threshold.lin_qichi.player.fear.afraid",
         "subject_id": "player",
         "content": "林栖迟 became afraid toward the player (fear).",
-        "source_event_id": "6f30d248-dce1-4c9f-ae7d-7fde5ea691a8",
+        "source_event_id": "d2719edb-016c-4a06-9372-881a489551a2",
         "visibility": [
           "player"
         ],
         "salience": 0.7
       },
-      "caused_by_event_id": "6f30d248-dce1-4c9f-ae7d-7fde5ea691a8",
-      "created_at": "2026-06-01T09:46:07.902205+00:00"
+      "caused_by_event_id": "d2719edb-016c-4a06-9372-881a489551a2",
+      "created_at": "2026-06-01T15:01:37.531816+00:00"
     },
     {
-      "id": "8721c0e1-c258-4dd3-8970-9b1ce32b664d",
+      "id": "e6b987d5-f1ef-47e3-bb3d-3328690d7034",
       "case_id": "mist_clock_manor",
-      "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+      "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
       "actor_id": "memory_snapshot_system",
       "type": "agent_memory_snapshot.updated",
       "payload": {
         "memory_id": "memory.player.relationship_threshold.lin_qichi.player.fear.afraid",
         "subject_id": "player",
         "source_event_ids": [
-          "6f30d248-dce1-4c9f-ae7d-7fde5ea691a8"
+          "d2719edb-016c-4a06-9372-881a489551a2"
         ],
         "salience": 0.7,
         "visibility": "private",
         "operation": "created"
       },
-      "caused_by_event_id": "e1d87274-87c1-4a66-a988-05793a6ffec4",
-      "created_at": "2026-06-01T09:46:07.902205+00:00"
+      "caused_by_event_id": "2e1dac31-1500-4c80-a740-f21a9037bfa4",
+      "created_at": "2026-06-01T15:01:37.531816+00:00"
     },
     {
-      "id": "753d37f5-ffc1-4e65-93e7-da8d955649b2",
+      "id": "47984950-9bc0-444e-98c9-45a6f103ceff",
       "case_id": "mist_clock_manor",
-      "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+      "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
       "actor_id": "player",
       "type": "player.presented_clue",
       "payload": {
@@ -4276,12 +4276,12 @@
         "interaction_pressure": 0.9
       },
       "caused_by_event_id": null,
-      "created_at": "2026-06-01T09:46:07.902205+00:00"
+      "created_at": "2026-06-01T15:01:37.531816+00:00"
     },
     {
-      "id": "e290be41-ddff-42f6-a1d1-5724629c4d89",
+      "id": "cf9695e4-d30c-4fd5-92c6-9fd4eaadf0bb",
       "case_id": "mist_clock_manor",
-      "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+      "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
       "actor_id": "lin_qichi",
       "type": "npc.replied",
       "payload": {
@@ -4300,13 +4300,13 @@
         ],
         "disclosure_claims": []
       },
-      "caused_by_event_id": "753d37f5-ffc1-4e65-93e7-da8d955649b2",
-      "created_at": "2026-06-01T09:46:07.902205+00:00"
+      "caused_by_event_id": "47984950-9bc0-444e-98c9-45a6f103ceff",
+      "created_at": "2026-06-01T15:01:37.531816+00:00"
     },
     {
-      "id": "f9e91d11-5645-4db4-bad3-982ad3fa8ce5",
+      "id": "65c4e8d9-0c64-4b26-90b4-9b30e43d1e9d",
       "case_id": "mist_clock_manor",
-      "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+      "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
       "actor_id": "system",
       "type": "relationship.changed",
       "payload": {
@@ -4326,13 +4326,13 @@
           "hostility": 0.0
         }
       },
-      "caused_by_event_id": "e290be41-ddff-42f6-a1d1-5724629c4d89",
-      "created_at": "2026-06-01T09:46:07.902205+00:00"
+      "caused_by_event_id": "cf9695e4-d30c-4fd5-92c6-9fd4eaadf0bb",
+      "created_at": "2026-06-01T15:01:37.531816+00:00"
     },
     {
-      "id": "1cdebc3b-cf15-4d4b-851c-23d81aef71b3",
+      "id": "6fb2179b-da0e-4bf0-bb6e-690d5e9935b3",
       "case_id": "mist_clock_manor",
-      "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+      "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
       "actor_id": "character_impression_system",
       "type": "character_impression.updated",
       "payload": {
@@ -4365,19 +4365,19 @@
         ],
         "confidence": 0.3,
         "source_event_ids": [
-          "f6fb9b21-4d18-48ad-9db8-3825c48925ed",
-          "6f30d248-dce1-4c9f-ae7d-7fde5ea691a8",
-          "753d37f5-ffc1-4e65-93e7-da8d955649b2"
+          "a3f35e63-2649-4175-994d-1e1b0cf06d44",
+          "d2719edb-016c-4a06-9372-881a489551a2",
+          "47984950-9bc0-444e-98c9-45a6f103ceff"
         ],
-        "last_updated_event_id": "1cdebc3b-cf15-4d4b-851c-23d81aef71b3"
+        "last_updated_event_id": "6fb2179b-da0e-4bf0-bb6e-690d5e9935b3"
       },
-      "caused_by_event_id": "753d37f5-ffc1-4e65-93e7-da8d955649b2",
-      "created_at": "2026-06-01T09:46:07.902205+00:00"
+      "caused_by_event_id": "47984950-9bc0-444e-98c9-45a6f103ceff",
+      "created_at": "2026-06-01T15:01:37.531816+00:00"
     },
     {
-      "id": "0b49abf5-3f0c-48e5-8255-68c5da2027fb",
+      "id": "46991a27-250f-4157-8a3f-4dd94dcb20d2",
       "case_id": "mist_clock_manor",
-      "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+      "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
       "actor_id": "character_fact_awareness_system",
       "type": "character_fact_awareness.updated",
       "payload": {
@@ -4397,81 +4397,81 @@
         ],
         "source_event_ids": [
           "case_package",
-          "f6fb9b21-4d18-48ad-9db8-3825c48925ed",
-          "753d37f5-ffc1-4e65-93e7-da8d955649b2"
+          "a3f35e63-2649-4175-994d-1e1b0cf06d44",
+          "47984950-9bc0-444e-98c9-45a6f103ceff"
         ],
-        "last_updated_event_id": "0b49abf5-3f0c-48e5-8255-68c5da2027fb"
+        "last_updated_event_id": "46991a27-250f-4157-8a3f-4dd94dcb20d2"
       },
-      "caused_by_event_id": "753d37f5-ffc1-4e65-93e7-da8d955649b2",
-      "created_at": "2026-06-01T09:46:07.902205+00:00"
+      "caused_by_event_id": "47984950-9bc0-444e-98c9-45a6f103ceff",
+      "created_at": "2026-06-01T15:01:37.531816+00:00"
     },
     {
-      "id": "c2bd2621-8b2e-4c76-bf1b-2c04fd2e1560",
+      "id": "6233f9af-c3fe-442d-a4fc-52ea5a518765",
       "case_id": "mist_clock_manor",
-      "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+      "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
       "actor_id": "derived_event_system",
       "type": "memory_candidate.created",
       "payload": {
         "memory_id": "memory.player.presented_clue.lin_qichi.bitter_wine",
         "subject_id": "player",
         "content": "Player pressured 林栖迟 with clue 'bitter_wine' at pressure 0.9.",
-        "source_event_id": "753d37f5-ffc1-4e65-93e7-da8d955649b2",
+        "source_event_id": "47984950-9bc0-444e-98c9-45a6f103ceff",
         "visibility": [
           "player"
         ],
         "salience": 0.9
       },
-      "caused_by_event_id": "753d37f5-ffc1-4e65-93e7-da8d955649b2",
-      "created_at": "2026-06-01T09:46:07.902205+00:00"
+      "caused_by_event_id": "47984950-9bc0-444e-98c9-45a6f103ceff",
+      "created_at": "2026-06-01T15:01:37.531816+00:00"
     },
     {
-      "id": "6df08e9e-0949-47f8-b748-4da6c4541626",
+      "id": "98548a3c-4b15-4d72-b2d0-61e880b1c215",
       "case_id": "mist_clock_manor",
-      "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+      "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
       "actor_id": "memory_snapshot_system",
       "type": "agent_memory_snapshot.updated",
       "payload": {
         "memory_id": "memory.player.presented_clue.lin_qichi.bitter_wine",
         "subject_id": "player",
         "source_event_ids": [
-          "753d37f5-ffc1-4e65-93e7-da8d955649b2"
+          "47984950-9bc0-444e-98c9-45a6f103ceff"
         ],
         "salience": 0.9,
         "visibility": "private",
         "operation": "created"
       },
-      "caused_by_event_id": "c2bd2621-8b2e-4c76-bf1b-2c04fd2e1560",
-      "created_at": "2026-06-01T09:46:07.902205+00:00"
+      "caused_by_event_id": "6233f9af-c3fe-442d-a4fc-52ea5a518765",
+      "created_at": "2026-06-01T15:01:37.531816+00:00"
     },
     {
-      "id": "4be7420f-a24b-4c41-bd0d-842fc0ac1ba1",
+      "id": "65e2426e-3cdd-4947-92b7-50f593006ecc",
       "case_id": "mist_clock_manor",
-      "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+      "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
       "actor_id": "player",
       "type": "player.inspected",
       "payload": {
         "target_id": "study_lock"
       },
       "caused_by_event_id": null,
-      "created_at": "2026-06-01T09:46:07.902205+00:00"
+      "created_at": "2026-06-01T15:01:37.531816+00:00"
     },
     {
-      "id": "4901cf8d-bfab-4119-bdff-6f538c492147",
+      "id": "01679c69-e122-45aa-a660-154c165dce43",
       "case_id": "mist_clock_manor",
-      "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+      "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
       "actor_id": "system",
       "type": "clue.discovered",
       "payload": {
         "clue_id": "delayed_lock_marks",
         "source_hotspot_id": "study_lock"
       },
-      "caused_by_event_id": "4be7420f-a24b-4c41-bd0d-842fc0ac1ba1",
-      "created_at": "2026-06-01T09:46:07.902205+00:00"
+      "caused_by_event_id": "65e2426e-3cdd-4947-92b7-50f593006ecc",
+      "created_at": "2026-06-01T15:01:37.531816+00:00"
     },
     {
-      "id": "e8954c55-2e37-42bc-bb6a-2a77f6851956",
+      "id": "a6bf9fc7-41d4-4ca2-b798-5cf4d3302c93",
       "case_id": "mist_clock_manor",
-      "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+      "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
       "actor_id": "derived_event_system",
       "type": "player_knowledge.updated",
       "payload": {
@@ -4481,93 +4481,93 @@
         "confidence": 1.0,
         "acquisition": "discovered",
         "source_type": "clue",
-        "source_event_id": "4901cf8d-bfab-4119-bdff-6f538c492147",
+        "source_event_id": "01679c69-e122-45aa-a660-154c165dce43",
         "title": "书房门锁被改成延时落锁",
         "summary": "门锁内侧的新划痕和润滑油说明，有人提前做了延时卡榫，制造密室假象。"
       },
-      "caused_by_event_id": "4901cf8d-bfab-4119-bdff-6f538c492147",
-      "created_at": "2026-06-01T09:46:07.902205+00:00"
+      "caused_by_event_id": "01679c69-e122-45aa-a660-154c165dce43",
+      "created_at": "2026-06-01T15:01:37.531816+00:00"
     },
     {
-      "id": "0644e5cc-0d97-460d-9c80-3e30c412542f",
+      "id": "35178258-7838-42c0-8358-065669e5ff82",
       "case_id": "mist_clock_manor",
-      "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+      "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
       "actor_id": "derived_event_system",
       "type": "memory_candidate.created",
       "payload": {
         "memory_id": "memory.player.clue_discovered.delayed_lock_marks",
         "subject_id": "player",
         "content": "Player discovered clue '门锁内侧的新划痕'.",
-        "source_event_id": "4901cf8d-bfab-4119-bdff-6f538c492147",
+        "source_event_id": "01679c69-e122-45aa-a660-154c165dce43",
         "visibility": [
           "player"
         ],
         "salience": 0.8
       },
-      "caused_by_event_id": "4901cf8d-bfab-4119-bdff-6f538c492147",
-      "created_at": "2026-06-01T09:46:07.902205+00:00"
+      "caused_by_event_id": "01679c69-e122-45aa-a660-154c165dce43",
+      "created_at": "2026-06-01T15:01:37.531816+00:00"
     },
     {
-      "id": "1c997122-dce7-453c-aa9e-10e4a2f272ab",
+      "id": "0a2d506c-ab4e-4196-935a-2e23a6fc781b",
       "case_id": "mist_clock_manor",
-      "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+      "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
       "actor_id": "memory_snapshot_system",
       "type": "agent_memory_snapshot.updated",
       "payload": {
         "memory_id": "memory.player.clue_discovered.delayed_lock_marks",
         "subject_id": "player",
         "source_event_ids": [
-          "4901cf8d-bfab-4119-bdff-6f538c492147"
+          "01679c69-e122-45aa-a660-154c165dce43"
         ],
         "salience": 0.8,
         "visibility": "private",
         "operation": "created"
       },
-      "caused_by_event_id": "0644e5cc-0d97-460d-9c80-3e30c412542f",
-      "created_at": "2026-06-01T09:46:07.902205+00:00"
+      "caused_by_event_id": "35178258-7838-42c0-8358-065669e5ff82",
+      "created_at": "2026-06-01T15:01:37.531816+00:00"
     },
     {
-      "id": "da73e7cb-e992-46ef-a274-6d79fe06c7f7",
+      "id": "129f0c1f-3170-4691-ac7b-7c05744f7171",
       "case_id": "mist_clock_manor",
-      "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+      "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
       "actor_id": "player",
       "type": "player.inspected",
       "payload": {
         "target_id": "tape_recorder"
       },
       "caused_by_event_id": null,
-      "created_at": "2026-06-01T09:46:07.902205+00:00"
+      "created_at": "2026-06-01T15:01:37.531816+00:00"
     },
     {
-      "id": "71283d84-8e99-457e-80d9-2d5fe933d90b",
+      "id": "1faa6aae-0406-4b8b-b630-f0c811e33fbb",
       "case_id": "mist_clock_manor",
-      "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+      "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
       "actor_id": "system",
       "type": "clue.discovered",
       "payload": {
         "clue_id": "echo_tape",
         "source_hotspot_id": "tape_recorder"
       },
-      "caused_by_event_id": "da73e7cb-e992-46ef-a274-6d79fe06c7f7",
-      "created_at": "2026-06-01T09:46:07.902205+00:00"
+      "caused_by_event_id": "129f0c1f-3170-4691-ac7b-7c05744f7171",
+      "created_at": "2026-06-01T15:01:37.531816+00:00"
     },
     {
-      "id": "c6fb0aa9-06cc-4648-8f27-074dc7046b10",
+      "id": "27bbb14a-3578-45f6-bcbd-cfe1a4b873db",
       "case_id": "mist_clock_manor",
-      "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+      "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
       "actor_id": "system",
       "type": "clue.discovered",
       "payload": {
         "clue_id": "ruolan_voice_tape",
         "source_hotspot_id": "tape_recorder"
       },
-      "caused_by_event_id": "da73e7cb-e992-46ef-a274-6d79fe06c7f7",
-      "created_at": "2026-06-01T09:46:07.902205+00:00"
+      "caused_by_event_id": "129f0c1f-3170-4691-ac7b-7c05744f7171",
+      "created_at": "2026-06-01T15:01:37.531816+00:00"
     },
     {
-      "id": "7083bbc2-d038-448b-979a-f5d8c04d4f36",
+      "id": "ab61941a-ac2f-4a0c-830d-8542fadd449a",
       "case_id": "mist_clock_manor",
-      "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+      "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
       "actor_id": "derived_event_system",
       "type": "player_knowledge.updated",
       "payload": {
@@ -4577,55 +4577,55 @@
         "confidence": 1.0,
         "acquisition": "discovered",
         "source_type": "clue",
-        "source_event_id": "71283d84-8e99-457e-80d9-2d5fe933d90b",
+        "source_event_id": "1faa6aae-0406-4b8b-b630-f0c811e33fbb",
         "title": "书房录音带被替换",
         "summary": "十一点十七分响起的钟声来自书房录音机，而不是山庄钟楼。"
       },
-      "caused_by_event_id": "71283d84-8e99-457e-80d9-2d5fe933d90b",
-      "created_at": "2026-06-01T09:46:07.902205+00:00"
+      "caused_by_event_id": "1faa6aae-0406-4b8b-b630-f0c811e33fbb",
+      "created_at": "2026-06-01T15:01:37.531816+00:00"
     },
     {
-      "id": "22722769-dad2-4b3a-a389-2abba357c991",
+      "id": "43e7903a-4960-42e3-a6b7-e480dcc26fed",
       "case_id": "mist_clock_manor",
-      "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+      "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
       "actor_id": "derived_event_system",
       "type": "memory_candidate.created",
       "payload": {
         "memory_id": "memory.player.clue_discovered.echo_tape",
         "subject_id": "player",
         "content": "Player discovered clue '标着“回声钟终稿”的磁带'.",
-        "source_event_id": "71283d84-8e99-457e-80d9-2d5fe933d90b",
+        "source_event_id": "1faa6aae-0406-4b8b-b630-f0c811e33fbb",
         "visibility": [
           "player"
         ],
         "salience": 0.8
       },
-      "caused_by_event_id": "71283d84-8e99-457e-80d9-2d5fe933d90b",
-      "created_at": "2026-06-01T09:46:07.902205+00:00"
+      "caused_by_event_id": "1faa6aae-0406-4b8b-b630-f0c811e33fbb",
+      "created_at": "2026-06-01T15:01:37.531816+00:00"
     },
     {
-      "id": "2b67826a-909f-45aa-92f1-426bb7493494",
+      "id": "0f5aac4b-74cb-48a4-86b6-0b8069a33f67",
       "case_id": "mist_clock_manor",
-      "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+      "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
       "actor_id": "memory_snapshot_system",
       "type": "agent_memory_snapshot.updated",
       "payload": {
         "memory_id": "memory.player.clue_discovered.echo_tape",
         "subject_id": "player",
         "source_event_ids": [
-          "71283d84-8e99-457e-80d9-2d5fe933d90b"
+          "1faa6aae-0406-4b8b-b630-f0c811e33fbb"
         ],
         "salience": 0.8,
         "visibility": "private",
         "operation": "created"
       },
-      "caused_by_event_id": "22722769-dad2-4b3a-a389-2abba357c991",
-      "created_at": "2026-06-01T09:46:07.902205+00:00"
+      "caused_by_event_id": "43e7903a-4960-42e3-a6b7-e480dcc26fed",
+      "created_at": "2026-06-01T15:01:37.531816+00:00"
     },
     {
-      "id": "833115a0-0ec6-46d7-b3b4-f917ec305ffc",
+      "id": "f0681af7-04dd-4a86-bea6-720254102be4",
       "case_id": "mist_clock_manor",
-      "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+      "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
       "actor_id": "derived_event_system",
       "type": "player_knowledge.updated",
       "payload": {
@@ -4635,68 +4635,68 @@
         "confidence": 1.0,
         "acquisition": "discovered",
         "source_type": "clue",
-        "source_event_id": "c6fb0aa9-06cc-4648-8f27-074dc7046b10",
+        "source_event_id": "27bbb14a-3578-45f6-bcbd-cfe1a4b873db",
         "title": "江若岚旧录音存在",
         "summary": "磁带中保存了江若岚生前指责陆澜生盗用与操控的录音。"
       },
-      "caused_by_event_id": "c6fb0aa9-06cc-4648-8f27-074dc7046b10",
-      "created_at": "2026-06-01T09:46:07.902205+00:00"
+      "caused_by_event_id": "27bbb14a-3578-45f6-bcbd-cfe1a4b873db",
+      "created_at": "2026-06-01T15:01:37.531816+00:00"
     },
     {
-      "id": "23e8ddff-5a3c-42a9-ae20-e620546a5e60",
+      "id": "18e50a13-2668-4bfb-a39f-90ed2a586a1b",
       "case_id": "mist_clock_manor",
-      "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+      "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
       "actor_id": "derived_event_system",
       "type": "memory_candidate.created",
       "payload": {
         "memory_id": "memory.player.clue_discovered.ruolan_voice_tape",
         "subject_id": "player",
         "content": "Player discovered clue '江若岚的录音片段'.",
-        "source_event_id": "c6fb0aa9-06cc-4648-8f27-074dc7046b10",
+        "source_event_id": "27bbb14a-3578-45f6-bcbd-cfe1a4b873db",
         "visibility": [
           "player"
         ],
         "salience": 0.8
       },
-      "caused_by_event_id": "c6fb0aa9-06cc-4648-8f27-074dc7046b10",
-      "created_at": "2026-06-01T09:46:07.902205+00:00"
+      "caused_by_event_id": "27bbb14a-3578-45f6-bcbd-cfe1a4b873db",
+      "created_at": "2026-06-01T15:01:37.531816+00:00"
     },
     {
-      "id": "4b0dca06-3b25-4a9a-b130-d47f3eea6831",
+      "id": "11b4df9c-2dbc-4fc6-b9d2-99941383354a",
       "case_id": "mist_clock_manor",
-      "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+      "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
       "actor_id": "memory_snapshot_system",
       "type": "agent_memory_snapshot.updated",
       "payload": {
         "memory_id": "memory.player.clue_discovered.ruolan_voice_tape",
         "subject_id": "player",
         "source_event_ids": [
-          "c6fb0aa9-06cc-4648-8f27-074dc7046b10"
+          "27bbb14a-3578-45f6-bcbd-cfe1a4b873db"
         ],
         "salience": 0.8,
         "visibility": "private",
         "operation": "created"
       },
-      "caused_by_event_id": "23e8ddff-5a3c-42a9-ae20-e620546a5e60",
-      "created_at": "2026-06-01T09:46:07.902205+00:00"
+      "caused_by_event_id": "18e50a13-2668-4bfb-a39f-90ed2a586a1b",
+      "created_at": "2026-06-01T15:01:37.531816+00:00"
     },
     {
-      "id": "74e6417a-d21c-443d-ad2c-043f34b4db88",
+      "id": "ce8ffa8d-bfcc-456e-a645-0eac6c705deb",
       "case_id": "mist_clock_manor",
-      "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+      "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
       "actor_id": "rule_trigger_system",
       "type": "narrative.beat.completed",
       "payload": {
         "beat_id": "mechanism_exposed",
         "phase": "investigation"
       },
-      "caused_by_event_id": "c6fb0aa9-06cc-4648-8f27-074dc7046b10",
-      "created_at": "2026-06-01T09:46:07.902205+00:00"
+      "caused_by_event_id": "27bbb14a-3578-45f6-bcbd-cfe1a4b873db",
+      "created_at": "2026-06-01T15:01:37.531816+00:00"
     },
     {
-      "id": "ea33d02b-f708-4f5f-a901-577f14ab734c",
+      "id": "20536453-5756-46c8-beaa-f8e196203aa0",
       "case_id": "mist_clock_manor",
-      "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+      "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
       "actor_id": "rule_trigger_system",
       "type": "narrative.phase.changed",
       "payload": {
@@ -4705,13 +4705,13 @@
         "to_phase": "confrontation",
         "trigger_beat_id": "mechanism_exposed"
       },
-      "caused_by_event_id": "c6fb0aa9-06cc-4648-8f27-074dc7046b10",
-      "created_at": "2026-06-01T09:46:07.902205+00:00"
+      "caused_by_event_id": "27bbb14a-3578-45f6-bcbd-cfe1a4b873db",
+      "created_at": "2026-06-01T15:01:37.531816+00:00"
     },
     {
-      "id": "ac99b99f-0117-4d2a-844a-38384e4a6d4e",
+      "id": "52bcaeba-7c3a-422f-be8c-6fd28c3951b9",
       "case_id": "mist_clock_manor",
-      "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+      "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
       "actor_id": "player",
       "type": "player.talked",
       "payload": {
@@ -4719,12 +4719,12 @@
         "text": "Tell me what you hid."
       },
       "caused_by_event_id": null,
-      "created_at": "2026-06-01T09:46:07.902205+00:00"
+      "created_at": "2026-06-01T15:01:37.531816+00:00"
     },
     {
-      "id": "41e214ea-ac23-469d-b732-80c0d3f3ba2d",
+      "id": "a0948a2c-f860-425f-b819-18706135bab9",
       "case_id": "mist_clock_manor",
-      "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+      "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
       "actor_id": "director",
       "type": "director.blocked",
       "payload": {
@@ -4740,13 +4740,13 @@
         "safe_fallback_used": true,
         "disclosure_claims": []
       },
-      "caused_by_event_id": "ac99b99f-0117-4d2a-844a-38384e4a6d4e",
-      "created_at": "2026-06-01T09:46:07.903802+00:00"
+      "caused_by_event_id": "52bcaeba-7c3a-422f-be8c-6fd28c3951b9",
+      "created_at": "2026-06-01T15:01:37.531816+00:00"
     },
     {
-      "id": "0b4b4738-c9d4-41c3-9560-1a92230572e4",
+      "id": "31a6750c-3942-4b4c-b67a-f0f8b3c6ef59",
       "case_id": "mist_clock_manor",
-      "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+      "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
       "actor_id": "character_impression_system",
       "type": "character_impression.updated",
       "payload": {
@@ -4769,55 +4769,55 @@
         ],
         "confidence": 0.1,
         "source_event_ids": [
-          "41e214ea-ac23-469d-b732-80c0d3f3ba2d"
+          "a0948a2c-f860-425f-b819-18706135bab9"
         ],
-        "last_updated_event_id": "0b4b4738-c9d4-41c3-9560-1a92230572e4"
+        "last_updated_event_id": "31a6750c-3942-4b4c-b67a-f0f8b3c6ef59"
       },
-      "caused_by_event_id": "41e214ea-ac23-469d-b732-80c0d3f3ba2d",
-      "created_at": "2026-06-01T09:46:07.903802+00:00"
+      "caused_by_event_id": "a0948a2c-f860-425f-b819-18706135bab9",
+      "created_at": "2026-06-01T15:01:37.531816+00:00"
     },
     {
-      "id": "0846791d-bf3c-4684-86e5-b7e20074376d",
+      "id": "8516d8e5-bcde-4435-96ae-30cd74d37305",
       "case_id": "mist_clock_manor",
-      "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+      "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
       "actor_id": "derived_event_system",
       "type": "memory_candidate.created",
       "payload": {
         "memory_id": "memory.player.director_blocked.jiang_yanhui.jiang_yanhui_mechanism",
         "subject_id": "player",
         "content": "Conversation with 江雁回 was blocked by narrative rules.",
-        "source_event_id": "41e214ea-ac23-469d-b732-80c0d3f3ba2d",
+        "source_event_id": "a0948a2c-f860-425f-b819-18706135bab9",
         "visibility": [
           "player"
         ],
         "salience": 0.9
       },
-      "caused_by_event_id": "41e214ea-ac23-469d-b732-80c0d3f3ba2d",
-      "created_at": "2026-06-01T09:46:07.903802+00:00"
+      "caused_by_event_id": "a0948a2c-f860-425f-b819-18706135bab9",
+      "created_at": "2026-06-01T15:01:37.531816+00:00"
     },
     {
-      "id": "9a8c7800-83fb-47f4-aded-798d53a16bbb",
+      "id": "d7137156-4b07-4374-91da-1829f17c4f86",
       "case_id": "mist_clock_manor",
-      "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+      "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
       "actor_id": "memory_snapshot_system",
       "type": "agent_memory_snapshot.updated",
       "payload": {
         "memory_id": "memory.player.director_blocked.jiang_yanhui.jiang_yanhui_mechanism",
         "subject_id": "player",
         "source_event_ids": [
-          "41e214ea-ac23-469d-b732-80c0d3f3ba2d"
+          "a0948a2c-f860-425f-b819-18706135bab9"
         ],
         "salience": 0.9,
         "visibility": "private",
         "operation": "created"
       },
-      "caused_by_event_id": "0846791d-bf3c-4684-86e5-b7e20074376d",
-      "created_at": "2026-06-01T09:46:07.903802+00:00"
+      "caused_by_event_id": "8516d8e5-bcde-4435-96ae-30cd74d37305",
+      "created_at": "2026-06-01T15:01:37.531816+00:00"
     },
     {
-      "id": "1f3bd68e-3ce9-48af-b689-e7696d25b360",
+      "id": "bda743e9-dea0-4d9e-844a-7457dcbf56d3",
       "case_id": "mist_clock_manor",
-      "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+      "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
       "actor_id": "player",
       "type": "player.presented_clue",
       "payload": {
@@ -4828,12 +4828,12 @@
         "interaction_pressure": 0.9
       },
       "caused_by_event_id": null,
-      "created_at": "2026-06-01T09:46:07.903802+00:00"
+      "created_at": "2026-06-01T15:01:37.531816+00:00"
     },
     {
-      "id": "820cbf93-ecea-4f43-889a-e9a47f158b9f",
+      "id": "72aa1bfc-24d2-4493-9579-2ab447c39e85",
       "case_id": "mist_clock_manor",
-      "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+      "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
       "actor_id": "jiang_yanhui",
       "type": "npc.replied",
       "payload": {
@@ -4852,13 +4852,13 @@
         ],
         "disclosure_claims": []
       },
-      "caused_by_event_id": "1f3bd68e-3ce9-48af-b689-e7696d25b360",
-      "created_at": "2026-06-01T09:46:07.903802+00:00"
+      "caused_by_event_id": "bda743e9-dea0-4d9e-844a-7457dcbf56d3",
+      "created_at": "2026-06-01T15:01:37.533338+00:00"
     },
     {
-      "id": "c8462799-4c58-42cc-9357-f73a55845ffd",
+      "id": "e04c084b-8448-48b5-a99e-e96e5f8b9b83",
       "case_id": "mist_clock_manor",
-      "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+      "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
       "actor_id": "system",
       "type": "relationship.changed",
       "payload": {
@@ -4878,13 +4878,13 @@
           "hostility": 0.0
         }
       },
-      "caused_by_event_id": "820cbf93-ecea-4f43-889a-e9a47f158b9f",
-      "created_at": "2026-06-01T09:46:07.903802+00:00"
+      "caused_by_event_id": "72aa1bfc-24d2-4493-9579-2ab447c39e85",
+      "created_at": "2026-06-01T15:01:37.533338+00:00"
     },
     {
-      "id": "d0e88932-1f7e-4744-8d82-3e46033fda17",
+      "id": "27ea7f62-8abf-4d2d-b6bf-982f02e745c2",
       "case_id": "mist_clock_manor",
-      "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+      "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
       "actor_id": "system",
       "type": "relationship.threshold.crossed",
       "payload": {
@@ -4895,13 +4895,13 @@
         "state": "guarded",
         "current_value": 0.7
       },
-      "caused_by_event_id": "c8462799-4c58-42cc-9357-f73a55845ffd",
-      "created_at": "2026-06-01T09:46:07.903802+00:00"
+      "caused_by_event_id": "e04c084b-8448-48b5-a99e-e96e5f8b9b83",
+      "created_at": "2026-06-01T15:01:37.533338+00:00"
     },
     {
-      "id": "0620f7e5-bb35-43f3-ad32-e583f8480183",
+      "id": "3995ca70-ad0d-4dfe-b0f4-4fee0696aca4",
       "case_id": "mist_clock_manor",
-      "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+      "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
       "actor_id": "character_impression_system",
       "type": "character_impression.updated",
       "payload": {
@@ -4931,18 +4931,18 @@
         ],
         "confidence": 0.2,
         "source_event_ids": [
-          "41e214ea-ac23-469d-b732-80c0d3f3ba2d",
-          "1f3bd68e-3ce9-48af-b689-e7696d25b360"
+          "a0948a2c-f860-425f-b819-18706135bab9",
+          "bda743e9-dea0-4d9e-844a-7457dcbf56d3"
         ],
-        "last_updated_event_id": "0620f7e5-bb35-43f3-ad32-e583f8480183"
+        "last_updated_event_id": "3995ca70-ad0d-4dfe-b0f4-4fee0696aca4"
       },
-      "caused_by_event_id": "1f3bd68e-3ce9-48af-b689-e7696d25b360",
-      "created_at": "2026-06-01T09:46:07.903802+00:00"
+      "caused_by_event_id": "bda743e9-dea0-4d9e-844a-7457dcbf56d3",
+      "created_at": "2026-06-01T15:01:37.533338+00:00"
     },
     {
-      "id": "98ac081d-6630-4e82-9a6c-bc01a138367d",
+      "id": "950a638e-84a5-491a-97ac-e9b7be18722a",
       "case_id": "mist_clock_manor",
-      "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+      "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
       "actor_id": "character_fact_awareness_system",
       "type": "character_fact_awareness.updated",
       "payload": {
@@ -4962,55 +4962,55 @@
         ],
         "source_event_ids": [
           "case_package",
-          "1f3bd68e-3ce9-48af-b689-e7696d25b360"
+          "bda743e9-dea0-4d9e-844a-7457dcbf56d3"
         ],
-        "last_updated_event_id": "98ac081d-6630-4e82-9a6c-bc01a138367d"
+        "last_updated_event_id": "950a638e-84a5-491a-97ac-e9b7be18722a"
       },
-      "caused_by_event_id": "1f3bd68e-3ce9-48af-b689-e7696d25b360",
-      "created_at": "2026-06-01T09:46:07.903802+00:00"
+      "caused_by_event_id": "bda743e9-dea0-4d9e-844a-7457dcbf56d3",
+      "created_at": "2026-06-01T15:01:37.533338+00:00"
     },
     {
-      "id": "ec50f4f0-cc02-4a46-aeb7-989494152664",
+      "id": "bd566c86-d695-4a1c-9c14-3ece6141bfc0",
       "case_id": "mist_clock_manor",
-      "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+      "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
       "actor_id": "derived_event_system",
       "type": "memory_candidate.created",
       "payload": {
         "memory_id": "memory.player.presented_clue.jiang_yanhui.delayed_lock_marks",
         "subject_id": "player",
         "content": "Player pressured 江雁回 with clue 'delayed_lock_marks' at pressure 0.9.",
-        "source_event_id": "1f3bd68e-3ce9-48af-b689-e7696d25b360",
+        "source_event_id": "bda743e9-dea0-4d9e-844a-7457dcbf56d3",
         "visibility": [
           "player"
         ],
         "salience": 0.9
       },
-      "caused_by_event_id": "1f3bd68e-3ce9-48af-b689-e7696d25b360",
-      "created_at": "2026-06-01T09:46:07.903802+00:00"
+      "caused_by_event_id": "bda743e9-dea0-4d9e-844a-7457dcbf56d3",
+      "created_at": "2026-06-01T15:01:37.533338+00:00"
     },
     {
-      "id": "41e02cf3-d1c2-4d82-98f2-2a803e9f55bb",
+      "id": "58835d05-3801-4743-bc47-7ee9e212cd51",
       "case_id": "mist_clock_manor",
-      "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+      "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
       "actor_id": "memory_snapshot_system",
       "type": "agent_memory_snapshot.updated",
       "payload": {
         "memory_id": "memory.player.presented_clue.jiang_yanhui.delayed_lock_marks",
         "subject_id": "player",
         "source_event_ids": [
-          "1f3bd68e-3ce9-48af-b689-e7696d25b360"
+          "bda743e9-dea0-4d9e-844a-7457dcbf56d3"
         ],
         "salience": 0.9,
         "visibility": "private",
         "operation": "created"
       },
-      "caused_by_event_id": "ec50f4f0-cc02-4a46-aeb7-989494152664",
-      "created_at": "2026-06-01T09:46:07.903802+00:00"
+      "caused_by_event_id": "bd566c86-d695-4a1c-9c14-3ece6141bfc0",
+      "created_at": "2026-06-01T15:01:37.533338+00:00"
     },
     {
-      "id": "3f41ec97-f45a-443d-a13d-6fb93386b17b",
+      "id": "6182da7d-602b-4d02-b777-534a500e5d79",
       "case_id": "mist_clock_manor",
-      "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+      "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
       "actor_id": "character_impression_system",
       "type": "character_impression.updated",
       "payload": {
@@ -5043,82 +5043,82 @@
         ],
         "confidence": 0.3,
         "source_event_ids": [
-          "41e214ea-ac23-469d-b732-80c0d3f3ba2d",
-          "1f3bd68e-3ce9-48af-b689-e7696d25b360",
-          "d0e88932-1f7e-4744-8d82-3e46033fda17"
+          "a0948a2c-f860-425f-b819-18706135bab9",
+          "bda743e9-dea0-4d9e-844a-7457dcbf56d3",
+          "27ea7f62-8abf-4d2d-b6bf-982f02e745c2"
         ],
-        "last_updated_event_id": "3f41ec97-f45a-443d-a13d-6fb93386b17b"
+        "last_updated_event_id": "6182da7d-602b-4d02-b777-534a500e5d79"
       },
-      "caused_by_event_id": "d0e88932-1f7e-4744-8d82-3e46033fda17",
-      "created_at": "2026-06-01T09:46:07.903802+00:00"
+      "caused_by_event_id": "27ea7f62-8abf-4d2d-b6bf-982f02e745c2",
+      "created_at": "2026-06-01T15:01:37.533338+00:00"
     },
     {
-      "id": "dcd8b7e6-61ed-4d55-bcc0-f7ada3aafb78",
+      "id": "7fed06a0-b2fa-4614-b878-62d013493fb5",
       "case_id": "mist_clock_manor",
-      "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+      "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
       "actor_id": "derived_event_system",
       "type": "memory_candidate.created",
       "payload": {
         "memory_id": "memory.player.relationship_threshold.jiang_yanhui.player.suspicion.guarded",
         "subject_id": "player",
         "content": "江雁回 became guarded toward the player (suspicion).",
-        "source_event_id": "d0e88932-1f7e-4744-8d82-3e46033fda17",
+        "source_event_id": "27ea7f62-8abf-4d2d-b6bf-982f02e745c2",
         "visibility": [
           "player"
         ],
         "salience": 0.7
       },
-      "caused_by_event_id": "d0e88932-1f7e-4744-8d82-3e46033fda17",
-      "created_at": "2026-06-01T09:46:07.903802+00:00"
+      "caused_by_event_id": "27ea7f62-8abf-4d2d-b6bf-982f02e745c2",
+      "created_at": "2026-06-01T15:01:37.533338+00:00"
     },
     {
-      "id": "26e35ca9-a4b1-4c0a-aa3c-5ab60488cfc2",
+      "id": "167e2433-0c60-4079-8aad-f1f642c2403f",
       "case_id": "mist_clock_manor",
-      "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+      "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
       "actor_id": "memory_snapshot_system",
       "type": "agent_memory_snapshot.updated",
       "payload": {
         "memory_id": "memory.player.relationship_threshold.jiang_yanhui.player.suspicion.guarded",
         "subject_id": "player",
         "source_event_ids": [
-          "d0e88932-1f7e-4744-8d82-3e46033fda17"
+          "27ea7f62-8abf-4d2d-b6bf-982f02e745c2"
         ],
         "salience": 0.7,
         "visibility": "private",
         "operation": "created"
       },
-      "caused_by_event_id": "dcd8b7e6-61ed-4d55-bcc0-f7ada3aafb78",
-      "created_at": "2026-06-01T09:46:07.903802+00:00"
+      "caused_by_event_id": "7fed06a0-b2fa-4614-b878-62d013493fb5",
+      "created_at": "2026-06-01T15:01:37.533338+00:00"
     },
     {
-      "id": "4a7f06c8-b3fc-4572-ab68-5d8e50c6e550",
+      "id": "f90e9a7e-4477-4c33-892f-21e5cf0eb78d",
       "case_id": "mist_clock_manor",
-      "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+      "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
       "actor_id": "player",
       "type": "player.inspected",
       "payload": {
         "target_id": "burned_letter"
       },
       "caused_by_event_id": null,
-      "created_at": "2026-06-01T09:46:07.903802+00:00"
+      "created_at": "2026-06-01T15:01:37.533338+00:00"
     },
     {
-      "id": "adbf7038-59f4-4e55-aea8-57054ee84a3b",
+      "id": "bba6fc08-12b1-4730-82e0-8492d39e2f28",
       "case_id": "mist_clock_manor",
-      "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+      "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
       "actor_id": "system",
       "type": "clue.discovered",
       "payload": {
         "clue_id": "burned_confession",
         "source_hotspot_id": "burned_letter"
       },
-      "caused_by_event_id": "4a7f06c8-b3fc-4572-ab68-5d8e50c6e550",
-      "created_at": "2026-06-01T09:46:07.903802+00:00"
+      "caused_by_event_id": "f90e9a7e-4477-4c33-892f-21e5cf0eb78d",
+      "created_at": "2026-06-01T15:01:37.533338+00:00"
     },
     {
-      "id": "a021ce19-a144-4751-91e4-16a6db717609",
+      "id": "60092e04-3ad5-43f1-89b6-ae49107d3693",
       "case_id": "mist_clock_manor",
-      "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+      "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
       "actor_id": "derived_event_system",
       "type": "player_knowledge.updated",
       "payload": {
@@ -5128,80 +5128,80 @@
         "confidence": 1.0,
         "acquisition": "discovered",
         "source_type": "clue",
-        "source_event_id": "adbf7038-59f4-4e55-aea8-57054ee84a3b",
+        "source_event_id": "bba6fc08-12b1-4730-82e0-8492d39e2f28",
         "title": "陆澜生准备伪造忏悔信洗白旧案",
         "summary": "陆澜生计划用伪造忏悔信和信托条款，把江若岚之死包装成个人情绪导致的意外。"
       },
-      "caused_by_event_id": "adbf7038-59f4-4e55-aea8-57054ee84a3b",
-      "created_at": "2026-06-01T09:46:07.903802+00:00"
+      "caused_by_event_id": "bba6fc08-12b1-4730-82e0-8492d39e2f28",
+      "created_at": "2026-06-01T15:01:37.533338+00:00"
     },
     {
-      "id": "f2b09a08-bf4b-441b-86f5-404ad2252e61",
+      "id": "62606fe1-fa09-4ce7-92d1-1748f5b43add",
       "case_id": "mist_clock_manor",
-      "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+      "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
       "actor_id": "derived_event_system",
       "type": "memory_candidate.created",
       "payload": {
         "memory_id": "memory.player.clue_discovered.burned_confession",
         "subject_id": "player",
         "content": "Player discovered clue '烧毁半截的忏悔信附录'.",
-        "source_event_id": "adbf7038-59f4-4e55-aea8-57054ee84a3b",
+        "source_event_id": "bba6fc08-12b1-4730-82e0-8492d39e2f28",
         "visibility": [
           "player"
         ],
         "salience": 0.8
       },
-      "caused_by_event_id": "adbf7038-59f4-4e55-aea8-57054ee84a3b",
-      "created_at": "2026-06-01T09:46:07.903802+00:00"
+      "caused_by_event_id": "bba6fc08-12b1-4730-82e0-8492d39e2f28",
+      "created_at": "2026-06-01T15:01:37.533338+00:00"
     },
     {
-      "id": "cef0d9ce-00b9-4a6e-900c-44f21aa79a68",
+      "id": "94573a21-bfd4-4312-bdd3-71f7e9c7c644",
       "case_id": "mist_clock_manor",
-      "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+      "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
       "actor_id": "memory_snapshot_system",
       "type": "agent_memory_snapshot.updated",
       "payload": {
         "memory_id": "memory.player.clue_discovered.burned_confession",
         "subject_id": "player",
         "source_event_ids": [
-          "adbf7038-59f4-4e55-aea8-57054ee84a3b"
+          "bba6fc08-12b1-4730-82e0-8492d39e2f28"
         ],
         "salience": 0.8,
         "visibility": "private",
         "operation": "created"
       },
-      "caused_by_event_id": "f2b09a08-bf4b-441b-86f5-404ad2252e61",
-      "created_at": "2026-06-01T09:46:07.903802+00:00"
+      "caused_by_event_id": "62606fe1-fa09-4ce7-92d1-1748f5b43add",
+      "created_at": "2026-06-01T15:01:37.533338+00:00"
     },
     {
-      "id": "c5423e1d-562d-41dd-bcf3-08223570f7ed",
+      "id": "8e03777b-e587-42b2-b478-c4691af688de",
       "case_id": "mist_clock_manor",
-      "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+      "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
       "actor_id": "player",
       "type": "player.inspected",
       "payload": {
         "target_id": "medicine_box"
       },
       "caused_by_event_id": null,
-      "created_at": "2026-06-01T09:46:07.903802+00:00"
+      "created_at": "2026-06-01T15:01:37.533338+00:00"
     },
     {
-      "id": "638ba3df-89a3-486b-b2bb-c814fc2649a5",
+      "id": "95e4fc77-9205-4a92-9be2-62eb3a045fe0",
       "case_id": "mist_clock_manor",
-      "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+      "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
       "actor_id": "system",
       "type": "clue.discovered",
       "payload": {
         "clue_id": "empty_capsules",
         "source_hotspot_id": "medicine_box"
       },
-      "caused_by_event_id": "c5423e1d-562d-41dd-bcf3-08223570f7ed",
-      "created_at": "2026-06-01T09:46:07.905374+00:00"
+      "caused_by_event_id": "8e03777b-e587-42b2-b478-c4691af688de",
+      "created_at": "2026-06-01T15:01:37.533338+00:00"
     },
     {
-      "id": "787b5281-0d74-40d5-a698-73e3b7d3d186",
+      "id": "a2abbb49-20fd-4265-a2c2-b4f44f42574a",
       "case_id": "mist_clock_manor",
-      "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+      "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
       "actor_id": "derived_event_system",
       "type": "player_knowledge.updated",
       "payload": {
@@ -5211,80 +5211,80 @@
         "confidence": 1.0,
         "acquisition": "discovered",
         "source_type": "clue",
-        "source_event_id": "638ba3df-89a3-486b-b2bb-c814fc2649a5",
+        "source_event_id": "95e4fc77-9205-4a92-9be2-62eb3a045fe0",
         "title": "陆澜生的心脏病药被换成空胶囊",
         "summary": "书房药盒中有外观相同的空胶囊，导致陆澜生发病时没有得到有效药物。"
       },
-      "caused_by_event_id": "638ba3df-89a3-486b-b2bb-c814fc2649a5",
-      "created_at": "2026-06-01T09:46:07.905374+00:00"
+      "caused_by_event_id": "95e4fc77-9205-4a92-9be2-62eb3a045fe0",
+      "created_at": "2026-06-01T15:01:37.533338+00:00"
     },
     {
-      "id": "6ab4f2cf-a091-40f0-bdca-782e28f14b12",
+      "id": "056d8c80-82fb-43db-80ee-4a3785635761",
       "case_id": "mist_clock_manor",
-      "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+      "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
       "actor_id": "derived_event_system",
       "type": "memory_candidate.created",
       "payload": {
         "memory_id": "memory.player.clue_discovered.empty_capsules",
         "subject_id": "player",
         "content": "Player discovered clue '重量异常的心脏病胶囊'.",
-        "source_event_id": "638ba3df-89a3-486b-b2bb-c814fc2649a5",
+        "source_event_id": "95e4fc77-9205-4a92-9be2-62eb3a045fe0",
         "visibility": [
           "player"
         ],
         "salience": 0.8
       },
-      "caused_by_event_id": "638ba3df-89a3-486b-b2bb-c814fc2649a5",
-      "created_at": "2026-06-01T09:46:07.905374+00:00"
+      "caused_by_event_id": "95e4fc77-9205-4a92-9be2-62eb3a045fe0",
+      "created_at": "2026-06-01T15:01:37.533338+00:00"
     },
     {
-      "id": "a4542972-bfc8-449c-a0ab-570b1b001f82",
+      "id": "d5c2eb72-03fe-4198-b4c1-a940220c815a",
       "case_id": "mist_clock_manor",
-      "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+      "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
       "actor_id": "memory_snapshot_system",
       "type": "agent_memory_snapshot.updated",
       "payload": {
         "memory_id": "memory.player.clue_discovered.empty_capsules",
         "subject_id": "player",
         "source_event_ids": [
-          "638ba3df-89a3-486b-b2bb-c814fc2649a5"
+          "95e4fc77-9205-4a92-9be2-62eb3a045fe0"
         ],
         "salience": 0.8,
         "visibility": "private",
         "operation": "created"
       },
-      "caused_by_event_id": "6ab4f2cf-a091-40f0-bdca-782e28f14b12",
-      "created_at": "2026-06-01T09:46:07.905374+00:00"
+      "caused_by_event_id": "056d8c80-82fb-43db-80ee-4a3785635761",
+      "created_at": "2026-06-01T15:01:37.533338+00:00"
     },
     {
-      "id": "9ac663f2-1373-4327-b0dd-2a43afc8f772",
+      "id": "cadb8193-32f0-4942-a855-58cff1546473",
       "case_id": "mist_clock_manor",
-      "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+      "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
       "actor_id": "player",
       "type": "player.inspected",
       "payload": {
         "target_id": "breaker_box"
       },
       "caused_by_event_id": null,
-      "created_at": "2026-06-01T09:46:07.905374+00:00"
+      "created_at": "2026-06-01T15:01:37.533338+00:00"
     },
     {
-      "id": "21351cae-ddcf-4680-9c85-5a8508fb9efa",
+      "id": "820ea6ac-f631-4046-90b1-fb9796f1894a",
       "case_id": "mist_clock_manor",
-      "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+      "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
       "actor_id": "system",
       "type": "clue.discovered",
       "payload": {
         "clue_id": "cut_power_trace",
         "source_hotspot_id": "breaker_box"
       },
-      "caused_by_event_id": "9ac663f2-1373-4327-b0dd-2a43afc8f772",
-      "created_at": "2026-06-01T09:46:07.905374+00:00"
+      "caused_by_event_id": "cadb8193-32f0-4942-a855-58cff1546473",
+      "created_at": "2026-06-01T15:01:37.533338+00:00"
     },
     {
-      "id": "820c3b5a-981a-4b8b-9068-158bd1bcf74b",
+      "id": "6d2f1254-44ff-4ac5-9562-a7e19642a587",
       "case_id": "mist_clock_manor",
-      "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+      "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
       "actor_id": "derived_event_system",
       "type": "player_knowledge.updated",
       "payload": {
@@ -5294,68 +5294,68 @@
         "confidence": 1.0,
         "acquisition": "discovered",
         "source_type": "clue",
-        "source_event_id": "21351cae-ddcf-4680-9c85-5a8508fb9efa",
+        "source_event_id": "820ea6ac-f631-4046-90b1-fb9796f1894a",
         "title": "沈照夜切断主电源",
         "summary": "沈照夜在案发前切断主电源，想迫使陆澜生无法按原计划播放公开视频。"
       },
-      "caused_by_event_id": "21351cae-ddcf-4680-9c85-5a8508fb9efa",
-      "created_at": "2026-06-01T09:46:07.905374+00:00"
+      "caused_by_event_id": "820ea6ac-f631-4046-90b1-fb9796f1894a",
+      "created_at": "2026-06-01T15:01:37.533338+00:00"
     },
     {
-      "id": "77455df1-531b-4638-9b7a-b5feb3d369f0",
+      "id": "48e878d2-353e-4d12-b2f9-ba96db80f896",
       "case_id": "mist_clock_manor",
-      "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+      "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
       "actor_id": "derived_event_system",
       "type": "memory_candidate.created",
       "payload": {
         "memory_id": "memory.player.clue_discovered.cut_power_trace",
         "subject_id": "player",
         "content": "Player discovered clue '被人为拉下的主电闸'.",
-        "source_event_id": "21351cae-ddcf-4680-9c85-5a8508fb9efa",
+        "source_event_id": "820ea6ac-f631-4046-90b1-fb9796f1894a",
         "visibility": [
           "player"
         ],
         "salience": 0.8
       },
-      "caused_by_event_id": "21351cae-ddcf-4680-9c85-5a8508fb9efa",
-      "created_at": "2026-06-01T09:46:07.905374+00:00"
+      "caused_by_event_id": "820ea6ac-f631-4046-90b1-fb9796f1894a",
+      "created_at": "2026-06-01T15:01:37.533338+00:00"
     },
     {
-      "id": "f5d23141-c6d4-41a7-960d-ed26f277166d",
+      "id": "fd70b757-5574-4e80-b7b4-bbe72d8ffba1",
       "case_id": "mist_clock_manor",
-      "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+      "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
       "actor_id": "memory_snapshot_system",
       "type": "agent_memory_snapshot.updated",
       "payload": {
         "memory_id": "memory.player.clue_discovered.cut_power_trace",
         "subject_id": "player",
         "source_event_ids": [
-          "21351cae-ddcf-4680-9c85-5a8508fb9efa"
+          "820ea6ac-f631-4046-90b1-fb9796f1894a"
         ],
         "salience": 0.8,
         "visibility": "private",
         "operation": "created"
       },
-      "caused_by_event_id": "77455df1-531b-4638-9b7a-b5feb3d369f0",
-      "created_at": "2026-06-01T09:46:07.905374+00:00"
+      "caused_by_event_id": "48e878d2-353e-4d12-b2f9-ba96db80f896",
+      "created_at": "2026-06-01T15:01:37.533338+00:00"
     },
     {
-      "id": "04be89e6-1957-45cf-a863-0c11dfb1a24e",
+      "id": "d535dd7f-0026-4c93-9183-730e8768054c",
       "case_id": "mist_clock_manor",
-      "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+      "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
       "actor_id": "rule_trigger_system",
       "type": "narrative.beat.completed",
       "payload": {
         "beat_id": "motive_chain_exposed",
         "phase": "confrontation"
       },
-      "caused_by_event_id": "21351cae-ddcf-4680-9c85-5a8508fb9efa",
-      "created_at": "2026-06-01T09:46:07.905374+00:00"
+      "caused_by_event_id": "820ea6ac-f631-4046-90b1-fb9796f1894a",
+      "created_at": "2026-06-01T15:01:37.533338+00:00"
     },
     {
-      "id": "a1a06499-c678-460b-90de-4ae4de08d863",
+      "id": "11925087-86e0-42f3-8de7-e3a2c9ec3b8a",
       "case_id": "mist_clock_manor",
-      "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+      "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
       "actor_id": "rule_trigger_system",
       "type": "narrative.phase.changed",
       "payload": {
@@ -5364,13 +5364,13 @@
         "to_phase": "reconstruction",
         "trigger_beat_id": "motive_chain_exposed"
       },
-      "caused_by_event_id": "21351cae-ddcf-4680-9c85-5a8508fb9efa",
-      "created_at": "2026-06-01T09:46:07.905374+00:00"
+      "caused_by_event_id": "820ea6ac-f631-4046-90b1-fb9796f1894a",
+      "created_at": "2026-06-01T15:01:37.533338+00:00"
     },
     {
-      "id": "f2407797-f925-42c7-b7b7-4e64dc64f977",
+      "id": "8007224c-d00c-4fac-9257-67db89855e22",
       "case_id": "mist_clock_manor",
-      "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+      "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
       "actor_id": "player",
       "type": "player.accused",
       "payload": {
@@ -5387,12 +5387,12 @@
         "text": "The death was caused by a chain of actions."
       },
       "caused_by_event_id": null,
-      "created_at": "2026-06-01T09:46:07.905374+00:00"
+      "created_at": "2026-06-01T15:01:37.533338+00:00"
     },
     {
-      "id": "f8d02c43-af27-4a08-90b6-e0589f51a3a8",
+      "id": "15a89cd0-3221-43ae-99f5-e04123f5f2b6",
       "case_id": "mist_clock_manor",
-      "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+      "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
       "actor_id": "rule_engine",
       "type": "accusation.evaluated",
       "payload": {
@@ -5409,13 +5409,13 @@
         ],
         "missing_required_evidence": []
       },
-      "caused_by_event_id": "f2407797-f925-42c7-b7b7-4e64dc64f977",
-      "created_at": "2026-06-01T09:46:07.905374+00:00"
+      "caused_by_event_id": "8007224c-d00c-4fac-9257-67db89855e22",
+      "created_at": "2026-06-01T15:01:37.533338+00:00"
     },
     {
-      "id": "735efa4e-9d8c-46e5-91d0-c03292463972",
+      "id": "bf60b561-b8e7-4de8-b0c8-950c4905b89c",
       "case_id": "mist_clock_manor",
-      "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+      "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
       "actor_id": "character_impression_system",
       "type": "character_impression.updated",
       "payload": {
@@ -5455,20 +5455,20 @@
         ],
         "confidence": 0.4,
         "source_event_ids": [
-          "41e214ea-ac23-469d-b732-80c0d3f3ba2d",
-          "1f3bd68e-3ce9-48af-b689-e7696d25b360",
-          "d0e88932-1f7e-4744-8d82-3e46033fda17",
-          "f2407797-f925-42c7-b7b7-4e64dc64f977"
+          "a0948a2c-f860-425f-b819-18706135bab9",
+          "bda743e9-dea0-4d9e-844a-7457dcbf56d3",
+          "27ea7f62-8abf-4d2d-b6bf-982f02e745c2",
+          "8007224c-d00c-4fac-9257-67db89855e22"
         ],
-        "last_updated_event_id": "735efa4e-9d8c-46e5-91d0-c03292463972"
+        "last_updated_event_id": "bf60b561-b8e7-4de8-b0c8-950c4905b89c"
       },
-      "caused_by_event_id": "f2407797-f925-42c7-b7b7-4e64dc64f977",
-      "created_at": "2026-06-01T09:46:07.905374+00:00"
+      "caused_by_event_id": "8007224c-d00c-4fac-9257-67db89855e22",
+      "created_at": "2026-06-01T15:01:37.533338+00:00"
     },
     {
-      "id": "c73bf453-0eea-4791-9c99-f72f9f822c8e",
+      "id": "3d731bee-03de-4e10-8fe1-c5526d255645",
       "case_id": "mist_clock_manor",
-      "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+      "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
       "actor_id": "character_fact_awareness_system",
       "type": "character_fact_awareness.updated",
       "payload": {
@@ -5490,17 +5490,17 @@
           "empty_capsules"
         ],
         "source_event_ids": [
-          "f2407797-f925-42c7-b7b7-4e64dc64f977"
+          "8007224c-d00c-4fac-9257-67db89855e22"
         ],
-        "last_updated_event_id": "c73bf453-0eea-4791-9c99-f72f9f822c8e"
+        "last_updated_event_id": "3d731bee-03de-4e10-8fe1-c5526d255645"
       },
-      "caused_by_event_id": "f2407797-f925-42c7-b7b7-4e64dc64f977",
-      "created_at": "2026-06-01T09:46:07.905374+00:00"
+      "caused_by_event_id": "8007224c-d00c-4fac-9257-67db89855e22",
+      "created_at": "2026-06-01T15:01:37.533338+00:00"
     },
     {
-      "id": "83fec33c-efb9-4038-a83d-d21cb158a3c1",
+      "id": "1a0a9a22-1da4-4f4f-a0ae-6d6ca7bc74fa",
       "case_id": "mist_clock_manor",
-      "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+      "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
       "actor_id": "character_fact_awareness_system",
       "type": "character_fact_awareness.updated",
       "payload": {
@@ -5525,18 +5525,18 @@
         ],
         "source_event_ids": [
           "case_package",
-          "1f3bd68e-3ce9-48af-b689-e7696d25b360",
-          "f2407797-f925-42c7-b7b7-4e64dc64f977"
+          "bda743e9-dea0-4d9e-844a-7457dcbf56d3",
+          "8007224c-d00c-4fac-9257-67db89855e22"
         ],
-        "last_updated_event_id": "83fec33c-efb9-4038-a83d-d21cb158a3c1"
+        "last_updated_event_id": "1a0a9a22-1da4-4f4f-a0ae-6d6ca7bc74fa"
       },
-      "caused_by_event_id": "f2407797-f925-42c7-b7b7-4e64dc64f977",
-      "created_at": "2026-06-01T09:46:07.905374+00:00"
+      "caused_by_event_id": "8007224c-d00c-4fac-9257-67db89855e22",
+      "created_at": "2026-06-01T15:01:37.533338+00:00"
     },
     {
-      "id": "22c82800-f30b-4123-aeeb-848e34440a66",
+      "id": "59ebe4b0-d1bf-49a4-822e-f2feec31f17a",
       "case_id": "mist_clock_manor",
-      "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+      "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
       "actor_id": "character_fact_awareness_system",
       "type": "character_fact_awareness.updated",
       "payload": {
@@ -5561,17 +5561,17 @@
         ],
         "source_event_ids": [
           "case_package",
-          "f2407797-f925-42c7-b7b7-4e64dc64f977"
+          "8007224c-d00c-4fac-9257-67db89855e22"
         ],
-        "last_updated_event_id": "22c82800-f30b-4123-aeeb-848e34440a66"
+        "last_updated_event_id": "59ebe4b0-d1bf-49a4-822e-f2feec31f17a"
       },
-      "caused_by_event_id": "f2407797-f925-42c7-b7b7-4e64dc64f977",
-      "created_at": "2026-06-01T09:46:07.905374+00:00"
+      "caused_by_event_id": "8007224c-d00c-4fac-9257-67db89855e22",
+      "created_at": "2026-06-01T15:01:37.533338+00:00"
     },
     {
-      "id": "707a6894-90ac-4ad8-b62e-0e12322f3457",
+      "id": "3560943e-c650-4f14-8337-4a4ba21032d7",
       "case_id": "mist_clock_manor",
-      "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+      "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
       "actor_id": "character_fact_awareness_system",
       "type": "character_fact_awareness.updated",
       "payload": {
@@ -5596,17 +5596,17 @@
         ],
         "source_event_ids": [
           "case_package",
-          "f2407797-f925-42c7-b7b7-4e64dc64f977"
+          "8007224c-d00c-4fac-9257-67db89855e22"
         ],
-        "last_updated_event_id": "707a6894-90ac-4ad8-b62e-0e12322f3457"
+        "last_updated_event_id": "3560943e-c650-4f14-8337-4a4ba21032d7"
       },
-      "caused_by_event_id": "f2407797-f925-42c7-b7b7-4e64dc64f977",
-      "created_at": "2026-06-01T09:46:07.905374+00:00"
+      "caused_by_event_id": "8007224c-d00c-4fac-9257-67db89855e22",
+      "created_at": "2026-06-01T15:01:37.533338+00:00"
     },
     {
-      "id": "7db401d3-fbb8-4c01-9b45-e38319761273",
+      "id": "bfcb0eee-34d7-40d1-8a2d-c0bcfaed124c",
       "case_id": "mist_clock_manor",
-      "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+      "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
       "actor_id": "character_fact_awareness_system",
       "type": "character_fact_awareness.updated",
       "payload": {
@@ -5630,17 +5630,17 @@
         ],
         "source_event_ids": [
           "case_package",
-          "f2407797-f925-42c7-b7b7-4e64dc64f977"
+          "8007224c-d00c-4fac-9257-67db89855e22"
         ],
-        "last_updated_event_id": "7db401d3-fbb8-4c01-9b45-e38319761273"
+        "last_updated_event_id": "bfcb0eee-34d7-40d1-8a2d-c0bcfaed124c"
       },
-      "caused_by_event_id": "f2407797-f925-42c7-b7b7-4e64dc64f977",
-      "created_at": "2026-06-01T09:46:07.905374+00:00"
+      "caused_by_event_id": "8007224c-d00c-4fac-9257-67db89855e22",
+      "created_at": "2026-06-01T15:01:37.533338+00:00"
     },
     {
-      "id": "0bd2e5e9-3613-45c6-bcae-cb478c8dd445",
+      "id": "fc9f7386-3ad0-4228-9fdf-1d956c66e6f7",
       "case_id": "mist_clock_manor",
-      "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+      "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
       "actor_id": "character_fact_awareness_system",
       "type": "character_fact_awareness.updated",
       "payload": {
@@ -5662,55 +5662,55 @@
           "empty_capsules"
         ],
         "source_event_ids": [
-          "f2407797-f925-42c7-b7b7-4e64dc64f977"
+          "8007224c-d00c-4fac-9257-67db89855e22"
         ],
-        "last_updated_event_id": "0bd2e5e9-3613-45c6-bcae-cb478c8dd445"
+        "last_updated_event_id": "fc9f7386-3ad0-4228-9fdf-1d956c66e6f7"
       },
-      "caused_by_event_id": "f2407797-f925-42c7-b7b7-4e64dc64f977",
-      "created_at": "2026-06-01T09:46:07.905374+00:00"
+      "caused_by_event_id": "8007224c-d00c-4fac-9257-67db89855e22",
+      "created_at": "2026-06-01T15:01:37.533338+00:00"
     },
     {
-      "id": "7e119306-34f6-4fc4-b5a1-4c1228634313",
+      "id": "e38c73e1-5c28-4b86-82a8-f5b1b0c68932",
       "case_id": "mist_clock_manor",
-      "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+      "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
       "actor_id": "derived_event_system",
       "type": "memory_candidate.created",
       "payload": {
         "memory_id": "memory.player.accused.jiang_yanhui.shared_death_chain",
         "subject_id": "player",
         "content": "Player formally accused 江雁回 with claim 'shared_death_chain' using evidence ['bitter_wine', 'delayed_lock_marks', 'echo_tape', 'burned_confession', 'empty_capsules', 'cut_power_trace'].",
-        "source_event_id": "f2407797-f925-42c7-b7b7-4e64dc64f977",
+        "source_event_id": "8007224c-d00c-4fac-9257-67db89855e22",
         "visibility": [
           "player"
         ],
         "salience": 1.0
       },
-      "caused_by_event_id": "f2407797-f925-42c7-b7b7-4e64dc64f977",
-      "created_at": "2026-06-01T09:46:07.905374+00:00"
+      "caused_by_event_id": "8007224c-d00c-4fac-9257-67db89855e22",
+      "created_at": "2026-06-01T15:01:37.533338+00:00"
     },
     {
-      "id": "236a537a-bd48-4593-a780-a1f434e388bc",
+      "id": "4a9579c0-92e3-4faf-98ff-615a37dcbd82",
       "case_id": "mist_clock_manor",
-      "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+      "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
       "actor_id": "memory_snapshot_system",
       "type": "agent_memory_snapshot.updated",
       "payload": {
         "memory_id": "memory.player.accused.jiang_yanhui.shared_death_chain",
         "subject_id": "player",
         "source_event_ids": [
-          "f2407797-f925-42c7-b7b7-4e64dc64f977"
+          "8007224c-d00c-4fac-9257-67db89855e22"
         ],
         "salience": 1.0,
         "visibility": "private",
         "operation": "created"
       },
-      "caused_by_event_id": "7e119306-34f6-4fc4-b5a1-4c1228634313",
-      "created_at": "2026-06-01T09:46:07.905374+00:00"
+      "caused_by_event_id": "e38c73e1-5c28-4b86-82a8-f5b1b0c68932",
+      "created_at": "2026-06-01T15:01:37.533338+00:00"
     },
     {
-      "id": "03d99ccc-fe04-4405-8e16-c9cd52db9be8",
+      "id": "35ec9d78-b5e8-413c-837f-5f0af361fddc",
       "case_id": "mist_clock_manor",
-      "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+      "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
       "actor_id": "character_impression_system",
       "type": "character_impression.updated",
       "payload": {
@@ -5752,72 +5752,72 @@
         ],
         "confidence": 0.5,
         "source_event_ids": [
-          "41e214ea-ac23-469d-b732-80c0d3f3ba2d",
-          "1f3bd68e-3ce9-48af-b689-e7696d25b360",
-          "d0e88932-1f7e-4744-8d82-3e46033fda17",
-          "f2407797-f925-42c7-b7b7-4e64dc64f977",
-          "f8d02c43-af27-4a08-90b6-e0589f51a3a8"
+          "a0948a2c-f860-425f-b819-18706135bab9",
+          "bda743e9-dea0-4d9e-844a-7457dcbf56d3",
+          "27ea7f62-8abf-4d2d-b6bf-982f02e745c2",
+          "8007224c-d00c-4fac-9257-67db89855e22",
+          "15a89cd0-3221-43ae-99f5-e04123f5f2b6"
         ],
-        "last_updated_event_id": "03d99ccc-fe04-4405-8e16-c9cd52db9be8"
+        "last_updated_event_id": "35ec9d78-b5e8-413c-837f-5f0af361fddc"
       },
-      "caused_by_event_id": "f8d02c43-af27-4a08-90b6-e0589f51a3a8",
-      "created_at": "2026-06-01T09:46:07.905374+00:00"
+      "caused_by_event_id": "15a89cd0-3221-43ae-99f5-e04123f5f2b6",
+      "created_at": "2026-06-01T15:01:37.533338+00:00"
     },
     {
-      "id": "3f1f05eb-fed0-4e55-815f-3eb86b7a24d7",
+      "id": "a567bf16-1aff-40e5-b326-3e34ce6280da",
       "case_id": "mist_clock_manor",
-      "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+      "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
       "actor_id": "derived_event_system",
       "type": "memory_candidate.created",
       "payload": {
         "memory_id": "memory.player.accusation_evaluated.jiang_yanhui.shared_death_chain.correct",
         "subject_id": "player",
         "content": "Rule Engine evaluated the accusation against 江雁回 for claim 'shared_death_chain' as correct.",
-        "source_event_id": "f8d02c43-af27-4a08-90b6-e0589f51a3a8",
+        "source_event_id": "15a89cd0-3221-43ae-99f5-e04123f5f2b6",
         "visibility": [
           "player"
         ],
         "salience": 1.0
       },
-      "caused_by_event_id": "f8d02c43-af27-4a08-90b6-e0589f51a3a8",
-      "created_at": "2026-06-01T09:46:07.905374+00:00"
+      "caused_by_event_id": "15a89cd0-3221-43ae-99f5-e04123f5f2b6",
+      "created_at": "2026-06-01T15:01:37.533338+00:00"
     },
     {
-      "id": "f56e5af6-5c41-429b-b16a-c072b6808d7f",
+      "id": "14d8aa62-5358-452e-a280-4513bcdf9c25",
       "case_id": "mist_clock_manor",
-      "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+      "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
       "actor_id": "memory_snapshot_system",
       "type": "agent_memory_snapshot.updated",
       "payload": {
         "memory_id": "memory.player.accusation_evaluated.jiang_yanhui.shared_death_chain.correct",
         "subject_id": "player",
         "source_event_ids": [
-          "f8d02c43-af27-4a08-90b6-e0589f51a3a8"
+          "15a89cd0-3221-43ae-99f5-e04123f5f2b6"
         ],
         "salience": 1.0,
         "visibility": "private",
         "operation": "created"
       },
-      "caused_by_event_id": "3f1f05eb-fed0-4e55-815f-3eb86b7a24d7",
-      "created_at": "2026-06-01T09:46:07.905374+00:00"
+      "caused_by_event_id": "a567bf16-1aff-40e5-b326-3e34ce6280da",
+      "created_at": "2026-06-01T15:01:37.533338+00:00"
     },
     {
-      "id": "1c2721f0-24e8-4e42-857b-4ef0a70e7660",
+      "id": "7139c039-c4d6-4a35-8e00-885495a7c7b6",
       "case_id": "mist_clock_manor",
-      "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+      "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
       "actor_id": "rule_trigger_system",
       "type": "narrative.beat.completed",
       "payload": {
         "beat_id": "case_solved",
         "phase": "reconstruction"
       },
-      "caused_by_event_id": "f8d02c43-af27-4a08-90b6-e0589f51a3a8",
-      "created_at": "2026-06-01T09:46:07.905374+00:00"
+      "caused_by_event_id": "15a89cd0-3221-43ae-99f5-e04123f5f2b6",
+      "created_at": "2026-06-01T15:01:37.533338+00:00"
     },
     {
-      "id": "29d126ac-e773-4810-b20d-17f4eef65241",
+      "id": "4f3d0027-3380-4899-9d19-9cac920f53a5",
       "case_id": "mist_clock_manor",
-      "session_id": "24b1384e-7120-4b84-a11a-db59047869c0",
+      "session_id": "84faad4b-28b6-4997-90ff-af59942832ff",
       "actor_id": "rule_trigger_system",
       "type": "narrative.phase.changed",
       "payload": {
@@ -5826,8 +5826,8 @@
         "to_phase": "resolved",
         "trigger_beat_id": "case_solved"
       },
-      "caused_by_event_id": "f8d02c43-af27-4a08-90b6-e0589f51a3a8",
-      "created_at": "2026-06-01T09:46:07.905374+00:00"
+      "caused_by_event_id": "15a89cd0-3221-43ae-99f5-e04123f5f2b6",
+      "created_at": "2026-06-01T15:01:37.533338+00:00"
     }
   ],
   "replay_check": {

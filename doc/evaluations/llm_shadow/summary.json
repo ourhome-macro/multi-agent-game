@@ -1,0 +1,34 @@
+{
+  "generated_at": "2026-06-01T14:58:42.085067+00:00",
+  "case_count": 1,
+  "cases": [
+    "mist_clock_manor"
+  ],
+  "total_shadow_calls": 4,
+  "schema_failure_count": 0,
+  "director_block_count": 0,
+  "missing_disclosure_claim_count": 0,
+  "speech_touched_world_info_count": 0,
+  "mode_violation_count": 0,
+  "full_reveal_block_count": 0,
+  "fallback_count": 0,
+  "skipped_count": 0,
+  "state_unchanged": true,
+  "reports": [
+    {
+      "case_id": "mist_clock_manor",
+      "scenario_path": "cases\\mist_clock_manor\\scenarios\\standard_path.yaml",
+      "llm_backend": "real",
+      "total_shadow_calls": 4,
+      "schema_failure_count": 0,
+      "director_block_count": 0,
+      "missing_disclosure_claim_count": 0,
+      "speech_touched_world_info_count": 0,
+      "mode_violation_count": 0,
+      "full_reveal_block_count": 0,
+      "fallback_count": 0,
+      "skipped_count": 0,
+      "state_unchanged": true
+    }
+  ]
+}

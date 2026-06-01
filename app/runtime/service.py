@@ -303,7 +303,11 @@ class ActionService:
         return events
 
 
-def create_runtime(case_packages: list[CasePackage]) -> RuntimeContainer:
+def create_runtime(
+    case_packages: list[CasePackage],
+    *,
+    agent_gateway: AgentGateway | None = None,
+) -> RuntimeContainer:
     recorder = EventRecorder()
     case_store = InMemoryCaseStore()
     for package in case_packages:
@@ -313,7 +317,7 @@ def create_runtime(case_packages: list[CasePackage]) -> RuntimeContainer:
     action_service = ActionService(
         case_store=case_store,
         recorder=recorder,
-        agent_gateway=AgentGateway.from_env(),
+        agent_gateway=agent_gateway or AgentGateway.from_env(),
         director=NarrativeDirector(),
         rule_engine=rule_engine,
         trigger_system=RuleTriggerSystem(recorder),

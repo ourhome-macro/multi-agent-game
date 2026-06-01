@@ -157,9 +157,12 @@ OPENAI_API_KEY=...
 
 ```text
 OPENAI_MODEL=...
+OPENAI_BASE_URL=https://api.xiaomimimo.com/v1
 ```
 
 如果设置了 `LLM_BACKEND=real` 但没有 `OPENAI_API_KEY`，`AgentGateway` 仍保持 `MockAgent`。因此 CI、本地测试和完整场景快照默认继续使用 mock。
+
+`OPENAI_BASE_URL` 用于 OpenAI-compatible 服务。运行时会优先拼接 `/responses`，例如 `https://api.xiaomimimo.com/v1` 会先请求 `https://api.xiaomimimo.com/v1/responses`。如果兼容服务明确不支持 Responses API，适配器会降级到 `/chat/completions`。`LLM_BASE_URL` 是同义兜底配置；优先级低于 `OPENAI_BASE_URL`。本轮真实 Shadow Eval 对小米 API 使用 `OPENAI_MODEL=mimo-v2.5` 验证通过。
 
 适配器流程：
 
@@ -167,6 +170,7 @@ OPENAI_MODEL=...
 AgentContext
   -> build_llm_agent_input
   -> OpenAI Responses API strict JSON request
+  -> optional OpenAI-compatible chat completions fallback
   -> parse model JSON
   -> validate_llm_agent_output(contract_input)
   -> AgentIntent or safe fallback
@@ -206,6 +210,34 @@ AgentContext + CharacterInnerContext
 ```
 
 `accuse` 保持在 Agent 路径之外。它不调用 `AgentGateway`、真实 LLM 或 `LLMAgentStub`。
+
+## Shadow Eval 合同
+
+LLM Shadow Eval v0 使用同一个 `AgentContext -> AgentIntent -> NarrativeDirector.validate` 合同，但它是只读评测链路：
+
+```text
+standard_path state
+  -> copied SessionState
+  -> build_agent_context
+  -> LLMAgentStub 或显式真实 LLM
+  -> AgentIntent
+  -> NarrativeDirector.validate
+  -> llm_shadow_report.json / llm_shadow_report.md
+```
+
+Shadow Eval 不执行 Rule Engine intent 应用，不写 `WorldEvent`，不修改 `SessionState`。它默认使用 `LLMAgentStub`；真实 LLM 需要同时设置：
+
+```text
+LLM_SHADOW_EVAL=1
+LLM_BACKEND=real
+OPENAI_API_KEY=...
+```
+
+没有 API key 时，Shadow Eval 记录该 step 为 skipped，不调用真实 API，也不让普通测试失败。
+
+即使 Shadow Eval 进程设置了 `LLM_BACKEND=real`，标准路径推进也固定使用 `MockAgent`。真实 LLM 只生成候选 `AgentIntent`，不会接管正式 scenario runtime。
+
+报告只保存结构化摘要、`disclosure_claims` 摘要和 Director 审计结果。候选 speech 和玩家自由文本不公开写入报告，避免在评测产物中泄露 private 原文、forbidden facts、blocked terms 或 solution claims。`--all` 会额外写 `doc/evaluations/llm_shadow/summary.json` 和 `summary.md`。
 
 ## 测试要求
 

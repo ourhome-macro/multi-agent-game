@@ -30,6 +30,7 @@ class AgentGateway:
 
     @classmethod
     def from_env(cls) -> AgentGateway:
+        load_dotenv()
         backend = os.getenv("LLM_BACKEND", "mock").strip().lower()
         if backend == "llm_stub":
             return cls(backend="llm_stub")
@@ -43,3 +44,26 @@ class AgentGateway:
 
     def generate(self, context: AgentContext) -> AgentIntent:
         return self._agents[self._backend].generate(context)
+
+
+def load_dotenv(path: str = ".env") -> None:
+    if os.getenv("LLM_LOAD_DOTENV", "1").strip().lower() in {"0", "false", "no", "off"}:
+        return
+    if not os.path.exists(path):
+        return
+    with open(path, encoding="utf-8") as env_file:
+        for raw_line in env_file:
+            line = raw_line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            key = key.strip()
+            if not key or key in os.environ:
+                continue
+            os.environ[key] = _clean_env_value(value.strip())
+
+
+def _clean_env_value(value: str) -> str:
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
+        return value[1:-1]
+    return value

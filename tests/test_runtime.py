@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+import httpx
 import pytest
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
@@ -1970,6 +1971,7 @@ def test_agent_gateway_defaults_to_mock_agent() -> None:
 def test_agent_gateway_from_env_enables_real_only_with_api_key(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    monkeypatch.setenv("LLM_LOAD_DOTENV", "0")
     monkeypatch.delenv("LLM_BACKEND", raising=False)
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
 
@@ -2032,6 +2034,74 @@ def test_real_llm_agent_generates_validated_intent_from_strict_json() -> None:
     assert client.request_payload["text"]["format"]["strict"] is True
     serialized_request = json.dumps(client.request_payload, ensure_ascii=True)
     assert "test-key" not in serialized_request
+
+
+def test_real_llm_agent_uses_configured_openai_compatible_base_url() -> None:
+    context = _build_butler_agent_context()
+    client = _FakeOpenAIClient(
+        {
+            "output_text": json.dumps(
+                {
+                    "speech": "Safe answer.",
+                    "intent": "answer",
+                    "emotional_shift": {},
+                    "proposed_actions": [],
+                    "memory_refs": [],
+                    "disclosure_claims": [],
+                }
+            )
+        }
+    )
+
+    OpenAILLMAgent(
+        api_key="test-key",
+        base_url="https://api.xiaomimimo.com/v1",
+        client=client,
+    ).generate(context)
+
+    assert client.request_url == "https://api.xiaomimimo.com/v1/responses"
+
+
+def test_real_llm_agent_falls_back_to_chat_completions_for_compatible_base_url() -> None:
+    context = _build_butler_agent_context()
+    client = _FakeOpenAIClient(
+        [
+            _FakeOpenAIResponse({"error": "not found"}, status_code=404),
+            _FakeOpenAIResponse(
+                {
+                    "choices": [
+                        {
+                            "message": {
+                                "content": json.dumps(
+                                    {
+                                        "speech": "Safe answer from chat completions.",
+                                        "intent": "answer",
+                                        "emotional_shift": {},
+                                        "proposed_actions": [],
+                                        "memory_refs": [],
+                                        "disclosure_claims": [],
+                                    }
+                                )
+                            }
+                        }
+                    ]
+                }
+            ),
+        ]
+    )
+
+    intent = OpenAILLMAgent(
+        api_key="test-key",
+        base_url="https://api.xiaomimimo.com/v1",
+        client=client,
+    ).generate(context)
+
+    assert intent.speech == "Safe answer from chat completions."
+    assert client.request_urls == [
+        "https://api.xiaomimimo.com/v1/responses",
+        "https://api.xiaomimimo.com/v1/chat/completions",
+    ]
+    assert client.request_payloads[1]["response_format"]["type"] == "json_schema"
 
 
 def test_real_llm_agent_falls_back_without_api_key() -> None:
@@ -3116,10 +3186,24 @@ def test_case_loader_rejects_legacy_relationship_endpoint_fields(tmp_path: Path)
 
 
 class _FakeOpenAIResponse:
-    def __init__(self, payload: dict[str, Any]) -> None:
+    def __init__(self, payload: dict[str, Any], *, status_code: int = 200) -> None:
         self._payload = payload
+        self.status_code = status_code
+        self.request_url = "https://example.test"
 
     def raise_for_status(self) -> None:
+        if self.status_code >= 400:
+            request = httpx.Request("POST", self.request_url)
+            response = httpx.Response(
+                self.status_code,
+                request=request,
+                json=self._payload,
+            )
+            raise httpx.HTTPStatusError(
+                f"HTTP status {self.status_code}",
+                request=request,
+                response=response,
+            )
         return None
 
     def json(self) -> dict[str, Any]:
@@ -3127,15 +3211,30 @@ class _FakeOpenAIResponse:
 
 
 class _FakeOpenAIClient:
-    def __init__(self, payload: dict[str, Any]) -> None:
-        self._payload = payload
+    def __init__(
+        self,
+        payload: dict[str, Any] | list[dict[str, Any] | _FakeOpenAIResponse],
+    ) -> None:
+        raw_responses = payload if isinstance(payload, list) else [payload]
+        self._responses = [
+            item if isinstance(item, _FakeOpenAIResponse) else _FakeOpenAIResponse(item)
+            for item in raw_responses
+        ]
         self.request_payload: dict[str, Any] | None = None
+        self.request_url: str | None = None
+        self.request_payloads: list[dict[str, Any]] = []
+        self.request_urls: list[str] = []
 
     def post(self, _url: str, **kwargs: Any) -> _FakeOpenAIResponse:
+        self.request_url = _url
+        self.request_urls.append(_url)
         request_payload = kwargs.get("json")
         if isinstance(request_payload, dict):
             self.request_payload = request_payload
-        return _FakeOpenAIResponse(self._payload)
+            self.request_payloads.append(request_payload)
+        response = self._responses.pop(0)
+        response.request_url = _url
+        return response
 
 
 def _build_butler_agent_context() -> AgentContext:

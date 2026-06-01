@@ -78,6 +78,23 @@ Narrative Director 只判断台词是否安全，不负责让状态变化生效�
 
 Rule Engine 仍负责决定 `AgentIntent.proposed_actions` 是否变成真实 `WorldEvent`。知道 private 信息不代表 NPC 可以直接修改世界状态、线索状态、关系状态、记忆快照或剧情阶段。
 
+## Shadow Eval 边界
+
+LLM Shadow Eval v0 会调用同一个 `NarrativeDirector.validate(case, narrative, intent, context)`，但它不会写入 `director.blocked` 事件，也不会把安全降级台词提交给 runtime。影子评测只记录：
+
+- `director_decision`
+- `blocked_reason`
+- `safe_fallback_used`
+- `disclosure_claims`
+- `speech_touched_world_info`
+- `missing_disclosure_claim`
+- `rejected_world_info_ids`
+- `state_unchanged`
+
+这意味着 Director 在影子评测中仍是唯一审计门，但不是状态写入者。任何 block 只进入 `doc/case/<case_id>/llm_shadow_report.json` 和 `.md`，不能影响当前 `SessionState`、玩家已知、NPC 认知或剧情阶段。
+
+影子报告不得包含 forbidden fact 原文、blocked terms、private 原文或 solution claim 公开文本。候选 `speech` 不公开写入报告，只记录长度和脱敏标记；玩家 action 自由文本也只记录长度和脱敏标记。
+
 ## 当前限制
 
 当前事实触碰检测仍是保守的文本匹配检查，不是完整语义理解。它能防止 LLM 明确命中受控 `WorldInfo` 的 title、alias、claim pattern 或 forbidden term 却不提交声明，也能防止低披露 claim 包装直接事实台词，但还不能识别所有隐喻、多跳推断或跨事实组合泄漏。
