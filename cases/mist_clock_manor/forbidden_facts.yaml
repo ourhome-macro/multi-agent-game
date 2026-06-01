@@ -1,0 +1,29 @@
+- id: shared_death_chain
+  world_info_id: death_chain_shared
+  text: 四个人的小动作共同促成了陆澜生死亡，没有单一凶手。
+  blocked_terms:
+    - 共同促成死亡
+    - 四个人都推动了死亡
+    - 没有单一凶手
+    - everyone helped cause Lu's death
+  reveal_phase: reconstruction
+
+- id: jiang_yanhui_mechanism
+  world_info_id: heart_medicine_replaced
+  text: 江雁回改了门锁并把陆澜生的心脏病药换成空胶囊。
+  blocked_terms:
+    - 江雁回换了药
+    - 心脏药被换
+    - 药是空胶囊
+    - Jiang replaced the medicine
+  reveal_phase: reconstruction
+
+- id: shen_power_cut
+  world_info_id: power_cut_by_shen
+  text: 沈照夜切断主电源，意外促成录音机定时播放。
+  blocked_terms:
+    - 沈照夜切断电源
+    - 沈照夜拉闸
+    - 停电是人为的
+    - Shen cut the power
+  reveal_phase: reconstruction

@@ -1,0 +1,23 @@
+- source_id: lin_qichi
+  target_id: player
+  trust: 0
+  suspicion: 0
+  fear: 0.4
+  intimacy: 0
+  hostility: 0
+
+- source_id: qi_yan
+  target_id: player
+  trust: 0
+  suspicion: 0.2
+  fear: 0
+  intimacy: 0
+  hostility: 0.2
+
+- source_id: jiang_yanhui
+  target_id: player
+  trust: 0
+  suspicion: 0
+  fear: 0
+  intimacy: 0
+  hostility: 0

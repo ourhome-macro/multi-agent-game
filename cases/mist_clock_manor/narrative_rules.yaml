@@ -1,0 +1,54 @@
+phases:
+  - id: opening
+    title: Opening
+  - id: investigation
+    title: Investigation
+  - id: confrontation
+    title: Confrontation
+  - id: reconstruction
+    title: Reconstruction
+  - id: resolved
+    title: Resolved
+
+beats:
+  - id: sedative_found
+    phase: opening
+    description: Player found that the wine contained sedative.
+    all_discovered:
+      - bitter_wine
+    next_phase: investigation
+
+  - id: mechanism_exposed
+    phase: investigation
+    description: Lock and tape evidence show the locked-room setup was staged.
+    all_completed:
+      - sedative_found
+    min_completed: 1
+    all_discovered:
+      - delayed_lock_marks
+      - echo_tape
+    next_phase: confrontation
+
+  - id: motive_chain_exposed
+    phase: confrontation
+    description: Confession fragments, capsules, and power trace expose the full death chain.
+    all_completed:
+      - mechanism_exposed
+    min_completed: 2
+    all_discovered:
+      - burned_confession
+      - empty_capsules
+      - cut_power_trace
+    next_phase: reconstruction
+
+  - id: case_solved
+    phase: reconstruction
+    description: Correct formal accusation resolves the shared causality case.
+    all_completed:
+      - motive_chain_exposed
+    trigger_event_type: accusation.evaluated
+    trigger_payload:
+      target_id: jiang_yanhui
+      claim_id: shared_death_chain
+      result: correct
+    next_phase: resolved

@@ -1,0 +1,116 @@
+- id: sedative_wine
+  title: 红酒中含有镇静剂
+  description: 林栖迟送入书房的红酒含有安眠药成分，削弱了陆澜生的反应能力。
+  category: physical_fact
+  sensitivity: medium
+  aliases:
+    - 酒里有药
+    - 红酒被下药
+    - 镇静剂在红酒里
+  claim_patterns:
+    - "红酒.*(药|镇静剂|安眠药)"
+    - "酒.*(下药|有药)"
+
+- id: timed_lock_modified
+  title: 书房门锁被改成延时落锁
+  description: 门锁内侧的新划痕和润滑油说明，有人提前做了延时卡榫，制造密室假象。
+  category: physical_fact
+  sensitivity: high
+  aliases:
+    - 门锁被改过
+    - 延时落锁
+    - 密室是假的
+  claim_patterns:
+    - "门锁.*(改|动过|延时)"
+    - "密室.*假"
+
+- id: recording_tape_swapped
+  title: 书房录音带被替换
+  description: 十一点十七分响起的钟声来自书房录音机，而不是山庄钟楼。
+  category: physical_fact
+  sensitivity: medium
+  aliases:
+    - 录音带被换
+    - 钟声是录音
+    - 书房播放了钟声
+  claim_patterns:
+    - "录音带.*(换|替换)"
+    - "钟声.*录音"
+
+- id: fake_confession_plan
+  title: 陆澜生准备伪造忏悔信洗白旧案
+  description: 陆澜生计划用伪造忏悔信和信托条款，把江若岚之死包装成个人情绪导致的意外。
+  category: case_truth
+  sensitivity: high
+  aliases:
+    - 伪造忏悔信
+    - 洗白旧案
+    - 把旧案包装成意外
+  claim_patterns:
+    - "忏悔信.*(伪造|洗白)"
+    - "旧案.*包装.*意外"
+
+- id: jiang_ruolan_recording_exists
+  title: 江若岚旧录音存在
+  description: 磁带中保存了江若岚生前指责陆澜生盗用与操控的录音。
+  category: physical_fact
+  sensitivity: high
+  aliases:
+    - 江若岚的录音
+    - 若岚旧录音
+    - 死者声音在磁带里
+  claim_patterns:
+    - "江若岚.*录音"
+    - "若岚.*声音"
+
+- id: heart_medicine_replaced
+  title: 陆澜生的心脏病药被换成空胶囊
+  description: 书房药盒中有外观相同的空胶囊，导致陆澜生发病时没有得到有效药物。
+  category: character_action
+  sensitivity: high
+  aliases:
+    - 心脏药被换
+    - 药是空胶囊
+    - 救命药失效
+  claim_patterns:
+    - "心脏.*药.*(换|空)"
+    - "空胶囊"
+
+- id: power_cut_by_shen
+  title: 沈照夜切断主电源
+  description: 沈照夜在案发前切断主电源，想迫使陆澜生无法按原计划播放公开视频。
+  category: character_action
+  sensitivity: high
+  aliases:
+    - 沈照夜拉闸
+    - 沈照夜切断电源
+    - 停电是人为的
+  claim_patterns:
+    - "沈照夜.*(拉闸|切断电源)"
+    - "停电.*人为"
+
+- id: death_chain_shared
+  title: 四人的小动作共同促成死亡
+  description: 镇静剂、录音刺激、延时门锁、空胶囊、停电和心脏病共同构成陆澜生死亡链条。
+  category: case_truth
+  sensitivity: high
+  aliases:
+    - 共同促成死亡
+    - 四个人都推动了死亡
+    - 没有单一凶手
+  claim_patterns:
+    - "共同.*死亡"
+    - "没有.*单一凶手"
+
+- id: jiang_ruolan_death_coverup
+  title: 江若岚十年前死亡被陆澜生掩盖
+  description: 江若岚坠湖不是单纯意外，陆澜生没有及时救她并长期掩盖旧案真相。
+  category: case_truth
+  sensitivity: high
+  aliases:
+    - 江若岚不是意外
+    - 陆澜生害死江若岚
+    - 十年前旧案被掩盖
+  claim_patterns:
+    - "江若岚.*(不是意外|被掩盖)"
+    - "陆澜生.*害死.*江若岚"

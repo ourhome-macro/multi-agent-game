@@ -421,6 +421,9 @@ class MockAgent:
             "true_killer": "niece is the killer",
             "ledger_owner": "clerk hid the ledger",
             "swapped_will": "the will was swapped",
+            "jiang_yanhui_mechanism": "Jiang replaced the medicine",
+            "shared_death_chain": "everyone helped cause Lu's death",
+            "shen_power_cut": "Shen cut the power",
         }
         for fact_id in probes:
             if fact_id in blocked_fact_ids:

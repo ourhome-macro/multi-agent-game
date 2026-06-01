@@ -1,0 +1,39 @@
+- id: study
+  name: 书房
+  description: 陆澜生死亡的密室。门锁、书桌、壁炉和怀表都留下异常痕迹。
+  characters:
+    - lin_qichi
+    - qi_yan
+    - jiang_yanhui
+  hotspots:
+    - id: wine_table
+      name: 红酒杯
+      description: 桌边碎裂的酒杯还残留暗红酒液，杯口有不自然的苦味。
+      discover_clues:
+        - bitter_wine
+    - id: study_lock
+      name: 书房门锁
+      description: 锁舌边缘有新划痕，缝隙里残留少量润滑油。
+      discover_clues:
+        - delayed_lock_marks
+    - id: tape_recorder
+      name: 录音机
+      description: 录音机停在播放位置，磁带标签写着“回声钟终稿”。
+      discover_clues:
+        - echo_tape
+        - ruolan_voice_tape
+    - id: burned_letter
+      name: 壁炉纸灰
+      description: 壁炉里有烧毁半截的信纸和信托文件附录残片。
+      discover_clues:
+        - burned_confession
+    - id: medicine_box
+      name: 药盒
+      description: 抽屉里的心脏病药盒被打开，有几颗胶囊重量异常。
+      discover_clues:
+        - empty_capsules
+    - id: breaker_box
+      name: 配电箱
+      description: 主电源被人为拉下，备用线路仍维持部分设备运转。
+      discover_clues:
+        - cut_power_trace

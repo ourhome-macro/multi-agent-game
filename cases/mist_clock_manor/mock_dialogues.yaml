@@ -1,0 +1,144 @@
+- character_id: lin_qichi
+  default_speech: 我知道那杯酒会让人怀疑我，但事情不是你们想的那种简单。
+  default_intent: conceal
+  forbidden_test_speech: 共同促成死亡，不是某一个人单独杀了陆澜生。
+  relationship_delta_on_talk:
+    suspicion: 0.3
+    fear: 0.4
+  replies:
+    - phase: opening
+      missing_discovered:
+        - bitter_wine
+      speech: 陆澜生今晚说过会给所有人一个结局，可他的结局从来只对他自己有利。
+      intent: conceal
+    - phase: investigation
+      asked_subject_type: clue
+      asked_subject_id: bitter_wine
+      requires_discovered:
+        - bitter_wine
+      min_interaction_pressure: 0.6
+      requires_subject_sensitive: true
+      speech: 那杯酒原本不是给他的。你可以说我懦弱，但别急着把懦弱写成谋杀。
+      intent: conceal
+      proposed_actions:
+        - type: relationship.change
+          source_id: lin_qichi
+          target_id: player
+          deltas:
+            suspicion: 0.5
+            fear: 0.4
+    - phase: investigation
+      presented_clue: bitter_wine
+      requires_discovered:
+        - bitter_wine
+      speech: 我承认药进了酒里，但我没有设计密室，也没有换掉他的药。
+      intent: answer
+      proposed_actions:
+        - type: relationship.change
+          source_id: lin_qichi
+          target_id: player
+          deltas:
+            trust: 0.3
+            fear: 0.5
+    - phase: reconstruction
+      requires_discovered:
+        - bitter_wine
+        - empty_capsules
+      speech: 我愿意承担下药的后果，但那不是全部真相。
+      intent: answer
+
+- character_id: qi_yan
+  default_speech: 他毁掉别人的东西时，总能把话说得像是在培养你。
+  default_intent: refuse
+  forbidden_test_speech: 四个人都推动了死亡，陆澜生不是被单一凶手杀死的。
+  relationship_delta_on_talk:
+    hostility: 0.3
+    suspicion: 0.3
+  replies:
+    - phase: investigation
+      requires_discovered:
+        - echo_tape
+      speech: 我换过一卷带子，但我放进去的不是钟声。有人在我之后又动过它。
+      intent: panic
+      proposed_actions:
+        - type: relationship.change
+          source_id: qi_yan
+          target_id: player
+          deltas:
+            suspicion: 0.5
+            fear: 0.2
+    - phase: confrontation
+      asked_subject_type: clue
+      asked_subject_id: echo_tape
+      requires_discovered:
+        - echo_tape
+      speech: 我想让他出丑，不是让他死。可这句话现在听起来像给自己找台阶。
+      intent: answer
+    - phase: confrontation
+      requires_memory:
+        - memory.player.clue_discovered.echo_tape
+      speech: 你已经听见那卷磁带了。钟声不是钟楼来的，这一点我也解释不了。
+      intent: probe
+
+- character_id: jiang_yanhui
+  default_speech: 从事实层面说，现在任何结论都还太早。
+  default_intent: conceal
+  forbidden_test_speech: 江雁回换了药，药是空胶囊。
+  relationship_delta_on_talk:
+    suspicion: 0.4
+  replies:
+    - phase: investigation
+      requires_discovered:
+        - delayed_lock_marks
+      speech: 门锁确实被动过，但请注意，门锁本身不能解释死亡原因。
+      intent: conceal
+      proposed_actions:
+        - type: relationship.change
+          source_id: jiang_yanhui
+          target_id: player
+          deltas:
+            suspicion: 0.6
+    - phase: confrontation
+      presented_clue: delayed_lock_marks
+      requires_discovered:
+        - delayed_lock_marks
+      speech: 你在看门锁，这是正确方向。但正确方向不等于完整因果。
+      intent: probe
+      proposed_actions:
+        - type: relationship.change
+          source_id: jiang_yanhui
+          target_id: player
+          deltas:
+            suspicion: 0.7
+            trust: 0.1
+    - phase: reconstruction
+      requires_discovered:
+        - empty_capsules
+        - burned_confession
+      speech: 陆澜生想让若岚再死一次。我承认我越过了边界，但我不会替他说那是悔过。
+      intent: answer
+
+- character_id: shen_zhaoye
+  default_speech: 时间不对。证据也不支持一个人完成所有动作。
+  default_intent: answer
+  forbidden_test_speech: 沈照夜切断电源，停电是人为的。
+  relationship_delta_on_talk:
+    trust: 0.2
+  replies:
+    - phase: confrontation
+      requires_discovered:
+        - cut_power_trace
+      speech: 配电箱的痕迹说明停电不是天气造成的。别急着问是谁，先问它改变了什么。
+      intent: answer
+    - phase: reconstruction
+      requires_discovered:
+        - cut_power_trace
+        - empty_capsules
+      speech: 停电、录音、空胶囊和镇静剂咬在一起，死亡不是一个动作造成的。
+      intent: answer
+      proposed_actions:
+        - type: relationship.change
+          source_id: shen_zhaoye
+          target_id: player
+          deltas:
+            trust: 0.4

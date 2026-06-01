@@ -1,0 +1,85 @@
+- id: bitter_wine
+  title: 带苦味的红酒残液
+  description: 酒杯残液中有明显苦味，和林栖迟房间中的安眠药气味相近。
+  truth_status: "true"
+  reveals_world_info:
+    - sedative_wine
+  related_characters:
+    - lin_qichi
+  related_events:
+    - lin_delivered_wine
+  key: true
+
+- id: delayed_lock_marks
+  title: 门锁内侧的新划痕
+  description: 锁舌上有新划痕和润滑油，说明书房门锁被人提前做过延时处理。
+  truth_status: "true"
+  reveals_world_info:
+    - timed_lock_modified
+  related_characters:
+    - jiang_yanhui
+  related_events:
+    - lock_modified
+  key: true
+
+- id: echo_tape
+  title: 标着“回声钟终稿”的磁带
+  description: 磁带中先播放十一点十七分钟声，随后出现江若岚的旧录音片段。
+  truth_status: "true"
+  reveals_world_info:
+    - recording_tape_swapped
+  related_characters:
+    - qi_yan
+    - jiang_yanhui
+  related_events:
+    - tape_swapped
+  key: true
+
+- id: burned_confession
+  title: 烧毁半截的忏悔信附录
+  description: 残片显示基金成立前提是众人承认江若岚之死属于个人情绪引发的意外。
+  truth_status: "true"
+  reveals_world_info:
+    - fake_confession_plan
+  related_characters:
+    - jiang_yanhui
+  related_events:
+    - fake_confession
+  key: true
+
+- id: ruolan_voice_tape
+  title: 江若岚的录音片段
+  description: 录音中，江若岚指责陆澜生拿走她的剧本、名字和恐惧。
+  truth_status: "true"
+  reveals_world_info:
+    - jiang_ruolan_recording_exists
+  related_characters:
+    - jiang_yanhui
+    - qi_yan
+  related_events:
+    - old_case_echo
+  key: false
+
+- id: empty_capsules
+  title: 重量异常的心脏病胶囊
+  description: 药盒中有两颗外观相同却没有药粉的空胶囊。
+  truth_status: "true"
+  reveals_world_info:
+    - heart_medicine_replaced
+  related_characters:
+    - jiang_yanhui
+  related_events:
+    - medicine_replaced
+  key: true
+
+- id: cut_power_trace
+  title: 被人为拉下的主电闸
+  description: 配电箱主闸被人为切断，备用线路仍让录音机定时装置运行。
+  truth_status: "true"
+  reveals_world_info:
+    - power_cut_by_shen
+  related_characters:
+    - shen_zhaoye
+  related_events:
+    - power_cut
+  key: true

@@ -71,12 +71,16 @@ def test_service_starts_and_health_is_ok(client: TestClient) -> None:
     assert response.json() == {"status": "ok"}
 
 
-def test_loads_fake_cases_on_startup(client: TestClient) -> None:
+def test_loads_available_cases_on_startup(client: TestClient) -> None:
     response = client.get("/cases")
 
     assert response.status_code == 200
     cases = response.json()
-    assert {case["id"] for case in cases} == {"fake_case_001", "fake_case_002"}
+    assert {case["id"] for case in cases} == {
+        "fake_case_001",
+        "fake_case_002",
+        "mist_clock_manor",
+    }
     assert all(case["title"] for case in cases)
 
 
@@ -2896,8 +2900,12 @@ def test_invalid_case_reference_raises_clear_error(tmp_path: Path) -> None:
         CaseLoader().load(case_dir)
 
 
-def test_case_validate_command_accepts_all_fake_cases() -> None:
-    assert validate_cases(PROJECT_ROOT / "cases") == ["fake_case_001", "fake_case_002"]
+def test_case_validate_command_accepts_all_cases() -> None:
+    assert validate_cases(PROJECT_ROOT / "cases") == [
+        "fake_case_001",
+        "fake_case_002",
+        "mist_clock_manor",
+    ]
 
 
 def test_case_loader_rejects_unreachable_clue(tmp_path: Path) -> None:

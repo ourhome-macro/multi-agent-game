@@ -1,0 +1,31 @@
+claims:
+  - id: shared_death_chain
+    target_id: jiang_yanhui
+    required_evidence:
+      - bitter_wine
+      - delayed_lock_marks
+      - echo_tape
+      - burned_confession
+      - empty_capsules
+      - cut_power_trace
+    required_world_info:
+      - sedative_wine
+      - timed_lock_modified
+      - recording_tape_swapped
+      - fake_confession_plan
+      - heart_medicine_replaced
+      - power_cut_by_shen
+    allowed_phases:
+      - reconstruction
+    result: correct
+
+  - id: lin_poisoned_lu
+    target_id: lin_qichi
+    required_evidence:
+      - bitter_wine
+    required_world_info:
+      - sedative_wine
+    allowed_phases:
+      - confrontation
+      - reconstruction
+    result: incorrect

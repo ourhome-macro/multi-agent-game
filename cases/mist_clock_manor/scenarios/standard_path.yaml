@@ -1,0 +1,342 @@
+case_id: mist_clock_manor
+expected_final_phase: resolved
+expected_final_beats:
+- sedative_found
+- mechanism_exposed
+- motive_chain_exposed
+- case_solved
+expected_final_player_world_info_ids:
+- sedative_wine
+- timed_lock_modified
+- recording_tape_swapped
+- jiang_ruolan_recording_exists
+- fake_confession_plan
+- heart_medicine_replaced
+- power_cut_by_shen
+forbidden_public_terms:
+- Jiang replaced the medicine
+- everyone helped cause Lu's death
+- Shen cut the power
+steps:
+- name: inspect wine table unlocks sedative fact
+  action:
+    type: inspect
+    target_id: wine_table
+  expected_events:
+  - player.inspected
+  - clue.discovered
+  - player_knowledge.updated
+  - memory_candidate.created
+  - agent_memory_snapshot.updated
+  - narrative.beat.completed
+  - narrative.phase.changed
+  expected_phase: investigation
+  expected_player_world_info_ids:
+  - sedative_wine
+  accepted: true
+  director_blocked: false
+  expected_new_awareness: []
+  expected_block: null
+  label: 检查酒桌
+- name: ask lin about wine updates only lin awareness
+  action:
+    type: ask_about
+    target_id: lin_qichi
+    subject_type: clue
+    subject_id: bitter_wine
+    text: What about the wine?
+  expected_events:
+  - player.asked_about
+  - npc.replied
+  - relationship.changed
+  - relationship.threshold.crossed
+  - character_impression.updated
+  - character_fact_awareness.updated
+  - memory_candidate.created
+  - agent_memory_snapshot.updated
+  - character_impression.updated
+  - memory_candidate.created
+  - agent_memory_snapshot.updated
+  expected_phase: investigation
+  expected_player_world_info_ids:
+  - sedative_wine
+  accepted: true
+  director_blocked: false
+  expected_new_awareness:
+  - character_id: lin_qichi
+    world_info_id: sedative_wine
+  expected_block: null
+  label: 询问林栖迟酒液问题
+- name: present wine keeps player knowledge unchanged
+  action:
+    type: present_clue
+    target_id: lin_qichi
+    clue_id: bitter_wine
+    text: Explain the bitter wine.
+  expected_events:
+  - player.presented_clue
+  - npc.replied
+  - relationship.changed
+  - character_impression.updated
+  - character_fact_awareness.updated
+  - memory_candidate.created
+  - agent_memory_snapshot.updated
+  expected_phase: investigation
+  expected_player_world_info_ids:
+  - sedative_wine
+  accepted: true
+  director_blocked: false
+  expected_new_awareness:
+  - character_id: lin_qichi
+    world_info_id: sedative_wine
+  expected_block: null
+  label: 向林栖迟展示酒液线索
+- name: inspect study lock unlocks delayed lock fact
+  action:
+    type: inspect
+    target_id: study_lock
+  expected_events:
+  - player.inspected
+  - clue.discovered
+  - player_knowledge.updated
+  - memory_candidate.created
+  - agent_memory_snapshot.updated
+  expected_phase: investigation
+  expected_player_world_info_ids:
+  - sedative_wine
+  - timed_lock_modified
+  accepted: true
+  director_blocked: false
+  expected_new_awareness: []
+  expected_block: null
+  label: 检查书房门锁
+- name: inspect tape recorder moves to confrontation
+  action:
+    type: inspect
+    target_id: tape_recorder
+  expected_events:
+  - player.inspected
+  - clue.discovered
+  - clue.discovered
+  - player_knowledge.updated
+  - memory_candidate.created
+  - agent_memory_snapshot.updated
+  - player_knowledge.updated
+  - memory_candidate.created
+  - agent_memory_snapshot.updated
+  - narrative.beat.completed
+  - narrative.phase.changed
+  expected_phase: confrontation
+  expected_player_world_info_ids:
+  - sedative_wine
+  - timed_lock_modified
+  - recording_tape_swapped
+  - jiang_ruolan_recording_exists
+  accepted: true
+  director_blocked: false
+  expected_new_awareness: []
+  expected_block: null
+  label: 检查录音机
+- name: director blocks jiang medicine reveal before reconstruction
+  action:
+    type: talk
+    target_id: jiang_yanhui
+    text: Tell me what you hid.
+    force_forbidden: true
+  expected_events:
+  - player.talked
+  - director.blocked
+  - character_impression.updated
+  - memory_candidate.created
+  - agent_memory_snapshot.updated
+  expected_phase: confrontation
+  expected_player_world_info_ids:
+  - sedative_wine
+  - timed_lock_modified
+  - recording_tape_swapped
+  - jiang_ruolan_recording_exists
+  accepted: false
+  director_blocked: true
+  expected_new_awareness: []
+  expected_block:
+    target_id: jiang_yanhui
+    blocked_fact_id: jiang_yanhui_mechanism
+    world_info_id: heart_medicine_replaced
+    matched_by: forbidden_term
+    matched_text: '[redacted]'
+    safe_fallback_used: true
+  label: 试探江雁回禁说事实
+- name: present lock marks updates only jiang awareness
+  action:
+    type: present_clue
+    target_id: jiang_yanhui
+    clue_id: delayed_lock_marks
+    text: Explain the lock marks.
+  expected_events:
+  - player.presented_clue
+  - npc.replied
+  - relationship.changed
+  - relationship.threshold.crossed
+  - character_impression.updated
+  - character_fact_awareness.updated
+  - memory_candidate.created
+  - agent_memory_snapshot.updated
+  - character_impression.updated
+  - memory_candidate.created
+  - agent_memory_snapshot.updated
+  expected_phase: confrontation
+  expected_player_world_info_ids:
+  - sedative_wine
+  - timed_lock_modified
+  - recording_tape_swapped
+  - jiang_ruolan_recording_exists
+  accepted: true
+  director_blocked: false
+  expected_new_awareness:
+  - character_id: jiang_yanhui
+    world_info_id: timed_lock_modified
+  expected_block: null
+  label: 向江雁回展示门锁线索
+- name: inspect burned letter unlocks fake confession plan
+  action:
+    type: inspect
+    target_id: burned_letter
+  expected_events:
+  - player.inspected
+  - clue.discovered
+  - player_knowledge.updated
+  - memory_candidate.created
+  - agent_memory_snapshot.updated
+  expected_phase: confrontation
+  expected_player_world_info_ids:
+  - sedative_wine
+  - timed_lock_modified
+  - recording_tape_swapped
+  - jiang_ruolan_recording_exists
+  - fake_confession_plan
+  accepted: true
+  director_blocked: false
+  expected_new_awareness: []
+  expected_block: null
+  label: 检查烧毁供词
+- name: inspect medicine box unlocks replaced medicine fact
+  action:
+    type: inspect
+    target_id: medicine_box
+  expected_events:
+  - player.inspected
+  - clue.discovered
+  - player_knowledge.updated
+  - memory_candidate.created
+  - agent_memory_snapshot.updated
+  expected_phase: confrontation
+  expected_player_world_info_ids:
+  - sedative_wine
+  - timed_lock_modified
+  - recording_tape_swapped
+  - jiang_ruolan_recording_exists
+  - fake_confession_plan
+  - heart_medicine_replaced
+  accepted: true
+  director_blocked: false
+  expected_new_awareness: []
+  expected_block: null
+  label: 检查药盒
+- name: inspect breaker box moves to reconstruction
+  action:
+    type: inspect
+    target_id: breaker_box
+  expected_events:
+  - player.inspected
+  - clue.discovered
+  - player_knowledge.updated
+  - memory_candidate.created
+  - agent_memory_snapshot.updated
+  - narrative.beat.completed
+  - narrative.phase.changed
+  expected_phase: reconstruction
+  expected_player_world_info_ids:
+  - sedative_wine
+  - timed_lock_modified
+  - recording_tape_swapped
+  - jiang_ruolan_recording_exists
+  - fake_confession_plan
+  - heart_medicine_replaced
+  - power_cut_by_shen
+  accepted: true
+  director_blocked: false
+  expected_new_awareness: []
+  expected_block: null
+  label: 检查电闸箱
+- name: formal shared chain accusation resolves manor case
+  action:
+    type: accuse
+    target_id: jiang_yanhui
+    claim_id: shared_death_chain
+    evidence_clue_ids:
+    - bitter_wine
+    - delayed_lock_marks
+    - echo_tape
+    - burned_confession
+    - empty_capsules
+    - cut_power_trace
+    text: The death was caused by a chain of actions.
+  expected_events:
+  - player.accused
+  - accusation.evaluated
+  - character_impression.updated
+  - character_fact_awareness.updated
+  - character_fact_awareness.updated
+  - character_fact_awareness.updated
+  - character_fact_awareness.updated
+  - character_fact_awareness.updated
+  - character_fact_awareness.updated
+  - memory_candidate.created
+  - agent_memory_snapshot.updated
+  - character_impression.updated
+  - memory_candidate.created
+  - agent_memory_snapshot.updated
+  - narrative.beat.completed
+  - narrative.phase.changed
+  expected_phase: resolved
+  expected_player_world_info_ids:
+  - sedative_wine
+  - timed_lock_modified
+  - recording_tape_swapped
+  - jiang_ruolan_recording_exists
+  - fake_confession_plan
+  - heart_medicine_replaced
+  - power_cut_by_shen
+  accepted: true
+  director_blocked: false
+  expected_new_awareness:
+  - character_id: jiang_yanhui
+    world_info_id: sedative_wine
+  - character_id: jiang_yanhui
+    world_info_id: timed_lock_modified
+  - character_id: jiang_yanhui
+    world_info_id: recording_tape_swapped
+  - character_id: jiang_yanhui
+    world_info_id: fake_confession_plan
+  - character_id: jiang_yanhui
+    world_info_id: heart_medicine_replaced
+  - character_id: jiang_yanhui
+    world_info_id: power_cut_by_shen
+  expected_block: null
+  label: 正式指控共同死亡链
+reconstruction:
+  overview:
+  - 暴雨夜，剧作家陆澜生死于雾钟山庄书房。表面上，这是一个反锁密室死亡；实际上，死亡由多名在场者的行为共同推向终点。
+  - 酒中的镇静剂、被替换的录音带、被改造的延迟门锁、被调换为空胶囊的心脏药，以及死亡前后的断电，共同构成了死亡链。
+  runtime_note:
+  - 这个案件的关键不是寻找单一凶手，而是重建“谁在什么时间推动了哪一环”。
+  - 运行时通过 `WorldInfo` 锚定每个事实，通过线索逐步释放事实，再由 `NarrativeDirector` 阻止阶段外剧透。
+  director_note: 标准路径第 6 步在 `confrontation` 阶段强制触发江雁回相关禁说事实探针。运行时应返回 `director.blocked`，拒绝原始越界台词，并使用安全降级台词。
+  facts:
+  - 陆澜生计划利用录音、供词和基金会安排清洗旧案，把江若岚之死重新包装为对自己有利的叙事。
+  - 林栖迟在酒中加入镇静剂，原意不是直接杀人，但陆澜生饮下后，身体和判断能力被削弱。
+  - 祁宴曾调换录音带，使陆澜生在书房听到足以撕开旧案的声音刺激。
+  - 江雁回改造书房门锁，让密室反锁效果出现延迟，并将陆澜生的心脏药替换成空胶囊。
+  - 沈照夜切断电源，使关键时间段的求救、判断和现场反应被进一步打乱。
+  - 陆澜生最终死于心脏病、药物失效、精神刺激和现场延误共同叠加后的结果。
+  - 因此，本案的正确指控不是“某一个人独立杀人”，而是“多人的动机和行动共同形成死亡链”。

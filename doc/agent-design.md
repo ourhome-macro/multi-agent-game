@@ -212,6 +212,8 @@ Agent 也不能写 `FactDisclosureStrategy`。策略是上下文投影，不是�
 
 `MockAgent` 使用 `AgentContext`，根据案件包中的确定性规则选择回复。它可以根据阶段、已发现线索、询问对象、展示线索、交互压力、敏感主题、记忆快照、关系指标和目标 NPC 自己的 `inner_portraits` 改变回复。
 
+当 `PlayerAction.force_forbidden=true` 时，`MockAgent` 会输出一段专门用于测试的越界探针台词。探针只服务于自动化测试，用来确认 Narrative Director 能拦截当前阶段禁说的事实，不代表真实 LLM 可以绕过 `FactDisclosureStrategy`。新增真实案件时，如果希望剧情级回归覆盖某个禁说事实，应让该禁说事实拥有稳定 `blocked_fact_id`，并在 mock 探针中有对应的可检测台词。
+
 配置在 `mock_dialogues.yaml` 的 reply 优先级最高。没有匹配 reply 时，MockAgent 使用安全角色卡 fallback：
 
 - `defensive_style=evasive` 产生隐瞒风格回复
