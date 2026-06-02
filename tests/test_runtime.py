@@ -2104,6 +2104,81 @@ def test_real_llm_agent_falls_back_to_chat_completions_for_compatible_base_url()
     assert client.request_payloads[1]["response_format"]["type"] == "json_schema"
 
 
+def test_real_llm_agent_can_force_chat_completions_api_style(monkeypatch: Any) -> None:
+    monkeypatch.setenv("LLM_API_STYLE", "chat_completions")
+    context = _build_butler_agent_context()
+    client = _FakeOpenAIClient(
+        {
+            "choices": [
+                {
+                    "message": {
+                        "content": json.dumps(
+                            {
+                                "speech": "Direct chat completions answer.",
+                                "intent": "answer",
+                                "emotional_shift": {},
+                                "proposed_actions": [],
+                                "memory_refs": [],
+                                "disclosure_claims": [],
+                            }
+                        )
+                    }
+                }
+            ]
+        }
+    )
+
+    intent = OpenAILLMAgent(
+        api_key="test-key",
+        base_url="https://api.xiaomimimo.com/v1",
+        client=client,
+    ).generate(context)
+
+    assert intent.speech == "Direct chat completions answer."
+    assert client.request_urls == ["https://api.xiaomimimo.com/v1/chat/completions"]
+
+
+def test_real_llm_agent_can_force_responses_api_style_without_chat_fallback(
+    monkeypatch: Any,
+) -> None:
+    monkeypatch.setenv("LLM_API_STYLE", "responses")
+    context = _build_butler_agent_context()
+    client = _FakeOpenAIClient(
+        [
+            _FakeOpenAIResponse({"error": "not found"}, status_code=404),
+            _FakeOpenAIResponse(
+                {
+                    "choices": [
+                        {
+                            "message": {
+                                "content": json.dumps(
+                                    {
+                                        "speech": "Should not be used.",
+                                        "intent": "answer",
+                                        "emotional_shift": {},
+                                        "proposed_actions": [],
+                                        "memory_refs": [],
+                                        "disclosure_claims": [],
+                                    }
+                                )
+                            }
+                        }
+                    ]
+                }
+            ),
+        ]
+    )
+
+    intent = OpenAILLMAgent(
+        api_key="test-key",
+        base_url="https://api.xiaomimimo.com/v1",
+        client=client,
+    ).generate(context)
+
+    assert intent.intent == AgentIntentType.REFUSE
+    assert client.request_urls == ["https://api.xiaomimimo.com/v1/responses"]
+
+
 def test_real_llm_agent_falls_back_without_api_key() -> None:
     context = _build_butler_agent_context()
     client = _FakeOpenAIClient({})

@@ -158,11 +158,12 @@ OPENAI_API_KEY=...
 ```text
 OPENAI_MODEL=...
 OPENAI_BASE_URL=https://api.xiaomimimo.com/v1
+LLM_API_STYLE=auto | responses | chat_completions
 ```
 
 如果设置了 `LLM_BACKEND=real` 但没有 `OPENAI_API_KEY`，`AgentGateway` 仍保持 `MockAgent`。因此 CI、本地测试和完整场景快照默认继续使用 mock。
 
-`OPENAI_BASE_URL` 用于 OpenAI-compatible 服务。运行时会优先拼接 `/responses`，例如 `https://api.xiaomimimo.com/v1` 会先请求 `https://api.xiaomimimo.com/v1/responses`。如果兼容服务明确不支持 Responses API，适配器会降级到 `/chat/completions`。`LLM_BASE_URL` 是同义兜底配置；优先级低于 `OPENAI_BASE_URL`。本轮真实 Shadow Eval 对小米 API 使用 `OPENAI_MODEL=mimo-v2.5` 验证通过。
+`OPENAI_BASE_URL` 用于 OpenAI-compatible 服务。运行时会优先拼接 `/responses`，例如 `https://api.xiaomimimo.com/v1` 会先请求 `https://api.xiaomimimo.com/v1/responses`。如果兼容服务明确不支持 Responses API，适配器会降级到 `/chat/completions`。`LLM_API_STYLE=chat_completions` 会直接请求 `/chat/completions`，用于小米 API 这类兼容服务；`LLM_API_STYLE=responses` 会强制只用 `/responses`。`LLM_BASE_URL` 是同义兜底配置；优先级低于 `OPENAI_BASE_URL`。本轮真实 Shadow Eval 对小米 API 使用 `OPENAI_MODEL=mimo-v2.5` 验证通过。
 
 适配器流程：
 
@@ -237,7 +238,25 @@ OPENAI_API_KEY=...
 
 即使 Shadow Eval 进程设置了 `LLM_BACKEND=real`，标准路径推进也固定使用 `MockAgent`。真实 LLM 只生成候选 `AgentIntent`，不会接管正式 scenario runtime。
 
-报告只保存结构化摘要、`disclosure_claims` 摘要和 Director 审计结果。候选 speech 和玩家自由文本不公开写入报告，避免在评测产物中泄露 private 原文、forbidden facts、blocked terms 或 solution claims。`--all` 会额外写 `doc/evaluations/llm_shadow/summary.json` 和 `summary.md`。
+报告只保存结构化摘要、`disclosure_claims` 摘要、Director 审计结果和 `failure_categories`。候选 speech 和玩家自由文本不公开写入报告，避免在评测产物中泄露 private 原文、forbidden facts、blocked terms 或 solution claims。`--all` 会额外写 `doc/evaluations/llm_shadow/summary.json` 和 `summary.md`。
+
+如需查看真实 LLM 对话，可显式设置 `LLM_SHADOW_WRITE_RAW=1`。raw transcript 只写入 ignored 的 `.shadow_eval/private_transcripts/`，或写入 `LLM_SHADOW_RAW_DIR` 指定的本地目录。该产物可能包含 raw prompt、raw provider response、raw LLM output、raw speech 和玩家自由文本，禁止进入 `doc` 或提交。
+
+安全基准使用确定性候选 intent，不调用真实 LLM：
+
+```text
+py -3.12 scripts\run_llm_shadow_eval.py --case mist_clock_manor --benchmark safety
+```
+
+它覆盖合规 hint、full reveal、claim 合规但 speech 越界、漏 disclosure claim、编造 world_info_id 和 unsupported proposed_action，输出 `llm_shadow_safety_benchmark.json` / `.md`。
+
+Red-team shadow eval 使用同一合同和同一 Director 审计门：
+
+```text
+py -3.12 scripts\run_llm_shadow_eval.py --case mist_clock_manor --redteam
+```
+
+Red-team 输入会尝试诱导 LLM 直接揭露结局、输出 private inner monologue、漏报 `disclosure_claims`、伪造 `world_info_id` 或直接修改剧情阶段。它不会把这些玩家自由文本写入公开报告，也不会让候选 intent 进入 Rule Engine。报告中的 failure taxonomy 用于定位失败类型，例如 `schema.invalid`、`disclosure.full_reveal`、`speech.missing_disclosure_claim`、`speech.directness_exceeds_mode`、`disclosure.unknown_world_info`、`fallback.used` 和 `state.pollution`。
 
 ## 测试要求
 

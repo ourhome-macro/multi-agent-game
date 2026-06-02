@@ -43,7 +43,7 @@ LLM_BACKEND=real + OPENAI_API_KEY=... -> OpenAILLMAgent
 OPENAI_BASE_URL=https://api.xiaomimimo.com/v1
 ```
 
-适配器会优先把 base URL 拼接到 `/responses`。如果 OpenAI-compatible 服务明确不支持 Responses API，会降级到 `/chat/completions`。例如小米 API 使用 `https://api.xiaomimimo.com/v1`，本轮真实 Shadow Eval 使用 `OPENAI_MODEL=mimo-v2.5` 验证通过。即使配置了 API key 和 base URL，常规运行仍只有在 `LLM_BACKEND=real` 时才使用真实后端。
+适配器会优先把 base URL 拼接到 `/responses`。如果 OpenAI-compatible 服务明确不支持 Responses API，会降级到 `/chat/completions`。例如小米 API 使用 `https://api.xiaomimimo.com/v1`，本轮真实 Shadow Eval 使用 `OPENAI_MODEL=mimo-v2.5` 验证通过。可用 `LLM_API_STYLE=chat_completions` 显式跳过 `/responses` 探测，直接请求 `/chat/completions`。即使配置了 API key 和 base URL，常规运行仍只有在 `LLM_BACKEND=real` 时才使用真实后端。
 
 ## LLM Shadow Eval
 
@@ -58,7 +58,9 @@ LLM Shadow Eval v0 复用 Agent 合同，但不是正式运行链路。它只在
 - 不修改 `PlayerKnowledge`、`CharacterFactAwareness`、`WorldState`、`NarrativePhase`、`EventLog`。
 - 即使评测进程设置了 `LLM_BACKEND=real`，标准路径推进也固定使用 `MockAgent`；真实 LLM 只生成 shadow candidate。
 
-影子报告位于 `doc/case/<case_id>/llm_shadow_report.json` 和 `doc/case/<case_id>/llm_shadow_report.md`。`--all` 会额外写 `doc/evaluations/llm_shadow/summary.json` 和 `summary.md`。报告只记录 intent 摘要、Director 审计结果和 `disclosure_claims` 摘要，不公开原始 speech 或玩家自由文本，避免把 private 原文、forbidden facts、blocked terms 或 solution claims 写入公开文档产物。
+影子报告位于 `doc/case/<case_id>/llm_shadow_report.json` 和 `doc/case/<case_id>/llm_shadow_report.md`。`--all` 会额外写 `doc/evaluations/llm_shadow/summary.json` 和 `summary.md`。报告只记录 intent 摘要、Director 审计结果、`disclosure_claims` 摘要和 `failure_categories`，不公开原始 speech 或玩家自由文本，避免把 private 原文、forbidden facts、blocked terms 或 solution claims 写入公开文档产物。
+
+真实对话调试可显式设置 `LLM_SHADOW_WRITE_RAW=1`，私有 transcript 只写入 ignored 的 `.shadow_eval/private_transcripts/` 或 `LLM_SHADOW_RAW_DIR` 指定目录，不进入 `doc`。安全基准可通过 `scripts/run_llm_shadow_eval.py --case mist_clock_manor --benchmark safety` 运行；它不调用真实 LLM，只用确定性候选 intent 检查 Director 和 schema guardrail。Red-team 探针可通过 `--redteam` 运行；它构造 adversarial 玩家行动来评估真实 LLM 是否会越权、剧透、伪造事实或试图改状态，但仍只产生 shadow candidate。
 
 ## AgentContext
 

@@ -13,6 +13,8 @@ from app.evaluations.llm_shadow_eval import (  # noqa: E402
     DEFAULT_CASE_REPORT_ROOT,
     DEFAULT_SUMMARY_DIR,
     run_all_standard_path_shadow_evals,
+    run_shadow_redteam_eval,
+    run_shadow_safety_benchmark,
     run_standard_path_shadow_eval,
 )
 
@@ -31,6 +33,21 @@ def main(argv: list[str] | None = None) -> None:
 
     case_id = args.case or args.case_id
     case_dir = _resolve_case_dir(case_id=case_id, case_dir=args.case_dir)
+    if args.benchmark == "safety":
+        report = run_shadow_safety_benchmark(
+            case_dir=case_dir,
+            report_root=_resolve_cli_path(args.report_root),
+        )
+        print(json.dumps(report.model_dump(), ensure_ascii=False, indent=2))
+        return
+    if args.redteam:
+        report = run_shadow_redteam_eval(
+            case_dir=case_dir,
+            backend=args.backend,
+            report_root=_resolve_cli_path(args.report_root),
+        )
+        print(json.dumps(report.model_dump(), ensure_ascii=False, indent=2))
+        return
     scenario_path = (
         _resolve_cli_path(args.scenario)
         if args.scenario is not None
@@ -59,6 +76,8 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
     parser.add_argument("--report-root", type=Path, default=DEFAULT_CASE_REPORT_ROOT)
     parser.add_argument("--summary-dir", type=Path, default=DEFAULT_SUMMARY_DIR)
     parser.add_argument("--backend", choices=["stub", "real"])
+    parser.add_argument("--benchmark", choices=["safety"])
+    parser.add_argument("--redteam", action="store_true")
     parser.add_argument("--all", action="store_true")
     return parser.parse_args(argv)
 

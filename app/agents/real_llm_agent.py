@@ -13,6 +13,15 @@ from app.domain.models import AgentContext, AgentIntent, AgentIntentType
 OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses"
 DEFAULT_OPENAI_BASE_URL = "https://api.openai.com/v1"
 DEFAULT_OPENAI_MODEL = "gpt-4.1-mini"
+LLM_API_STYLE_ENV = "LLM_API_STYLE"
+LLM_API_STYLE_RESPONSES = "responses"
+LLM_API_STYLE_CHAT_COMPLETIONS = "chat_completions"
+LLM_API_STYLE_AUTO = "auto"
+LLM_API_STYLES = {
+    LLM_API_STYLE_RESPONSES,
+    LLM_API_STYLE_CHAT_COMPLETIONS,
+    LLM_API_STYLE_AUTO,
+}
 
 
 class OpenAILLMAgent:
@@ -33,6 +42,7 @@ class OpenAILLMAgent:
             or DEFAULT_OPENAI_BASE_URL
         )
         self._model = model or os.getenv("OPENAI_MODEL") or DEFAULT_OPENAI_MODEL
+        self._api_style = _api_style_from_env()
         self._timeout_seconds = timeout_seconds
         self._client = client
 
@@ -49,6 +59,13 @@ class OpenAILLMAgent:
             return self._safe_fallback(context)
 
     def _create_response(self, contract_payload: dict[str, Any]) -> dict[str, Any]:
+        headers = {
+            "Authorization": f"Bearer {self._api_key}",
+            "Content-Type": "application/json",
+        }
+        if self._api_style == LLM_API_STYLE_CHAT_COMPLETIONS:
+            return self._create_chat_completion(contract_payload, headers)
+
         request_payload = {
             "model": self._model,
             "instructions": _agent_intent_system_prompt(),
@@ -72,14 +89,13 @@ class OpenAILLMAgent:
                 }
             },
         }
-        headers = {
-            "Authorization": f"Bearer {self._api_key}",
-            "Content-Type": "application/json",
-        }
         try:
             return self._post_json(self._responses_url(), headers, request_payload)
         except httpx.HTTPStatusError as exc:
-            if not self._should_try_chat_completions(exc):
+            if (
+                self._api_style == LLM_API_STYLE_RESPONSES
+                or not self._should_try_chat_completions(exc)
+            ):
                 raise
         return self._create_chat_completion(contract_payload, headers)
 
@@ -224,6 +240,15 @@ def _parse_json_object_text(text: str, source: str) -> dict[str, Any]:
     if not isinstance(parsed, dict):
         raise ValueError(f"{source} must decode to a JSON object")
     return parsed
+
+
+def _api_style_from_env() -> str:
+    value = os.getenv(LLM_API_STYLE_ENV, LLM_API_STYLE_AUTO).strip().lower().replace("-", "_")
+    if value in {"chat", "chat_completion"}:
+        return LLM_API_STYLE_CHAT_COMPLETIONS
+    if value in LLM_API_STYLES:
+        return value
+    return LLM_API_STYLE_AUTO
 
 
 def _agent_intent_system_prompt() -> str:
