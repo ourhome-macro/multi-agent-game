@@ -402,6 +402,39 @@ class LLMDisclosureConstraint(APIModel):
     blocked: bool = True
 
 
+class LLMAgentOutputContract(APIModel):
+    allowed_top_level_keys: list[NonEmptyString] = Field(
+        default_factory=lambda: [
+            "speech",
+            "intent",
+            "emotional_shift",
+            "proposed_actions",
+            "memory_refs",
+            "disclosure_claims",
+        ]
+    )
+    allowed_intents: list[AgentIntentType] = Field(
+        default_factory=lambda: list(AgentIntentType)
+    )
+    fallback_intent: AgentIntentType = AgentIntentType.REFUSE
+    allowed_proposed_action_types: list[ProposedActionType] = Field(
+        default_factory=lambda: [
+            ProposedActionType.DISCOVER_CLUE,
+            ProposedActionType.RELATIONSHIP_CHANGE,
+        ]
+    )
+    allowed_disclosure_modes: list[DisclosureMode] = Field(
+        default_factory=lambda: [
+            mode for mode in DisclosureMode if mode != DisclosureMode.FULL
+        ]
+    )
+    allowed_rhetoric_tactics: list[RhetoricTactic] = Field(
+        default_factory=lambda: list(RhetoricTactic)
+    )
+    disclosure_claim_required_for_world_info_touch: bool = True
+    unknown_world_info_policy: Literal["avoid_or_refuse"] = "avoid_or_refuse"
+
+
 class DisclosureClaim(APIModel):
     world_info_id: NonEmptyString
     mode: DisclosureMode
@@ -650,6 +683,12 @@ class AgentIntent(APIModel):
         return value
 
 
+class PromptBundle(APIModel):
+    agent_prompt: NonEmptyString
+    contract_instruction: NonEmptyString
+    safety_instruction: NonEmptyString
+
+
 class DirectorDecision(APIModel):
     allowed: bool
     reason: str | None = None
@@ -745,6 +784,9 @@ class AgentContext(APIModel):
 class LLMAgentContractInput(APIModel):
     agent_context: AgentContext
     disclosure_constraints: list[LLMDisclosureConstraint] = Field(default_factory=list)
+    output_contract: LLMAgentOutputContract = Field(
+        default_factory=LLMAgentOutputContract
+    )
     required_output_schema: Literal["AgentIntent"] = "AgentIntent"
 
 

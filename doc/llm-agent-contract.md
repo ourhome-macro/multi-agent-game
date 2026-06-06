@@ -21,8 +21,11 @@
 class LLMAgentContractInput(BaseModel):
     agent_context: AgentContext
     disclosure_constraints: list[LLMDisclosureConstraint]
+    output_contract: LLMAgentOutputContract
     required_output_schema: Literal["AgentIntent"] = "AgentIntent"
 ```
+
+`output_contract` 是给真实 LLM 的机器可读输出边界，不是状态。它包含允许的 top-level keys、`AgentIntent.intent` 枚举、fallback intent、允许的 proposed action 类型、允许的 disclosure modes、允许的 rhetoric tactics，以及“speech 触碰 WorldInfo 必须提交 disclosure claim”的规则。
 
 `agent_context` 包含：
 
@@ -114,7 +117,7 @@ class DisclosureClaim(BaseModel):
 语义：
 
 - `world_info_id`：这句话触碰了哪个事实锚点。
-- `mode`：本次表达属于 `deny`、`deflect`、`hint`、`partial` 或 `full` 中哪一级。
+- `mode`：本次表达属于 `none`、`deny`、`deflect`、`hint`、`partial` 或 `full` 中哪一级。`none` 只能用于不触碰事实或安全占位；一旦 speech 实际触碰 `WorldInfo`，仍必须接受 Director 的直接度审计。
 - `tactic`：使用的话术策略，例如转移重点、反问、邻近真实或降低确定性。
 - `source_refs`：本次表达依赖的安全证据引用。
 - `claim_refs`：本次声明触碰到的结构化禁说声明引用。
@@ -165,6 +168,8 @@ LLM_API_STYLE=auto | responses | chat_completions
 
 `OPENAI_BASE_URL` 用于 OpenAI-compatible 服务。运行时会优先拼接 `/responses`，例如 `https://api.xiaomimimo.com/v1` 会先请求 `https://api.xiaomimimo.com/v1/responses`。如果兼容服务明确不支持 Responses API，适配器会降级到 `/chat/completions`。`LLM_API_STYLE=chat_completions` 会直接请求 `/chat/completions`，用于小米 API 这类兼容服务；`LLM_API_STYLE=responses` 会强制只用 `/responses`。`LLM_BASE_URL` 是同义兜底配置；优先级低于 `OPENAI_BASE_URL`。本轮真实 Shadow Eval 对小米 API 使用 `OPENAI_MODEL=mimo-v2.5` 验证通过。
 
+Chat Completions 默认仍使用 `response_format.type=json_schema`。如果兼容服务对 schema 返回 400/422，适配器默认不再静默降级到 `json_object`，而是安全 fallback；只有显式设置 `LLM_ALLOW_JSON_OBJECT_FALLBACK=1` 时才允许降级。`json_object` 只保证 JSON，不保证 enum 或 schema，因此不是信任边界；输出仍必须通过 `validate_llm_agent_output` 和 Director。
+
 适配器流程：
 
 ```text
@@ -177,7 +182,7 @@ AgentContext
   -> AgentIntent or safe fallback
 ```
 
-真实适配器的严格 JSON schema 只允许这些 proposed action：
+真实适配器的严格 JSON schema 由当前 `LLMAgentContractInput` 动态生成。它会把 `AgentIntent.intent` 收窄到领域模型枚举，把 `disclosure_claims.world_info_id` 收窄到当前 `world_info` 约束，把 disclosure `mode` 收窄到当前约束允许且不含 `full` 的集合。严格 JSON schema 只允许这些 proposed action：
 
 - `clue.discover`
 - `relationship.change`

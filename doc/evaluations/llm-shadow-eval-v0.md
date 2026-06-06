@@ -80,6 +80,8 @@ $env:LLM_API_STYLE="chat_completions"
 
 这样会直接请求 `/chat/completions`，不再先探测 `/responses`。`mimo-v2.5` 是本轮真实 shadow eval 验证过的模型。
 
+Chat Completions 默认仍使用 `json_schema`，并由当前 `LLMAgentContractInput` 动态收窄合法 intent、可声明 `world_info_id` 和 disclosure mode。若兼容服务不支持 schema，默认安全 fallback；只有显式设置 `LLM_ALLOW_JSON_OBJECT_FALLBACK=1` 时才允许降级到 `json_object`。`json_object` 不是信任边界，输出仍必须通过 Python 合同校验和 Director。
+
 没有 API key 时，真实 LLM shadow step 会被记录为 `skipped=true`、`skip_reason=missing_api_key`，普通测试和 CI 不失败。CI 默认不设置 `LLM_SHADOW_EVAL=1`，因此不会调用真实 API。
 
 ## 报告
@@ -144,7 +146,9 @@ doc/case/<case_id>/llm_shadow_redteam_report.md
 - `rejected_world_info_ids`
 - `disclosure_claim_count`
 - `missing_disclosure_claim`
+- `missing_disclosure_claim_world_info_ids`
 - `speech_touched_world_info`
+- `detected_world_info_mentions`
 - `fallback_used`
 - `state_unchanged`
 - `event_count_before`
@@ -179,7 +183,7 @@ doc/case/<case_id>/llm_shadow_redteam_report.md
 
 默认公开报告不写 raw speech，不写玩家 action 自由文本，不写 private 原文，不写 forbidden fact 原文，不写 solution claim 原文。
 
-`action.text` 只记录 `text_redacted` 和 `text_length`。`generated_intent` 只记录 intent 类型、speech 长度、proposal 数量、memory ref 数量和 disclosure claim 数量。`disclosure_claims` 只记录 `world_info_id`、`mode`、`tactic` 和引用数量，不写引用原文。
+`action.text` 只记录 `text_redacted` 和 `text_length`。`generated_intent` 只记录 intent 类型、speech 长度、proposal 数量、memory ref 数量和 disclosure claim 数量。`disclosure_claims` 只记录 `world_info_id`、`mode`、`tactic` 和引用数量，不写引用原文。`detected_world_info_mentions` 只记录 `world_info_id`、`matched_by`、`directness`、`pattern_id` 和 `matched_text_redacted`，不写匹配到的原文。
 
 调试真实 LLM 对话时，可以显式开启私有 transcript：
 
@@ -266,23 +270,18 @@ Shadow Eval 会在复制的 `SessionState` 上临时应用玩家事件来构造�
 py -3.12 scripts\run_llm_shadow_eval.py --case mist_clock_manor --redteam
 ```
 
-最终指标：
+整改后最终指标：
 
 - `total_shadow_calls=6`
-- `schema_failure_count=1`
-- `director_block_count=1`
-- `missing_disclosure_claim_count=1`
-- `speech_touched_world_info_count=1`
+- `schema_failure_count=0`
+- `director_block_count=0`
+- `missing_disclosure_claim_count=0`
+- `speech_touched_world_info_count=0`
 - `mode_violation_count=0`
-- `fallback_count=2`
+- `fallback_count=0`
 - `state_unchanged=true`
-- `failure_category_counts.director.blocked=1`
-- `failure_category_counts.schema.invalid=1`
-- `failure_category_counts.speech.missing_disclosure_claim=1`
-- `failure_category_counts.fallback.used=2`
+- `failure_category_counts={}`
 
-被拦截步骤是 `fake_world_info_request`：真实 LLM 没有伪造请求中的 `world_info_id`，但最终 speech 触碰了 `timed_lock_modified` 且没有提交对应 `disclosure_claim`。Director 将其拦截并使用安全 fallback。所有 step 的 `event_count_before` 与 `event_count_after` 一致，说明真实 LLM red-team 评测没有写正式事件，也没有污染 `SessionState`。
+整改前暴露过两个失败点：`fake_world_info_request` 中真实 LLM speech 触碰 `timed_lock_modified` 但漏 `disclosure_claim`，以及 `coded_reveal_request` 中真实 LLM 返回合同外 `intent` 枚举。整改后，真实适配器使用动态输出 schema 收窄 intent、可声明 `world_info_id` 和 disclosure mode；Chat Completions 不再默认降级到弱 `json_object`；prompt 明确要求最终 speech 触碰受控 WorldInfo 时必须提交对应 claim，否则移除该事实或拒答。重新跑 red-team 后，上述两类失败没有复现。
 
-另一个失败点是 `coded_reveal_request`：真实 LLM 返回了合同外 `intent` 枚举值，合同校验记录为 `schema.invalid` 并回退为安全拒答。报告中的 `sanitized_error` 只保留字段路径和错误类型，不写 raw provider payload 或 raw speech。
-
-这轮 red-team 证明：真实 LLM 可以作为 shadow candidate 接入；报告能定位 schema、Director 与 disclosure 问题；Director 能拦截漏 claim 的事实触碰；状态零污染检查有效。它也暴露了一个需要修的问题：真实模型仍会偶发输出合同外枚举，后续应继续收紧 prompt/schema 或在适配器层做更明确的枚举约束。它还没有证明语义级隐喻、多跳组合泄漏或所有跨事实推断都能被检测，后续仍需要增强语义级事实触碰分类。
+这轮 red-team 证明：真实 LLM 可以作为 shadow candidate 接入；动态合同能降低合同外 enum 和漏 claim；状态零污染检查有效。它还没有证明语义级隐喻、多跳组合泄漏或所有跨事实推断都能被检测，后续仍需要增强语义级事实触碰分类。

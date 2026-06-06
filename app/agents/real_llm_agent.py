@@ -8,12 +8,20 @@ from urllib.parse import urljoin
 import httpx
 
 from app.agents.llm_contract import build_llm_agent_input, validate_llm_agent_output
-from app.domain.models import AgentContext, AgentIntent, AgentIntentType
+from app.domain.models import (
+    AgentContext,
+    AgentIntent,
+    AgentIntentType,
+    LLMAgentContractInput,
+    LLMAgentOutputContract,
+    LLMDisclosureConstraint,
+)
 
 OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses"
 DEFAULT_OPENAI_BASE_URL = "https://api.openai.com/v1"
 DEFAULT_OPENAI_MODEL = "gpt-4.1-mini"
 LLM_API_STYLE_ENV = "LLM_API_STYLE"
+LLM_ALLOW_JSON_OBJECT_FALLBACK_ENV = "LLM_ALLOW_JSON_OBJECT_FALLBACK"
 LLM_API_STYLE_RESPONSES = "responses"
 LLM_API_STYLE_CHAT_COMPLETIONS = "chat_completions"
 LLM_API_STYLE_AUTO = "auto"
@@ -52,19 +60,25 @@ class OpenAILLMAgent:
 
         try:
             contract_input = build_llm_agent_input(context)
-            response_payload = self._create_response(contract_input.model_dump(mode="json"))
+            response_payload = self._create_response(contract_input)
             output_payload = self._extract_json_payload(response_payload)
             return validate_llm_agent_output(output_payload, contract_input)
         except Exception:
             return self._safe_fallback(context)
 
-    def _create_response(self, contract_payload: dict[str, Any]) -> dict[str, Any]:
+    def _create_response(
+        self,
+        contract_input: LLMAgentContractInput | dict[str, Any],
+    ) -> dict[str, Any]:
+        contract_input = _ensure_contract_input(contract_input)
+        contract_payload = contract_input.model_dump(mode="json")
+        response_schema = _agent_intent_json_schema(contract_input)
         headers = {
             "Authorization": f"Bearer {self._api_key}",
             "Content-Type": "application/json",
         }
         if self._api_style == LLM_API_STYLE_CHAT_COMPLETIONS:
-            return self._create_chat_completion(contract_payload, headers)
+            return self._create_chat_completion(contract_input, headers)
 
         request_payload = {
             "model": self._model,
@@ -85,7 +99,7 @@ class OpenAILLMAgent:
                     "type": "json_schema",
                     "name": "agent_intent",
                     "strict": True,
-                    "schema": _agent_intent_json_schema(),
+                    "schema": response_schema,
                 }
             },
         }
@@ -97,13 +111,14 @@ class OpenAILLMAgent:
                 or not self._should_try_chat_completions(exc)
             ):
                 raise
-        return self._create_chat_completion(contract_payload, headers)
+        return self._create_chat_completion(contract_input, headers)
 
     def _create_chat_completion(
         self,
-        contract_payload: dict[str, Any],
+        contract_input: LLMAgentContractInput,
         headers: dict[str, str],
     ) -> dict[str, Any]:
+        contract_payload = contract_input.model_dump(mode="json")
         request_payload = {
             "model": self._model,
             "messages": [
@@ -121,14 +136,17 @@ class OpenAILLMAgent:
                 "json_schema": {
                     "name": "agent_intent",
                     "strict": True,
-                    "schema": _agent_intent_json_schema(),
+                    "schema": _agent_intent_json_schema(contract_input),
                 },
             },
         }
         try:
             return self._post_json(self._chat_completions_url(), headers, request_payload)
         except httpx.HTTPStatusError as exc:
-            if exc.response.status_code not in {400, 422}:
+            if (
+                exc.response.status_code not in {400, 422}
+                or not _json_object_fallback_enabled()
+            ):
                 raise
         fallback_payload = dict(request_payload)
         fallback_payload["response_format"] = {"type": "json_object"}
@@ -251,6 +269,23 @@ def _api_style_from_env() -> str:
     return LLM_API_STYLE_AUTO
 
 
+def _json_object_fallback_enabled() -> bool:
+    return os.getenv(LLM_ALLOW_JSON_OBJECT_FALLBACK_ENV, "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+
+
+def _ensure_contract_input(
+    contract_input: LLMAgentContractInput | dict[str, Any],
+) -> LLMAgentContractInput:
+    if isinstance(contract_input, LLMAgentContractInput):
+        return contract_input
+    return LLMAgentContractInput.model_validate(contract_input)
+
+
 def _agent_intent_system_prompt() -> str:
     return (
         "You are a controlled NPC agent for an event-sourced mystery runtime. "
@@ -258,7 +293,9 @@ def _agent_intent_system_prompt() -> str:
         "speech, intent, emotional_shift, proposed_actions, memory_refs, disclosure_claims. "
         "Do not include thoughts, reasoning, analysis, agent_id, character_name, metadata, "
         "or any other extra key. speech must be a string. intent must be one of: answer, "
-        "conceal, lie, refuse, probe, panic. emotional_shift must be an object; use {} "
+        "conceal, lie, refuse, probe, panic. Use these exact intent enum strings only; "
+        "never invent synonyms such as investigate, comply, reveal, observe, or clarify. "
+        "If no enum fits, use intent refuse. emotional_shift must be an object; use {} "
         "when there is no shift. proposed_actions must be an array; use [] when there is "
         "no allowed state proposal. proposed_actions may only contain clue.discover "
         "objects with clue_id, or relationship.change objects with source_id, target_id, "
@@ -270,14 +307,25 @@ def _agent_intent_system_prompt() -> str:
         "emotional_screen, silence. For disclosure_claims, only use world_info_id values "
         "that appear in disclosure_constraints, and only use modes listed in that item's "
         "allowed_modes. Never use a mode listed in forbidden_modes. Never use mode full. "
-        "If the allowed mode is unclear, omit the disclosure claim and avoid mentioning "
-        "that WorldInfo in speech. Do not reveal raw private text. Do not propose narrative "
+        "Before finalizing speech, audit every sentence: if it mentions, paraphrases, "
+        "or clearly touches any constrained WorldInfo, include exactly one matching "
+        "disclosure_claim for that world_info_id. If the matching world_info_id or "
+        "allowed mode is unclear, remove that fact from speech or refuse. Do not reveal "
+        "raw private text. Do not propose narrative "
         "phase changes. Any real state change must be requested only through allowed "
-        "proposed_actions. If uncertain, return intent refuse with empty arrays."
+        "proposed_actions. The user payload includes output_contract; treat its enum "
+        "lists as authoritative. If uncertain, return intent refuse with empty arrays."
     )
 
 
-def _agent_intent_json_schema() -> dict[str, Any]:
+def _agent_intent_json_schema(
+    contract_input: LLMAgentContractInput | None = None,
+) -> dict[str, Any]:
+    output_contract = (
+        contract_input.output_contract
+        if contract_input is not None
+        else LLMAgentOutputContract()
+    )
     return {
         "type": "object",
         "additionalProperties": False,
@@ -293,7 +341,7 @@ def _agent_intent_json_schema() -> dict[str, Any]:
             "speech": {"type": "string"},
             "intent": {
                 "type": "string",
-                "enum": ["answer", "conceal", "lie", "refuse", "probe", "panic"],
+                "enum": [intent.value for intent in output_contract.allowed_intents],
             },
             "emotional_shift": {
                 "type": "object",
@@ -357,55 +405,117 @@ def _agent_intent_json_schema() -> dict[str, Any]:
             },
             "disclosure_claims": {
                 "type": "array",
-                "items": {
-                    "type": "object",
-                    "additionalProperties": False,
-                    "required": [
-                        "world_info_id",
-                        "mode",
-                        "tactic",
-                        "source_refs",
-                        "claim_refs",
-                    ],
-                    "properties": {
-                        "world_info_id": {"type": "string"},
-                        "mode": {
-                            "type": "string",
-                            "enum": [
-                                "none",
-                                "deny",
-                                "deflect",
-                                "hint",
-                                "partial",
-                                "full",
-                            ],
-                        },
-                        "tactic": {
-                            "anyOf": [
-                                {
-                                    "type": "string",
-                                    "enum": [
-                                        "answer_adjacent_truth",
-                                        "shift_focus",
-                                        "counter_question",
-                                        "qualify_certainty",
-                                        "emotional_screen",
-                                        "silence",
-                                    ],
-                                },
-                                {"type": "null"},
-                            ],
-                        },
-                        "source_refs": {
-                            "type": "array",
-                            "items": {"type": "string"},
-                        },
-                        "claim_refs": {
-                            "type": "array",
-                            "items": {"type": "string"},
-                        },
-                    },
-                },
+                "items": _disclosure_claim_json_schema(contract_input, output_contract),
             },
         },
     }
+
+
+def _disclosure_claim_json_schema(
+    contract_input: LLMAgentContractInput | None,
+    output_contract: LLMAgentOutputContract,
+) -> dict[str, Any]:
+    world_info_constraints = _world_info_constraints(contract_input)
+    claim_schemas = [
+        _disclosure_claim_json_schema_for_constraint(constraint, output_contract)
+        for constraint in world_info_constraints
+    ]
+    claim_schemas = [schema for schema in claim_schemas if schema is not None]
+    if not claim_schemas:
+        return _generic_disclosure_claim_json_schema(output_contract)
+    if len(claim_schemas) == 1:
+        return claim_schemas[0]
+    return {"anyOf": claim_schemas}
+
+
+def _disclosure_claim_json_schema_for_constraint(
+    constraint: LLMDisclosureConstraint,
+    output_contract: LLMAgentOutputContract,
+) -> dict[str, Any] | None:
+    allowed_modes = [
+        mode.value
+        for mode in constraint.allowed_modes
+        if mode in output_contract.allowed_disclosure_modes
+        and mode not in constraint.forbidden_modes
+    ]
+    if not allowed_modes:
+        return None
+    tactic_values = [
+        tactic.value
+        for tactic in (
+            constraint.rhetoric_tactics or output_contract.allowed_rhetoric_tactics
+        )
+        if tactic in output_contract.allowed_rhetoric_tactics
+    ]
+    return _disclosure_claim_object_schema(
+        world_info_id_schema={"type": "string", "enum": [constraint.item_id]},
+        mode_values=allowed_modes,
+        tactic_values=tactic_values,
+    )
+
+
+def _generic_disclosure_claim_json_schema(
+    output_contract: LLMAgentOutputContract,
+) -> dict[str, Any]:
+    return _disclosure_claim_object_schema(
+        world_info_id_schema={"type": "string"},
+        mode_values=[mode.value for mode in output_contract.allowed_disclosure_modes],
+        tactic_values=[
+            tactic.value for tactic in output_contract.allowed_rhetoric_tactics
+        ],
+    )
+
+
+def _disclosure_claim_object_schema(
+    *,
+    world_info_id_schema: dict[str, Any],
+    mode_values: list[str],
+    tactic_values: list[str],
+) -> dict[str, Any]:
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "required": [
+            "world_info_id",
+            "mode",
+            "tactic",
+            "source_refs",
+            "claim_refs",
+        ],
+        "properties": {
+            "world_info_id": world_info_id_schema,
+            "mode": {
+                "type": "string",
+                "enum": mode_values,
+            },
+            "tactic": {
+                "anyOf": [
+                    {
+                        "type": "string",
+                        "enum": tactic_values,
+                    },
+                    {"type": "null"},
+                ],
+            },
+            "source_refs": {
+                "type": "array",
+                "items": {"type": "string"},
+            },
+            "claim_refs": {
+                "type": "array",
+                "items": {"type": "string"},
+            },
+        },
+    }
+
+
+def _world_info_constraints(
+    contract_input: LLMAgentContractInput | None,
+) -> list[LLMDisclosureConstraint]:
+    if contract_input is None:
+        return []
+    return [
+        constraint
+        for constraint in contract_input.disclosure_constraints
+        if constraint.item_kind == "world_info"
+    ]

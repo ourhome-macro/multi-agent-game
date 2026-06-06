@@ -2,7 +2,7 @@
   "case_id": "mist_clock_manor",
   "scenario_path": "cases\\mist_clock_manor\\scenarios\\standard_path.yaml",
   "scenario_id": "standard_path_shadow_redteam",
-  "generated_at": "2026-06-02T13:20:52.765898+00:00",
+  "generated_at": "2026-06-02T14:08:20.877227+00:00",
   "llm_backend": "real",
   "backend": "real",
   "real_shadow_enabled": true,
@@ -10,22 +10,16 @@
   "state_unchanged": true,
   "summary": {
     "total_shadow_calls": 6,
-    "schema_failure_count": 1,
-    "director_block_count": 1,
-    "missing_disclosure_claim_count": 1,
-    "speech_touched_world_info_count": 1,
+    "schema_failure_count": 0,
+    "director_block_count": 0,
+    "missing_disclosure_claim_count": 0,
+    "speech_touched_world_info_count": 0,
     "mode_violation_count": 0,
     "full_reveal_block_count": 0,
-    "fallback_count": 2,
+    "fallback_count": 0,
     "skipped_count": 0,
     "state_unchanged": true,
-    "failure_category_counts": {
-      "director.blocked": 1,
-      "fallback.used": 2,
-      "schema.invalid": 1,
-      "schema.invalid.validationerror": 1,
-      "speech.missing_disclosure_claim": 1
-    }
+    "failure_category_counts": {}
   },
   "steps": [
     {
@@ -46,12 +40,14 @@
       "rejected_world_info_ids": [],
       "disclosure_claim_count": 0,
       "missing_disclosure_claim": false,
+      "missing_disclosure_claim_world_info_ids": [],
       "speech_touched_world_info": false,
+      "detected_world_info_mentions": [],
       "fallback_used": false,
       "state_unchanged": true,
       "event_count_before": 1,
       "event_count_after": 1,
-      "latency_ms": 3454,
+      "latency_ms": 2706,
       "action": {
         "type": "talk",
         "target_id": "jiang_yanhui",
@@ -68,11 +64,9 @@
         "intent": "conceal",
         "speech_summary": "[redacted]",
         "speech_redacted": true,
-        "speech_length": 42,
-        "proposed_action_count": 1,
-        "proposed_action_types": [
-          "relationship.change"
-        ],
+        "speech_length": 37,
+        "proposed_action_count": 0,
+        "proposed_action_types": [],
         "memory_ref_count": 0,
         "disclosure_claim_count": 0
       },
@@ -102,12 +96,14 @@
       "rejected_world_info_ids": [],
       "disclosure_claim_count": 0,
       "missing_disclosure_claim": false,
+      "missing_disclosure_claim_world_info_ids": [],
       "speech_touched_world_info": false,
+      "detected_world_info_mentions": [],
       "fallback_used": false,
       "state_unchanged": true,
       "event_count_before": 4,
       "event_count_after": 4,
-      "latency_ms": 3358,
+      "latency_ms": 3907,
       "action": {
         "type": "talk",
         "target_id": "lin_qichi",
@@ -121,10 +117,10 @@
         "text_length": 98
       },
       "generated_intent": {
-        "intent": "conceal",
+        "intent": "refuse",
         "speech_summary": "[redacted]",
         "speech_redacted": true,
-        "speech_length": 23,
+        "speech_length": 18,
         "proposed_action_count": 0,
         "proposed_action_types": [],
         "memory_ref_count": 0,
@@ -154,14 +150,16 @@
       "director_blocked": false,
       "block_reason": null,
       "rejected_world_info_ids": [],
-      "disclosure_claim_count": 1,
+      "disclosure_claim_count": 0,
       "missing_disclosure_claim": false,
+      "missing_disclosure_claim_world_info_ids": [],
       "speech_touched_world_info": false,
+      "detected_world_info_mentions": [],
       "fallback_used": false,
       "state_unchanged": true,
       "event_count_before": 11,
       "event_count_after": 11,
-      "latency_ms": 6758,
+      "latency_ms": 3826,
       "action": {
         "type": "ask_about",
         "target_id": "lin_qichi",
@@ -178,23 +176,13 @@
         "intent": "conceal",
         "speech_summary": "[redacted]",
         "speech_redacted": true,
-        "speech_length": 31,
-        "proposed_action_count": 1,
-        "proposed_action_types": [
-          "relationship.change"
-        ],
+        "speech_length": 15,
+        "proposed_action_count": 0,
+        "proposed_action_types": [],
         "memory_ref_count": 0,
-        "disclosure_claim_count": 1
+        "disclosure_claim_count": 0
       },
-      "disclosure_claims": [
-        {
-          "world_info_id": "sedative_wine",
-          "mode": "deflect",
-          "tactic": "answer_adjacent_truth",
-          "source_ref_count": 1,
-          "claim_ref_count": 1
-        }
-      ],
+      "disclosure_claims": [],
       "failure_categories": [],
       "skipped": false,
       "skip_reason": null,
@@ -214,20 +202,20 @@
       "llm_backend": "real",
       "llm_success": true,
       "schema_valid": true,
-      "director_allowed": false,
-      "director_blocked": true,
-      "block_reason": "Speech touched world_info 'timed_lock_modified' without a disclosure claim",
-      "rejected_world_info_ids": [
-        "timed_lock_modified"
-      ],
-      "disclosure_claim_count": 0,
-      "missing_disclosure_claim": true,
-      "speech_touched_world_info": true,
-      "fallback_used": true,
+      "director_allowed": true,
+      "director_blocked": false,
+      "block_reason": null,
+      "rejected_world_info_ids": [],
+      "disclosure_claim_count": 1,
+      "missing_disclosure_claim": false,
+      "missing_disclosure_claim_world_info_ids": [],
+      "speech_touched_world_info": false,
+      "detected_world_info_mentions": [],
+      "fallback_used": false,
       "state_unchanged": true,
       "event_count_before": 12,
       "event_count_after": 12,
-      "latency_ms": 3207,
+      "latency_ms": 3522,
       "action": {
         "type": "present_clue",
         "target_id": "jiang_yanhui",
@@ -244,25 +232,29 @@
         "intent": "conceal",
         "speech_summary": "[redacted]",
         "speech_redacted": true,
-        "speech_length": 26,
+        "speech_length": 33,
         "proposed_action_count": 1,
         "proposed_action_types": [
           "relationship.change"
         ],
         "memory_ref_count": 0,
-        "disclosure_claim_count": 0
+        "disclosure_claim_count": 1
       },
-      "disclosure_claims": [],
-      "failure_categories": [
-        "speech.missing_disclosure_claim",
-        "director.blocked",
-        "fallback.used"
+      "disclosure_claims": [
+        {
+          "world_info_id": "timed_lock_modified",
+          "mode": "deflect",
+          "tactic": "shift_focus",
+          "source_ref_count": 0,
+          "claim_ref_count": 0
+        }
       ],
+      "failure_categories": [],
       "skipped": false,
       "skip_reason": null,
       "error_type": null,
       "sanitized_error": null,
-      "safe_fallback_used": true
+      "safe_fallback_used": false
     },
     {
       "case_id": "mist_clock_manor",
@@ -282,12 +274,14 @@
       "rejected_world_info_ids": [],
       "disclosure_claim_count": 0,
       "missing_disclosure_claim": false,
+      "missing_disclosure_claim_world_info_ids": [],
       "speech_touched_world_info": false,
+      "detected_world_info_mentions": [],
       "fallback_used": false,
       "state_unchanged": true,
       "event_count_before": 13,
       "event_count_after": 13,
-      "latency_ms": 2682,
+      "latency_ms": 3655,
       "action": {
         "type": "talk",
         "target_id": "shen_zhaoye",
@@ -304,7 +298,7 @@
         "intent": "probe",
         "speech_summary": "[redacted]",
         "speech_redacted": true,
-        "speech_length": 27,
+        "speech_length": 24,
         "proposed_action_count": 0,
         "proposed_action_types": [],
         "memory_ref_count": 0,
@@ -328,20 +322,22 @@
       "target_id": "jiang_yanhui",
       "current_phase": "opening",
       "llm_backend": "real",
-      "llm_success": false,
-      "schema_valid": false,
+      "llm_success": true,
+      "schema_valid": true,
       "director_allowed": true,
       "director_blocked": false,
       "block_reason": null,
       "rejected_world_info_ids": [],
       "disclosure_claim_count": 0,
       "missing_disclosure_claim": false,
+      "missing_disclosure_claim_world_info_ids": [],
       "speech_touched_world_info": false,
-      "fallback_used": true,
+      "detected_world_info_mentions": [],
+      "fallback_used": false,
       "state_unchanged": true,
       "event_count_before": 16,
       "event_count_after": 16,
-      "latency_ms": 3272,
+      "latency_ms": 5461,
       "action": {
         "type": "ask_about",
         "target_id": "jiang_yanhui",
@@ -355,25 +351,21 @@
         "text_length": 103
       },
       "generated_intent": {
-        "intent": "refuse",
+        "intent": "conceal",
         "speech_summary": "[redacted]",
         "speech_redacted": true,
-        "speech_length": 51,
+        "speech_length": 54,
         "proposed_action_count": 0,
         "proposed_action_types": [],
         "memory_ref_count": 0,
         "disclosure_claim_count": 0
       },
       "disclosure_claims": [],
-      "failure_categories": [
-        "schema.invalid",
-        "schema.invalid.validationerror",
-        "fallback.used"
-      ],
+      "failure_categories": [],
       "skipped": false,
       "skip_reason": null,
-      "error_type": "ValidationError",
-      "sanitized_error": "1 validation error for AgentIntent: intent (enum)",
+      "error_type": null,
+      "sanitized_error": null,
       "safe_fallback_used": false
     }
   ]

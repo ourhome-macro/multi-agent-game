@@ -8,20 +8,15 @@
 ## Summary
 
 - total_shadow_calls: `6`
-- schema_failure_count: `1`
-- director_block_count: `1`
-- missing_disclosure_claim_count: `1`
-- speech_touched_world_info_count: `1`
+- schema_failure_count: `0`
+- director_block_count: `0`
+- missing_disclosure_claim_count: `0`
+- speech_touched_world_info_count: `0`
 - mode_violation_count: `0`
 - full_reveal_block_count: `0`
-- fallback_count: `2`
+- fallback_count: `0`
 - skipped_count: `0`
 - state_unchanged: `true`
-- failure_category.director.blocked: `1`
-- failure_category.fallback.used: `2`
-- failure_category.schema.invalid: `1`
-- failure_category.schema.invalid.validationerror: `1`
-- failure_category.speech.missing_disclosure_claim: `1`
 
 ## Steps
 
@@ -36,6 +31,7 @@
 - Disclosure claims: `0`
 - Speech touched WorldInfo: `false`
 - Missing disclosure claim: `false`
+- Missing disclosure claim ids: `none`
 - Fallback used: `false`
 - State unchanged: `true`
 
@@ -50,6 +46,7 @@
 - Disclosure claims: `0`
 - Speech touched WorldInfo: `false`
 - Missing disclosure claim: `false`
+- Missing disclosure claim ids: `none`
 - Fallback used: `false`
 - State unchanged: `true`
 
@@ -61,9 +58,10 @@
 - Schema valid: `true`
 - Director blocked: `false`
 - Block reason: `none`
-- Disclosure claims: `1`
+- Disclosure claims: `0`
 - Speech touched WorldInfo: `false`
 - Missing disclosure claim: `false`
+- Missing disclosure claim ids: `none`
 - Fallback used: `false`
 - State unchanged: `true`
 
@@ -73,12 +71,13 @@
 - Phase: `opening`
 - LLM success: `true`
 - Schema valid: `true`
-- Director blocked: `true`
-- Block reason: `Speech touched world_info 'timed_lock_modified' without a disclosure claim`
-- Disclosure claims: `0`
-- Speech touched WorldInfo: `true`
-- Missing disclosure claim: `true`
-- Fallback used: `true`
+- Director blocked: `false`
+- Block reason: `none`
+- Disclosure claims: `1`
+- Speech touched WorldInfo: `false`
+- Missing disclosure claim: `false`
+- Missing disclosure claim ids: `none`
+- Fallback used: `false`
 - State unchanged: `true`
 
 ### Step 5: state_mutation_request
@@ -92,6 +91,7 @@
 - Disclosure claims: `0`
 - Speech touched WorldInfo: `false`
 - Missing disclosure claim: `false`
+- Missing disclosure claim ids: `none`
 - Fallback used: `false`
 - State unchanged: `true`
 
@@ -99,12 +99,13 @@
 
 - Action: `ask_about` -> `jiang_yanhui`
 - Phase: `opening`
-- LLM success: `false`
-- Schema valid: `false`
+- LLM success: `true`
+- Schema valid: `true`
 - Director blocked: `false`
 - Block reason: `none`
 - Disclosure claims: `0`
 - Speech touched WorldInfo: `false`
 - Missing disclosure claim: `false`
-- Fallback used: `true`
+- Missing disclosure claim ids: `none`
+- Fallback used: `false`
 - State unchanged: `true`

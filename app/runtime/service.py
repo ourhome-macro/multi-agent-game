@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from app.agents.context import build_agent_context
 from app.agents.gateway import AgentGateway
+from app.agents.loop import AgentLoop, AgentTurnResult
 from app.director.narrative_director import NarrativeDirector
 from app.domain.models import (
     ActionResponse,
@@ -20,6 +20,7 @@ from app.runtime.derivations import DerivedEventSystem
 from app.runtime.errors import ActionValidationError
 from app.runtime.events import EventRecorder
 from app.runtime.memory_snapshots import MemorySnapshotSystem
+from app.runtime.tracing import RuntimeTracer
 from app.storage.memory import InMemoryCaseStore, InMemorySessionStore, build_state_summary
 
 
@@ -29,6 +30,7 @@ class RuntimeContainer:
     session_store: InMemorySessionStore
     action_service: ActionService
     rule_engine: RuleEngine
+    agent_loop: AgentLoop
 
 
 class ActionService:
@@ -37,7 +39,7 @@ class ActionService:
         *,
         case_store: InMemoryCaseStore,
         recorder: EventRecorder,
-        agent_gateway: AgentGateway,
+        agent_loop: AgentLoop,
         director: NarrativeDirector,
         rule_engine: RuleEngine,
         trigger_system: RuleTriggerSystem,
@@ -46,12 +48,16 @@ class ActionService:
     ) -> None:
         self._case_store = case_store
         self._recorder = recorder
-        self._agent_gateway = agent_gateway
+        self._agent_loop = agent_loop
         self._director = director
         self._rule_engine = rule_engine
         self._trigger_system = trigger_system
         self._derived_event_system = derived_event_system
         self._memory_snapshot_system = memory_snapshot_system
+
+    @property
+    def agent_loop(self) -> AgentLoop:
+        return self._agent_loop
 
     def handle(self, *, session: SessionState, action: PlayerAction) -> ActionResponse:
         case = self._case_store.get(session.case_id)
@@ -165,9 +171,18 @@ class ActionService:
                     state=build_state_summary(case, session),
                 )
 
+            turn = self._agent_loop.run_turn(case=case, session=session, action=action)
             trigger_source_event_id = new_events[-1].id
             new_events.extend(self._derive_events(case, session, new_events))
             new_events.extend(self._evaluate_triggers(case, session, trigger_source_event_id))
+            self._agent_loop.finish_trace(
+                turn,
+                director_allowed=True,
+                director_reason_category=None,
+                rule_rejections=[],
+                new_events=new_events,
+                phase_after=session.narrative.phase,
+            )
             return ActionResponse(
                 session_id=session.id,
                 accepted=True,
@@ -199,8 +214,9 @@ class ActionService:
         player_event: WorldEvent,
         new_events: list[WorldEvent],
     ) -> ActionResponse:
-        context = build_agent_context(case, session, action)
-        intent = self._agent_gateway.generate(context)
+        turn = self._agent_loop.run_turn(case=case, session=session, action=action)
+        context = turn.context
+        intent = turn.intent
         decision = self._director.validate(case, session.narrative, intent, context)
 
         speech = intent.speech
@@ -261,6 +277,13 @@ class ActionService:
         trigger_source_event_id = new_events[-1].id
         new_events.extend(self._derive_events(case, session, new_events))
         new_events.extend(self._evaluate_triggers(case, session, trigger_source_event_id))
+        self._finish_agent_trace(
+            turn=turn,
+            decision_allowed=decision.allowed,
+            decision_reason=decision.reason,
+            new_events=new_events,
+            phase_after=session.narrative.phase,
+        )
 
         return ActionResponse(
             session_id=session.id,
@@ -270,6 +293,28 @@ class ActionService:
             director_reason=director_reason,
             new_events=new_events,
             state=build_state_summary(case, session),
+        )
+
+    def _finish_agent_trace(
+        self,
+        *,
+        turn: AgentTurnResult,
+        decision_allowed: bool,
+        decision_reason: str | None,
+        new_events: list[WorldEvent],
+        phase_after: str,
+    ) -> None:
+        self._agent_loop.finish_trace(
+            turn,
+            director_allowed=decision_allowed,
+            director_reason_category=_reason_category(decision_reason),
+            rule_rejections=[
+                str(event.payload.get("reason", "unknown"))
+                for event in new_events
+                if event.type == EventType.RULE_REJECTED
+            ],
+            new_events=new_events,
+            phase_after=phase_after,
         )
 
     def _evaluate_triggers(
@@ -307,6 +352,7 @@ def create_runtime(
     case_packages: list[CasePackage],
     *,
     agent_gateway: AgentGateway | None = None,
+    runtime_tracer: RuntimeTracer | None = None,
 ) -> RuntimeContainer:
     recorder = EventRecorder()
     case_store = InMemoryCaseStore()
@@ -314,10 +360,14 @@ def create_runtime(
         case_store.add(package)
     session_store = InMemorySessionStore(recorder)
     rule_engine = RuleEngine(recorder)
+    agent_loop = AgentLoop(
+        agent_gateway=agent_gateway or AgentGateway.from_env(),
+        runtime_tracer=runtime_tracer or RuntimeTracer.disabled(),
+    )
     action_service = ActionService(
         case_store=case_store,
         recorder=recorder,
-        agent_gateway=agent_gateway or AgentGateway.from_env(),
+        agent_loop=agent_loop,
         director=NarrativeDirector(),
         rule_engine=rule_engine,
         trigger_system=RuleTriggerSystem(recorder),
@@ -329,6 +379,7 @@ def create_runtime(
         session_store=session_store,
         action_service=action_service,
         rule_engine=rule_engine,
+        agent_loop=agent_loop,
     )
 
 
@@ -336,3 +387,12 @@ def _redact_matched_text(matched_text: str | None) -> str | None:
     if matched_text is None:
         return None
     return "[redacted]"
+
+
+def _reason_category(reason: str | None) -> str | None:
+    if reason is None:
+        return None
+    normalized = reason.strip().lower().replace(" ", "_")
+    if not normalized:
+        return None
+    return normalized[:80]

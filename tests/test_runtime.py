@@ -2036,6 +2036,50 @@ def test_real_llm_agent_generates_validated_intent_from_strict_json() -> None:
     assert "test-key" not in serialized_request
 
 
+def test_real_llm_agent_request_schema_uses_contract_enums() -> None:
+    context = _build_butler_agent_context()
+    contract_input = build_llm_agent_input(context)
+    world_info_ids = [
+        constraint.item_id
+        for constraint in contract_input.disclosure_constraints
+        if constraint.item_kind == "world_info"
+    ]
+    client = _FakeOpenAIClient(
+        {
+            "output_text": json.dumps(
+                {
+                    "speech": "I will not go further than the rules allow.",
+                    "intent": "refuse",
+                    "emotional_shift": {},
+                    "proposed_actions": [],
+                    "memory_refs": [],
+                    "disclosure_claims": [],
+                }
+            )
+        }
+    )
+
+    OpenAILLMAgent(api_key="test-key", client=client).generate(context)
+
+    assert client.request_payload is not None
+    schema = client.request_payload["text"]["format"]["schema"]
+    assert schema["properties"]["intent"]["enum"] == [
+        item.value for item in AgentIntentType
+    ]
+    claim_schema = schema["properties"]["disclosure_claims"]["items"]
+    claim_branches = claim_schema.get("anyOf", [claim_schema])
+    claim_world_info_ids = [
+        branch["properties"]["world_info_id"]["enum"][0] for branch in claim_branches
+    ]
+    claim_modes = {
+        mode
+        for branch in claim_branches
+        for mode in branch["properties"]["mode"]["enum"]
+    }
+    assert claim_world_info_ids == world_info_ids
+    assert DisclosureMode.FULL.value not in claim_modes
+
+
 def test_real_llm_agent_uses_configured_openai_compatible_base_url() -> None:
     context = _build_butler_agent_context()
     client = _FakeOpenAIClient(
@@ -2136,6 +2180,94 @@ def test_real_llm_agent_can_force_chat_completions_api_style(monkeypatch: Any) -
 
     assert intent.speech == "Direct chat completions answer."
     assert client.request_urls == ["https://api.xiaomimimo.com/v1/chat/completions"]
+
+
+def test_real_llm_agent_does_not_default_to_json_object_fallback(
+    monkeypatch: Any,
+) -> None:
+    monkeypatch.setenv("LLM_API_STYLE", "chat_completions")
+    monkeypatch.delenv("LLM_ALLOW_JSON_OBJECT_FALLBACK", raising=False)
+    context = _build_butler_agent_context()
+    client = _FakeOpenAIClient(
+        [
+            _FakeOpenAIResponse({"error": "schema unsupported"}, status_code=400),
+            _FakeOpenAIResponse(
+                {
+                    "choices": [
+                        {
+                            "message": {
+                                "content": json.dumps(
+                                    {
+                                        "speech": "Should not be used.",
+                                        "intent": "answer",
+                                        "emotional_shift": {},
+                                        "proposed_actions": [],
+                                        "memory_refs": [],
+                                        "disclosure_claims": [],
+                                    }
+                                )
+                            }
+                        }
+                    ]
+                }
+            ),
+        ]
+    )
+
+    intent = OpenAILLMAgent(
+        api_key="test-key",
+        base_url="https://api.xiaomimimo.com/v1",
+        client=client,
+    ).generate(context)
+
+    assert intent.intent == AgentIntentType.REFUSE
+    assert client.request_urls == ["https://api.xiaomimimo.com/v1/chat/completions"]
+
+
+def test_real_llm_agent_json_object_fallback_must_be_explicit(
+    monkeypatch: Any,
+) -> None:
+    monkeypatch.setenv("LLM_API_STYLE", "chat_completions")
+    monkeypatch.setenv("LLM_ALLOW_JSON_OBJECT_FALLBACK", "1")
+    context = _build_butler_agent_context()
+    client = _FakeOpenAIClient(
+        [
+            _FakeOpenAIResponse({"error": "schema unsupported"}, status_code=400),
+            _FakeOpenAIResponse(
+                {
+                    "choices": [
+                        {
+                            "message": {
+                                "content": json.dumps(
+                                    {
+                                        "speech": "Unsafe enum output.",
+                                        "intent": "investigate",
+                                        "emotional_shift": {},
+                                        "proposed_actions": [],
+                                        "memory_refs": [],
+                                        "disclosure_claims": [],
+                                    }
+                                )
+                            }
+                        }
+                    ]
+                }
+            ),
+        ]
+    )
+
+    intent = OpenAILLMAgent(
+        api_key="test-key",
+        base_url="https://api.xiaomimimo.com/v1",
+        client=client,
+    ).generate(context)
+
+    assert intent.intent == AgentIntentType.REFUSE
+    assert client.request_urls == [
+        "https://api.xiaomimimo.com/v1/chat/completions",
+        "https://api.xiaomimimo.com/v1/chat/completions",
+    ]
+    assert client.request_payloads[1]["response_format"]["type"] == "json_object"
 
 
 def test_real_llm_agent_can_force_responses_api_style_without_chat_fallback(

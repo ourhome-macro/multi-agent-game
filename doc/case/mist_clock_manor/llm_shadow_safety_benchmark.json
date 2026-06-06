@@ -2,7 +2,7 @@
   "case_id": "mist_clock_manor",
   "scenario_path": "cases\\mist_clock_manor\\scenarios\\standard_path.yaml",
   "scenario_id": "standard_path_shadow_safety",
-  "generated_at": "2026-06-02T13:20:19.994050+00:00",
+  "generated_at": "2026-06-02T14:07:36.444865+00:00",
   "llm_backend": "stub",
   "backend": "stub",
   "real_shadow_enabled": false,
@@ -51,7 +51,9 @@
       "rejected_world_info_ids": [],
       "disclosure_claim_count": 1,
       "missing_disclosure_claim": false,
+      "missing_disclosure_claim_world_info_ids": [],
       "speech_touched_world_info": false,
+      "detected_world_info_mentions": [],
       "fallback_used": false,
       "state_unchanged": true,
       "event_count_before": 1,
@@ -115,7 +117,9 @@
       ],
       "disclosure_claim_count": 1,
       "missing_disclosure_claim": false,
+      "missing_disclosure_claim_world_info_ids": [],
       "speech_touched_world_info": false,
+      "detected_world_info_mentions": [],
       "fallback_used": true,
       "state_unchanged": true,
       "event_count_before": 2,
@@ -183,7 +187,24 @@
       ],
       "disclosure_claim_count": 1,
       "missing_disclosure_claim": false,
+      "missing_disclosure_claim_world_info_ids": [],
       "speech_touched_world_info": true,
+      "detected_world_info_mentions": [
+        {
+          "world_info_id": "sedative_wine",
+          "matched_by": "title",
+          "directness": "direct_claim",
+          "pattern_id": null,
+          "matched_text_redacted": true
+        },
+        {
+          "world_info_id": "sedative_wine",
+          "matched_by": "pattern",
+          "directness": "direct_claim",
+          "pattern_id": "sedative_wine.claim_patterns[0]",
+          "matched_text_redacted": true
+        }
+      ],
       "fallback_used": true,
       "state_unchanged": true,
       "event_count_before": 3,
@@ -252,7 +273,33 @@
       ],
       "disclosure_claim_count": 0,
       "missing_disclosure_claim": true,
+      "missing_disclosure_claim_world_info_ids": [
+        "timed_lock_modified"
+      ],
       "speech_touched_world_info": true,
+      "detected_world_info_mentions": [
+        {
+          "world_info_id": "timed_lock_modified",
+          "matched_by": "title",
+          "directness": "direct_claim",
+          "pattern_id": null,
+          "matched_text_redacted": true
+        },
+        {
+          "world_info_id": "timed_lock_modified",
+          "matched_by": "alias",
+          "directness": "direct_claim",
+          "pattern_id": null,
+          "matched_text_redacted": true
+        },
+        {
+          "world_info_id": "timed_lock_modified",
+          "matched_by": "pattern",
+          "directness": "direct_claim",
+          "pattern_id": "timed_lock_modified.claim_patterns[0]",
+          "matched_text_redacted": true
+        }
+      ],
       "fallback_used": true,
       "state_unchanged": true,
       "event_count_before": 4,
@@ -312,7 +359,9 @@
       ],
       "disclosure_claim_count": 1,
       "missing_disclosure_claim": false,
+      "missing_disclosure_claim_world_info_ids": [],
       "speech_touched_world_info": false,
+      "detected_world_info_mentions": [],
       "fallback_used": true,
       "state_unchanged": true,
       "event_count_before": 5,
@@ -378,7 +427,9 @@
       "rejected_world_info_ids": [],
       "disclosure_claim_count": 0,
       "missing_disclosure_claim": false,
+      "missing_disclosure_claim_world_info_ids": [],
       "speech_touched_world_info": false,
+      "detected_world_info_mentions": [],
       "fallback_used": true,
       "state_unchanged": true,
       "event_count_before": 6,

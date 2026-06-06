@@ -18,7 +18,11 @@ from app.agents.llm_stub import LLMAgentStub
 from app.agents.protocol import AgentProtocol
 from app.agents.real_llm_agent import OpenAILLMAgent
 from app.cases.loader import CaseLoader
-from app.director.narrative_director import NarrativeDirector, detect_world_info_mentions
+from app.director.narrative_director import (
+    DetectedWorldInfoMention,
+    NarrativeDirector,
+    detect_world_info_mentions,
+)
 from app.domain.models import (
     ALLOWED_PROPOSED_ACTION_TYPES,
     ActionType,
@@ -95,7 +99,9 @@ class LLMShadowEvalStep:
     rejected_world_info_ids: list[str]
     disclosure_claim_count: int
     missing_disclosure_claim: bool
+    missing_disclosure_claim_world_info_ids: list[str]
     speech_touched_world_info: bool
+    detected_world_info_mentions: list[dict[str, Any]]
     fallback_used: bool
     state_unchanged: bool
     event_count_before: int
@@ -130,7 +136,11 @@ class LLMShadowEvalStep:
             "rejected_world_info_ids": self.rejected_world_info_ids,
             "disclosure_claim_count": self.disclosure_claim_count,
             "missing_disclosure_claim": self.missing_disclosure_claim,
+            "missing_disclosure_claim_world_info_ids": (
+                self.missing_disclosure_claim_world_info_ids
+            ),
             "speech_touched_world_info": self.speech_touched_world_info,
+            "detected_world_info_mentions": self.detected_world_info_mentions,
             "fallback_used": self.fallback_used,
             "state_unchanged": self.state_unchanged,
             "event_count_before": self.event_count_before,
@@ -496,10 +506,14 @@ def _evaluate_shadow_step(
         agent=agent,
     )
     decision = director.validate(case, shadow_session.narrative, generation.intent, context)
-    touched_world_info_ids = _touched_world_info_ids(generation.intent.speech, case)
+    detected_mentions = detect_world_info_mentions(generation.intent.speech, case)
+    touched_world_info_ids = {mention.world_info_id for mention in detected_mentions}
     claim_world_info_ids = {
         claim.world_info_id for claim in generation.intent.disclosure_claims
     }
+    missing_disclosure_claim_world_info_ids = sorted(
+        touched_world_info_ids - claim_world_info_ids
+    )
     after = _state_fingerprint(case, session)
     event_count_after = len(session.events)
     rejected_world_info_ids = sorted(
@@ -517,7 +531,7 @@ def _evaluate_shadow_step(
         generation=generation,
         decision_allowed=decision.allowed,
         block_reason=decision.reason,
-        missing_disclosure_claim=bool(touched_world_info_ids - claim_world_info_ids),
+        missing_disclosure_claim=bool(missing_disclosure_claim_world_info_ids),
         speech_touched_world_info=bool(touched_world_info_ids),
         fallback_used=generation.fallback_used or decision.safe_fallback_used,
         state_unchanged=before == after and event_count_before == event_count_after,
@@ -539,8 +553,12 @@ def _evaluate_shadow_step(
         block_reason=_sanitize_reason(decision.reason),
         rejected_world_info_ids=rejected_world_info_ids,
         disclosure_claim_count=len(generation.intent.disclosure_claims),
-        missing_disclosure_claim=bool(touched_world_info_ids - claim_world_info_ids),
+        missing_disclosure_claim=bool(missing_disclosure_claim_world_info_ids),
+        missing_disclosure_claim_world_info_ids=missing_disclosure_claim_world_info_ids,
         speech_touched_world_info=bool(touched_world_info_ids),
+        detected_world_info_mentions=[
+            _safe_world_info_mention_summary(mention) for mention in detected_mentions
+        ],
         fallback_used=generation.fallback_used or decision.safe_fallback_used,
         state_unchanged=before == after and event_count_before == event_count_after,
         event_count_before=event_count_before,
@@ -626,7 +644,7 @@ def _generate_from_real_llm(*, context: Any, start: float) -> ShadowGenerationRe
     try:
         contract_input = build_llm_agent_input(context)
         contract_payload = contract_input.model_dump(mode="json")
-        response_payload = agent._create_response(contract_payload)
+        response_payload = agent._create_response(contract_input)
         output_payload = agent._extract_json_payload(response_payload)
         intent = validate_llm_agent_output(output_payload, contract_input)
     except Exception as exc:
@@ -1111,7 +1129,11 @@ def _rename_report_step(
         rejected_world_info_ids=step.rejected_world_info_ids,
         disclosure_claim_count=step.disclosure_claim_count,
         missing_disclosure_claim=step.missing_disclosure_claim,
+        missing_disclosure_claim_world_info_ids=(
+            step.missing_disclosure_claim_world_info_ids
+        ),
         speech_touched_world_info=step.speech_touched_world_info,
+        detected_world_info_mentions=step.detected_world_info_mentions,
         fallback_used=step.fallback_used,
         state_unchanged=step.state_unchanged,
         event_count_before=step.event_count_before,
@@ -1160,6 +1182,8 @@ def render_shadow_report_markdown(report: LLMShadowEvalReport) -> str:
                 f"- Disclosure claims: `{step.disclosure_claim_count}`",
                 f"- Speech touched WorldInfo: `{str(step.speech_touched_world_info).lower()}`",
                 f"- Missing disclosure claim: `{str(step.missing_disclosure_claim).lower()}`",
+                "- Missing disclosure claim ids: "
+                f"`{', '.join(step.missing_disclosure_claim_world_info_ids) or 'none'}`",
                 f"- Fallback used: `{str(step.fallback_used).lower()}`",
                 f"- State unchanged: `{str(step.state_unchanged).lower()}`",
                 "",
@@ -1251,6 +1275,18 @@ def _safe_disclosure_claim_summary(payload: dict[str, Any]) -> dict[str, Any]:
         "tactic": payload.get("tactic"),
         "source_ref_count": len(payload.get("source_refs", [])),
         "claim_ref_count": len(payload.get("claim_refs", [])),
+    }
+
+
+def _safe_world_info_mention_summary(
+    mention: DetectedWorldInfoMention,
+) -> dict[str, Any]:
+    return {
+        "world_info_id": mention.world_info_id,
+        "matched_by": mention.matched_by.value,
+        "directness": mention.directness.value,
+        "pattern_id": mention.pattern_id,
+        "matched_text_redacted": mention.matched_text is not None,
     }
 
 

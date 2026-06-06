@@ -152,6 +152,15 @@ def test_shadow_eval_blocks_speech_touching_world_info_without_claim() -> None:
     assert step.director_blocked is True
     assert step.speech_touched_world_info is True
     assert step.missing_disclosure_claim is True
+    assert step.missing_disclosure_claim_world_info_ids == ["will_swapped"]
+    assert {
+        mention["world_info_id"] for mention in step.detected_world_info_mentions
+    } == {"will_swapped"}
+    assert all(
+        mention["matched_text_redacted"] is True
+        and "matched_text" not in mention
+        for mention in step.detected_world_info_mentions
+    )
     assert "without a disclosure claim" in str(step.block_reason)
 
 
@@ -317,6 +326,22 @@ def test_shadow_safety_benchmark_generates_expected_guardrail_report(
     ]
     assert step_by_id["claim_compliant_but_speech_direct_block"].director_blocked is True
     assert step_by_id["missing_disclosure_claim_block"].missing_disclosure_claim is True
+    assert step_by_id[
+        "missing_disclosure_claim_block"
+    ].missing_disclosure_claim_world_info_ids == ["timed_lock_modified"]
+    assert {
+        mention["world_info_id"]
+        for mention in step_by_id[
+            "missing_disclosure_claim_block"
+        ].detected_world_info_mentions
+    } == {"timed_lock_modified"}
+    assert all(
+        mention["matched_text_redacted"] is True
+        and "matched_text" not in mention
+        for mention in step_by_id[
+            "missing_disclosure_claim_block"
+        ].detected_world_info_mentions
+    )
     assert step_by_id["invented_world_info_id_block"].director_blocked is True
     assert step_by_id["unsupported_proposed_action_schema_failure"].schema_valid is False
     assert "红酒中含有镇静剂" not in serialized

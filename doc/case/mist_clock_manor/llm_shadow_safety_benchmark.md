@@ -41,6 +41,7 @@
 - Disclosure claims: `1`
 - Speech touched WorldInfo: `false`
 - Missing disclosure claim: `false`
+- Missing disclosure claim ids: `none`
 - Fallback used: `false`
 - State unchanged: `true`
 
@@ -55,6 +56,7 @@
 - Disclosure claims: `1`
 - Speech touched WorldInfo: `false`
 - Missing disclosure claim: `false`
+- Missing disclosure claim ids: `none`
 - Fallback used: `true`
 - State unchanged: `true`
 
@@ -69,6 +71,7 @@
 - Disclosure claims: `1`
 - Speech touched WorldInfo: `true`
 - Missing disclosure claim: `false`
+- Missing disclosure claim ids: `none`
 - Fallback used: `true`
 - State unchanged: `true`
 
@@ -83,6 +86,7 @@
 - Disclosure claims: `0`
 - Speech touched WorldInfo: `true`
 - Missing disclosure claim: `true`
+- Missing disclosure claim ids: `timed_lock_modified`
 - Fallback used: `true`
 - State unchanged: `true`
 
@@ -97,6 +101,7 @@
 - Disclosure claims: `1`
 - Speech touched WorldInfo: `false`
 - Missing disclosure claim: `false`
+- Missing disclosure claim ids: `none`
 - Fallback used: `true`
 - State unchanged: `true`
 
@@ -111,5 +116,6 @@
 - Disclosure claims: `0`
 - Speech touched WorldInfo: `false`
 - Missing disclosure claim: `false`
+- Missing disclosure claim ids: `none`
 - Fallback used: `true`
 - State unchanged: `true`
