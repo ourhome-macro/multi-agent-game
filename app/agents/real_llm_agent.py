@@ -8,6 +8,7 @@ from urllib.parse import urljoin
 import httpx
 
 from app.agents.llm_contract import build_llm_agent_input, validate_llm_agent_output
+from app.agents.prompt_builder import load_agent_system_prompt
 from app.domain.models import (
     AgentContext,
     AgentIntent,
@@ -82,7 +83,7 @@ class OpenAILLMAgent:
 
         request_payload = {
             "model": self._model,
-            "instructions": _agent_intent_system_prompt(),
+            "instructions": load_agent_system_prompt(),
             "input": [
                 {
                     "role": "user",
@@ -124,7 +125,7 @@ class OpenAILLMAgent:
             "messages": [
                 {
                     "role": "system",
-                    "content": _agent_intent_system_prompt(),
+                    "content": load_agent_system_prompt(),
                 },
                 {
                     "role": "user",
@@ -284,38 +285,6 @@ def _ensure_contract_input(
     if isinstance(contract_input, LLMAgentContractInput):
         return contract_input
     return LLMAgentContractInput.model_validate(contract_input)
-
-
-def _agent_intent_system_prompt() -> str:
-    return (
-        "You are a controlled NPC agent for an event-sourced mystery runtime. "
-        "Return a single JSON object and no markdown. The top-level keys must be exactly: "
-        "speech, intent, emotional_shift, proposed_actions, memory_refs, disclosure_claims. "
-        "Do not include thoughts, reasoning, analysis, agent_id, character_name, metadata, "
-        "or any other extra key. speech must be a string. intent must be one of: answer, "
-        "conceal, lie, refuse, probe, panic. Use these exact intent enum strings only; "
-        "never invent synonyms such as investigate, comply, reveal, observe, or clarify. "
-        "If no enum fits, use intent refuse. emotional_shift must be an object; use {} "
-        "when there is no shift. proposed_actions must be an array; use [] when there is "
-        "no allowed state proposal. proposed_actions may only contain clue.discover "
-        "objects with clue_id, or relationship.change objects with source_id, target_id, "
-        "and numeric deltas for trust, suspicion, fear, intimacy, hostility. memory_refs "
-        "must be an array of strings. disclosure_claims must be an array; each item must "
-        "have world_info_id, mode, tactic, source_refs, claim_refs. mode must be one of: "
-        "none, deny, deflect, hint, partial, full. tactic must be null or one of: "
-        "answer_adjacent_truth, shift_focus, counter_question, qualify_certainty, "
-        "emotional_screen, silence. For disclosure_claims, only use world_info_id values "
-        "that appear in disclosure_constraints, and only use modes listed in that item's "
-        "allowed_modes. Never use a mode listed in forbidden_modes. Never use mode full. "
-        "Before finalizing speech, audit every sentence: if it mentions, paraphrases, "
-        "or clearly touches any constrained WorldInfo, include exactly one matching "
-        "disclosure_claim for that world_info_id. If the matching world_info_id or "
-        "allowed mode is unclear, remove that fact from speech or refuse. Do not reveal "
-        "raw private text. Do not propose narrative "
-        "phase changes. Any real state change must be requested only through allowed "
-        "proposed_actions. The user payload includes output_contract; treat its enum "
-        "lists as authoritative. If uncertain, return intent refuse with empty arrays."
-    )
 
 
 def _agent_intent_json_schema(
