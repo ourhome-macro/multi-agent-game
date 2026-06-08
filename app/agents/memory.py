@@ -1,0 +1,75 @@
+from __future__ import annotations
+
+import re
+
+from app.domain.models import (
+    AgentMemorySnapshot,
+    CasePackage,
+    PlayerAction,
+    SessionState,
+)
+
+
+class MemoryRetriever:
+    def __init__(self, *, max_results: int = 8) -> None:
+        self._max_results = max_results
+
+    def retrieve(
+        self,
+        *,
+        case: CasePackage,
+        session: SessionState,
+        action: PlayerAction,
+    ) -> list[AgentMemorySnapshot]:
+        _ = case
+        candidates = [
+            snapshot
+            for snapshot in session.memory_snapshots.values()
+            if snapshot.subject_id == "player" and snapshot.visibility == "private"
+        ]
+        scored = [
+            (self._score(snapshot, action), snapshot)
+            for snapshot in candidates
+        ]
+        scored = [(score, snapshot) for score, snapshot in scored if score > 0]
+        if not scored:
+            scored = [
+                (snapshot.salience, snapshot)
+                for snapshot in candidates
+                if snapshot.salience > 0
+            ]
+        scored.sort(
+            key=lambda item: (
+                item[0],
+                item[1].salience,
+                item[1].updated_at or "",
+                item[1].memory_id,
+            ),
+            reverse=True,
+        )
+        return [snapshot for _, snapshot in scored[: self._max_results]]
+
+    def _score(self, snapshot: AgentMemorySnapshot, action: PlayerAction) -> float:
+        haystack = f"{snapshot.memory_id} {snapshot.content}".lower()
+        score = snapshot.salience
+        direct_terms = [
+            action.target_id,
+            action.clue_id,
+            action.claim_id,
+            action.subject_id,
+            *(action.evidence_clue_ids or []),
+        ]
+        for term in direct_terms:
+            if term and term.lower() in haystack:
+                score += 2.0
+        for token in _tokens(action.text or ""):
+            if token in haystack:
+                score += 1.0
+        return score if score > snapshot.salience else 0.0
+
+
+def _tokens(text: str) -> set[str]:
+    return {
+        token.lower()
+        for token in re.findall(r"[A-Za-z0-9_]{4,}", text)
+    }

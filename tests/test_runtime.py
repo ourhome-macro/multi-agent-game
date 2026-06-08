@@ -2270,6 +2270,359 @@ def test_real_llm_agent_json_object_fallback_must_be_explicit(
     assert client.request_payloads[1]["response_format"]["type"] == "json_object"
 
 
+def test_real_llm_agent_repairs_schema_invalid_output_once(
+    monkeypatch: Any,
+) -> None:
+    monkeypatch.setenv("LLM_API_STYLE", "chat_completions")
+    context = _build_butler_agent_context()
+    client = _FakeOpenAIClient(
+        [
+            {
+                "choices": [
+                    {
+                        "message": {
+                            "content": json.dumps(
+                                {
+                                    "speech": "I will be careful.",
+                                    "intent": "answer",
+                                    "emotional_shift": {},
+                                    "proposed_actions": [],
+                                    "memory_refs": [],
+                                    "disclosure_claims": [
+                                        {
+                                            "world_info_id": "desk_forced_open",
+                                            "mode": "hint",
+                                            "tactic": None,
+                                            "source_refs": [],
+                                            "claim_refs": [],
+                                            "extra_field": "not allowed",
+                                        }
+                                    ],
+                                }
+                            )
+                        }
+                    }
+                ]
+            },
+            {
+                "choices": [
+                    {
+                        "message": {
+                            "content": json.dumps(
+                                {
+                                    "speech": "I will be careful.",
+                                    "intent": "answer",
+                                    "emotional_shift": {},
+                                    "proposed_actions": [],
+                                    "memory_refs": [],
+                                    "disclosure_claims": [],
+                                }
+                            )
+                        }
+                    }
+                ]
+            },
+        ]
+    )
+
+    intent = OpenAILLMAgent(
+        api_key="test-key",
+        base_url="https://api.xiaomimimo.com/v1",
+        model="test-model",
+        client=client,
+        schema_repair_attempts=1,
+    ).generate_strict(context)
+
+    assert intent.intent == AgentIntentType.ANSWER
+    assert client.request_urls == [
+        "https://api.xiaomimimo.com/v1/chat/completions",
+        "https://api.xiaomimimo.com/v1/chat/completions",
+    ]
+    serialized_repair_request = json.dumps(
+        client.request_payloads[1],
+        ensure_ascii=False,
+    )
+    assert "schema repair" in serialized_repair_request.lower()
+    assert "extra_forbidden" in serialized_repair_request
+    assert "extra_field" not in intent.model_dump_json()
+
+
+def test_real_llm_agent_repair_prompt_distinguishes_intent_from_disclosure_mode(
+    monkeypatch: Any,
+) -> None:
+    monkeypatch.setenv("LLM_API_STYLE", "chat_completions")
+    context = _build_butler_agent_context()
+    client = _FakeOpenAIClient(
+        [
+            {
+                "choices": [
+                    {
+                        "message": {
+                            "content": json.dumps(
+                                {
+                                    "speech": "I am redirecting the question.",
+                                    "intent": "deflect",
+                                    "emotional_shift": {},
+                                    "proposed_actions": [],
+                                    "memory_refs": [],
+                                    "disclosure_claims": [],
+                                }
+                            )
+                        }
+                    }
+                ]
+            },
+            {
+                "choices": [
+                    {
+                        "message": {
+                            "content": json.dumps(
+                                {
+                                    "speech": "I am redirecting the question.",
+                                    "intent": "conceal",
+                                    "emotional_shift": {},
+                                    "proposed_actions": [],
+                                    "memory_refs": [],
+                                    "disclosure_claims": [],
+                                }
+                            )
+                        }
+                    }
+                ]
+            },
+        ]
+    )
+
+    intent = OpenAILLMAgent(
+        api_key="test-key",
+        base_url="https://api.xiaomimimo.com/v1",
+        model="test-model",
+        client=client,
+        schema_repair_attempts=1,
+    ).generate_strict(context)
+
+    serialized_repair_request = json.dumps(
+        client.request_payloads[1],
+        ensure_ascii=False,
+    )
+    assert intent.intent == AgentIntentType.CONCEAL
+    assert "Allowed top-level intent values" in serialized_repair_request
+    assert "deflect is a disclosure_claims[].mode value" in serialized_repair_request
+    assert "never the top-level intent" in serialized_repair_request
+
+
+def test_real_llm_agent_repair_prompt_uses_contract_projection_without_extra_keys(
+    monkeypatch: Any,
+) -> None:
+    monkeypatch.setenv("LLM_API_STYLE", "chat_completions")
+    context = _build_butler_agent_context()
+    client = _FakeOpenAIClient(
+        [
+            {
+                "choices": [
+                    {
+                        "message": {
+                            "content": json.dumps(
+                                {
+                                    "speech": "I can only hint at that.",
+                                    "intent": "answer",
+                                    "emotional_shift": {},
+                                    "proposed_actions": [],
+                                    "memory_refs": [],
+                                    "disclosure_claims": [
+                                        {
+                                            "world_info_id": "desk_forced_open",
+                                            "mode": "hint",
+                                            "tactic": None,
+                                            "source_refs": [],
+                                            "claim_refs": [],
+                                            "confidence": 0.7,
+                                            "source_event_id": "event.secret",
+                                        }
+                                    ],
+                                }
+                            )
+                        }
+                    }
+                ]
+            },
+            {
+                "choices": [
+                    {
+                        "message": {
+                            "content": json.dumps(
+                                {
+                                    "speech": "I can only hint at that.",
+                                    "intent": "answer",
+                                    "emotional_shift": {},
+                                    "proposed_actions": [],
+                                    "memory_refs": [],
+                                    "disclosure_claims": [
+                                        {
+                                            "world_info_id": "desk_forced_open",
+                                            "mode": "hint",
+                                            "tactic": None,
+                                            "source_refs": [],
+                                            "claim_refs": [],
+                                        }
+                                    ],
+                                }
+                            )
+                        }
+                    }
+                ]
+            },
+        ]
+    )
+
+    intent = OpenAILLMAgent(
+        api_key="test-key",
+        base_url="https://api.xiaomimimo.com/v1",
+        model="test-model",
+        client=client,
+        schema_repair_attempts=1,
+    ).generate_strict(context)
+
+    repair_instruction = client.request_payloads[1]["messages"][-1]["content"]
+    assert intent.intent == AgentIntentType.ANSWER
+    assert "extra_forbidden" in repair_instruction
+    assert "source_event_id" not in repair_instruction
+    assert "confidence" not in repair_instruction
+    assert "event.secret" not in repair_instruction
+
+
+def test_real_llm_agent_repair_prompt_lists_allowed_disclosure_modes_by_world_info(
+    monkeypatch: Any,
+) -> None:
+    monkeypatch.setenv("LLM_API_STYLE", "chat_completions")
+    context = _build_butler_agent_context()
+    client = _FakeOpenAIClient(
+        [
+            {
+                "choices": [
+                    {
+                        "message": {
+                            "content": json.dumps(
+                                {
+                                    "speech": "I should not reveal this fully.",
+                                    "intent": "answer",
+                                    "emotional_shift": {},
+                                    "proposed_actions": [],
+                                    "memory_refs": [],
+                                    "disclosure_claims": [
+                                        {
+                                            "world_info_id": "desk_forced_open",
+                                            "mode": "full",
+                                            "tactic": None,
+                                            "source_refs": [],
+                                            "claim_refs": [],
+                                        }
+                                    ],
+                                }
+                            )
+                        }
+                    }
+                ]
+            },
+            {
+                "choices": [
+                    {
+                        "message": {
+                            "content": json.dumps(
+                                {
+                                    "speech": "I should not reveal this fully.",
+                                    "intent": "conceal",
+                                    "emotional_shift": {},
+                                    "proposed_actions": [],
+                                    "memory_refs": [],
+                                    "disclosure_claims": [],
+                                }
+                            )
+                        }
+                    }
+                ]
+            },
+        ]
+    )
+
+    intent = OpenAILLMAgent(
+        api_key="test-key",
+        base_url="https://api.xiaomimimo.com/v1",
+        model="test-model",
+        client=client,
+        schema_repair_attempts=1,
+    ).generate_strict(context)
+
+    repair_instruction = client.request_payloads[1]["messages"][-1]["content"]
+    assert intent.intent == AgentIntentType.CONCEAL
+    assert "Allowed disclosure modes by world_info_id" in repair_instruction
+    assert "desk_forced_open" in repair_instruction
+    assert "full" not in _disclosure_modes_line(repair_instruction, "desk_forced_open")
+    assert "delete that disclosure_claim" in repair_instruction
+
+
+def test_real_llm_agent_repairs_unparseable_json_output_once(
+    monkeypatch: Any,
+) -> None:
+    monkeypatch.setenv("LLM_API_STYLE", "chat_completions")
+    context = _build_butler_agent_context()
+    invalid_text = (
+        '{"speech":"I can answer safely.","intent":"answer","emotional_shift":{},'
+        '"proposed_actions":[],"memory_refs":[],"disclosure_claims":[]} '
+        "Here is why this matters."
+    )
+    client = _FakeOpenAIClient(
+        [
+            {
+                "choices": [
+                    {
+                        "message": {
+                            "content": invalid_text,
+                        }
+                    }
+                ]
+            },
+            {
+                "choices": [
+                    {
+                        "message": {
+                            "content": json.dumps(
+                                {
+                                    "speech": "I can answer safely.",
+                                    "intent": "answer",
+                                    "emotional_shift": {},
+                                    "proposed_actions": [],
+                                    "memory_refs": [],
+                                    "disclosure_claims": [],
+                                }
+                            )
+                        }
+                    }
+                ]
+            },
+        ]
+    )
+
+    intent = OpenAILLMAgent(
+        api_key="test-key",
+        base_url="https://api.xiaomimimo.com/v1",
+        model="test-model",
+        client=client,
+        schema_repair_attempts=1,
+    ).generate_strict(context)
+
+    repair_instruction = client.request_payloads[1]["messages"][-1]["content"]
+    assert intent.intent == AgentIntentType.ANSWER
+    assert intent.speech == "I can answer safely."
+    assert "JSON repair required" in repair_instruction
+    assert "not a single JSON object" in repair_instruction
+    assert "Here is why this matters." in repair_instruction
+
+
+def _disclosure_modes_line(text: str, world_info_id: str) -> str:
+    return next(line for line in text.splitlines() if world_info_id in line)
+
+
 def test_real_llm_agent_can_force_responses_api_style_without_chat_fallback(
     monkeypatch: Any,
 ) -> None:

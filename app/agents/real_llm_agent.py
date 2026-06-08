@@ -6,6 +6,7 @@ from typing import Any
 from urllib.parse import urljoin
 
 import httpx
+from pydantic import ValidationError
 
 from app.agents.llm_contract import build_llm_agent_input, validate_llm_agent_output
 from app.agents.prompt_builder import load_agent_system_prompt
@@ -13,6 +14,7 @@ from app.domain.models import (
     AgentContext,
     AgentIntent,
     AgentIntentType,
+    DisclosureMode,
     LLMAgentContractInput,
     LLMAgentOutputContract,
     LLMDisclosureConstraint,
@@ -42,6 +44,7 @@ class OpenAILLMAgent:
         model: str | None = None,
         timeout_seconds: float = 20.0,
         client: httpx.Client | None = None,
+        schema_repair_attempts: int = 0,
     ) -> None:
         self._api_key = api_key if api_key is not None else os.getenv("OPENAI_API_KEY")
         self._base_url = (
@@ -54,18 +57,47 @@ class OpenAILLMAgent:
         self._api_style = _api_style_from_env()
         self._timeout_seconds = timeout_seconds
         self._client = client
+        self._schema_repair_attempts = schema_repair_attempts
+
+    @property
+    def model_name(self) -> str:
+        return self._model
 
     def generate(self, context: AgentContext) -> AgentIntent:
         if not self._api_key:
             return self._safe_fallback(context)
 
         try:
-            contract_input = build_llm_agent_input(context)
-            response_payload = self._create_response(contract_input)
-            output_payload = self._extract_json_payload(response_payload)
-            return validate_llm_agent_output(output_payload, contract_input)
+            return self.generate_strict(context)
         except Exception:
             return self._safe_fallback(context)
+
+    def generate_strict(self, context: AgentContext) -> AgentIntent:
+        if not self._api_key:
+            raise RuntimeError("OPENAI_API_KEY is required for strict LLM generation")
+        contract_input = build_llm_agent_input(context)
+        response_payload = self._create_response(contract_input)
+        for attempt in range(self._schema_repair_attempts + 1):
+            try:
+                output_payload = self._extract_json_payload(response_payload)
+                return validate_llm_agent_output(output_payload, contract_input)
+            except json.JSONDecodeError as exc:
+                if attempt >= self._schema_repair_attempts:
+                    raise
+                response_payload = self._create_json_repair_response(
+                    contract_input=contract_input,
+                    invalid_text=_extract_text_output(response_payload),
+                    error_summary=_json_error_summary(exc),
+                )
+            except (ValidationError, ValueError) as exc:
+                if attempt >= self._schema_repair_attempts:
+                    raise
+                response_payload = self._create_schema_repair_response(
+                    contract_input=contract_input,
+                    invalid_output=output_payload,
+                    error_summary=_schema_error_summary(exc),
+                )
+        raise RuntimeError("unreachable schema repair state")
 
     def _create_response(
         self,
@@ -118,20 +150,29 @@ class OpenAILLMAgent:
         self,
         contract_input: LLMAgentContractInput,
         headers: dict[str, str],
+        repair_instruction: str | None = None,
     ) -> dict[str, Any]:
         contract_payload = contract_input.model_dump(mode="json")
-        request_payload = {
-            "model": self._model,
-            "messages": [
-                {
-                    "role": "system",
-                    "content": load_agent_system_prompt(),
-                },
+        messages = [
+            {
+                "role": "system",
+                "content": load_agent_system_prompt(),
+            },
+            {
+                "role": "user",
+                "content": json.dumps(contract_payload, ensure_ascii=False),
+            },
+        ]
+        if repair_instruction is not None:
+            messages.append(
                 {
                     "role": "user",
-                    "content": json.dumps(contract_payload, ensure_ascii=False),
-                },
-            ],
+                    "content": repair_instruction,
+                }
+            )
+        request_payload = {
+            "model": self._model,
+            "messages": messages,
             "response_format": {
                 "type": "json_schema",
                 "json_schema": {
@@ -152,6 +193,129 @@ class OpenAILLMAgent:
         fallback_payload = dict(request_payload)
         fallback_payload["response_format"] = {"type": "json_object"}
         return self._post_json(self._chat_completions_url(), headers, fallback_payload)
+
+    def _create_schema_repair_response(
+        self,
+        *,
+        contract_input: LLMAgentContractInput,
+        invalid_output: dict[str, Any],
+        error_summary: str,
+    ) -> dict[str, Any]:
+        headers = {
+            "Authorization": f"Bearer {self._api_key}",
+            "Content-Type": "application/json",
+        }
+        allowed_intents = ", ".join(
+            intent.value for intent in contract_input.output_contract.allowed_intents
+        )
+        disclosure_modes = ", ".join(mode.value for mode in DisclosureMode)
+        disclosure_matrix = _allowed_disclosure_mode_matrix(contract_input)
+        repair_draft = _contract_repair_projection(invalid_output)
+        repair_instruction = (
+            "Schema repair required. Return the same NPC turn as a single corrected "
+            "AgentIntent JSON object. Do not add new facts. Do not add markdown. "
+            "Do not include any keys outside the contract. "
+            f"Allowed top-level intent values: {allowed_intents}. "
+            "deflect is a disclosure_claims[].mode value, never the top-level intent. "
+            f"Disclosure mode values are only for disclosure_claims[].mode: "
+            f"{disclosure_modes}. "
+            "Allowed disclosure modes by world_info_id:\n"
+            f"{disclosure_matrix}\n"
+            "For every disclosure_claim, mode must be allowed for that exact "
+            "world_info_id. If unsure, delete that disclosure_claim. "
+            "If the rejected output used a disclosure mode as top-level intent, choose "
+            "the nearest valid intent such as conceal, refuse, answer, probe, lie, or "
+            "panic while preserving the safe speech meaning. Validation error summary: "
+            f"{error_summary}. Contract-shaped draft JSON with illegal extra keys removed: "
+            f"{json.dumps(repair_draft, ensure_ascii=False)}"
+        )
+        if self._api_style == LLM_API_STYLE_RESPONSES:
+            return self._create_response_schema_repair(
+                contract_input=contract_input,
+                headers=headers,
+                repair_instruction=repair_instruction,
+            )
+        return self._create_chat_completion(
+            contract_input,
+            headers,
+            repair_instruction=repair_instruction,
+        )
+
+    def _create_json_repair_response(
+        self,
+        *,
+        contract_input: LLMAgentContractInput,
+        invalid_text: str,
+        error_summary: str,
+    ) -> dict[str, Any]:
+        headers = {
+            "Authorization": f"Bearer {self._api_key}",
+            "Content-Type": "application/json",
+        }
+        allowed_intents = ", ".join(
+            intent.value for intent in contract_input.output_contract.allowed_intents
+        )
+        repair_instruction = (
+            "JSON repair required. The previous model response was not a single JSON "
+            "object. Return exactly one AgentIntent JSON object and no markdown, no "
+            "explanation, no trailing text. Do not add new facts. "
+            f"Allowed top-level intent values: {allowed_intents}. "
+            f"Parse error summary: {error_summary}. Previous response text: "
+            f"{_trim_repair_text(invalid_text)}"
+        )
+        if self._api_style == LLM_API_STYLE_RESPONSES:
+            return self._create_response_schema_repair(
+                contract_input=contract_input,
+                headers=headers,
+                repair_instruction=repair_instruction,
+            )
+        return self._create_chat_completion(
+            contract_input,
+            headers,
+            repair_instruction=repair_instruction,
+        )
+
+    def _create_response_schema_repair(
+        self,
+        *,
+        contract_input: LLMAgentContractInput,
+        headers: dict[str, str],
+        repair_instruction: str,
+    ) -> dict[str, Any]:
+        contract_payload = contract_input.model_dump(mode="json")
+        request_payload = {
+            "model": self._model,
+            "instructions": load_agent_system_prompt(),
+            "input": [
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "input_text",
+                            "text": json.dumps(contract_payload, ensure_ascii=False),
+                        }
+                    ],
+                },
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "input_text",
+                            "text": repair_instruction,
+                        }
+                    ],
+                },
+            ],
+            "text": {
+                "format": {
+                    "type": "json_schema",
+                    "name": "agent_intent",
+                    "strict": True,
+                    "schema": _agent_intent_json_schema(contract_input),
+                }
+            },
+        }
+        return self._post_json(self._responses_url(), headers, request_payload)
 
     def _post_json(
         self,
@@ -259,6 +423,172 @@ def _parse_json_object_text(text: str, source: str) -> dict[str, Any]:
     if not isinstance(parsed, dict):
         raise ValueError(f"{source} must decode to a JSON object")
     return parsed
+
+
+def _extract_text_output(response_payload: dict[str, Any]) -> str:
+    output_text = response_payload.get("output_text")
+    if isinstance(output_text, str):
+        return output_text
+
+    for output_item in response_payload.get("output", []):
+        if not isinstance(output_item, dict):
+            continue
+        for content_item in output_item.get("content", []):
+            if not isinstance(content_item, dict):
+                continue
+            text = content_item.get("text")
+            if isinstance(text, str):
+                return text
+
+    choices = response_payload.get("choices")
+    if isinstance(choices, list):
+        for choice in choices:
+            if not isinstance(choice, dict):
+                continue
+            message = choice.get("message")
+            if not isinstance(message, dict):
+                continue
+            content = message.get("content")
+            if isinstance(content, str):
+                return content
+            if isinstance(content, list):
+                for content_item in content:
+                    if not isinstance(content_item, dict):
+                        continue
+                    text = content_item.get("text")
+                    if isinstance(text, str):
+                        return text
+    return json.dumps(response_payload, ensure_ascii=False)
+
+
+def _trim_repair_text(text: str, *, limit: int = 2000) -> str:
+    if len(text) <= limit:
+        return text
+    return text[:limit] + "...[truncated]"
+
+
+def _json_error_summary(exc: json.JSONDecodeError) -> str:
+    return f"{exc.msg} at line {exc.lineno} column {exc.colno}"
+
+
+def _schema_error_summary(exc: Exception) -> str:
+    if isinstance(exc, ValidationError):
+        errors = exc.errors()
+        if not errors:
+            return f"{exc.error_count()} validation errors"
+        first_error = errors[0]
+        error_type = str(first_error.get("type", "unknown"))
+        return f"{exc.error_count()} validation errors; first_error_type={error_type}"
+    message = str(exc).splitlines()[0]
+    return message[:160]
+
+
+def _contract_repair_projection(payload: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "speech": payload.get("speech")
+        if isinstance(payload.get("speech"), str)
+        else "I cannot answer that safely.",
+        "intent": payload.get("intent")
+        if isinstance(payload.get("intent"), str)
+        else AgentIntentType.REFUSE.value,
+        "emotional_shift": _numeric_mapping(payload.get("emotional_shift")),
+        "proposed_actions": _project_proposed_actions(payload.get("proposed_actions")),
+        "memory_refs": _string_list(payload.get("memory_refs")),
+        "disclosure_claims": _project_disclosure_claims(
+            payload.get("disclosure_claims")
+        ),
+    }
+
+
+def _allowed_disclosure_mode_matrix(contract_input: LLMAgentContractInput) -> str:
+    lines: list[str] = []
+    for constraint in contract_input.disclosure_constraints:
+        if constraint.item_kind != "world_info":
+            continue
+        allowed_modes = [
+            mode.value
+            for mode in constraint.allowed_modes
+            if mode not in set(constraint.forbidden_modes) and mode != DisclosureMode.FULL
+        ]
+        if not allowed_modes:
+            allowed_modes = ["none"]
+        lines.append(f"- {constraint.item_id}: {', '.join(allowed_modes)}")
+    if not lines:
+        return "- no world_info disclosure_claim is allowed; use []"
+    return "\n".join(lines)
+
+
+def _numeric_mapping(value: object) -> dict[str, float]:
+    if not isinstance(value, dict):
+        return {}
+    return {
+        str(key): float(item)
+        for key, item in value.items()
+        if isinstance(item, int | float)
+    }
+
+
+def _string_list(value: object) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    return [item for item in value if isinstance(item, str)]
+
+
+def _project_proposed_actions(value: object) -> list[dict[str, Any]]:
+    if not isinstance(value, list):
+        return []
+    return [
+        projected
+        for item in value
+        if isinstance(item, dict)
+        for projected in [_project_proposed_action(item)]
+        if projected
+    ]
+
+
+def _project_proposed_action(item: dict[str, Any]) -> dict[str, Any]:
+    action_type = item.get("type")
+    if action_type == "clue.discover":
+        return {
+            key: item[key]
+            for key in ("type", "clue_id")
+            if key in item and isinstance(item[key], str)
+        }
+    if action_type == "relationship.change":
+        projected = {
+            key: item[key]
+            for key in ("type", "source_id", "target_id")
+            if key in item and isinstance(item[key], str)
+        }
+        deltas = item.get("deltas")
+        if isinstance(deltas, dict):
+            projected["deltas"] = {
+                key: float(deltas[key])
+                for key in ("trust", "suspicion", "fear", "intimacy", "hostility")
+                if key in deltas and isinstance(deltas[key], int | float)
+            }
+        return projected
+    if isinstance(action_type, str):
+        return {"type": action_type}
+    return {}
+
+
+def _project_disclosure_claims(value: object) -> list[dict[str, Any]]:
+    if not isinstance(value, list):
+        return []
+    return [
+        {
+            "world_info_id": item.get("world_info_id")
+            if isinstance(item.get("world_info_id"), str)
+            else "",
+            "mode": item.get("mode") if isinstance(item.get("mode"), str) else "none",
+            "tactic": item.get("tactic") if isinstance(item.get("tactic"), str) else None,
+            "source_refs": _string_list(item.get("source_refs")),
+            "claim_refs": _string_list(item.get("claim_refs")),
+        }
+        for item in value
+        if isinstance(item, dict)
+    ]
 
 
 def _api_style_from_env() -> str:

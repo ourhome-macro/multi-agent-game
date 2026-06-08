@@ -42,6 +42,15 @@ class AgentGateway:
     def backend_name(self) -> AgentBackend:
         return self._backend
 
+    @property
+    def model_name(self) -> str | None:
+        model_name = getattr(self._agents[self._backend], "model_name", None)
+        if callable(model_name):
+            model_name = model_name()
+        if model_name is None:
+            return None
+        return str(model_name)
+
     def generate(self, context: AgentContext) -> AgentIntent:
         return self._agents[self._backend].generate(context)
 

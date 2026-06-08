@@ -50,6 +50,11 @@ class PromptBuilder:
                 item.knowledge_id for item in context.player_knowledge
             ],
             "memory_ids": [item.memory_id for item in context.memory_snapshots],
+            "compressed_history": (
+                context.compressed_history.model_dump(mode="json")
+                if context.compressed_history is not None
+                else None
+            ),
             "blocked_fact_ids": context.blocked_fact_ids,
             "revealable_fact_ids": context.revealable_fact_ids,
             "target_profile": (

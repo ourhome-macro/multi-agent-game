@@ -10,7 +10,7 @@ from uuid import uuid4
 
 from app.domain.models import ActionType, AgentIntent, PlayerAction, WorldEvent
 
-TRACE_SCHEMA_VERSION = 1
+TRACE_SCHEMA_VERSION = 2
 
 
 @dataclass
@@ -103,6 +103,8 @@ class RuntimeTracer:
         rule_rejections: list[str],
         new_events: list[WorldEvent],
         phase_after: str,
+        public_speech: str | None = None,
+        public_speech_source: str | None = None,
         status: str = "ok",
         error_category: str | None = None,
     ) -> dict[str, object]:
@@ -125,6 +127,8 @@ class RuntimeTracer:
             "tool_calls": draft.tool_calls,
             "security_flags": draft.security_flags,
             "intent_type": intent.intent.value if intent is not None else None,
+            "public_speech": public_speech,
+            "public_speech_source": public_speech_source,
             "director_allowed": director_allowed,
             "director_reason_category": director_reason_category,
             "rule_rejections": rule_rejections,
@@ -178,6 +182,13 @@ def _render_log_record(record: dict[str, object]) -> str:
     events = ",".join(str(item) for item in record.get("new_event_types", [])) or "none"
     memories = len(record.get("memory_ids_used", []))
     tools = len(record.get("tool_calls", []))
+    public_speech = record.get("public_speech")
+    speech_source = record.get("public_speech_source")
+    speech_part = (
+        f" speech_source={speech_source} speech={_single_line_text(public_speech)}"
+        if isinstance(public_speech, str) and public_speech
+        else ""
+    )
     return (
         f"[{record['timestamp']}] turn={record['turn_id']} trace={record['trace_id']} "
         f"case={record['case_id']} session={record['session_id']} "
@@ -193,4 +204,9 @@ def _render_log_record(record: dict[str, object]) -> str:
         f"phase={record['phase_before']}->{record['phase_after']} events={events} "
         f"player_text={record.get('player_text_hash')} "
         f"len={record.get('player_text_length')}"
+        f"{speech_part}"
     )
+
+
+def _single_line_text(value: str) -> str:
+    return value.replace("\r", "\\r").replace("\n", "\\n")

@@ -751,6 +751,14 @@ class AgentMemorySnapshot(APIModel):
     updated_at: str | None = None
 
 
+class CompressedHistoryContext(APIModel):
+    summary: str
+    important_event_ids: list[str] = Field(default_factory=list)
+    important_memory_ids: list[str] = Field(default_factory=list)
+    open_threads: list[str] = Field(default_factory=list)
+    risk_notes: list[str] = Field(default_factory=list)
+
+
 class AgentContext(APIModel):
     case_id: NonEmptyString
     session_id: NonEmptyString
@@ -764,6 +772,7 @@ class AgentContext(APIModel):
     recent_events: list[WorldEvent] = Field(default_factory=list)
     memory_candidates: list[MemoryCandidateState] = Field(default_factory=list)
     memory_snapshots: list[AgentMemorySnapshot] = Field(default_factory=list)
+    compressed_history: CompressedHistoryContext | None = None
     blocked_fact_ids: list[NonEmptyString] = Field(default_factory=list)
     revealable_fact_ids: list[NonEmptyString] = Field(default_factory=list)
     asked_subject_type: SubjectType | None = None

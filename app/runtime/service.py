@@ -16,6 +16,7 @@ from app.domain.models import (
 )
 from app.rules.engine import RuleEngine
 from app.rules.triggers import RuleTriggerSystem
+from app.runtime.budget import ContextBudgetManager
 from app.runtime.derivations import DerivedEventSystem
 from app.runtime.errors import ActionValidationError
 from app.runtime.events import EventRecorder
@@ -182,6 +183,8 @@ class ActionService:
                 rule_rejections=[],
                 new_events=new_events,
                 phase_after=session.narrative.phase,
+                public_speech=None,
+                public_speech_source=None,
             )
             return ActionResponse(
                 session_id=session.id,
@@ -283,6 +286,10 @@ class ActionService:
             decision_reason=decision.reason,
             new_events=new_events,
             phase_after=session.narrative.phase,
+            public_speech=speech,
+            public_speech_source=(
+                "npc" if decision.allowed else "director_safe_fallback"
+            ),
         )
 
         return ActionResponse(
@@ -303,6 +310,8 @@ class ActionService:
         decision_reason: str | None,
         new_events: list[WorldEvent],
         phase_after: str,
+        public_speech: str | None,
+        public_speech_source: str | None,
     ) -> None:
         self._agent_loop.finish_trace(
             turn,
@@ -315,6 +324,8 @@ class ActionService:
             ],
             new_events=new_events,
             phase_after=phase_after,
+            public_speech=public_speech,
+            public_speech_source=public_speech_source,
         )
 
     def _evaluate_triggers(
@@ -353,6 +364,7 @@ def create_runtime(
     *,
     agent_gateway: AgentGateway | None = None,
     runtime_tracer: RuntimeTracer | None = None,
+    context_limit_tokens: int = 8000,
 ) -> RuntimeContainer:
     recorder = EventRecorder()
     case_store = InMemoryCaseStore()
@@ -363,6 +375,9 @@ def create_runtime(
     agent_loop = AgentLoop(
         agent_gateway=agent_gateway or AgentGateway.from_env(),
         runtime_tracer=runtime_tracer or RuntimeTracer.disabled(),
+        context_budget_manager=ContextBudgetManager(
+            context_limit_tokens=context_limit_tokens,
+        ),
     )
     action_service = ActionService(
         case_store=case_store,
