@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 
 from app.domain.models import (
+    ActionType,
     AgentContext,
     AgentIntent,
     CasePackage,
@@ -12,6 +13,9 @@ from app.domain.models import (
     DisclosureClaim,
     DisclosureMode,
     NarrativeState,
+    PlayerAction,
+    SessionState,
+    SubjectType,
 )
 
 SAFE_SPEECH = "I cannot discuss that right now."
@@ -39,6 +43,44 @@ class DetectedWorldInfoMention:
 
 
 class NarrativeDirector:
+    def precheck_player_action(
+        self,
+        case: CasePackage,
+        session: SessionState,
+        action: PlayerAction,
+    ) -> DirectorDecision:
+        if action.type == ActionType.ASK_ABOUT and action.subject_type == SubjectType.CLUE:
+            knowledge_id = _player_knowledge_id_for_clue(case, str(action.subject_id))
+            if (
+                str(action.subject_id) not in session.discovered_clues
+                and knowledge_id not in session.player_knowledge
+            ):
+                return DirectorDecision(allowed=False, reason="subject_not_discovered")
+
+        if action.type == ActionType.PRESENT_CLUE:
+            if str(action.clue_id) not in session.discovered_clues:
+                return DirectorDecision(allowed=False, reason="clue_not_discovered")
+            knowledge_id = _player_knowledge_id_for_clue(case, str(action.clue_id))
+            if knowledge_id not in session.player_knowledge:
+                return DirectorDecision(allowed=False, reason="clue_not_available")
+
+        if action.type == ActionType.ACCUSE:
+            claim = next(
+                (item for item in case.solution_claims.claims if item.id == action.claim_id),
+                None,
+            )
+            if claim is None:
+                return DirectorDecision(allowed=False, reason="claim_unknown")
+            if session.narrative.phase not in claim.allowed_phases:
+                return DirectorDecision(allowed=False, reason="claim_not_available")
+            if not action.evidence_clue_ids:
+                return DirectorDecision(allowed=False, reason="insufficient_evidence")
+            undiscovered = sorted(set(action.evidence_clue_ids) - session.discovered_clues)
+            if undiscovered:
+                return DirectorDecision(allowed=False, reason="evidence_not_discovered")
+
+        return DirectorDecision(allowed=True)
+
     def validate(
         self,
         case: CasePackage,
@@ -351,3 +393,17 @@ def _claim_mode_exceeds_mention(
 
 def _normalize_text(value: str) -> str:
     return value.casefold()
+
+
+def _player_knowledge_id_for_clue(case: CasePackage, clue_id: str) -> str:
+    clue = next((item for item in case.clues if item.id == clue_id), None)
+    if clue is None:
+        return f"player_knowledge.{clue_id}"
+    world_info_ids = {item.id for item in case.world_info}
+    world_info_id = next(
+        (item_id for item_id in clue.reveals_world_info if item_id in world_info_ids),
+        None,
+    )
+    if world_info_id is None:
+        return f"player_knowledge.{clue_id}"
+    return f"player_knowledge.{world_info_id}"

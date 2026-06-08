@@ -164,6 +164,7 @@ def test_terminal_mvp_fixed_sequence_still_runs(tmp_path: Path) -> None:
         cwd=PROJECT_ROOT,
         input=commands,
         text=True,
+        encoding="utf-8",
         capture_output=True,
         check=True,
     )

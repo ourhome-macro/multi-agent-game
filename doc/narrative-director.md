@@ -2,6 +2,21 @@
 
 当前 Narrative Director 是一个最小防剧透安全层。它会在 NPC 台词写入 `npc.replied` 事件之前校验文本。它不推进剧情阶段，也不完成 beats；这些仍由 `narrative_rules.yaml` 和 `RuleTriggerSystem` 负责。
 
+## 玩家动作前置检查
+
+`NarrativeDirector.precheck_player_action(case, session, action)` 是一个纯决策辅助方法，用于在自然语言 Router 产出 `PlayerAction` 后检查明显越界的玩家动作。
+
+当前检查包括：
+
+- `ask_about` 询问未发现线索时返回 `subject_not_discovered`
+- `present_clue` 展示未发现线索时返回 `clue_not_discovered`
+- `accuse` 使用当前阶段不可用的 claim 时返回 `claim_not_available`
+- `accuse` 缺少证据或证据未发现时返回 `insufficient_evidence` / `evidence_not_discovered`
+
+这个方法不写入 `WorldEvent`，也不替代 Rule Engine。正式状态权威仍然由 `RuleEngine.apply_*` 写入 `rule.rejected`、`player.asked_about`、`player.presented_clue`、`player.accused` 等事件。
+
+这样做的目的是让 Router 集成层可以提前获得安全决策摘要，同时保持事件日志和状态变化只有一个权威来源。
+
 ## 配置来源
 
 禁说事实写在每个案件包的 `forbidden_facts.yaml`。

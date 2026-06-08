@@ -10,7 +10,8 @@ if str(PROJECT) not in sys.path:
     sys.path.insert(0, str(PROJECT))
 
 from app.cases.loader import CaseLoader  # noqa: E402
-from app.domain.models import ActionType, PlayerAction, SubjectType  # noqa: E402
+from app.domain.models import ActionType, CasePackage, PlayerAction, SubjectType  # noqa: E402
+from app.runtime.action_router import ActionRouter  # noqa: E402
 from app.runtime.service import create_runtime  # noqa: E402
 from app.runtime.tracing import RuntimeTracer  # noqa: E402
 
@@ -23,6 +24,7 @@ class ParsedCommand:
 
 
 def main(argv: list[str] | None = None) -> None:
+    _configure_stdio()
     args = _parse_args(argv)
     case = CaseLoader().load(PROJECT / "cases" / args.case_id)
     runtime = create_runtime(
@@ -43,7 +45,7 @@ def main(argv: list[str] | None = None) -> None:
             raw_line = input("> ")
         except EOFError:
             break
-        parsed = parse_player_command(raw_line)
+        parsed = parse_player_command(raw_line, case=case)
         if parsed.command in {"quit", "exit"}:
             break
         if parsed.command == "help":
@@ -73,7 +75,11 @@ def main(argv: list[str] | None = None) -> None:
         )
 
 
-def parse_player_command(raw_line: str) -> ParsedCommand:
+def parse_player_command(
+    raw_line: str,
+    *,
+    case: CasePackage | None = None,
+) -> ParsedCommand:
     line = raw_line.strip()
     if not line:
         return ParsedCommand(command="empty")
@@ -152,6 +158,16 @@ def parse_player_command(raw_line: str) -> ParsedCommand:
             )
     except ValueError as exc:
         return ParsedCommand(command=command, error=str(exc))
+    if case is not None:
+        routed = ActionRouter(case).route(line)
+        if routed.action is not None:
+            return ParsedCommand(command="natural_language", action=routed.action)
+        if routed.needs_clarification:
+            missing = ", ".join(routed.missing_slots)
+            return ParsedCommand(
+                command="natural_language",
+                error=f"needs clarification: {missing}",
+            )
     return ParsedCommand(command=command, error=f"unknown command: {command}")
 
 
@@ -170,6 +186,12 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
     )
     parser.add_argument("--no-trace", action="store_true")
     return parser.parse_args(argv)
+
+
+def _configure_stdio() -> None:
+    for stream in (sys.stdin, sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8")
 
 
 def _print_help() -> None:
