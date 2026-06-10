@@ -733,6 +733,8 @@ class PlayerKnowledgeState(APIModel):
 class MemoryCandidateState(APIModel):
     memory_id: NonEmptyString
     subject_id: NonEmptyString
+    owner_character_id: NonEmptyString | None = None
+    visible_to_character_ids: list[NonEmptyString] = Field(default_factory=list)
     content: NonEmptyString
     source_event_id: NonEmptyString
     visibility: list[NonEmptyString] = Field(default_factory=list)
@@ -742,6 +744,8 @@ class MemoryCandidateState(APIModel):
 class AgentMemorySnapshot(APIModel):
     memory_id: NonEmptyString
     subject_id: NonEmptyString
+    owner_character_id: NonEmptyString | None = None
+    visible_to_character_ids: list[NonEmptyString] = Field(default_factory=list)
     content: NonEmptyString
     source_event_ids: list[NonEmptyString] = Field(default_factory=list)
     salience: float = Field(default=0.0, ge=0.0, le=1.0)

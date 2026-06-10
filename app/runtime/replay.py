@@ -112,6 +112,10 @@ def _apply_event(session: SessionState, event: WorldEvent) -> None:
         memory = MemoryCandidateState(
             memory_id=str(event.payload["memory_id"]),
             subject_id=str(event.payload["subject_id"]),
+            owner_character_id=_optional_str(event.payload.get("owner_character_id")),
+            visible_to_character_ids=[
+                str(item) for item in event.payload.get("visible_to_character_ids", [])
+            ],
             content=str(event.payload["content"]),
             source_event_id=str(event.payload["source_event_id"]),
             visibility=[str(item) for item in event.payload["visibility"]],
@@ -129,6 +133,10 @@ def _apply_event(session: SessionState, event: WorldEvent) -> None:
         snapshot = AgentMemorySnapshot(
             memory_id=memory_id,
             subject_id=str(event.payload["subject_id"]),
+            owner_character_id=_optional_str(event.payload.get("owner_character_id")),
+            visible_to_character_ids=[
+                str(item) for item in event.payload.get("visible_to_character_ids", [])
+            ],
             content=current.content if current is not None else content,
             source_event_ids=[str(item) for item in event.payload["source_event_ids"]],
             salience=float(event.payload["salience"]),
@@ -153,3 +161,10 @@ def _apply_event(session: SessionState, event: WorldEvent) -> None:
 
     if event.type == EventType.NARRATIVE_PHASE_CHANGED:
         session.narrative.phase = str(event.payload["phase"])
+        return
+
+
+def _optional_str(value: object) -> str | None:
+    if value is None:
+        return None
+    return str(value)

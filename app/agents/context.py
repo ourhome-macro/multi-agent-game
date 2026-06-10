@@ -111,6 +111,7 @@ def build_agent_context(
                 snapshot
                 for snapshot in session.memory_snapshots.values()
                 if snapshot.subject_id == "player"
+                and _memory_visible_to_target(snapshot, action.target_id)
             ),
             key=lambda value: value.memory_id,
         ),
@@ -318,3 +319,11 @@ def _action_matches_related_clue(action: PlayerAction, related_clue_ids: list[st
         and action.subject_id is not None
         and action.subject_id in related_clue_ids
     )
+
+
+def _memory_visible_to_target(snapshot: object, target_id: str) -> bool:
+    owner = getattr(snapshot, "owner_character_id", None)
+    visible_to = set(getattr(snapshot, "visible_to_character_ids", []))
+    if not visible_to and owner is None:
+        return True
+    return owner == target_id or target_id in visible_to

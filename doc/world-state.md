@@ -283,6 +283,8 @@ accusation.evaluated(result=correct)
 
 - `memory_id`
 - `subject_id`
+- `owner_character_id`
+- `visible_to_character_ids`
 - `content`
 - `source_event_ids`
 - `salience`
@@ -292,6 +294,30 @@ accusation.evaluated(result=correct)
 - `updated_at`
 
 `MemorySnapshotSystem` 只消费 `memory_candidate.created`，更新 `session.memory_snapshots`，并写入 `agent_memory_snapshot.updated`。Agent、LLM 和 `AgentIntent.proposed_actions` 都不能写记忆快照。
+
+NPC 记忆隔离规则：
+
+- `owner_character_id` 表示这条记忆属于哪个 NPC 的可检索经历。
+- `visible_to_character_ids` 表示允许哪些 NPC 在普通 Agent turn 中检索该记忆。
+- 玩家与某个 NPC 的互动记忆默认只对该 NPC 可见。
+- 线索发现记忆默认作为玩家已知探索状态，对案件内 NPC 可见，但仍只暴露 clue/world info 的安全摘要。
+- Director 审计视角可以通过专门检索入口查看所有 player-scoped 记忆摘要；这不等于把记忆注入某个 NPC 上下文。
+
+示例：
+
+```text
+player.presented_clue target=jiang_yanhui clue=empty_capsules
+  -> memory.player.presented_clue.jiang_yanhui.empty_capsules
+  -> owner_character_id=jiang_yanhui
+  -> visible_to_character_ids=[jiang_yanhui]
+
+player.asked_about target=shen_zhaoye subject=empty_capsules
+  -> memory.player.asked_about.shen_zhaoye.clue.empty_capsules
+  -> owner_character_id=shen_zhaoye
+  -> visible_to_character_ids=[shen_zhaoye]
+```
+
+`MemoryRetriever.retrieve(...)` 必须按 `action.target_id` 过滤可见性。`MemoryRetriever.retrieve_for_director(...)` 是 Director 审计入口，可以看到所有 player-scoped 记忆摘要，但不能绕过 Director/Rule Engine 造成状态变化。
 
 运行时生成的 memory id 是语义化且稳定的，足以被案件配置的 mock dialogue 条件引用，例如：
 

@@ -66,6 +66,11 @@
     "payload": {
       "memory_id": "memory.player.clue_discovered.scratched_drawer",
       "subject_id": "player",
+      "owner_character_id": null,
+      "visible_to_character_ids": [
+        "butler",
+        "niece"
+      ],
       "content": "Player discovered clue '抽屉划痕'.",
       "source_event_id": "event_003",
       "visibility": [
@@ -85,6 +90,11 @@
     "payload": {
       "memory_id": "memory.player.clue_discovered.scratched_drawer",
       "subject_id": "player",
+      "owner_character_id": null,
+      "visible_to_character_ids": [
+        "butler",
+        "niece"
+      ],
       "source_event_ids": [
         "event_003"
       ],
@@ -267,6 +277,10 @@
     "payload": {
       "memory_id": "memory.player.asked_about.butler.clue.scratched_drawer",
       "subject_id": "player",
+      "owner_character_id": "butler",
+      "visible_to_character_ids": [
+        "butler"
+      ],
       "content": "Player asked 韩管家 about clue 'scratched_drawer' with pressure 0.6.",
       "source_event_id": "event_009",
       "visibility": [
@@ -286,6 +300,10 @@
     "payload": {
       "memory_id": "memory.player.asked_about.butler.clue.scratched_drawer",
       "subject_id": "player",
+      "owner_character_id": "butler",
+      "visible_to_character_ids": [
+        "butler"
+      ],
       "source_event_ids": [
         "event_009"
       ],
@@ -462,6 +480,10 @@
     "payload": {
       "memory_id": "memory.player.presented_clue.butler.scratched_drawer",
       "subject_id": "player",
+      "owner_character_id": "butler",
+      "visible_to_character_ids": [
+        "butler"
+      ],
       "content": "Player pressured 韩管家 with clue 'scratched_drawer' at pressure 0.9.",
       "source_event_id": "event_016",
       "visibility": [
@@ -481,6 +503,10 @@
     "payload": {
       "memory_id": "memory.player.presented_clue.butler.scratched_drawer",
       "subject_id": "player",
+      "owner_character_id": "butler",
+      "visible_to_character_ids": [
+        "butler"
+      ],
       "source_event_ids": [
         "event_016"
       ],
@@ -545,6 +571,10 @@
     "payload": {
       "memory_id": "memory.player.relationship_threshold.butler.player.suspicion.guarded",
       "subject_id": "player",
+      "owner_character_id": "butler",
+      "visible_to_character_ids": [
+        "butler"
+      ],
       "content": "韩管家 became guarded toward the player (suspicion).",
       "source_event_id": "event_019",
       "visibility": [
@@ -564,6 +594,10 @@
     "payload": {
       "memory_id": "memory.player.relationship_threshold.butler.player.suspicion.guarded",
       "subject_id": "player",
+      "owner_character_id": "butler",
+      "visible_to_character_ids": [
+        "butler"
+      ],
       "source_event_ids": [
         "event_019"
       ],
@@ -692,6 +726,11 @@
     "payload": {
       "memory_id": "memory.player.clue_discovered.dustless_frame",
       "subject_id": "player",
+      "owner_character_id": null,
+      "visible_to_character_ids": [
+        "butler",
+        "niece"
+      ],
       "content": "Player discovered clue '无尘画框印'.",
       "source_event_id": "event_031",
       "visibility": [
@@ -711,6 +750,11 @@
     "payload": {
       "memory_id": "memory.player.clue_discovered.dustless_frame",
       "subject_id": "player",
+      "owner_character_id": null,
+      "visible_to_character_ids": [
+        "butler",
+        "niece"
+      ],
       "source_event_ids": [
         "event_031"
       ],
@@ -878,6 +922,10 @@
     "payload": {
       "memory_id": "memory.player.director_blocked.butler.true_killer",
       "subject_id": "player",
+      "owner_character_id": "butler",
+      "visible_to_character_ids": [
+        "butler"
+      ],
       "content": "Conversation with 韩管家 was blocked by narrative rules.",
       "source_event_id": "event_039",
       "visibility": [
@@ -897,6 +945,10 @@
     "payload": {
       "memory_id": "memory.player.director_blocked.butler.true_killer",
       "subject_id": "player",
+      "owner_character_id": "butler",
+      "visible_to_character_ids": [
+        "butler"
+      ],
       "source_event_ids": [
         "event_039"
       ],
@@ -961,6 +1013,11 @@
     "payload": {
       "memory_id": "memory.player.clue_discovered.torn_note",
       "subject_id": "player",
+      "owner_character_id": null,
+      "visible_to_character_ids": [
+        "butler",
+        "niece"
+      ],
       "content": "Player discovered clue '被撕碎的便签'.",
       "source_event_id": "event_044",
       "visibility": [
@@ -980,6 +1037,11 @@
     "payload": {
       "memory_id": "memory.player.clue_discovered.torn_note",
       "subject_id": "player",
+      "owner_character_id": null,
+      "visible_to_character_ids": [
+        "butler",
+        "niece"
+      ],
       "source_event_ids": [
         "event_044"
       ],
@@ -1215,6 +1277,10 @@
     "payload": {
       "memory_id": "memory.player.accused.butler.butler_moved_key",
       "subject_id": "player",
+      "owner_character_id": "butler",
+      "visible_to_character_ids": [
+        "butler"
+      ],
       "content": "Player formally accused 韩管家 with claim 'butler_moved_key' using evidence ['scratched_drawer', 'dustless_frame', 'torn_note'].",
       "source_event_id": "event_050",
       "visibility": [
@@ -1234,6 +1300,10 @@
     "payload": {
       "memory_id": "memory.player.accused.butler.butler_moved_key",
       "subject_id": "player",
+      "owner_character_id": "butler",
+      "visible_to_character_ids": [
+        "butler"
+      ],
       "source_event_ids": [
         "event_050"
       ],
@@ -1310,6 +1380,10 @@
     "payload": {
       "memory_id": "memory.player.accusation_evaluated.butler.butler_moved_key.correct",
       "subject_id": "player",
+      "owner_character_id": "butler",
+      "visible_to_character_ids": [
+        "butler"
+      ],
       "content": "Rule Engine evaluated the accusation against 韩管家 for claim 'butler_moved_key' as correct.",
       "source_event_id": "event_051",
       "visibility": [
@@ -1329,6 +1403,10 @@
     "payload": {
       "memory_id": "memory.player.accusation_evaluated.butler.butler_moved_key.correct",
       "subject_id": "player",
+      "owner_character_id": "butler",
+      "visible_to_character_ids": [
+        "butler"
+      ],
       "source_event_ids": [
         "event_051"
       ],

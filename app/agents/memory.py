@@ -22,10 +22,41 @@ class MemoryRetriever:
         action: PlayerAction,
     ) -> list[AgentMemorySnapshot]:
         _ = case
+        return self._retrieve(
+            session=session,
+            action=action,
+            enforce_target_visibility=True,
+        )
+
+    def retrieve_for_director(
+        self,
+        *,
+        case: CasePackage,
+        session: SessionState,
+        action: PlayerAction,
+    ) -> list[AgentMemorySnapshot]:
+        _ = case
+        return self._retrieve(
+            session=session,
+            action=action,
+            enforce_target_visibility=False,
+        )
+
+    def _retrieve(
+        self,
+        *,
+        session: SessionState,
+        action: PlayerAction,
+        enforce_target_visibility: bool,
+    ) -> list[AgentMemorySnapshot]:
         candidates = [
             snapshot
             for snapshot in session.memory_snapshots.values()
             if snapshot.subject_id == "player" and snapshot.visibility == "private"
+            and (
+                not enforce_target_visibility
+                or _visible_to_target(snapshot, action.target_id)
+            )
         ]
         scored = [
             (self._score(snapshot, action), snapshot)
@@ -73,3 +104,11 @@ def _tokens(text: str) -> set[str]:
         token.lower()
         for token in re.findall(r"[A-Za-z0-9_]{4,}", text)
     }
+
+
+def _visible_to_target(snapshot: AgentMemorySnapshot, target_id: str) -> bool:
+    if not snapshot.visible_to_character_ids and snapshot.owner_character_id is None:
+        return True
+    if snapshot.owner_character_id == target_id:
+        return True
+    return target_id in set(snapshot.visible_to_character_ids)

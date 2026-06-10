@@ -33,6 +33,8 @@ class MemorySnapshotSystem:
             payload={
                 "memory_id": snapshot.memory_id,
                 "subject_id": snapshot.subject_id,
+                "owner_character_id": snapshot.owner_character_id,
+                "visible_to_character_ids": snapshot.visible_to_character_ids,
                 "source_event_ids": snapshot.source_event_ids,
                 "salience": snapshot.salience,
                 "visibility": snapshot.visibility,
@@ -55,6 +57,10 @@ class MemorySnapshotSystem:
         return MemoryCandidateState(
             memory_id=memory_id,
             subject_id=str(event.payload["subject_id"]),
+            owner_character_id=_optional_str(event.payload.get("owner_character_id")),
+            visible_to_character_ids=[
+                str(item) for item in event.payload.get("visible_to_character_ids", [])
+            ],
             content=str(event.payload["content"]),
             source_event_id=source_event_id,
             visibility=[str(item) for item in event.payload.get("visibility", [])],
@@ -76,6 +82,16 @@ class MemorySnapshotSystem:
         return AgentMemorySnapshot(
             memory_id=candidate.memory_id,
             subject_id=candidate.subject_id,
+            owner_character_id=(
+                current.owner_character_id
+                if current is not None
+                else candidate.owner_character_id
+            ),
+            visible_to_character_ids=(
+                list(current.visible_to_character_ids)
+                if current is not None
+                else list(candidate.visible_to_character_ids)
+            ),
             content=current.content if current is not None else candidate.content,
             source_event_ids=source_event_ids,
             salience=max(current.salience if current is not None else 0.0, candidate.salience),
@@ -84,3 +100,9 @@ class MemorySnapshotSystem:
             created_at=current.created_at if current is not None else event.created_at,
             updated_at=event.created_at,
         )
+
+
+def _optional_str(value: object) -> str | None:
+    if value is None:
+        return None
+    return str(value)

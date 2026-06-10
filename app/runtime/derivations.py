@@ -285,6 +285,8 @@ class DerivedEventSystem:
             memory_id=f"memory.player.clue_discovered.{clue_id}",
             content=f"Player discovered clue '{clue.title}'.",
             salience=0.8,
+            owner_character_id=None,
+            visible_to_character_ids=self._all_character_ids(case),
         )
 
     def _derive_relationship_memory_candidate(
@@ -309,6 +311,8 @@ class DerivedEventSystem:
             ),
             content=f"{character_name} became {state_name} toward the player ({metric}).",
             salience=0.7,
+            owner_character_id=source_id,
+            visible_to_character_ids=[source_id],
         )
 
     def _derive_director_block_memory_candidate(
@@ -331,6 +335,8 @@ class DerivedEventSystem:
             ),
             content=f"Conversation with {character_name} was blocked by narrative rules.",
             salience=0.9,
+            owner_character_id=target_id,
+            visible_to_character_ids=[target_id],
         )
 
     def _derive_asked_about_memory_candidate(
@@ -353,6 +359,8 @@ class DerivedEventSystem:
                 f"with pressure {pressure}."
             ),
             salience=max(0.4, pressure),
+            owner_character_id=target_id,
+            visible_to_character_ids=[target_id],
         )
 
     def _derive_presented_clue_memory_candidate(
@@ -374,6 +382,8 @@ class DerivedEventSystem:
                 f"at pressure {pressure}."
             ),
             salience=max(0.6, pressure),
+            owner_character_id=target_id,
+            visible_to_character_ids=[target_id],
         )
 
     def _derive_player_accused_memory_candidate(
@@ -397,6 +407,8 @@ class DerivedEventSystem:
                 f"using evidence {evidence_ids}."
             ),
             salience=1.0,
+            owner_character_id=target_id,
+            visible_to_character_ids=[target_id],
         )
 
     def _derive_accusation_evaluated_memory_candidate(
@@ -418,6 +430,8 @@ class DerivedEventSystem:
                 f"for claim '{claim_id}' as {result}."
             ),
             salience=1.0,
+            owner_character_id=target_id,
+            visible_to_character_ids=[target_id],
         )
 
     def _character_name(self, case: CasePackage, character_id: str) -> str:
@@ -425,6 +439,9 @@ class DerivedEventSystem:
             (item.display_name for item in case.characters if item.id == character_id),
             character_id,
         )
+
+    def _all_character_ids(self, case: CasePackage) -> list[str]:
+        return [character.id for character in case.characters]
 
     def _derive_character_impression(
         self,
@@ -655,6 +672,8 @@ class DerivedEventSystem:
         memory_id: str,
         content: str,
         salience: float,
+        owner_character_id: str | None,
+        visible_to_character_ids: list[str],
     ) -> WorldEvent | None:
         current = session.memory_candidates.get(memory_id)
         if current is not None and current.source_event_id == source_event.id:
@@ -662,6 +681,8 @@ class DerivedEventSystem:
         session.memory_candidates[memory_id] = MemoryCandidateState(
             memory_id=memory_id,
             subject_id="player",
+            owner_character_id=owner_character_id,
+            visible_to_character_ids=visible_to_character_ids,
             content=content,
             source_event_id=source_event.id,
             visibility=["player"],
@@ -674,6 +695,8 @@ class DerivedEventSystem:
             payload={
                 "memory_id": memory_id,
                 "subject_id": "player",
+                "owner_character_id": owner_character_id,
+                "visible_to_character_ids": visible_to_character_ids,
                 "content": content,
                 "source_event_id": source_event.id,
                 "visibility": ["player"],
