@@ -62,6 +62,7 @@ class PromptBuilder:
                 if context.target_profile is not None
                 else None
             ),
+            "portrait_summary": context.portrait_summary,
             "inner_context_summary": self._inner_context_summary(context),
             "player_action": self._action_summary(context),
         }
@@ -116,6 +117,7 @@ class PromptBuilder:
             "type": action.type.value,
             "target_id": action.target_id,
             "clue_id": action.clue_id,
+            "scene_id": action.scene_id,
             "claim_id": action.claim_id,
             "evidence_clue_ids": list(action.evidence_clue_ids),
             "subject_type": action.subject_type.value if action.subject_type else None,

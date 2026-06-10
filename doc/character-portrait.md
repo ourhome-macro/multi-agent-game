@@ -31,7 +31,18 @@ session.character_impressions[npc_id]["player"]
 
 ## 模型
 
-`CharacterImpression` 包含：
+运行时画像的基础模型是 `NPCPortraitState`：
+
+- `owner_character_id`
+- `subject_id`
+- `trust`
+- `suspicion`
+- `fear`
+- `traits`
+- `current_strategy`
+- `source_memory_ids`
+
+`CharacterImpression` 继承 `NPCPortraitState`，并继续包含：
 
 - `observer_id`
 - `target_id`
@@ -51,6 +62,8 @@ session.character_impressions[npc_id]["player"]
 
 文本字段必须来自安全运行时信号。不得复制禁说事实原文、blocked terms、角色 private secrets 或 solution claim 配置。
 
+静态人物画像、作者注释和角色写作参考可以用 Markdown 维护；运行时 NPC 对玩家的画像不能只写在 Markdown 中，必须通过 `character_impression.updated` 落入事件日志，才能 replay、审计和隔离。
+
 ## 派生来源
 
 v0 画像由运行时代码派生，不由 LLM 输出。
@@ -66,13 +79,27 @@ v0 画像由运行时代码派生，不由 LLM 输出。
 
 每次更新都会写入 `character_impression.updated`。Replay 直接应用该事件，不重新运行画像派生逻辑。
 
+Memory v1 中，画像也会记录 typed memory 的来源。例如江医生看到 `empty_capsules` 后，规则会派生：
+
+- `belief`：玩家正在接近药物线索
+- `relationship`：`suspicion +0.2`、`trust -0.1`
+- `strategy`：`avoid_medicine_topic`
+
+画像随后把这些 memory id 写入 `source_memory_ids`，并更新 `suspicion`、`trust` 和 `current_strategy`。这仍然是规则派生，不由 LLM 生成。
+
+同一个 `source_event_id` 对同一个 portrait 只能应用一次。Replay 直接应用 `character_impression.updated` 中的完整画像状态，不根据 relationship memory 再叠加数值。
+
 ## Agent 输入
 
 `CharacterInnerContext.inner_portraits` 只暴露当前目标 NPC 自己的画像。如果 butler 对 player 有画像，butler 可以在 `inner_portraits` 中看到；另一个 NPC 看不到。
 
 `AgentContext.recent_events` 会过滤 `character_impression.updated`，避免一个 NPC 通过近期事件流看到其他 NPC 的私有画像。
 
-LLM Agent 可以读取 `inner_portraits`，但不能直接修改 `SessionState`。未来任何画像写入仍必须是运行时派生的 `character_impression.updated` 事件。
+`AgentContext.portrait_summary` 会注入当前目标 NPC 自己的低泄漏画像摘要，例如“江医生当前对玩家高度警惕”。它不是新的状态源，也不替代 `inner_portraits`。
+
+`portrait_summary` 只能描述当前目标 NPC 自己可见的主观状态。它不得包含其他 NPC 的私有 memory、Director audit 结论、未发现真相、memory id、source event id 或“某 NPC 不知道某事”这类跨视角判断。
+
+LLM Agent 可以读取目标 NPC 自己的 `inner_portraits` 和 `portrait_summary`，但不能直接修改 `SessionState`。未来任何画像写入仍必须是运行时派生的 `character_impression.updated` 事件。
 
 ## 画像感知披露 v0
 

@@ -111,6 +111,10 @@ def _apply_event(session: SessionState, event: WorldEvent) -> None:
     if event.type == EventType.MEMORY_CANDIDATE_CREATED:
         memory = MemoryCandidateState(
             memory_id=str(event.payload["memory_id"]),
+            rule_id=_optional_str(event.payload.get("rule_id")),
+            memory_type=str(event.payload.get("memory_type", "episodic")),
+            memory_scope=str(event.payload.get("memory_scope", "npc_private")),
+            memory_layer=str(event.payload.get("memory_layer", "working")),
             subject_id=str(event.payload["subject_id"]),
             owner_character_id=_optional_str(event.payload.get("owner_character_id")),
             visible_to_character_ids=[
@@ -118,8 +122,17 @@ def _apply_event(session: SessionState, event: WorldEvent) -> None:
             ],
             content=str(event.payload["content"]),
             source_event_id=str(event.payload["source_event_id"]),
+            source_event_ids=_source_event_ids(
+                event.payload,
+                str(event.payload["source_event_id"]),
+            ),
+            source_memory_ids=[
+                str(item) for item in event.payload.get("source_memory_ids", [])
+            ],
             visibility=[str(item) for item in event.payload["visibility"]],
             salience=float(event.payload["salience"]),
+            confidence=float(event.payload.get("confidence", 1.0)),
+            metadata=_metadata(event.payload.get("metadata")),
         )
         session.memory_candidates[memory.memory_id] = memory
         return
@@ -128,19 +141,44 @@ def _apply_event(session: SessionState, event: WorldEvent) -> None:
         memory_id = str(event.payload["memory_id"])
         current = session.memory_snapshots.get(memory_id)
         candidate = session.memory_candidates.get(memory_id)
-        content = candidate.content if candidate is not None else ""
+        fallback_content = candidate.content if candidate is not None else ""
+        content = str(event.payload.get("content") or fallback_content)
         created_at = current.created_at if current is not None else event.created_at
         snapshot = AgentMemorySnapshot(
             memory_id=memory_id,
-            subject_id=str(event.payload["subject_id"]),
+            rule_id=_optional_str(event.payload.get("rule_id")),
+            memory_type=str(
+                event.payload.get(
+                    "memory_type",
+                    candidate.memory_type if candidate is not None else "episodic",
+                )
+            ),
+            memory_scope=str(
+                event.payload.get(
+                    "memory_scope",
+                    candidate.memory_scope if candidate is not None else "npc_private",
+                )
+            ),
+            memory_layer=str(
+                event.payload.get(
+                    "memory_layer",
+                    candidate.memory_layer if candidate is not None else "working",
+                )
+            ),
+            subject_id=_optional_str(event.payload.get("subject_id")),
             owner_character_id=_optional_str(event.payload.get("owner_character_id")),
             visible_to_character_ids=[
                 str(item) for item in event.payload.get("visible_to_character_ids", [])
             ],
             content=current.content if current is not None else content,
             source_event_ids=[str(item) for item in event.payload["source_event_ids"]],
+            source_memory_ids=[
+                str(item) for item in event.payload.get("source_memory_ids", [])
+            ],
             salience=float(event.payload["salience"]),
+            confidence=float(event.payload.get("confidence", 1.0)),
             visibility=str(event.payload["visibility"]),
+            metadata=_metadata(event.payload.get("metadata")),
             last_updated_event_id=event.id,
             created_at=created_at,
             updated_at=event.created_at,
@@ -168,3 +206,16 @@ def _optional_str(value: object) -> str | None:
     if value is None:
         return None
     return str(value)
+
+
+def _source_event_ids(payload: dict[str, object], fallback_event_id: str) -> list[str]:
+    values = payload.get("source_event_ids")
+    if not isinstance(values, list) or not values:
+        return [fallback_event_id]
+    return [str(item) for item in values]
+
+
+def _metadata(value: object) -> dict[str, object]:
+    if not isinstance(value, dict):
+        return {}
+    return {str(key): item for key, item in value.items()}

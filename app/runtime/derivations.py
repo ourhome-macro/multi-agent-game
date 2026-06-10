@@ -15,6 +15,30 @@ from app.domain.models import (
 )
 from app.runtime.character_fact_awareness import upsert_character_fact_awareness
 from app.runtime.events import EventRecorder
+from app.runtime.memory_derivations import (
+    MEDICINE_BELIEF_MEMORY_ID,
+    MEDICINE_RELATIONSHIP_MEMORY_ID,
+    MEDICINE_STRATEGY_ID,
+    MEDICINE_STRATEGY_MEMORY_ID,
+    MEDICINE_TOPIC_RULE_IDS,
+    memory_derivation_rule_ids_for_event,
+    resolve_memory_derivation_effects,
+)
+
+CLUE_DISCOVERED_MEMORY_RULE_ID = "memory_rule.core.clue_discovered.episodic.v1"
+RELATIONSHIP_THRESHOLD_MEMORY_RULE_ID = (
+    "memory_rule.core.relationship_threshold.episodic.v1"
+)
+DIRECTOR_BLOCK_MEMORY_RULE_ID = "memory_rule.core.director_block.episodic.v1"
+ASKED_ABOUT_MEMORY_RULE_ID = "memory_rule.core.asked_about.episodic.v1"
+PRESENTED_CLUE_MEMORY_RULE_ID = "memory_rule.core.presented_clue.episodic.v1"
+SCENE_SHARED_PRESENTED_CLUE_MEMORY_RULE_ID = (
+    "memory_rule.core.scene_shared_presented_clue.episodic.v1"
+)
+PLAYER_ACCUSED_MEMORY_RULE_ID = "memory_rule.core.player_accused.episodic.v1"
+ACCUSATION_EVALUATED_MEMORY_RULE_ID = (
+    "memory_rule.core.accusation_evaluated.episodic.v1"
+)
 
 
 class DerivedEventSystem:
@@ -71,6 +95,12 @@ class DerivedEventSystem:
                 )
                 if memory_event is not None:
                     events.append(memory_event)
+                events.extend(
+                    self._derive_medicine_topic_typed_memory_candidates(
+                        session=session,
+                        source_event=source_event,
+                    )
+                )
             elif source_event.type == EventType.PLAYER_PRESENTED_CLUE:
                 awareness_event = self._derive_character_awareness_from_presented_clue(
                     case,
@@ -86,6 +116,19 @@ class DerivedEventSystem:
                 )
                 if memory_event is not None:
                     events.append(memory_event)
+                memory_event = self._derive_scene_shared_presented_clue_memory_candidate(
+                    case,
+                    session,
+                    source_event,
+                )
+                if memory_event is not None:
+                    events.append(memory_event)
+                events.extend(
+                    self._derive_medicine_topic_typed_memory_candidates(
+                        session=session,
+                        source_event=source_event,
+                    )
+                )
             elif source_event.type == EventType.PLAYER_ACCUSED:
                 awareness_events = self._derive_character_awareness_from_accusation(
                     case,
@@ -283,10 +326,13 @@ class DerivedEventSystem:
             session=session,
             source_event=source_event,
             memory_id=f"memory.player.clue_discovered.{clue_id}",
+            rule_id=CLUE_DISCOVERED_MEMORY_RULE_ID,
             content=f"Player discovered clue '{clue.title}'.",
             salience=0.8,
             owner_character_id=None,
             visible_to_character_ids=self._all_character_ids(case),
+            memory_scope="case",
+            memory_layer="core",
         )
 
     def _derive_relationship_memory_candidate(
@@ -309,6 +355,7 @@ class DerivedEventSystem:
                 "memory.player.relationship_threshold."
                 f"{source_id}.player.{metric}.{state_name}"
             ),
+            rule_id=RELATIONSHIP_THRESHOLD_MEMORY_RULE_ID,
             content=f"{character_name} became {state_name} toward the player ({metric}).",
             salience=0.7,
             owner_character_id=source_id,
@@ -333,10 +380,13 @@ class DerivedEventSystem:
                 "memory.player.director_blocked."
                 f"{target_id}.{source_event.payload.get('blocked_fact_id', 'unknown')}"
             ),
+            rule_id=DIRECTOR_BLOCK_MEMORY_RULE_ID,
             content=f"Conversation with {character_name} was blocked by narrative rules.",
             salience=0.9,
-            owner_character_id=target_id,
-            visible_to_character_ids=[target_id],
+            owner_character_id=None,
+            visible_to_character_ids=[],
+            memory_scope="director_audit",
+            memory_layer="working",
         )
 
     def _derive_asked_about_memory_candidate(
@@ -354,6 +404,7 @@ class DerivedEventSystem:
             session=session,
             source_event=source_event,
             memory_id=f"memory.player.asked_about.{target_id}.{subject_type}.{subject_id}",
+            rule_id=ASKED_ABOUT_MEMORY_RULE_ID,
             content=(
                 f"Player asked {target_name} about {subject_type} '{subject_id}' "
                 f"with pressure {pressure}."
@@ -361,6 +412,47 @@ class DerivedEventSystem:
             salience=max(0.4, pressure),
             owner_character_id=target_id,
             visible_to_character_ids=[target_id],
+        )
+
+    def _derive_scene_shared_presented_clue_memory_candidate(
+        self,
+        case: CasePackage,
+        session: SessionState,
+        source_event: WorldEvent,
+    ) -> WorldEvent | None:
+        scene_id = source_event.payload.get("scene_id")
+        if not isinstance(scene_id, str):
+            return None
+        present_character_ids = [
+            str(item)
+            for item in source_event.payload.get("present_character_ids", [])
+            if item is not None
+        ]
+        if len(present_character_ids) < 2:
+            return None
+        target_id = str(source_event.payload["target_id"])
+        if target_id not in present_character_ids:
+            return None
+        clue_id = str(source_event.payload["clue_id"])
+        pressure = float(source_event.payload["interaction_pressure"])
+        clue = next((item for item in case.clues if item.id == clue_id), None)
+        clue_label = clue.title if clue is not None else clue_id
+        return self._store_memory_candidate(
+            session=session,
+            source_event=source_event,
+            memory_id=f"memory.player.scene_shared.presented_clue.{scene_id}.{clue_id}",
+            rule_id=SCENE_SHARED_PRESENTED_CLUE_MEMORY_RULE_ID,
+            content=(
+                f"Player publicly presented clue '{clue_label}' in scene '{scene_id}'."
+            ),
+            salience=max(0.6, pressure),
+            owner_character_id=None,
+            visible_to_character_ids=present_character_ids,
+            source_memory_ids=[
+                f"memory.player.presented_clue.{target_id}.{clue_id}",
+            ],
+            memory_scope="scene_shared",
+            memory_layer="working",
         )
 
     def _derive_presented_clue_memory_candidate(
@@ -377,6 +469,7 @@ class DerivedEventSystem:
             session=session,
             source_event=source_event,
             memory_id=f"memory.player.presented_clue.{target_id}.{clue_id}",
+            rule_id=PRESENTED_CLUE_MEMORY_RULE_ID,
             content=(
                 f"Player pressured {target_name} with clue '{clue_id}' "
                 f"at pressure {pressure}."
@@ -385,6 +478,34 @@ class DerivedEventSystem:
             owner_character_id=target_id,
             visible_to_character_ids=[target_id],
         )
+
+    def _derive_medicine_topic_typed_memory_candidates(
+        self,
+        *,
+        session: SessionState,
+        source_event: WorldEvent,
+    ) -> list[WorldEvent]:
+        target_id = str(source_event.payload["target_id"])
+        events: list[WorldEvent] = []
+        for resolved_effect in resolve_memory_derivation_effects(source_event):
+            effect = resolved_effect.effect
+            event = self._store_memory_candidate(
+                session=session,
+                source_event=source_event,
+                memory_id=effect.memory_id,
+                rule_id=resolved_effect.rule_id,
+                memory_type=effect.memory_type,
+                content=effect.content,
+                salience=effect.salience,
+                owner_character_id=target_id,
+                visible_to_character_ids=[target_id],
+                source_memory_ids=[resolved_effect.source_memory_id],
+                confidence=effect.confidence,
+                metadata=effect.metadata,
+            )
+            if event is not None:
+                events.append(event)
+        return events
 
     def _derive_player_accused_memory_candidate(
         self,
@@ -402,6 +523,7 @@ class DerivedEventSystem:
             session=session,
             source_event=source_event,
             memory_id=f"memory.player.accused.{target_id}.{claim_id}",
+            rule_id=PLAYER_ACCUSED_MEMORY_RULE_ID,
             content=(
                 f"Player formally accused {target_name} with claim '{claim_id}' "
                 f"using evidence {evidence_ids}."
@@ -425,6 +547,7 @@ class DerivedEventSystem:
             session=session,
             source_event=source_event,
             memory_id=f"memory.player.accusation_evaluated.{target_id}.{claim_id}.{result}",
+            rule_id=ACCUSATION_EVALUATED_MEMORY_RULE_ID,
             content=(
                 f"Rule Engine evaluated the accusation against {target_name} "
                 f"for claim '{claim_id}' as {result}."
@@ -561,6 +684,16 @@ class DerivedEventSystem:
             _append_unique(impression.tags, "applies_pressure")
             impression.manipulation_risk = _clamp01(impression.manipulation_risk + 0.05)
         impression.trust_boundary = "Answer only within disclosed player knowledge."
+        if self._is_medicine_topic_rule_match(source_event):
+            impression.suspicion = _clamp_relationship(impression.suspicion + 0.2)
+            impression.trust = _clamp_relationship(impression.trust - 0.1)
+            impression.current_strategy = MEDICINE_STRATEGY_ID
+            impression.traits["medicine_topic_pressure"] = _clamp01(
+                impression.traits.get("medicine_topic_pressure", 0.0) + 0.2
+            )
+            _append_unique(impression.source_memory_ids, MEDICINE_BELIEF_MEMORY_ID)
+            _append_unique(impression.source_memory_ids, MEDICINE_RELATIONSHIP_MEMORY_ID)
+            _append_unique(impression.source_memory_ids, MEDICINE_STRATEGY_MEMORY_ID)
 
     def _apply_presented_clue_impression(
         self,
@@ -581,6 +714,16 @@ class DerivedEventSystem:
         impression.manipulation_risk = _clamp01(impression.manipulation_risk + 0.15)
         impression.usefulness = _clamp01(impression.usefulness + 0.15)
         impression.trust_boundary = "Avoid direct admissions unless evidence rules allow it."
+        if self._is_medicine_topic_rule_match(source_event):
+            impression.suspicion = _clamp_relationship(impression.suspicion + 0.2)
+            impression.trust = _clamp_relationship(impression.trust - 0.1)
+            impression.current_strategy = MEDICINE_STRATEGY_ID
+            impression.traits["medicine_topic_pressure"] = _clamp01(
+                impression.traits.get("medicine_topic_pressure", 0.0) + 0.3
+            )
+            _append_unique(impression.source_memory_ids, MEDICINE_BELIEF_MEMORY_ID)
+            _append_unique(impression.source_memory_ids, MEDICINE_RELATIONSHIP_MEMORY_ID)
+            _append_unique(impression.source_memory_ids, MEDICINE_STRATEGY_MEMORY_ID)
 
     def _apply_player_accused_impression(
         self,
@@ -664,29 +807,50 @@ class DerivedEventSystem:
             appended = True
         return appended
 
+    def _is_medicine_topic_rule_match(self, source_event: WorldEvent) -> bool:
+        return bool(memory_derivation_rule_ids_for_event(source_event) & MEDICINE_TOPIC_RULE_IDS)
+
     def _store_memory_candidate(
         self,
         *,
         session: SessionState,
         source_event: WorldEvent,
         memory_id: str,
+        rule_id: str | None = None,
+        memory_type: str = "episodic",
         content: str,
         salience: float,
         owner_character_id: str | None,
         visible_to_character_ids: list[str],
+        memory_scope: str = "npc_private",
+        memory_layer: str = "working",
+        source_memory_ids: list[str] | None = None,
+        confidence: float = 1.0,
+        metadata: dict[str, object] | None = None,
     ) -> WorldEvent | None:
         current = session.memory_candidates.get(memory_id)
-        if current is not None and current.source_event_id == source_event.id:
+        if current is not None and source_event.id in current.source_event_ids:
+            return None
+        current_snapshot = session.memory_snapshots.get(memory_id)
+        if current_snapshot is not None and source_event.id in current_snapshot.source_event_ids:
             return None
         session.memory_candidates[memory_id] = MemoryCandidateState(
             memory_id=memory_id,
+            rule_id=rule_id,
+            memory_type=memory_type,
+            memory_scope=memory_scope,
+            memory_layer=memory_layer,
             subject_id="player",
             owner_character_id=owner_character_id,
             visible_to_character_ids=visible_to_character_ids,
             content=content,
             source_event_id=source_event.id,
+            source_event_ids=[source_event.id],
+            source_memory_ids=source_memory_ids or [],
             visibility=["player"],
             salience=salience,
+            confidence=confidence,
+            metadata=metadata or {},
         )
         return self._recorder.append(
             session,
@@ -694,13 +858,21 @@ class DerivedEventSystem:
             event_type=EventType.MEMORY_CANDIDATE_CREATED,
             payload={
                 "memory_id": memory_id,
+                "rule_id": rule_id,
+                "memory_type": memory_type,
+                "memory_scope": memory_scope,
+                "memory_layer": memory_layer,
                 "subject_id": "player",
                 "owner_character_id": owner_character_id,
                 "visible_to_character_ids": visible_to_character_ids,
                 "content": content,
                 "source_event_id": source_event.id,
+                "source_event_ids": [source_event.id],
+                "source_memory_ids": source_memory_ids or [],
                 "visibility": ["player"],
                 "salience": salience,
+                "confidence": confidence,
+                "metadata": metadata or {},
             },
             caused_by_event_id=source_event.id,
         )
@@ -713,3 +885,7 @@ def _append_unique(items: list[str], item: str) -> None:
 
 def _clamp01(value: float) -> float:
     return round(min(max(value, 0.0), 1.0), 4)
+
+
+def _clamp_relationship(value: float) -> float:
+    return round(min(max(value, -1.0), 1.0), 4)

@@ -79,6 +79,7 @@ def build_agent_context(
         if character is not None
         else None
     )
+    portrait_summary = _portrait_summary(character, inner_context)
 
     return AgentContext(
         case_id=case.meta.id,
@@ -100,10 +101,15 @@ def build_agent_context(
         recent_events=[
             event
             for event in session.events
-            if event.type != EventType.CHARACTER_IMPRESSION_UPDATED
+            if _event_visible_to_target(event, action.target_id)
         ][-RECENT_EVENT_LIMIT:],
         memory_candidates=sorted(
-            session.memory_candidates.values(),
+            (
+                candidate
+                for candidate in session.memory_candidates.values()
+                if candidate.subject_id == "player"
+                and _memory_injectable_to_agent(candidate, action.target_id)
+            ),
             key=lambda value: value.memory_id,
         ),
         memory_snapshots=sorted(
@@ -111,7 +117,7 @@ def build_agent_context(
                 snapshot
                 for snapshot in session.memory_snapshots.values()
                 if snapshot.subject_id == "player"
-                and _memory_visible_to_target(snapshot, action.target_id)
+                and _memory_injectable_to_agent(snapshot, action.target_id)
             ),
             key=lambda value: value.memory_id,
         ),
@@ -126,6 +132,7 @@ def build_agent_context(
         player_action=action,
         target_profile=target_profile,
         inner_context=inner_context,
+        portrait_summary=portrait_summary,
         default_speech=dialogue.default_speech if dialogue is not None else None,
         default_intent=dialogue.default_intent if dialogue is not None else None,
         reply_options=dialogue.replies if dialogue is not None else [],
@@ -321,9 +328,144 @@ def _action_matches_related_clue(action: PlayerAction, related_clue_ids: list[st
     )
 
 
+def _memory_injectable_to_agent(snapshot: object, target_id: str) -> bool:
+    if not _memory_scope_injectable(snapshot):
+        return False
+    if not _memory_visible_to_target(snapshot, target_id):
+        return False
+    return _memory_layer_injectable(snapshot)
+
+
+def _memory_scope_injectable(snapshot: object) -> bool:
+    return getattr(snapshot, "memory_scope", "npc_private") in {
+        "case",
+        "session",
+        "npc_private",
+        "scene_shared",
+    }
+
+
 def _memory_visible_to_target(snapshot: object, target_id: str) -> bool:
+    scope = getattr(snapshot, "memory_scope", "npc_private")
     owner = getattr(snapshot, "owner_character_id", None)
     visible_to = set(getattr(snapshot, "visible_to_character_ids", []))
-    if not visible_to and owner is None:
+    if scope in {"case", "session"}:
+        return not visible_to or owner == target_id or target_id in visible_to
+    if scope == "npc_private":
+        return owner == target_id or target_id in visible_to
+    if scope == "scene_shared":
+        return target_id in visible_to or owner == target_id
+    return False
+
+
+def _memory_layer_injectable(snapshot: object) -> bool:
+    scope = getattr(snapshot, "memory_scope", "npc_private")
+    layer = getattr(snapshot, "memory_layer", "working")
+    if scope == "case":
+        return layer == "core"
+    if scope == "session":
+        return layer == "working"
+    return layer != "archival"
+
+
+def _event_visible_to_target(event: object, target_id: str) -> bool:
+    event_type = getattr(event, "type", None)
+    payload = getattr(event, "payload", {})
+    actor_id = getattr(event, "actor_id", None)
+    if not isinstance(payload, dict):
         return True
-    return owner == target_id or target_id in visible_to
+    if event_type in {
+        EventType.CHARACTER_IMPRESSION_UPDATED,
+        EventType.CHARACTER_FACT_AWARENESS_UPDATED,
+    }:
+        return False
+    if event_type in {
+        EventType.MEMORY_CANDIDATE_CREATED,
+        EventType.AGENT_MEMORY_SNAPSHOT_UPDATED,
+    }:
+        return _memory_event_visible_to_target(payload, target_id)
+    if event_type in {
+        EventType.PLAYER_ASKED_ABOUT,
+        EventType.PLAYER_PRESENTED_CLUE,
+        EventType.PLAYER_ACCUSED,
+        EventType.ACCUSATION_EVALUATED,
+        EventType.DIRECTOR_BLOCKED,
+    }:
+        return payload.get("target_id") == target_id
+    if event_type == EventType.NPC_REPLIED:
+        return actor_id == target_id
+    if event_type in {
+        EventType.RELATIONSHIP_CHANGED,
+        EventType.RELATIONSHIP_THRESHOLD_CROSSED,
+    }:
+        return payload.get("source_id") == target_id or payload.get("target_id") == target_id
+    return True
+
+
+def _memory_event_visible_to_target(payload: dict[str, object], target_id: str) -> bool:
+    if not _memory_event_scope_injectable(payload):
+        return False
+    if not _memory_event_target_visible(payload, target_id):
+        return False
+    return _memory_event_layer_injectable(payload)
+
+
+def _memory_event_scope_injectable(payload: dict[str, object]) -> bool:
+    return str(payload.get("memory_scope", "npc_private")) in {
+        "case",
+        "session",
+        "npc_private",
+        "scene_shared",
+    }
+
+
+def _memory_event_target_visible(payload: dict[str, object], target_id: str) -> bool:
+    scope = str(payload.get("memory_scope", "npc_private"))
+    owner = payload.get("owner_character_id")
+    visible_to = {
+        str(item) for item in payload.get("visible_to_character_ids", []) if item is not None
+    }
+    if scope in {"case", "session"}:
+        return not visible_to or owner == target_id or target_id in visible_to
+    if scope == "npc_private":
+        return owner == target_id or target_id in visible_to
+    if scope == "scene_shared":
+        return target_id in visible_to or owner == target_id
+    return False
+
+
+def _memory_event_layer_injectable(payload: dict[str, object]) -> bool:
+    scope = str(payload.get("memory_scope", "npc_private"))
+    layer = str(payload.get("memory_layer", "working"))
+    if scope == "case":
+        return layer == "core"
+    if scope == "session":
+        return layer == "working"
+    return layer != "archival"
+
+
+def _portrait_summary(
+    character: CharacterConfig | None,
+    inner_context: CharacterInnerContext | None,
+) -> str | None:
+    if character is None or inner_context is None:
+        return None
+    portrait = next(
+        (
+            item
+            for item in inner_context.inner_portraits
+            if item.target_id == "player" and item.observer_id == character.id
+        ),
+        None,
+    )
+    if portrait is None:
+        return None
+    if (
+        portrait.current_strategy == "avoid_medicine_topic"
+        or portrait.suspicion >= 0.2
+        or portrait.threat_level >= 0.5
+    ):
+        return f"{character.display_name}当前对玩家高度警惕"
+    if portrait.trust >= 0.5 or portrait.alliance_potential >= 0.7:
+        return f"{character.display_name}当前对玩家保持有限信任"
+    return f"{character.display_name}当前仍在评估玩家"

@@ -65,6 +65,10 @@
     "type": "memory_candidate.created",
     "payload": {
       "memory_id": "memory.player.clue_discovered.inward_tide_mark",
+      "rule_id": "memory_rule.core.clue_discovered.episodic.v1",
+      "memory_type": "episodic",
+      "memory_scope": "case",
+      "memory_layer": "core",
       "subject_id": "player",
       "owner_character_id": null,
       "visible_to_character_ids": [
@@ -73,10 +77,16 @@
       ],
       "content": "Player discovered clue '向内延伸的潮痕'.",
       "source_event_id": "event_003",
+      "source_event_ids": [
+        "event_003"
+      ],
+      "source_memory_ids": [],
       "visibility": [
         "player"
       ],
-      "salience": 0.8
+      "salience": 0.8,
+      "confidence": 1.0,
+      "metadata": {}
     },
     "caused_by_event_id": "event_003",
     "created_at": "timestamp"
@@ -89,17 +99,25 @@
     "type": "agent_memory_snapshot.updated",
     "payload": {
       "memory_id": "memory.player.clue_discovered.inward_tide_mark",
+      "rule_id": "memory_rule.core.clue_discovered.episodic.v1",
+      "memory_type": "episodic",
+      "memory_scope": "case",
+      "memory_layer": "core",
       "subject_id": "player",
       "owner_character_id": null,
       "visible_to_character_ids": [
         "dockmaster",
         "clerk"
       ],
+      "content": "Player discovered clue '向内延伸的潮痕'.",
       "source_event_ids": [
         "event_003"
       ],
+      "source_memory_ids": [],
       "salience": 0.8,
+      "confidence": 1.0,
       "visibility": "private",
+      "metadata": {},
       "operation": "created"
     },
     "caused_by_event_id": "event_005",
@@ -225,6 +243,14 @@
     "actor_id": "character_impression_system",
     "type": "character_impression.updated",
     "payload": {
+      "owner_character_id": "dockmaster",
+      "subject_id": "player",
+      "trust": 0.0,
+      "suspicion": 0.0,
+      "fear": 0.0,
+      "traits": {},
+      "current_strategy": null,
+      "source_memory_ids": [],
       "observer_id": "dockmaster",
       "target_id": "player",
       "personality_impression": "The player asks targeted investigative questions.",
@@ -292,6 +318,10 @@
     "type": "memory_candidate.created",
     "payload": {
       "memory_id": "memory.player.asked_about.dockmaster.clue.inward_tide_mark",
+      "rule_id": "memory_rule.core.asked_about.episodic.v1",
+      "memory_type": "episodic",
+      "memory_scope": "npc_private",
+      "memory_layer": "working",
       "subject_id": "player",
       "owner_character_id": "dockmaster",
       "visible_to_character_ids": [
@@ -299,10 +329,16 @@
       ],
       "content": "Player asked 赵码头长 about clue 'inward_tide_mark' with pressure 0.6.",
       "source_event_id": "event_009",
+      "source_event_ids": [
+        "event_009"
+      ],
+      "source_memory_ids": [],
       "visibility": [
         "player"
       ],
-      "salience": 0.6
+      "salience": 0.6,
+      "confidence": 1.0,
+      "metadata": {}
     },
     "caused_by_event_id": "event_009",
     "created_at": "timestamp"
@@ -315,16 +351,24 @@
     "type": "agent_memory_snapshot.updated",
     "payload": {
       "memory_id": "memory.player.asked_about.dockmaster.clue.inward_tide_mark",
+      "rule_id": "memory_rule.core.asked_about.episodic.v1",
+      "memory_type": "episodic",
+      "memory_scope": "npc_private",
+      "memory_layer": "working",
       "subject_id": "player",
       "owner_character_id": "dockmaster",
       "visible_to_character_ids": [
         "dockmaster"
       ],
+      "content": "Player asked 赵码头长 about clue 'inward_tide_mark' with pressure 0.6.",
       "source_event_ids": [
         "event_009"
       ],
+      "source_memory_ids": [],
       "salience": 0.6,
+      "confidence": 1.0,
       "visibility": "private",
+      "metadata": {},
       "operation": "created"
     },
     "caused_by_event_id": "event_015",
@@ -337,6 +381,14 @@
     "actor_id": "character_impression_system",
     "type": "character_impression.updated",
     "payload": {
+      "owner_character_id": "dockmaster",
+      "subject_id": "player",
+      "trust": 0.0,
+      "suspicion": 0.0,
+      "fear": 0.0,
+      "traits": {},
+      "current_strategy": null,
+      "source_memory_ids": [],
       "observer_id": "dockmaster",
       "target_id": "player",
       "personality_impression": "The player asks targeted investigative questions.",
@@ -378,6 +430,10 @@
     "type": "memory_candidate.created",
     "payload": {
       "memory_id": "memory.player.relationship_threshold.dockmaster.player.suspicion.guarded",
+      "rule_id": "memory_rule.core.relationship_threshold.episodic.v1",
+      "memory_type": "episodic",
+      "memory_scope": "npc_private",
+      "memory_layer": "working",
       "subject_id": "player",
       "owner_character_id": "dockmaster",
       "visible_to_character_ids": [
@@ -385,10 +441,16 @@
       ],
       "content": "赵码头长 became guarded toward the player (suspicion).",
       "source_event_id": "event_012",
+      "source_event_ids": [
+        "event_012"
+      ],
+      "source_memory_ids": [],
       "visibility": [
         "player"
       ],
-      "salience": 0.7
+      "salience": 0.7,
+      "confidence": 1.0,
+      "metadata": {}
     },
     "caused_by_event_id": "event_012",
     "created_at": "timestamp"
@@ -401,16 +463,24 @@
     "type": "agent_memory_snapshot.updated",
     "payload": {
       "memory_id": "memory.player.relationship_threshold.dockmaster.player.suspicion.guarded",
+      "rule_id": "memory_rule.core.relationship_threshold.episodic.v1",
+      "memory_type": "episodic",
+      "memory_scope": "npc_private",
+      "memory_layer": "working",
       "subject_id": "player",
       "owner_character_id": "dockmaster",
       "visible_to_character_ids": [
         "dockmaster"
       ],
+      "content": "赵码头长 became guarded toward the player (suspicion).",
       "source_event_ids": [
         "event_012"
       ],
+      "source_memory_ids": [],
       "salience": 0.7,
+      "confidence": 1.0,
       "visibility": "private",
+      "metadata": {},
       "operation": "created"
     },
     "caused_by_event_id": "event_018",
@@ -522,6 +592,14 @@
     "actor_id": "character_impression_system",
     "type": "character_impression.updated",
     "payload": {
+      "owner_character_id": "clerk",
+      "subject_id": "player",
+      "trust": 0.0,
+      "suspicion": 0.0,
+      "fear": 0.0,
+      "traits": {},
+      "current_strategy": null,
+      "source_memory_ids": [],
       "observer_id": "clerk",
       "target_id": "player",
       "personality_impression": "The player can push the conversation into unsafe territory.",
@@ -556,17 +634,25 @@
     "type": "memory_candidate.created",
     "payload": {
       "memory_id": "memory.player.director_blocked.clerk.ledger_owner",
+      "rule_id": "memory_rule.core.director_block.episodic.v1",
+      "memory_type": "episodic",
+      "memory_scope": "director_audit",
+      "memory_layer": "working",
       "subject_id": "player",
-      "owner_character_id": "clerk",
-      "visible_to_character_ids": [
-        "clerk"
-      ],
+      "owner_character_id": null,
+      "visible_to_character_ids": [],
       "content": "Conversation with 沈账房 was blocked by narrative rules.",
       "source_event_id": "event_024",
+      "source_event_ids": [
+        "event_024"
+      ],
+      "source_memory_ids": [],
       "visibility": [
         "player"
       ],
-      "salience": 0.9
+      "salience": 0.9,
+      "confidence": 1.0,
+      "metadata": {}
     },
     "caused_by_event_id": "event_024",
     "created_at": "timestamp"
@@ -579,16 +665,22 @@
     "type": "agent_memory_snapshot.updated",
     "payload": {
       "memory_id": "memory.player.director_blocked.clerk.ledger_owner",
+      "rule_id": "memory_rule.core.director_block.episodic.v1",
+      "memory_type": "episodic",
+      "memory_scope": "director_audit",
+      "memory_layer": "working",
       "subject_id": "player",
-      "owner_character_id": "clerk",
-      "visible_to_character_ids": [
-        "clerk"
-      ],
+      "owner_character_id": null,
+      "visible_to_character_ids": [],
+      "content": "Conversation with 沈账房 was blocked by narrative rules.",
       "source_event_ids": [
         "event_024"
       ],
+      "source_memory_ids": [],
       "salience": 0.9,
+      "confidence": 1.0,
       "visibility": "private",
+      "metadata": {},
       "operation": "created"
     },
     "caused_by_event_id": "event_026",
@@ -647,6 +739,10 @@
     "type": "memory_candidate.created",
     "payload": {
       "memory_id": "memory.player.clue_discovered.inward_broken_lamp",
+      "rule_id": "memory_rule.core.clue_discovered.episodic.v1",
+      "memory_type": "episodic",
+      "memory_scope": "case",
+      "memory_layer": "core",
       "subject_id": "player",
       "owner_character_id": null,
       "visible_to_character_ids": [
@@ -655,10 +751,16 @@
       ],
       "content": "Player discovered clue '向内破裂的煤油灯'.",
       "source_event_id": "event_029",
+      "source_event_ids": [
+        "event_029"
+      ],
+      "source_memory_ids": [],
       "visibility": [
         "player"
       ],
-      "salience": 0.8
+      "salience": 0.8,
+      "confidence": 1.0,
+      "metadata": {}
     },
     "caused_by_event_id": "event_029",
     "created_at": "timestamp"
@@ -671,17 +773,25 @@
     "type": "agent_memory_snapshot.updated",
     "payload": {
       "memory_id": "memory.player.clue_discovered.inward_broken_lamp",
+      "rule_id": "memory_rule.core.clue_discovered.episodic.v1",
+      "memory_type": "episodic",
+      "memory_scope": "case",
+      "memory_layer": "core",
       "subject_id": "player",
       "owner_character_id": null,
       "visible_to_character_ids": [
         "dockmaster",
         "clerk"
       ],
+      "content": "Player discovered clue '向内破裂的煤油灯'.",
       "source_event_ids": [
         "event_029"
       ],
+      "source_memory_ids": [],
       "salience": 0.8,
+      "confidence": 1.0,
       "visibility": "private",
+      "metadata": {},
       "operation": "created"
     },
     "caused_by_event_id": "event_031",
@@ -740,6 +850,10 @@
     "type": "memory_candidate.created",
     "payload": {
       "memory_id": "memory.player.clue_discovered.blue_ledger_page",
+      "rule_id": "memory_rule.core.clue_discovered.episodic.v1",
+      "memory_type": "episodic",
+      "memory_scope": "case",
+      "memory_layer": "core",
       "subject_id": "player",
       "owner_character_id": null,
       "visible_to_character_ids": [
@@ -748,10 +862,16 @@
       ],
       "content": "Player discovered clue '蓝墨账页'.",
       "source_event_id": "event_034",
+      "source_event_ids": [
+        "event_034"
+      ],
+      "source_memory_ids": [],
       "visibility": [
         "player"
       ],
-      "salience": 0.8
+      "salience": 0.8,
+      "confidence": 1.0,
+      "metadata": {}
     },
     "caused_by_event_id": "event_034",
     "created_at": "timestamp"
@@ -764,17 +884,25 @@
     "type": "agent_memory_snapshot.updated",
     "payload": {
       "memory_id": "memory.player.clue_discovered.blue_ledger_page",
+      "rule_id": "memory_rule.core.clue_discovered.episodic.v1",
+      "memory_type": "episodic",
+      "memory_scope": "case",
+      "memory_layer": "core",
       "subject_id": "player",
       "owner_character_id": null,
       "visible_to_character_ids": [
         "dockmaster",
         "clerk"
       ],
+      "content": "Player discovered clue '蓝墨账页'.",
       "source_event_ids": [
         "event_034"
       ],
+      "source_memory_ids": [],
       "salience": 0.8,
+      "confidence": 1.0,
       "visibility": "private",
+      "metadata": {},
       "operation": "created"
     },
     "caused_by_event_id": "event_036",
@@ -897,6 +1025,14 @@
     "actor_id": "character_impression_system",
     "type": "character_impression.updated",
     "payload": {
+      "owner_character_id": "clerk",
+      "subject_id": "player",
+      "trust": 0.0,
+      "suspicion": 0.0,
+      "fear": 0.0,
+      "traits": {},
+      "current_strategy": null,
+      "source_memory_ids": [],
       "observer_id": "clerk",
       "target_id": "player",
       "personality_impression": "The player is evidence-driven and willing to pressure NPCs.",
@@ -970,6 +1106,10 @@
     "type": "memory_candidate.created",
     "payload": {
       "memory_id": "memory.player.presented_clue.clerk.blue_ledger_page",
+      "rule_id": "memory_rule.core.presented_clue.episodic.v1",
+      "memory_type": "episodic",
+      "memory_scope": "npc_private",
+      "memory_layer": "working",
       "subject_id": "player",
       "owner_character_id": "clerk",
       "visible_to_character_ids": [
@@ -977,10 +1117,16 @@
       ],
       "content": "Player pressured 沈账房 with clue 'blue_ledger_page' at pressure 0.9.",
       "source_event_id": "event_040",
+      "source_event_ids": [
+        "event_040"
+      ],
+      "source_memory_ids": [],
       "visibility": [
         "player"
       ],
-      "salience": 0.9
+      "salience": 0.9,
+      "confidence": 1.0,
+      "metadata": {}
     },
     "caused_by_event_id": "event_040",
     "created_at": "timestamp"
@@ -993,16 +1139,24 @@
     "type": "agent_memory_snapshot.updated",
     "payload": {
       "memory_id": "memory.player.presented_clue.clerk.blue_ledger_page",
+      "rule_id": "memory_rule.core.presented_clue.episodic.v1",
+      "memory_type": "episodic",
+      "memory_scope": "npc_private",
+      "memory_layer": "working",
       "subject_id": "player",
       "owner_character_id": "clerk",
       "visible_to_character_ids": [
         "clerk"
       ],
+      "content": "Player pressured 沈账房 with clue 'blue_ledger_page' at pressure 0.9.",
       "source_event_ids": [
         "event_040"
       ],
+      "source_memory_ids": [],
       "salience": 0.9,
+      "confidence": 1.0,
       "visibility": "private",
+      "metadata": {},
       "operation": "created"
     },
     "caused_by_event_id": "event_046",
@@ -1015,6 +1169,14 @@
     "actor_id": "character_impression_system",
     "type": "character_impression.updated",
     "payload": {
+      "owner_character_id": "clerk",
+      "subject_id": "player",
+      "trust": 0.0,
+      "suspicion": 0.0,
+      "fear": 0.0,
+      "traits": {},
+      "current_strategy": null,
+      "source_memory_ids": [],
       "observer_id": "clerk",
       "target_id": "player",
       "personality_impression": "The player is evidence-driven and willing to pressure NPCs.",
@@ -1061,6 +1223,10 @@
     "type": "memory_candidate.created",
     "payload": {
       "memory_id": "memory.player.relationship_threshold.clerk.player.fear.afraid",
+      "rule_id": "memory_rule.core.relationship_threshold.episodic.v1",
+      "memory_type": "episodic",
+      "memory_scope": "npc_private",
+      "memory_layer": "working",
       "subject_id": "player",
       "owner_character_id": "clerk",
       "visible_to_character_ids": [
@@ -1068,10 +1234,16 @@
       ],
       "content": "沈账房 became afraid toward the player (fear).",
       "source_event_id": "event_043",
+      "source_event_ids": [
+        "event_043"
+      ],
+      "source_memory_ids": [],
       "visibility": [
         "player"
       ],
-      "salience": 0.7
+      "salience": 0.7,
+      "confidence": 1.0,
+      "metadata": {}
     },
     "caused_by_event_id": "event_043",
     "created_at": "timestamp"
@@ -1084,16 +1256,24 @@
     "type": "agent_memory_snapshot.updated",
     "payload": {
       "memory_id": "memory.player.relationship_threshold.clerk.player.fear.afraid",
+      "rule_id": "memory_rule.core.relationship_threshold.episodic.v1",
+      "memory_type": "episodic",
+      "memory_scope": "npc_private",
+      "memory_layer": "working",
       "subject_id": "player",
       "owner_character_id": "clerk",
       "visible_to_character_ids": [
         "clerk"
       ],
+      "content": "沈账房 became afraid toward the player (fear).",
       "source_event_ids": [
         "event_043"
       ],
+      "source_memory_ids": [],
       "salience": 0.7,
+      "confidence": 1.0,
       "visibility": "private",
+      "metadata": {},
       "operation": "created"
     },
     "caused_by_event_id": "event_049",
@@ -1207,6 +1387,14 @@
     "actor_id": "character_impression_system",
     "type": "character_impression.updated",
     "payload": {
+      "owner_character_id": "dockmaster",
+      "subject_id": "player",
+      "trust": 0.0,
+      "suspicion": 0.0,
+      "fear": 0.0,
+      "traits": {},
+      "current_strategy": null,
+      "source_memory_ids": [],
       "observer_id": "dockmaster",
       "target_id": "player",
       "personality_impression": "The player is willing to make formal accusations.",
@@ -1350,6 +1538,10 @@
     "type": "memory_candidate.created",
     "payload": {
       "memory_id": "memory.player.accused.dockmaster.dockmaster_opened_warehouse",
+      "rule_id": "memory_rule.core.player_accused.episodic.v1",
+      "memory_type": "episodic",
+      "memory_scope": "npc_private",
+      "memory_layer": "working",
       "subject_id": "player",
       "owner_character_id": "dockmaster",
       "visible_to_character_ids": [
@@ -1357,10 +1549,16 @@
       ],
       "content": "Player formally accused 赵码头长 with claim 'dockmaster_opened_warehouse' using evidence ['inward_tide_mark', 'inward_broken_lamp', 'blue_ledger_page'].",
       "source_event_id": "event_054",
+      "source_event_ids": [
+        "event_054"
+      ],
+      "source_memory_ids": [],
       "visibility": [
         "player"
       ],
-      "salience": 1.0
+      "salience": 1.0,
+      "confidence": 1.0,
+      "metadata": {}
     },
     "caused_by_event_id": "event_054",
     "created_at": "timestamp"
@@ -1373,16 +1571,24 @@
     "type": "agent_memory_snapshot.updated",
     "payload": {
       "memory_id": "memory.player.accused.dockmaster.dockmaster_opened_warehouse",
+      "rule_id": "memory_rule.core.player_accused.episodic.v1",
+      "memory_type": "episodic",
+      "memory_scope": "npc_private",
+      "memory_layer": "working",
       "subject_id": "player",
       "owner_character_id": "dockmaster",
       "visible_to_character_ids": [
         "dockmaster"
       ],
+      "content": "Player formally accused 赵码头长 with claim 'dockmaster_opened_warehouse' using evidence ['inward_tide_mark', 'inward_broken_lamp', 'blue_ledger_page'].",
       "source_event_ids": [
         "event_054"
       ],
+      "source_memory_ids": [],
       "salience": 1.0,
+      "confidence": 1.0,
       "visibility": "private",
+      "metadata": {},
       "operation": "created"
     },
     "caused_by_event_id": "event_060",
@@ -1395,6 +1601,14 @@
     "actor_id": "character_impression_system",
     "type": "character_impression.updated",
     "payload": {
+      "owner_character_id": "dockmaster",
+      "subject_id": "player",
+      "trust": 0.0,
+      "suspicion": 0.0,
+      "fear": 0.0,
+      "traits": {},
+      "current_strategy": null,
+      "source_memory_ids": [],
       "observer_id": "dockmaster",
       "target_id": "player",
       "personality_impression": "The player can assemble decisive evidence.",
@@ -1445,6 +1659,10 @@
     "type": "memory_candidate.created",
     "payload": {
       "memory_id": "memory.player.accusation_evaluated.dockmaster.dockmaster_opened_warehouse.correct",
+      "rule_id": "memory_rule.core.accusation_evaluated.episodic.v1",
+      "memory_type": "episodic",
+      "memory_scope": "npc_private",
+      "memory_layer": "working",
       "subject_id": "player",
       "owner_character_id": "dockmaster",
       "visible_to_character_ids": [
@@ -1452,10 +1670,16 @@
       ],
       "content": "Rule Engine evaluated the accusation against 赵码头长 for claim 'dockmaster_opened_warehouse' as correct.",
       "source_event_id": "event_055",
+      "source_event_ids": [
+        "event_055"
+      ],
+      "source_memory_ids": [],
       "visibility": [
         "player"
       ],
-      "salience": 1.0
+      "salience": 1.0,
+      "confidence": 1.0,
+      "metadata": {}
     },
     "caused_by_event_id": "event_055",
     "created_at": "timestamp"
@@ -1468,16 +1692,24 @@
     "type": "agent_memory_snapshot.updated",
     "payload": {
       "memory_id": "memory.player.accusation_evaluated.dockmaster.dockmaster_opened_warehouse.correct",
+      "rule_id": "memory_rule.core.accusation_evaluated.episodic.v1",
+      "memory_type": "episodic",
+      "memory_scope": "npc_private",
+      "memory_layer": "working",
       "subject_id": "player",
       "owner_character_id": "dockmaster",
       "visible_to_character_ids": [
         "dockmaster"
       ],
+      "content": "Rule Engine evaluated the accusation against 赵码头长 for claim 'dockmaster_opened_warehouse' as correct.",
       "source_event_ids": [
         "event_055"
       ],
+      "source_memory_ids": [],
       "salience": 1.0,
+      "confidence": 1.0,
       "visibility": "private",
+      "metadata": {},
       "operation": "created"
     },
     "caused_by_event_id": "event_063",

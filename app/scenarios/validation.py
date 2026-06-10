@@ -288,6 +288,8 @@ def _validate_player_action(
 
     if action.clue_id is not None:
         _ensure_known(clue_ids, [action.clue_id], f"{context}.clue_id")
+    if action.scene_id is not None:
+        _ensure_known(scene_ids, [action.scene_id], f"{context}.scene_id")
     _ensure_known(clue_ids, action.evidence_clue_ids, f"{context}.evidence_clue_ids")
     if action.subject_type == SubjectType.CLUE:
         _ensure_known(clue_ids, [str(action.subject_id)], f"{context}.subject_id")

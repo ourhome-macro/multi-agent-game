@@ -65,6 +65,10 @@
     "type": "memory_candidate.created",
     "payload": {
       "memory_id": "memory.player.clue_discovered.scratched_drawer",
+      "rule_id": "memory_rule.core.clue_discovered.episodic.v1",
+      "memory_type": "episodic",
+      "memory_scope": "case",
+      "memory_layer": "core",
       "subject_id": "player",
       "owner_character_id": null,
       "visible_to_character_ids": [
@@ -73,10 +77,16 @@
       ],
       "content": "Player discovered clue '抽屉划痕'.",
       "source_event_id": "event_003",
+      "source_event_ids": [
+        "event_003"
+      ],
+      "source_memory_ids": [],
       "visibility": [
         "player"
       ],
-      "salience": 0.8
+      "salience": 0.8,
+      "confidence": 1.0,
+      "metadata": {}
     },
     "caused_by_event_id": "event_003",
     "created_at": "timestamp"
@@ -89,17 +99,25 @@
     "type": "agent_memory_snapshot.updated",
     "payload": {
       "memory_id": "memory.player.clue_discovered.scratched_drawer",
+      "rule_id": "memory_rule.core.clue_discovered.episodic.v1",
+      "memory_type": "episodic",
+      "memory_scope": "case",
+      "memory_layer": "core",
       "subject_id": "player",
       "owner_character_id": null,
       "visible_to_character_ids": [
         "butler",
         "niece"
       ],
+      "content": "Player discovered clue '抽屉划痕'.",
       "source_event_ids": [
         "event_003"
       ],
+      "source_memory_ids": [],
       "salience": 0.8,
+      "confidence": 1.0,
       "visibility": "private",
+      "metadata": {},
       "operation": "created"
     },
     "caused_by_event_id": "event_005",
@@ -208,6 +226,14 @@
     "actor_id": "character_impression_system",
     "type": "character_impression.updated",
     "payload": {
+      "owner_character_id": "butler",
+      "subject_id": "player",
+      "trust": 0.0,
+      "suspicion": 0.0,
+      "fear": 0.0,
+      "traits": {},
+      "current_strategy": null,
+      "source_memory_ids": [],
       "observer_id": "butler",
       "target_id": "player",
       "personality_impression": "The player asks targeted investigative questions.",
@@ -276,6 +302,10 @@
     "type": "memory_candidate.created",
     "payload": {
       "memory_id": "memory.player.asked_about.butler.clue.scratched_drawer",
+      "rule_id": "memory_rule.core.asked_about.episodic.v1",
+      "memory_type": "episodic",
+      "memory_scope": "npc_private",
+      "memory_layer": "working",
       "subject_id": "player",
       "owner_character_id": "butler",
       "visible_to_character_ids": [
@@ -283,10 +313,16 @@
       ],
       "content": "Player asked 韩管家 about clue 'scratched_drawer' with pressure 0.6.",
       "source_event_id": "event_009",
+      "source_event_ids": [
+        "event_009"
+      ],
+      "source_memory_ids": [],
       "visibility": [
         "player"
       ],
-      "salience": 0.6
+      "salience": 0.6,
+      "confidence": 1.0,
+      "metadata": {}
     },
     "caused_by_event_id": "event_009",
     "created_at": "timestamp"
@@ -299,16 +335,24 @@
     "type": "agent_memory_snapshot.updated",
     "payload": {
       "memory_id": "memory.player.asked_about.butler.clue.scratched_drawer",
+      "rule_id": "memory_rule.core.asked_about.episodic.v1",
+      "memory_type": "episodic",
+      "memory_scope": "npc_private",
+      "memory_layer": "working",
       "subject_id": "player",
       "owner_character_id": "butler",
       "visible_to_character_ids": [
         "butler"
       ],
+      "content": "Player asked 韩管家 about clue 'scratched_drawer' with pressure 0.6.",
       "source_event_ids": [
         "event_009"
       ],
+      "source_memory_ids": [],
       "salience": 0.6,
+      "confidence": 1.0,
       "visibility": "private",
+      "metadata": {},
       "operation": "created"
     },
     "caused_by_event_id": "event_014",
@@ -405,6 +449,14 @@
     "actor_id": "character_impression_system",
     "type": "character_impression.updated",
     "payload": {
+      "owner_character_id": "butler",
+      "subject_id": "player",
+      "trust": 0.0,
+      "suspicion": 0.0,
+      "fear": 0.0,
+      "traits": {},
+      "current_strategy": null,
+      "source_memory_ids": [],
       "observer_id": "butler",
       "target_id": "player",
       "personality_impression": "The player is evidence-driven and willing to pressure NPCs.",
@@ -479,6 +531,10 @@
     "type": "memory_candidate.created",
     "payload": {
       "memory_id": "memory.player.presented_clue.butler.scratched_drawer",
+      "rule_id": "memory_rule.core.presented_clue.episodic.v1",
+      "memory_type": "episodic",
+      "memory_scope": "npc_private",
+      "memory_layer": "working",
       "subject_id": "player",
       "owner_character_id": "butler",
       "visible_to_character_ids": [
@@ -486,10 +542,16 @@
       ],
       "content": "Player pressured 韩管家 with clue 'scratched_drawer' at pressure 0.9.",
       "source_event_id": "event_016",
+      "source_event_ids": [
+        "event_016"
+      ],
+      "source_memory_ids": [],
       "visibility": [
         "player"
       ],
-      "salience": 0.9
+      "salience": 0.9,
+      "confidence": 1.0,
+      "metadata": {}
     },
     "caused_by_event_id": "event_016",
     "created_at": "timestamp"
@@ -502,16 +564,24 @@
     "type": "agent_memory_snapshot.updated",
     "payload": {
       "memory_id": "memory.player.presented_clue.butler.scratched_drawer",
+      "rule_id": "memory_rule.core.presented_clue.episodic.v1",
+      "memory_type": "episodic",
+      "memory_scope": "npc_private",
+      "memory_layer": "working",
       "subject_id": "player",
       "owner_character_id": "butler",
       "visible_to_character_ids": [
         "butler"
       ],
+      "content": "Player pressured 韩管家 with clue 'scratched_drawer' at pressure 0.9.",
       "source_event_ids": [
         "event_016"
       ],
+      "source_memory_ids": [],
       "salience": 0.9,
+      "confidence": 1.0,
       "visibility": "private",
+      "metadata": {},
       "operation": "created"
     },
     "caused_by_event_id": "event_022",
@@ -524,6 +594,14 @@
     "actor_id": "character_impression_system",
     "type": "character_impression.updated",
     "payload": {
+      "owner_character_id": "butler",
+      "subject_id": "player",
+      "trust": 0.0,
+      "suspicion": 0.0,
+      "fear": 0.0,
+      "traits": {},
+      "current_strategy": null,
+      "source_memory_ids": [],
       "observer_id": "butler",
       "target_id": "player",
       "personality_impression": "The player is evidence-driven and willing to pressure NPCs.",
@@ -570,6 +648,10 @@
     "type": "memory_candidate.created",
     "payload": {
       "memory_id": "memory.player.relationship_threshold.butler.player.suspicion.guarded",
+      "rule_id": "memory_rule.core.relationship_threshold.episodic.v1",
+      "memory_type": "episodic",
+      "memory_scope": "npc_private",
+      "memory_layer": "working",
       "subject_id": "player",
       "owner_character_id": "butler",
       "visible_to_character_ids": [
@@ -577,10 +659,16 @@
       ],
       "content": "韩管家 became guarded toward the player (suspicion).",
       "source_event_id": "event_019",
+      "source_event_ids": [
+        "event_019"
+      ],
+      "source_memory_ids": [],
       "visibility": [
         "player"
       ],
-      "salience": 0.7
+      "salience": 0.7,
+      "confidence": 1.0,
+      "metadata": {}
     },
     "caused_by_event_id": "event_019",
     "created_at": "timestamp"
@@ -593,16 +681,24 @@
     "type": "agent_memory_snapshot.updated",
     "payload": {
       "memory_id": "memory.player.relationship_threshold.butler.player.suspicion.guarded",
+      "rule_id": "memory_rule.core.relationship_threshold.episodic.v1",
+      "memory_type": "episodic",
+      "memory_scope": "npc_private",
+      "memory_layer": "working",
       "subject_id": "player",
       "owner_character_id": "butler",
       "visible_to_character_ids": [
         "butler"
       ],
+      "content": "韩管家 became guarded toward the player (suspicion).",
       "source_event_ids": [
         "event_019"
       ],
+      "source_memory_ids": [],
       "salience": 0.7,
+      "confidence": 1.0,
       "visibility": "private",
+      "metadata": {},
       "operation": "created"
     },
     "caused_by_event_id": "event_025",
@@ -725,6 +821,10 @@
     "type": "memory_candidate.created",
     "payload": {
       "memory_id": "memory.player.clue_discovered.dustless_frame",
+      "rule_id": "memory_rule.core.clue_discovered.episodic.v1",
+      "memory_type": "episodic",
+      "memory_scope": "case",
+      "memory_layer": "core",
       "subject_id": "player",
       "owner_character_id": null,
       "visible_to_character_ids": [
@@ -733,10 +833,16 @@
       ],
       "content": "Player discovered clue '无尘画框印'.",
       "source_event_id": "event_031",
+      "source_event_ids": [
+        "event_031"
+      ],
+      "source_memory_ids": [],
       "visibility": [
         "player"
       ],
-      "salience": 0.8
+      "salience": 0.8,
+      "confidence": 1.0,
+      "metadata": {}
     },
     "caused_by_event_id": "event_031",
     "created_at": "timestamp"
@@ -749,17 +855,25 @@
     "type": "agent_memory_snapshot.updated",
     "payload": {
       "memory_id": "memory.player.clue_discovered.dustless_frame",
+      "rule_id": "memory_rule.core.clue_discovered.episodic.v1",
+      "memory_type": "episodic",
+      "memory_scope": "case",
+      "memory_layer": "core",
       "subject_id": "player",
       "owner_character_id": null,
       "visible_to_character_ids": [
         "butler",
         "niece"
       ],
+      "content": "Player discovered clue '无尘画框印'.",
       "source_event_ids": [
         "event_031"
       ],
+      "source_memory_ids": [],
       "salience": 0.8,
+      "confidence": 1.0,
       "visibility": "private",
+      "metadata": {},
       "operation": "created"
     },
     "caused_by_event_id": "event_033",
@@ -871,6 +985,14 @@
     "actor_id": "character_impression_system",
     "type": "character_impression.updated",
     "payload": {
+      "owner_character_id": "butler",
+      "subject_id": "player",
+      "trust": 0.0,
+      "suspicion": 0.0,
+      "fear": 0.0,
+      "traits": {},
+      "current_strategy": null,
+      "source_memory_ids": [],
       "observer_id": "butler",
       "target_id": "player",
       "personality_impression": "The player can push the conversation into unsafe territory.",
@@ -921,17 +1043,25 @@
     "type": "memory_candidate.created",
     "payload": {
       "memory_id": "memory.player.director_blocked.butler.true_killer",
+      "rule_id": "memory_rule.core.director_block.episodic.v1",
+      "memory_type": "episodic",
+      "memory_scope": "director_audit",
+      "memory_layer": "working",
       "subject_id": "player",
-      "owner_character_id": "butler",
-      "visible_to_character_ids": [
-        "butler"
-      ],
+      "owner_character_id": null,
+      "visible_to_character_ids": [],
       "content": "Conversation with 韩管家 was blocked by narrative rules.",
       "source_event_id": "event_039",
+      "source_event_ids": [
+        "event_039"
+      ],
+      "source_memory_ids": [],
       "visibility": [
         "player"
       ],
-      "salience": 0.9
+      "salience": 0.9,
+      "confidence": 1.0,
+      "metadata": {}
     },
     "caused_by_event_id": "event_039",
     "created_at": "timestamp"
@@ -944,16 +1074,22 @@
     "type": "agent_memory_snapshot.updated",
     "payload": {
       "memory_id": "memory.player.director_blocked.butler.true_killer",
+      "rule_id": "memory_rule.core.director_block.episodic.v1",
+      "memory_type": "episodic",
+      "memory_scope": "director_audit",
+      "memory_layer": "working",
       "subject_id": "player",
-      "owner_character_id": "butler",
-      "visible_to_character_ids": [
-        "butler"
-      ],
+      "owner_character_id": null,
+      "visible_to_character_ids": [],
+      "content": "Conversation with 韩管家 was blocked by narrative rules.",
       "source_event_ids": [
         "event_039"
       ],
+      "source_memory_ids": [],
       "salience": 0.9,
+      "confidence": 1.0,
       "visibility": "private",
+      "metadata": {},
       "operation": "created"
     },
     "caused_by_event_id": "event_041",
@@ -1012,6 +1148,10 @@
     "type": "memory_candidate.created",
     "payload": {
       "memory_id": "memory.player.clue_discovered.torn_note",
+      "rule_id": "memory_rule.core.clue_discovered.episodic.v1",
+      "memory_type": "episodic",
+      "memory_scope": "case",
+      "memory_layer": "core",
       "subject_id": "player",
       "owner_character_id": null,
       "visible_to_character_ids": [
@@ -1020,10 +1160,16 @@
       ],
       "content": "Player discovered clue '被撕碎的便签'.",
       "source_event_id": "event_044",
+      "source_event_ids": [
+        "event_044"
+      ],
+      "source_memory_ids": [],
       "visibility": [
         "player"
       ],
-      "salience": 0.8
+      "salience": 0.8,
+      "confidence": 1.0,
+      "metadata": {}
     },
     "caused_by_event_id": "event_044",
     "created_at": "timestamp"
@@ -1036,17 +1182,25 @@
     "type": "agent_memory_snapshot.updated",
     "payload": {
       "memory_id": "memory.player.clue_discovered.torn_note",
+      "rule_id": "memory_rule.core.clue_discovered.episodic.v1",
+      "memory_type": "episodic",
+      "memory_scope": "case",
+      "memory_layer": "core",
       "subject_id": "player",
       "owner_character_id": null,
       "visible_to_character_ids": [
         "butler",
         "niece"
       ],
+      "content": "Player discovered clue '被撕碎的便签'.",
       "source_event_ids": [
         "event_044"
       ],
+      "source_memory_ids": [],
       "salience": 0.8,
+      "confidence": 1.0,
       "visibility": "private",
+      "metadata": {},
       "operation": "created"
     },
     "caused_by_event_id": "event_046",
@@ -1126,6 +1280,14 @@
     "actor_id": "character_impression_system",
     "type": "character_impression.updated",
     "payload": {
+      "owner_character_id": "butler",
+      "subject_id": "player",
+      "trust": 0.0,
+      "suspicion": 0.0,
+      "fear": 0.0,
+      "traits": {},
+      "current_strategy": null,
+      "source_memory_ids": [],
       "observer_id": "butler",
       "target_id": "player",
       "personality_impression": "The player is willing to make formal accusations.",
@@ -1276,6 +1438,10 @@
     "type": "memory_candidate.created",
     "payload": {
       "memory_id": "memory.player.accused.butler.butler_moved_key",
+      "rule_id": "memory_rule.core.player_accused.episodic.v1",
+      "memory_type": "episodic",
+      "memory_scope": "npc_private",
+      "memory_layer": "working",
       "subject_id": "player",
       "owner_character_id": "butler",
       "visible_to_character_ids": [
@@ -1283,10 +1449,16 @@
       ],
       "content": "Player formally accused 韩管家 with claim 'butler_moved_key' using evidence ['scratched_drawer', 'dustless_frame', 'torn_note'].",
       "source_event_id": "event_050",
+      "source_event_ids": [
+        "event_050"
+      ],
+      "source_memory_ids": [],
       "visibility": [
         "player"
       ],
-      "salience": 1.0
+      "salience": 1.0,
+      "confidence": 1.0,
+      "metadata": {}
     },
     "caused_by_event_id": "event_050",
     "created_at": "timestamp"
@@ -1299,16 +1471,24 @@
     "type": "agent_memory_snapshot.updated",
     "payload": {
       "memory_id": "memory.player.accused.butler.butler_moved_key",
+      "rule_id": "memory_rule.core.player_accused.episodic.v1",
+      "memory_type": "episodic",
+      "memory_scope": "npc_private",
+      "memory_layer": "working",
       "subject_id": "player",
       "owner_character_id": "butler",
       "visible_to_character_ids": [
         "butler"
       ],
+      "content": "Player formally accused 韩管家 with claim 'butler_moved_key' using evidence ['scratched_drawer', 'dustless_frame', 'torn_note'].",
       "source_event_ids": [
         "event_050"
       ],
+      "source_memory_ids": [],
       "salience": 1.0,
+      "confidence": 1.0,
       "visibility": "private",
+      "metadata": {},
       "operation": "created"
     },
     "caused_by_event_id": "event_056",
@@ -1321,6 +1501,14 @@
     "actor_id": "character_impression_system",
     "type": "character_impression.updated",
     "payload": {
+      "owner_character_id": "butler",
+      "subject_id": "player",
+      "trust": 0.0,
+      "suspicion": 0.0,
+      "fear": 0.0,
+      "traits": {},
+      "current_strategy": null,
+      "source_memory_ids": [],
       "observer_id": "butler",
       "target_id": "player",
       "personality_impression": "The player can assemble decisive evidence.",
@@ -1379,6 +1567,10 @@
     "type": "memory_candidate.created",
     "payload": {
       "memory_id": "memory.player.accusation_evaluated.butler.butler_moved_key.correct",
+      "rule_id": "memory_rule.core.accusation_evaluated.episodic.v1",
+      "memory_type": "episodic",
+      "memory_scope": "npc_private",
+      "memory_layer": "working",
       "subject_id": "player",
       "owner_character_id": "butler",
       "visible_to_character_ids": [
@@ -1386,10 +1578,16 @@
       ],
       "content": "Rule Engine evaluated the accusation against 韩管家 for claim 'butler_moved_key' as correct.",
       "source_event_id": "event_051",
+      "source_event_ids": [
+        "event_051"
+      ],
+      "source_memory_ids": [],
       "visibility": [
         "player"
       ],
-      "salience": 1.0
+      "salience": 1.0,
+      "confidence": 1.0,
+      "metadata": {}
     },
     "caused_by_event_id": "event_051",
     "created_at": "timestamp"
@@ -1402,16 +1600,24 @@
     "type": "agent_memory_snapshot.updated",
     "payload": {
       "memory_id": "memory.player.accusation_evaluated.butler.butler_moved_key.correct",
+      "rule_id": "memory_rule.core.accusation_evaluated.episodic.v1",
+      "memory_type": "episodic",
+      "memory_scope": "npc_private",
+      "memory_layer": "working",
       "subject_id": "player",
       "owner_character_id": "butler",
       "visible_to_character_ids": [
         "butler"
       ],
+      "content": "Rule Engine evaluated the accusation against 韩管家 for claim 'butler_moved_key' as correct.",
       "source_event_ids": [
         "event_051"
       ],
+      "source_memory_ids": [],
       "salience": 1.0,
+      "confidence": 1.0,
       "visibility": "private",
+      "metadata": {},
       "operation": "created"
     },
     "caused_by_event_id": "event_059",

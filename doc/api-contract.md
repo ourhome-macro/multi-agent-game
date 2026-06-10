@@ -97,6 +97,7 @@ Rule Engine 会校验：
   "type": "present_clue",
   "target_id": "butler",
   "clue_id": "scratched_drawer",
+  "scene_id": "study",
   "text": "What about these scratch marks?"
 }
 ```
@@ -109,6 +110,7 @@ Rule Engine 会校验：
 - `clue_id` 存在于案件包
 - `clue_id` 已经被发现
 - 对应 `player_knowledge.<world_info_id>` 存在
+- 如果传入 `scene_id`，目标 NPC 必须位于该场景
 
 校验失败时返回 `accepted=false`，写入 `rule.rejected`，不会产生 `npc.replied` 或关系变化。
 
@@ -118,11 +120,15 @@ Rule Engine 会校验：
 {
   "target_id": "butler",
   "clue_id": "scratched_drawer",
+  "scene_id": "study",
+  "present_character_ids": ["butler", "niece"],
   "knowledge_id": "player_knowledge.desk_forced_open",
   "text": "What about these scratch marks?",
   "interaction_pressure": 0.9
 }
 ```
+
+`scene_id` 和 `present_character_ids` 只在玩家明确当众展示线索时出现。没有 `scene_id` 时，后端按私下展示处理，不自动把同一静态场景里的 NPC 都加入可见范围。
 
 之后进入 `AgentGateway -> NarrativeDirector -> RuleEngine` 链路。
 
@@ -210,9 +216,39 @@ Rule Engine 会校验：
 - `title`
 - `summary`
 
-`memory_candidate.created` 是重要事件派生出的候选记忆。`agent_memory_snapshot.updated` 是运行时派生的稳定记忆快照更新，actor 是 `memory_snapshot_system`。
+`memory_candidate.created` 是重要事件派生出的候选记忆。payload 包含：
 
-`character_impression.updated` 记录运行时派生的 NPC -> player 私有画像，不由 Agent 或 LLM 直接生成。
+- `memory_id`
+- `rule_id`
+- `memory_type`：`episodic`、`belief`、`relationship`、`strategy`
+- `memory_scope`：`case`、`session`、`npc_private`、`scene_shared`、`director_audit`
+- `memory_layer`：`core`、`working`、`archival`
+- `subject_id`
+- `owner_character_id`
+- `visible_to_character_ids`
+- `content`
+- `source_event_id`
+- `source_event_ids`
+- `source_memory_ids`
+- `visibility`
+- `salience`
+- `confidence`
+- `metadata`
+
+`agent_memory_snapshot.updated` 是运行时派生的稳定记忆快照更新，actor 是 `memory_snapshot_system`。payload 包含上述结构化记忆字段，并额外包含 `operation`。
+
+兼容旧事件时，缺失的 `memory_scope` 默认按 `npc_private` 处理，缺失的 `memory_layer` 默认按 `working` 处理。新事件必须显式写入这两个字段。普通 NPC 上下文不会注入 `director_audit` 或 `archival` memory；Director 审计入口可以检索 `director_audit` memory，但仍不产生状态写入权限。
+
+`metadata` 不是开放命名空间。当前只允许：
+
+- `relationship_delta`
+- `strategy_id`
+- `belief_subject`
+- `belief_polarity`
+- `emotion_delta`
+- `clue_id`
+
+`character_impression.updated` 记录运行时派生的 NPC -> player 私有画像，不由 Agent 或 LLM 直接生成。当前画像兼容 `NPCPortraitState`，包含 `owner_character_id`、`subject_id`、`trust`、`suspicion`、`fear`、`traits`、`current_strategy` 和 `source_memory_ids`，同时保留解释性 `CharacterImpression` 字段。
 
 `director.blocked` 记录 Director 拦截了某次 NPC 输出。payload 包含：
 

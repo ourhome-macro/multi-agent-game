@@ -78,6 +78,7 @@ LLM Shadow Eval v0 复用 Agent 合同，但不是正式运行链路。它只在
 - `recent_events`
 - `memory_candidates`
 - `memory_snapshots`
+- `portrait_summary`
 - `blocked_fact_ids`
 - `revealable_fact_ids`
 - `asked_subject_type`
@@ -128,7 +129,24 @@ LLM Shadow Eval v0 复用 Agent 合同，但不是正式运行链路。它只在
 - `trust_response`
 - `fear_response`
 
-`memory_candidates` 是运行时候选记忆；`memory_snapshots` 是从候选记忆归并出的稳定快照。当前版本只传递 `subject_id="player"` 的快照，不做向量检索、RAG 或 LLM 摘要。
+`memory_candidates` 是运行时候选记忆；`memory_snapshots` 是从候选记忆归并出的稳定快照。AgentContext 只传递当前目标 NPC 可见的 player-scoped 记忆，不把其他 NPC 的私有记忆塞进上下文，不做向量检索、RAG 或 LLM 摘要。
+
+Memory v1 支持四类 `memory_type`：`episodic`、`belief`、`relationship`、`strategy`。`build_agent_context(...)` 和 `MemoryRetriever` 会按目标 NPC 可见性过滤；Director 审计可以通过专门入口读取所有 player-scoped memory，但这不等于注入某个 NPC 的 AgentContext。
+
+Memory v1.1 要求每条 memory 带 `rule_id` 和 `source_event_ids`。规则来源由 `MemoryDerivationRule` 表示，当前 seed 规则仍写在运行时代码里，后续可以迁移到 case package。
+
+Memory v1.1 hardening 进一步要求每条 candidate / snapshot 都带：
+
+- `memory_scope`：`case`、`session`、`npc_private`、`scene_shared`、`director_audit`
+- `memory_layer`：`core`、`working`、`archival`
+
+现有 typed memory 默认是 `npc_private` + `working`。`player.presented_clue` 没有 `scene_id` 时仍按私下展示处理；如果事件带有合法 `scene_id` 和 `present_character_ids`，运行时额外生成 `scene_shared` memory，且 `visible_to_character_ids` 必须等于当前场景在场 NPC。
+
+`build_agent_context(...)` 只允许注入 `case/core`、`session/working`、当前目标 NPC 可见的 `npc_private`、当前目标 NPC 可见的 `scene_shared` 和当前目标 NPC 自己的 `portrait_summary`。它必须禁止注入 `director_audit`、其他 NPC 的 `npc_private`、其他 NPC 的 portrait 和任何 `archival` memory。
+
+`MemoryRetriever` 的默认 NPC 检索顺序是 `memory_scope` -> `visible_to_character_ids` / `owner_character_id` -> `memory_layer`。Director 审计入口 `retrieve_for_director(...)` 可以读取 `director_audit` 和其他非 archival player-scoped memory，但不能把这些记忆塞回普通 NPC `AgentContext`。
+
+`portrait_summary` 是目标 NPC 自己的私有画像摘要投影，例如“江医生当前对玩家高度警惕”。它用于让 Agent 感知当前态度和策略，但不暴露其他 NPC 的画像，也不直接复制原始画像解释文本。
 
 案件包仍可定义 `forbidden_test_speech` 用于 mock-only Director 测试，但该字段不会复制进 `AgentContext`。
 
@@ -146,7 +164,7 @@ CharacterInnerContext
 
 `SelfKnowledgeItem` 包含目标 NPC 自己的 selected goals/secrets/knowledge 以及 `inner_portraits`。它不能包含其他 NPC 的 private 数据或其他 NPC 的 impressions。
 
-`inner_portraits` 是目标 NPC 当前如何看待玩家的 `CharacterImpression`。v0 只支持 NPC -> player。画像不是角色真相，也不是公开资料；它是主观私有认知，可影响后续话术、警惕、合作、威胁判断和分支条件。
+`inner_portraits` 是目标 NPC 当前如何看待玩家的 `CharacterImpression`。v0 只支持 NPC -> player。画像不是角色真相，也不是公开资料；它是主观私有认知，可影响后续话术、警惕、合作、威胁判断和分支条件。`CharacterImpression` 继承 `NPCPortraitState`，因此同时包含 `trust`、`suspicion`、`fear`、`traits`、`current_strategy` 和 `source_memory_ids`。
 
 `DisclosurePolicy` 控制每个自我知识项是否能用于对外表达，以及表达粒度：
 
@@ -168,7 +186,9 @@ CharacterInnerContext
 
 即使有 `CharacterInnerContext`，对外发言仍受 Narrative Director 控制，`proposed_actions` 仍受 Rule Engine 控制。private knowledge 可以塑造意图，但不能直接写 `WorldEvent`。
 
-`AgentContext.recent_events` 会过滤 `character_impression.updated`，避免一个 NPC 通过近期事件流看到另一个 NPC 的私有画像。当前目标 NPC 只能通过 `inner_context.inner_portraits` 看到自己的画像。
+`AgentContext.recent_events` 会过滤私有运行时事件，避免一个 NPC 通过近期事件流看到另一个 NPC 的私有画像、私有 typed memory、角色事实认知或私有玩家交互。当前目标 NPC 只能通过 `inner_context.inner_portraits` 看到自己的画像。
+
+PromptBuilder 只把 `portrait_summary` 和 inner context 的 id 级摘要写入 prompt payload，不把其他 NPC 的 private memory、private portrait 或角色卡 private 原文写入 Agent 输入。
 
 ## 安全边界
 
@@ -178,6 +198,9 @@ CharacterInnerContext
 - 其他 NPC 的 `secrets`、`goals` 或内部 `knowledge`
 - 其他 NPC 的 `character_fact_awareness`
 - 其他 NPC 的 private impressions
+- 其他 NPC 的 private typed memory
+- `director_audit` memory
+- `archival` memory
 - 线索 `truth_status`
 - 带原文或 blocked terms 的 `forbidden_facts`
 - 通过 memory snapshots 泄露的角色秘密、目标或内部知识

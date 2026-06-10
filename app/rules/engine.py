@@ -9,6 +9,7 @@ from app.domain.models import (
     ProposedActionType,
     RelationshipChangeAction,
     RelationshipState,
+    SceneConfig,
     SessionState,
     SubjectType,
     WorldEvent,
@@ -170,18 +171,39 @@ class RuleEngine:
                     caused_by_event_id=None,
                 )
             ]
+        scene = self._scene_for_presented_clue(case, action.target_id, action.scene_id)
+        if action.scene_id is not None and scene is None:
+            return [
+                self._reject(
+                    session=session,
+                    action_type="player.present_clue",
+                    reason="scene_id is not defined or target is not present in scene",
+                    payload={
+                        "target_id": action.target_id,
+                        "clue_id": clue_id,
+                        "knowledge_id": knowledge_id,
+                        "scene_id": action.scene_id,
+                        "text": action.text,
+                    },
+                    caused_by_event_id=None,
+                )
+            ]
+        payload: dict[str, object] = {
+            "target_id": action.target_id,
+            "clue_id": clue_id,
+            "knowledge_id": knowledge_id,
+            "text": action.text,
+            "interaction_pressure": calculate_interaction_pressure(case, action),
+        }
+        if scene is not None:
+            payload["scene_id"] = scene.id
+            payload["present_character_ids"] = list(scene.characters)
         return [
             self._recorder.append(
                 session,
                 actor_id="player",
                 event_type=EventType.PLAYER_PRESENTED_CLUE,
-                payload={
-                    "target_id": action.target_id,
-                    "clue_id": clue_id,
-                    "knowledge_id": knowledge_id,
-                    "text": action.text,
-                    "interaction_pressure": calculate_interaction_pressure(case, action),
-                },
+                payload=payload,
             )
         ]
 
@@ -613,6 +635,19 @@ class RuleEngine:
 
     def _is_known_character(self, case: CasePackage, character_id: str) -> bool:
         return any(character.id == character_id for character in case.characters)
+
+    def _scene_for_presented_clue(
+        self,
+        case: CasePackage,
+        target_id: str,
+        scene_id: str | None,
+    ) -> SceneConfig | None:
+        if scene_id is None:
+            return None
+        scene = next((item for item in case.scenes if item.id == scene_id), None)
+        if scene is None or target_id not in scene.characters:
+            return None
+        return scene
 
 
 def relationship_key(source_id: str, target_id: str) -> str:

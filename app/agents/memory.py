@@ -9,6 +9,9 @@ from app.domain.models import (
     SessionState,
 )
 
+AGENT_MEMORY_SCOPES = {"case", "session", "npc_private", "scene_shared"}
+DIRECTOR_MEMORY_SCOPES = AGENT_MEMORY_SCOPES | {"director_audit"}
+
 
 class MemoryRetriever:
     def __init__(self, *, max_results: int = 8) -> None:
@@ -52,11 +55,16 @@ class MemoryRetriever:
         candidates = [
             snapshot
             for snapshot in session.memory_snapshots.values()
-            if snapshot.subject_id == "player" and snapshot.visibility == "private"
+            if snapshot.subject_id == "player"
+            and _scope_allowed(
+                snapshot,
+                enforce_target_visibility=enforce_target_visibility,
+            )
             and (
                 not enforce_target_visibility
                 or _visible_to_target(snapshot, action.target_id)
             )
+            and _layer_allowed(snapshot)
         ]
         scored = [
             (self._score(snapshot, action), snapshot)
@@ -107,8 +115,41 @@ def _tokens(text: str) -> set[str]:
 
 
 def _visible_to_target(snapshot: AgentMemorySnapshot, target_id: str) -> bool:
-    if not snapshot.visible_to_character_ids and snapshot.owner_character_id is None:
-        return True
-    if snapshot.owner_character_id == target_id:
-        return True
-    return target_id in set(snapshot.visible_to_character_ids)
+    if snapshot.memory_scope in {"case", "session"}:
+        return (
+            not snapshot.visible_to_character_ids
+            or snapshot.owner_character_id == target_id
+            or target_id in set(snapshot.visible_to_character_ids)
+        )
+    if snapshot.memory_scope == "npc_private":
+        return (
+            snapshot.owner_character_id == target_id
+            or target_id in set(snapshot.visible_to_character_ids)
+        )
+    if snapshot.memory_scope == "scene_shared":
+        return (
+            target_id in set(snapshot.visible_to_character_ids)
+            or snapshot.owner_character_id == target_id
+        )
+    return False
+
+
+def _scope_allowed(
+    snapshot: AgentMemorySnapshot,
+    *,
+    enforce_target_visibility: bool,
+) -> bool:
+    allowed_scopes = (
+        AGENT_MEMORY_SCOPES
+        if enforce_target_visibility
+        else DIRECTOR_MEMORY_SCOPES
+    )
+    return snapshot.memory_scope in allowed_scopes
+
+
+def _layer_allowed(snapshot: AgentMemorySnapshot) -> bool:
+    if snapshot.memory_scope == "case":
+        return snapshot.memory_layer == "core"
+    if snapshot.memory_scope == "session":
+        return snapshot.memory_layer == "working"
+    return snapshot.memory_layer != "archival"

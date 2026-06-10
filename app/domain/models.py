@@ -139,6 +139,28 @@ class EventType(StrEnum):
     NARRATIVE_PHASE_CHANGED = "narrative.phase.changed"
 
 
+MemoryType = Literal["episodic", "belief", "relationship", "strategy"]
+MemoryScope = Literal[
+    "case",
+    "session",
+    "npc_private",
+    "scene_shared",
+    "director_audit",
+]
+MemoryLayer = Literal["core", "working", "archival"]
+BeliefPolarity = Literal["believes", "suspects", "knows", "doubts"]
+ALLOWED_MEMORY_METADATA_KEYS = frozenset(
+    {
+        "relationship_delta",
+        "strategy_id",
+        "belief_subject",
+        "belief_polarity",
+        "emotion_delta",
+        "clue_id",
+    }
+)
+
+
 class ProposedActionType(StrEnum):
     DISCOVER_CLUE = "clue.discover"
     RELATIONSHIP_CHANGE = "relationship.change"
@@ -321,6 +343,22 @@ class AgentCharacterView(APIModel):
     fear_response: CharacterResponseStyle = CharacterResponseStyle.PANIC_CONCEAL
 
 
+class NPCPortraitState(APIModel):
+    owner_character_id: NonEmptyString
+    subject_id: NonEmptyString
+    trust: float = 0.0
+    suspicion: float = 0.0
+    fear: float = 0.0
+    traits: dict[str, float] = Field(default_factory=dict)
+    current_strategy: str | None = None
+    source_memory_ids: list[NonEmptyString] = Field(default_factory=list)
+
+    @field_validator("trust", "suspicion", "fear", mode="before")
+    @classmethod
+    def clamp_portrait_metric(cls, value: object) -> float:
+        return clamp_relationship_metric(value)
+
+
 class SelfKnowledgeItem(APIModel):
     id: NonEmptyString
     kind: Literal["goal", "secret", "knowledge"]
@@ -333,7 +371,7 @@ class SelfKnowledgeItem(APIModel):
     source: Literal["character_card"] = "character_card"
 
 
-class CharacterImpression(APIModel):
+class CharacterImpression(NPCPortraitState):
     observer_id: NonEmptyString
     target_id: NonEmptyString
     personality_impression: str = ""
@@ -349,6 +387,22 @@ class CharacterImpression(APIModel):
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
     source_event_ids: list[NonEmptyString] = Field(default_factory=list)
     last_updated_event_id: NonEmptyString
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_portrait_aliases(cls, value: object) -> object:
+        if not isinstance(value, dict):
+            return value
+        normalized = dict(value)
+        if "owner_character_id" not in normalized and "observer_id" in normalized:
+            normalized["owner_character_id"] = normalized["observer_id"]
+        if "subject_id" not in normalized and "target_id" in normalized:
+            normalized["subject_id"] = normalized["target_id"]
+        if "observer_id" not in normalized and "owner_character_id" in normalized:
+            normalized["observer_id"] = normalized["owner_character_id"]
+        if "target_id" not in normalized and "subject_id" in normalized:
+            normalized["target_id"] = normalized["subject_id"]
+        return normalized
 
 
 class CharacterFactAwarenessState(APIModel):
@@ -615,6 +669,7 @@ class PlayerAction(APIModel):
     type: ActionType
     target_id: NonEmptyString
     clue_id: NonEmptyString | None = None
+    scene_id: NonEmptyString | None = None
     claim_id: NonEmptyString | None = None
     evidence_clue_ids: list[NonEmptyString] = Field(default_factory=list)
     subject_type: SubjectType | None = None
@@ -629,6 +684,8 @@ class PlayerAction(APIModel):
                 raise ValueError("ask_about requires subject_type and subject_id")
             if self.clue_id is not None:
                 raise ValueError("clue_id is only valid for present_clue")
+            if self.scene_id is not None:
+                raise ValueError("scene_id is only valid for present_clue")
             if self.claim_id is not None or self.evidence_clue_ids:
                 raise ValueError("claim fields are only valid for accuse")
             return self
@@ -645,11 +702,15 @@ class PlayerAction(APIModel):
                 raise ValueError("accuse requires claim_id")
             if self.clue_id is not None:
                 raise ValueError("clue_id is only valid for present_clue")
+            if self.scene_id is not None:
+                raise ValueError("scene_id is only valid for present_clue")
             if self.subject_type is not None or self.subject_id is not None:
                 raise ValueError("subject fields are only valid for ask_about")
             return self
         if self.clue_id is not None:
             raise ValueError("clue_id is only valid for present_clue")
+        if self.scene_id is not None:
+            raise ValueError("scene_id is only valid for present_clue")
         if self.claim_id is not None or self.evidence_clue_ids:
             raise ValueError("claim fields are only valid for accuse")
         if self.subject_type is not None or self.subject_id is not None:
@@ -732,27 +793,52 @@ class PlayerKnowledgeState(APIModel):
 
 class MemoryCandidateState(APIModel):
     memory_id: NonEmptyString
+    rule_id: NonEmptyString | None = None
+    memory_type: MemoryType = "episodic"
+    memory_scope: MemoryScope = "npc_private"
+    memory_layer: MemoryLayer = "working"
     subject_id: NonEmptyString
     owner_character_id: NonEmptyString | None = None
     visible_to_character_ids: list[NonEmptyString] = Field(default_factory=list)
     content: NonEmptyString
     source_event_id: NonEmptyString
+    source_event_ids: list[NonEmptyString] = Field(default_factory=list)
+    source_memory_ids: list[NonEmptyString] = Field(default_factory=list)
     visibility: list[NonEmptyString] = Field(default_factory=list)
     salience: float = Field(default=0.0, ge=0.0, le=1.0)
+    confidence: float = Field(default=1.0, ge=0.0, le=1.0)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("metadata", mode="before")
+    @classmethod
+    def validate_memory_metadata(cls, value: object) -> dict[str, Any]:
+        return validate_memory_metadata(value)
 
 
 class AgentMemorySnapshot(APIModel):
     memory_id: NonEmptyString
-    subject_id: NonEmptyString
+    rule_id: NonEmptyString | None = None
+    memory_type: MemoryType = "episodic"
+    memory_scope: MemoryScope = "npc_private"
+    memory_layer: MemoryLayer = "working"
+    subject_id: NonEmptyString | None = None
     owner_character_id: NonEmptyString | None = None
     visible_to_character_ids: list[NonEmptyString] = Field(default_factory=list)
     content: NonEmptyString
     source_event_ids: list[NonEmptyString] = Field(default_factory=list)
+    source_memory_ids: list[NonEmptyString] = Field(default_factory=list)
     salience: float = Field(default=0.0, ge=0.0, le=1.0)
+    confidence: float = Field(default=1.0, ge=0.0, le=1.0)
     visibility: Literal["private", "public"] = "private"
+    metadata: dict[str, Any] = Field(default_factory=dict)
     last_updated_event_id: NonEmptyString
     created_at: str | None = None
     updated_at: str | None = None
+
+    @field_validator("metadata", mode="before")
+    @classmethod
+    def validate_memory_metadata(cls, value: object) -> dict[str, Any]:
+        return validate_memory_metadata(value)
 
 
 class CompressedHistoryContext(APIModel):
@@ -788,6 +874,7 @@ class AgentContext(APIModel):
     player_action: PlayerAction
     target_profile: AgentCharacterView | None = None
     inner_context: CharacterInnerContext | None = None
+    portrait_summary: str | None = None
     default_speech: str | None = None
     default_intent: AgentIntentType | None = None
     reply_options: list[MockReplyConfig] = Field(default_factory=list)
@@ -900,6 +987,44 @@ def clamp_relationship_metric(value: object) -> float:
     numeric_value = float(value)
     clamped = min(max(numeric_value, RELATIONSHIP_MIN), RELATIONSHIP_MAX)
     return round(clamped, 4)
+
+
+def validate_memory_metadata(value: object) -> dict[str, Any]:
+    if value is None:
+        return {}
+    if not isinstance(value, dict):
+        raise ValueError("memory metadata must be an object")
+    metadata = {str(key): item for key, item in value.items()}
+    unknown_keys = set(metadata) - ALLOWED_MEMORY_METADATA_KEYS
+    if unknown_keys:
+        raise ValueError(f"Unsupported memory metadata keys: {sorted(unknown_keys)}")
+    if "relationship_delta" in metadata:
+        metadata["relationship_delta"] = _validate_metric_delta(
+            metadata["relationship_delta"],
+            "relationship_delta",
+        )
+    if "emotion_delta" in metadata:
+        metadata["emotion_delta"] = _validate_metric_delta(
+            metadata["emotion_delta"],
+            "emotion_delta",
+        )
+    if "belief_polarity" in metadata and metadata["belief_polarity"] not in {
+        "believes",
+        "suspects",
+        "knows",
+        "doubts",
+    }:
+        raise ValueError("belief_polarity is not supported")
+    for key in ("strategy_id", "belief_subject", "clue_id"):
+        if key in metadata and metadata[key] is not None:
+            metadata[key] = str(metadata[key])
+    return metadata
+
+
+def _validate_metric_delta(value: object, field_name: str) -> dict[str, float]:
+    if not isinstance(value, dict):
+        raise ValueError(f"{field_name} must be an object")
+    return {str(key): clamp_relationship_metric(item) for key, item in value.items()}
 
 
 def normalize_private_items(value: object, prefix: str) -> object:

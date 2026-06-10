@@ -231,11 +231,15 @@ CharacterPrivateConfig
 
 - `target_id`
 - `clue_id`
+- `scene_id`，可选；只有玩家明确在某个场景当众展示时写入
+- `present_character_ids`，可选；由后端根据 `scene_id` 计算当前场景在场 NPC
 - `knowledge_id`
 - `text`
 - `interaction_pressure`
 
 该事件本身不修改线索状态。它是可审计的玩家施压/试探动作，会影响 `AgentContext`、MockAgent 回复选择、Director 检查和 Rule Engine 对 proposed actions 的处理。它不表示线索证明目标 NPC 有罪。
+
+如果 `present_clue` 带 `scene_id`，Rule Engine 必须校验目标 NPC 位于该场景，并把场景角色列表写入 `present_character_ids`。没有 `scene_id` 时，事件按私下展示处理，不能因为案件静态场景里有多名角色就默认扩散记忆。
 
 非法 `ask_about` 或 `present_clue` 会写入 `rule.rejected`，不会产生 NPC 回复或关系变化。
 
@@ -282,16 +286,89 @@ accusation.evaluated(result=correct)
 `AgentMemorySnapshot` 是运行时从候选事件归并出的结构化记忆状态。v0 只支持 `subject_id="player"`，包含：
 
 - `memory_id`
+- `rule_id`
+- `memory_type`：`episodic`、`belief`、`relationship`、`strategy`
+- `memory_scope`：`case`、`session`、`npc_private`、`scene_shared`、`director_audit`
+- `memory_layer`：`core`、`working`、`archival`
 - `subject_id`
 - `owner_character_id`
 - `visible_to_character_ids`
 - `content`
 - `source_event_ids`
+- `source_memory_ids`
 - `salience`
+- `confidence`
 - `visibility`
+- `metadata`
 - `last_updated_event_id`
 - `created_at`
 - `updated_at`
+
+Memory v1 把“NPC 记得事件”升级为“NPC 基于事件形成主观认知”。当前只支持四类 typed memory：
+
+- `episodic`：事件记忆，记录玩家做过什么。
+- `belief`：信念记忆，记录 NPC 相信或怀疑什么。
+- `relationship`：关系记忆，记录 NPC 对玩家信任、怀疑、恐惧等变化。
+- `strategy`：策略记忆，记录 NPC 接下来倾向如何应对。
+
+当前不引入 `theory`、`contradiction`、`commitment`、向量记忆或 graph memory。
+
+Memory v1.1 将硬编码派生收口为 `MemoryDerivationRule`，并把记忆分成 scope 与 layer：
+
+```text
+MemoryDerivationRule
+  -> id
+  -> trigger_action_type
+  -> target_character_id
+  -> subject_id
+  -> produces: list[MemoryEffect]
+```
+
+所有 `memory_candidate.created` 和 `agent_memory_snapshot.updated` 都必须带 `rule_id`、`memory_scope`、`memory_layer`，便于审计哪条规则产生了记忆，以及它属于哪个投影边界。每条 typed memory 必须带 `source_event_ids`，同一 `source_event_id` 对同一 memory / portrait 只能应用一次。
+
+当前 scope 语义：
+
+- `case`：案件级安全摘要，例如玩家发现某条线索；默认只允许 `core` 进入 NPC 上下文。
+- `session`：本局公共上下文；默认只允许 `working` 进入 NPC 上下文。
+- `npc_private`：某个 NPC 对玩家交互形成的私有记忆；默认 typed memory 使用 `npc_private` + `working`。
+- `scene_shared`：玩家在公共场景向多人展示线索时形成的共享事件记忆，`visible_to_character_ids` 必须包含当前场景在场 NPC。
+- `director_audit`：供 Narrative Director 审计的记忆，普通 NPC `AgentContext` 禁止注入。
+
+当前 layer 语义：
+
+- `core`：可长期作为案件级稳定锚点使用。
+- `working`：默认运行时工作记忆。
+- `archival`：事件和 replay 必须保留，但默认不注入 NPC `AgentContext`，当前也不做真正 archival search。
+
+`metadata` 仍以 dict 形式存储以保持事件 JSON 简洁，但键名受模型校验约束。当前允许的稳定键只有：
+
+- `relationship_delta`
+- `strategy_id`
+- `belief_subject`
+- `belief_polarity`
+- `emotion_delta`
+- `clue_id`
+
+禁止新增 `strategy`、`current_strategy`、`npc_strategy`、`deltas` 等漂移键。
+
+当前 seed 规则示例：
+
+```text
+player.presented_clue target=jiang_yanhui clue=empty_capsules
+  -> episodic: 玩家向江医生展示空胶囊
+  -> belief: 江医生认为玩家正在接近药物线索
+  -> relationship: suspicion +0.2, trust -0.1
+  -> strategy: avoid_medicine_topic
+  -> memory_scope=npc_private
+  -> memory_layer=working
+
+player.presented_clue target=jiang_yanhui clue=empty_capsules scene_id=study
+  -> scene_shared episodic: 玩家在 study 当众展示空胶囊
+  -> visible_to_character_ids=[study.characters]
+  -> memory_layer=working
+```
+
+这些记忆仍必须先作为 `memory_candidate.created` 出现，再由 `MemorySnapshotSystem` 写入 `agent_memory_snapshot.updated`。LLM 和 AgentIntent 不能直接创建 typed memory。
 
 `MemorySnapshotSystem` 只消费 `memory_candidate.created`，更新 `session.memory_snapshots`，并写入 `agent_memory_snapshot.updated`。Agent、LLM 和 `AgentIntent.proposed_actions` 都不能写记忆快照。
 
@@ -300,8 +377,9 @@ NPC 记忆隔离规则：
 - `owner_character_id` 表示这条记忆属于哪个 NPC 的可检索经历。
 - `visible_to_character_ids` 表示允许哪些 NPC 在普通 Agent turn 中检索该记忆。
 - 玩家与某个 NPC 的互动记忆默认只对该 NPC 可见。
-- 线索发现记忆默认作为玩家已知探索状态，对案件内 NPC 可见，但仍只暴露 clue/world info 的安全摘要。
-- Director 审计视角可以通过专门检索入口查看所有 player-scoped 记忆摘要；这不等于把记忆注入某个 NPC 上下文。
+- 线索发现记忆默认作为 `case/core` 玩家已知探索状态，对案件内 NPC 可见，但仍只暴露 clue/world info 的安全摘要。
+- Director 审计视角可以通过专门检索入口查看所有非 archival 的 player-scoped 记忆摘要，包括 `director_audit`；这不等于把记忆注入某个 NPC 上下文。
+- 普通 NPC `AgentContext` 禁止注入 `director_audit`、其他 NPC 的 `npc_private`、其他 NPC 的 portrait 和 `archival` memory。
 
 示例：
 
@@ -319,6 +397,14 @@ player.asked_about target=shen_zhaoye subject=empty_capsules
 
 `MemoryRetriever.retrieve(...)` 必须按 `action.target_id` 过滤可见性。`MemoryRetriever.retrieve_for_director(...)` 是 Director 审计入口，可以看到所有 player-scoped 记忆摘要，但不能绕过 Director/Rule Engine 造成状态变化。
 
+`MemoryRetriever` 的过滤顺序固定为：先过滤 `memory_scope`，再过滤 `visible_to_character_ids` / `owner_character_id`，最后过滤 `memory_layer`。`build_agent_context(...)` 只允许注入：
+
+- `case/core`
+- `session/working`
+- 当前 NPC 可见的 `npc_private`
+- 当前 NPC 可见的 `scene_shared`
+- 当前 NPC 自己的 `portrait_summary`
+
 运行时生成的 memory id 是语义化且稳定的，足以被案件配置的 mock dialogue 条件引用，例如：
 
 - `memory.player.clue_discovered.scratched_drawer`
@@ -335,7 +421,20 @@ player.asked_about target=shen_zhaoye subject=empty_capsules
 
 ## 私有角色画像
 
-`CharacterImpression` 是观察者角色拥有的私有认知。它不是角色卡真相，也不是公开资料。它记录某个 NPC 如何看待玩家：
+`CharacterImpression` 是观察者角色拥有的私有认知。它继承 `NPCPortraitState`，不是角色卡真相，也不是公开资料。它记录某个 NPC 如何看待玩家。
+
+`NPCPortraitState` 当前字段包括：
+
+- `owner_character_id`
+- `subject_id`
+- `trust`
+- `suspicion`
+- `fear`
+- `traits`
+- `current_strategy`
+- `source_memory_ids`
+
+`CharacterImpression` 在此基础上继续保留解释性画像字段：
 
 - personality impression
 - perceived motive
@@ -364,6 +463,10 @@ session.character_impressions[npc_id]["player"]
 - `accusation.evaluated`
 
 每次变化写入 `character_impression.updated`。Agent 和 LLM 可以通过 `CharacterInnerContext` 读取当前目标 NPC 自己的画像，但不能直接写入或修改画像状态。
+
+Memory v1 中，画像更新会消费同一套 typed-memory 规则结果。例如江医生看到 `empty_capsules` 后，画像会记录 `suspicion` 上升、`trust` 下降、`current_strategy=avoid_medicine_topic`，并把对应 belief / relationship / strategy memory id 写入 `source_memory_ids`。
+
+静态人物设定、作者侧角色画像说明可以继续用 Markdown 或案件包文档维护；运行时 NPC 对玩家的画像不能只维护在 Markdown 中，必须落到 `character_impression.updated` 事件和 `session.character_impressions`，否则无法 replay、审计或隔离。
 
 画像还会影响 `CharacterInnerContext` 中的有效披露模式：高威胁或危险话题会收窄表达；结盟潜力可允许 hint；相关证据可对匹配 self-knowledge 允许 partial。该投影不修改 `SessionState`，也不授予 full reveal。
 

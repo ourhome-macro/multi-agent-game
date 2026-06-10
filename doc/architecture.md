@@ -41,6 +41,7 @@ POST /sessions/{id}/actions
   -> RuleEngine.apply_*
   -> DerivedEventSystem.derive
   -> MemorySnapshotSystem.apply
+  -> typed memory / NPC portrait projection update
   -> RuleTriggerSystem.evaluate
   -> EventRecorder.append
   -> StateSummary
@@ -52,7 +53,7 @@ POST /sessions/{id}/actions
 
 `ask_about` 是结构化询问动作。Rule Engine 校验被询问对象，写入 `player.asked_about`，之后走与 `talk` 相同的 AgentGateway -> Director -> Rule Engine 链路。
 
-`present_clue` 是玩家向 NPC 施压或展示证据的动作。Rule Engine 会先校验：`target_id` 是已知角色、`clue_id` 存在、线索已被发现、且玩家已知账本里存在对应 `player_knowledge`。合法时写入 `player.presented_clue`，再进入 Agent 链路。非法时写入 `rule.rejected`，不会产生 NPC 回复或关系变化。
+`present_clue` 是玩家向 NPC 施压或展示证据的动作。Rule Engine 会先校验：`target_id` 是已知角色、`clue_id` 存在、线索已被发现、且玩家已知账本里存在对应 `player_knowledge`。如果请求带 `scene_id`，还必须校验目标 NPC 位于该场景，并把场景在场 NPC 写入事件。合法时写入 `player.presented_clue`，再进入 Agent 链路。非法时写入 `rule.rejected`，不会产生 NPC 回复或关系变化。
 
 `present_clue` 不等于证明真相，只表示玩家用某条已知线索进行施压或试探。叙事真相仍只能通过事件和 `RuleTriggerSystem` 推进。
 
@@ -73,6 +74,7 @@ POST /sessions/{id}/actions
 - `app/rules/engine.py`：真实状态变化的唯一权威。
 - `app/rules/triggers.py`：根据事件完成 beat 并推进 phase。
 - `app/runtime/derivations.py`：派生玩家已知、记忆候选和私有角色画像。
+- `app/runtime/memory_derivations.py`：定义 Memory v1.1 的 `MemoryDerivationRule` seed 规则。
 - `app/runtime/memory_snapshots.py`：把记忆候选归并成稳定 Agent 记忆快照。
 - `app/runtime/replay.py`：从 `WorldEvent` 重建 `SessionState`。
 - `app/storage/memory.py`：内存案件/会话存储与 `StateSummary` 构造。
@@ -101,7 +103,17 @@ Agent 接收的是 `AgentContext`，不是原始 `CasePackage` 或 `SessionState
 
 `memory_candidate.created` 只是候选记忆事件。运行时的 `MemorySnapshotSystem` 消费它并生成 `agent_memory_snapshot.updated`，更新 `session.memory_snapshots`。Agent 可以读取安全的 player-scoped 记忆快照，但不能直接创建或修改快照。
 
+Memory v1 在 `AgentMemorySnapshot` 上增加 `memory_type`，当前只支持 `episodic`、`belief`、`relationship`、`strategy`。`present_clue(target=jiang_yanhui, clue=empty_capsules)` 会按规则派生事件记忆、信念记忆、关系记忆和策略记忆；这些派生不调用 LLM，不接向量库。
+
+Memory v1.1 将 seed 逻辑抽为 `MemoryDerivationRule`，并要求派生出的 memory 带 `rule_id`、`source_event_ids` 和稳定 metadata 键。重复派生同一个 `source_event_id` 时不得重复写候选记忆，也不得重复叠加 portrait 数值。
+
+Memory v1.1 hardening 在 `MemoryCandidateState` 和 `AgentMemorySnapshot` 上增加 `memory_scope` 与 `memory_layer`。现有 typed memory 默认是 `npc_private` + `working`；线索发现记忆是 `case/core`；当 `player.presented_clue` 事件带合法 `scene_id` 和 `present_character_ids` 时，会额外生成 `scene_shared/working` 记忆；Director 拦截派生出的审计记忆是 `director_audit/working`。
+
+普通 NPC `AgentContext` 的 memory 投影只允许 `case/core`、`session/working`、当前目标 NPC 可见的 `npc_private` 和当前目标 NPC 可见的 `scene_shared`，并排除所有 `archival` 与 `director_audit`。`MemoryRetriever` 按 `memory_scope` -> `visible_to_character_ids` / `owner_character_id` -> `memory_layer` 的顺序过滤。Director 审计入口可以检索 `director_audit`，但这不等于把审计记忆注入 NPC。
+
 `character_impression.updated` 是运行时派生的私有认知事件，来源包括 `player.asked_about`、`player.presented_clue`、`player.accused`、`relationship.threshold.crossed`、`director.blocked` 和 `accusation.evaluated`。LLM 可以读取目标 NPC 自己的画像视图，但不能直接写画像状态。
+
+现有 `CharacterImpression` 兼容 `NPCPortraitState`：运行时画像包含 `trust`、`suspicion`、`fear`、`traits`、`current_strategy` 和 `source_memory_ids`。AgentContext 额外注入 `portrait_summary`，用于表达“目标 NPC 当前如何看待玩家”的低泄漏投影。
 
 画像感知披露 v0 会用私有画像计算目标 NPC 自我知识项的有效 `DisclosurePolicy.allowed_modes`。高威胁或危险话题会收窄披露；高结盟潜力可允许谨慎 hint；玩家有相关证据时可允许 partial；但永远不能授予 full reveal 或直接引用 private 原文。
 
@@ -124,4 +136,4 @@ Agent 接收的是 `AgentContext`，不是原始 `CasePackage` 或 `SessionState
 - private character impressions
 - event count
 
-Replay 会直接应用已持久化的 `agent_memory_snapshot.updated` 和 `character_impression.updated`，不会重新跑派生或聚合逻辑，因此不会递归创建新事件，也不会改变事件数量。
+Replay 会直接应用已持久化的 `agent_memory_snapshot.updated` 和 `character_impression.updated`，不会重新跑派生或聚合逻辑，因此不会递归创建新事件，也不会改变事件数量。同一批事件被重复输入 replay 时，snapshot / portrait 采用事件中的完整状态覆盖，不按 delta 再次叠加。Replay 必须保留 `memory_scope` 和 `memory_layer`，包括默认不注入 AgentContext 的 `archival` memory。
