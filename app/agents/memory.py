@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 
+from app.agents.retrieval_planner import MemoryRetrievalPlan
 from app.domain.models import (
     AgentMemorySnapshot,
     CasePackage,
@@ -23,12 +24,14 @@ class MemoryRetriever:
         case: CasePackage,
         session: SessionState,
         action: PlayerAction,
+        plan: MemoryRetrievalPlan | None = None,
     ) -> list[AgentMemorySnapshot]:
-        _ = case
         return self._retrieve(
+            case=case,
             session=session,
             action=action,
             enforce_target_visibility=True,
+            plan=plan,
         )
 
     def retrieve_for_director(
@@ -38,20 +41,27 @@ class MemoryRetriever:
         session: SessionState,
         action: PlayerAction,
     ) -> list[AgentMemorySnapshot]:
-        _ = case
         return self._retrieve(
+            case=case,
             session=session,
             action=action,
             enforce_target_visibility=False,
+            plan=None,
         )
 
     def _retrieve(
         self,
         *,
+        case: CasePackage,
         session: SessionState,
         action: PlayerAction,
         enforce_target_visibility: bool,
+        plan: MemoryRetrievalPlan | None,
     ) -> list[AgentMemorySnapshot]:
+        max_results = plan.max_memory_items if plan is not None else self._max_results
+        if max_results <= 0:
+            return []
+        forbidden_terms = _forbidden_terms(case) if enforce_target_visibility else ()
         candidates = [
             snapshot
             for snapshot in session.memory_snapshots.values()
@@ -65,6 +75,8 @@ class MemoryRetriever:
                 or _visible_to_target(snapshot, action.target_id)
             )
             and _layer_allowed(snapshot)
+            and memory_allowed_by_plan(snapshot, plan)
+            and not memory_content_matches_forbidden(snapshot, forbidden_terms)
         ]
         scored = [
             (self._score(snapshot, action), snapshot)
@@ -86,7 +98,7 @@ class MemoryRetriever:
             ),
             reverse=True,
         )
-        return [snapshot for _, snapshot in scored[: self._max_results]]
+        return [snapshot for _, snapshot in scored[:max_results]]
 
     def _score(self, snapshot: AgentMemorySnapshot, action: PlayerAction) -> float:
         haystack = f"{snapshot.memory_id} {snapshot.content}".lower()
@@ -112,6 +124,40 @@ def _tokens(text: str) -> set[str]:
         token.lower()
         for token in re.findall(r"[A-Za-z0-9_]{4,}", text)
     }
+
+
+def memory_allowed_by_plan(
+    snapshot: object,
+    plan: MemoryRetrievalPlan | None,
+) -> bool:
+    if plan is None:
+        return True
+    memory_type = str(getattr(snapshot, "memory_type", "episodic"))
+    memory_scope = str(getattr(snapshot, "memory_scope", "npc_private"))
+    memory_layer = str(getattr(snapshot, "memory_layer", "working"))
+    return (
+        memory_type in set(plan.included_memory_types)
+        and memory_scope in set(plan.included_scopes)
+        and memory_layer in set(plan.included_layers)
+        and memory_scope not in set(plan.forbidden_scopes)
+        and memory_layer not in set(plan.forbidden_layers)
+    )
+
+
+def memory_content_matches_forbidden(
+    snapshot: object,
+    forbidden_terms: tuple[str, ...],
+) -> bool:
+    content = str(getattr(snapshot, "content", ""))
+    return any(term and term in content for term in forbidden_terms)
+
+
+def _forbidden_terms(case: CasePackage) -> tuple[str, ...]:
+    terms: list[str] = []
+    for fact in case.forbidden_facts:
+        terms.append(fact.text)
+        terms.extend(fact.blocked_terms)
+    return tuple(term for term in terms if term)
 
 
 def _visible_to_target(snapshot: AgentMemorySnapshot, target_id: str) -> bool:

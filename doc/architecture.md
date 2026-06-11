@@ -111,7 +111,9 @@ Memory v1.1 hardening 在 `MemoryCandidateState` 和 `AgentMemorySnapshot` 上�
 
 普通 NPC `AgentContext` 的 memory 投影只允许 `case/core`、`session/working`、当前目标 NPC 可见的 `npc_private` 和当前目标 NPC 可见的 `scene_shared`，并排除所有 `archival` 与 `director_audit`。`MemoryRetriever` 按 `memory_scope` -> `visible_to_character_ids` / `owner_character_id` -> `memory_layer` 的顺序过滤。Director 审计入口可以检索 `director_audit`，但这不等于把审计记忆注入 NPC。
 
-Runtime trace schema v3 会记录 `memory_projection`，只包含已注入记忆的 `memory_id`、`memory_type`、`memory_scope`、`memory_layer`、`owner_character_id` 和 `visible_to_character_ids`，不记录 memory content。真实 LLM backend 也使用同一投影摘要，便于审计 real turn 是否遵守 scope/layer 边界。
+Memory v1.2 在 `AgentLoop` 前置加入 `RetrievalPlanner`。Planner 通过 `SkillLoader` 加载 app-level 和 case-level `MemoryProjectionSkill`，通过 `SkillSelector` 按结构化 `PlayerAction` 选择 skill，再生成 `MemoryRetrievalPlan`。Plan 控制 memory type/scope/layer、禁止项、最大条数、`portrait_summary` 和 `recent_events`，但不能突破代码级硬边界。默认 skill 覆盖 `talk`、`ask_about_clue`、`accuse`；案件级同 id skill 可以覆盖默认 skill。
+
+Runtime trace schema v4 会记录 `memory_projection` 对象。对象包含 skill 摘要：`skill_id`、`included_memory_types`、`included_scopes`、`included_layers`、`forbidden_scopes`、`forbidden_layers`、`selected_count`，以及 `items` 列表。每个 item 只包含已注入记忆的 `memory_id`、`memory_type`、`memory_scope`、`memory_layer`、`owner_character_id` 和 `visible_to_character_ids`，不记录 memory content。真实 LLM backend 也使用同一投影摘要，便于审计 real turn 是否遵守 scope/layer 边界。
 
 `character_impression.updated` 是运行时派生的私有认知事件，来源包括 `player.asked_about`、`player.presented_clue`、`player.accused`、`relationship.threshold.crossed`、`director.blocked` 和 `accusation.evaluated`。LLM 可以读取目标 NPC 自己的画像视图，但不能直接写画像状态。
 

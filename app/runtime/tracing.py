@@ -10,7 +10,7 @@ from uuid import uuid4
 
 from app.domain.models import ActionType, AgentIntent, PlayerAction, WorldEvent
 
-TRACE_SCHEMA_VERSION = 3
+TRACE_SCHEMA_VERSION = 4
 
 
 @dataclass
@@ -27,7 +27,7 @@ class RuntimeTraceDraft:
     context_budget_ratio: float = 0.0
     compression_used: bool = False
     memory_ids_used: list[str] = field(default_factory=list)
-    memory_projection: list[dict[str, object]] = field(default_factory=list)
+    memory_projection: dict[str, object] = field(default_factory=dict)
     tool_calls: list[dict[str, object]] = field(default_factory=list)
     security_flags: list[str] = field(default_factory=list)
     trace_id: str = field(default_factory=lambda: str(uuid4()))
@@ -74,7 +74,7 @@ class RuntimeTracer:
         context_budget_ratio: float = 0.0,
         compression_used: bool = False,
         memory_ids_used: list[str] | None = None,
-        memory_projection: list[dict[str, object]] | None = None,
+        memory_projection: dict[str, object] | None = None,
         tool_calls: list[dict[str, object]] | None = None,
         security_flags: list[str] | None = None,
     ) -> RuntimeTraceDraft:
@@ -91,9 +91,7 @@ class RuntimeTracer:
             context_budget_ratio=context_budget_ratio,
             compression_used=compression_used,
             memory_ids_used=memory_ids_used or [],
-            memory_projection=[
-                _sanitize_memory_projection(item) for item in (memory_projection or [])
-            ],
+            memory_projection=_sanitize_memory_projection(memory_projection or {}),
             tool_calls=[_sanitize_tool_call(item) for item in (tool_calls or [])],
             security_flags=security_flags or [],
         )
@@ -176,7 +174,26 @@ def _sanitize_tool_call(tool_call: dict[str, object]) -> dict[str, object]:
     }
 
 
-def _sanitize_memory_projection(item: dict[str, object]) -> dict[str, object]:
+def _sanitize_memory_projection(projection: dict[str, object]) -> dict[str, object]:
+    raw_items = projection.get("items", [])
+    items = raw_items if isinstance(raw_items, list) else []
+    return {
+        "skill_id": str(projection.get("skill_id", "")),
+        "included_memory_types": _string_list(
+            projection.get("included_memory_types", []),
+        ),
+        "included_scopes": _string_list(projection.get("included_scopes", [])),
+        "included_layers": _string_list(projection.get("included_layers", [])),
+        "forbidden_scopes": _string_list(projection.get("forbidden_scopes", [])),
+        "forbidden_layers": _string_list(projection.get("forbidden_layers", [])),
+        "selected_count": int(projection.get("selected_count", 0)),
+        "items": [_sanitize_memory_projection_item(item) for item in items],
+    }
+
+
+def _sanitize_memory_projection_item(item: object) -> dict[str, object]:
+    if not isinstance(item, dict):
+        item = {}
     visible_to = item.get("visible_to_character_ids", [])
     if not isinstance(visible_to, list):
         visible_to = []
@@ -188,6 +205,12 @@ def _sanitize_memory_projection(item: dict[str, object]) -> dict[str, object]:
         "owner_character_id": item.get("owner_character_id"),
         "visible_to_character_ids": [str(value) for value in visible_to],
     }
+
+
+def _string_list(value: object) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    return [str(item) for item in value]
 
 
 def _hash_text(text: str | None) -> str | None:

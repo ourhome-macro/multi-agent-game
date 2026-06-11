@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from time import perf_counter
 
 from app.agents.memory import MemoryRetriever
+from app.agents.retrieval_planner import MemoryRetrievalPlan
 from app.domain.models import CasePackage, PlayerAction, SessionState
 
 
@@ -46,6 +47,7 @@ class ToolRuntime:
         case: CasePackage,
         session: SessionState,
         action: PlayerAction,
+        plan: MemoryRetrievalPlan | None = None,
     ) -> ToolResult:
         started_at = perf_counter()
         if tool_name not in self._ALLOWED_TOOLS:
@@ -61,6 +63,7 @@ class ToolRuntime:
                     case=case,
                     session=session,
                     action=action,
+                    plan=plan,
                 )
             )
             return self._result(
@@ -77,11 +80,14 @@ class ToolRuntime:
                 result_count=len(session.discovered_clues),
             )
         if tool_name == "get_recent_events":
+            result_count = 0
+            if plan is None or plan.allow_recent_events:
+                result_count = min(len(session.events), 10)
             return self._result(
                 tool_name=tool_name,
                 status="ok",
                 started_at=started_at,
-                result_count=min(len(session.events), 10),
+                result_count=result_count,
             )
         return self._result(
             tool_name=tool_name,

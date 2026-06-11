@@ -5,9 +5,10 @@ from pathlib import Path
 from app.agents.context import build_agent_context
 from app.cases.loader import CaseLoader
 from app.domain.models import ActionType, NPCPortraitState, PlayerAction
-from app.runtime.memory_derivations import MEDICINE_STRATEGY_ID
 from app.runtime.replay import replay_events
 from app.runtime.service import create_runtime
+
+MEDICINE_STRATEGY_ID = "avoid_medicine_topic"
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 CASE_DIR = PROJECT_ROOT / "cases" / "mist_clock_manor"

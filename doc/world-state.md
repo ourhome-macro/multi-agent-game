@@ -406,6 +406,8 @@ player.asked_about target=shen_zhaoye subject=empty_capsules
 - 当前 NPC 可见的 `scene_shared`
 - 当前 NPC 自己的 `portrait_summary`
 
+Memory v1.2 的 `MemoryProjectionSkill` 和 `MemoryRetrievalPlan` 不是世界状态，不写入 `WorldEvent`，也不参与 replay 权威。它们只是在构造 `AgentContext` 时解释“当前动作、阶段和 completed beats 下应该投影哪些安全记忆”。Plan 可以收窄 memory type/scope/layer、限制条数、关闭画像摘要或 recent events；但不能让 `director_audit`、`archival`、其他 NPC private、其他 NPC portrait 或 forbidden fact 文本进入普通 NPC 上下文。
+
 运行时生成的 memory id 是语义化且稳定的，足以被案件配置的 mock dialogue 条件引用，例如：
 
 - `memory.player.clue_discovered.scratched_drawer`

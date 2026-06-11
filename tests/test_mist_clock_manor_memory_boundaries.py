@@ -294,13 +294,16 @@ def test_real_backend_trace_records_memory_scope_layer_projection(tmp_path: Path
         for line in (tmp_path / "trace.jsonl").read_text(encoding="utf-8").splitlines()
     ]
     record = records[-1]
+    memory_projection = record["memory_projection"]
     projection = {
         item["memory_id"]: item
-        for item in record["memory_projection"]
+        for item in memory_projection["items"]
     }
 
     assert record["agent_backend"] == "real"
     assert record["model"] == "deterministic-real-test-model"
+    assert memory_projection["skill_id"] == "talk"
+    assert memory_projection["selected_count"] == len(memory_projection["items"])
     assert projection[CASE_CORE_MEMORY]["memory_scope"] == "case"
     assert projection[CASE_CORE_MEMORY]["memory_layer"] == "core"
     assert projection[PRIVATE_PRESENTED_MEMORY]["memory_scope"] == "npc_private"
@@ -309,7 +312,7 @@ def test_real_backend_trace_records_memory_scope_layer_projection(tmp_path: Path
     assert projection[SCENE_SHARED_MEMORY]["memory_layer"] == "working"
     assert ARCHIVAL_MEMORY not in projection
     assert not any(item["memory_scope"] == "director_audit" for item in projection.values())
-    assert all("content" not in item for item in projection.values())
+    assert "content" not in json.dumps(memory_projection, ensure_ascii=False)
     assert set(record["memory_ids_used"]) == set(projection)
 
 

@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 from app.agents.gateway import AgentGateway
 from app.agents.loop import AgentLoop, AgentTurnResult
+from app.agents.retrieval_planner import RetrievalPlanner
 from app.director.narrative_director import NarrativeDirector
 from app.domain.models import (
     ActionResponse,
@@ -364,6 +365,7 @@ def create_runtime(
     *,
     agent_gateway: AgentGateway | None = None,
     runtime_tracer: RuntimeTracer | None = None,
+    retrieval_planner: RetrievalPlanner | None = None,
     context_limit_tokens: int = 8000,
 ) -> RuntimeContainer:
     recorder = EventRecorder()
@@ -375,6 +377,7 @@ def create_runtime(
     agent_loop = AgentLoop(
         agent_gateway=agent_gateway or AgentGateway.from_env(),
         runtime_tracer=runtime_tracer or RuntimeTracer.disabled(),
+        retrieval_planner=retrieval_planner,
         context_budget_manager=ContextBudgetManager(
             context_limit_tokens=context_limit_tokens,
         ),

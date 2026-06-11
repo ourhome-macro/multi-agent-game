@@ -1,0 +1,79 @@
+- id: memory_rule.jiang_empty_capsules_medicine_pressure.presented_clue.v1
+  trigger_action_type: player.presented_clue
+  target_character_id: jiang_yanhui
+  subject_id: empty_capsules
+  produces:
+    - memory_id: memory.player.belief.{target_id}.{subject_id}
+      memory_type: belief
+      content: Jiang believes the player is closing in on the medicine clue.
+      salience: 0.9
+      confidence: 0.8
+      metadata:
+        belief_subject: player_approaching_medicine_truth
+        belief_polarity: believes
+        clue_id: empty_capsules
+    - memory_id: memory.player.relationship.{target_id}.{subject_id}
+      memory_type: relationship
+      content: Jiang becomes more suspicious of the player around the medicine clue.
+      salience: 0.85
+      confidence: 0.8
+      metadata:
+        relationship_delta:
+          suspicion: 0.2
+          trust: -0.1
+        clue_id: empty_capsules
+    - memory_id: memory.player.strategy.{target_id}.{subject_id}
+      memory_type: strategy
+      content: Jiang is inclined to avoid the medicine topic.
+      salience: 0.95
+      confidence: 0.85
+      metadata:
+        strategy_id: avoid_medicine_topic
+        clue_id: empty_capsules
+  impression:
+    relationship_delta:
+      suspicion: 0.2
+      trust: -0.1
+    strategy_id: avoid_medicine_topic
+    traits:
+      medicine_topic_pressure: 0.3
+
+- id: memory_rule.jiang_empty_capsules_medicine_pressure.asked_about.v1
+  trigger_action_type: player.asked_about
+  target_character_id: jiang_yanhui
+  subject_id: empty_capsules
+  produces:
+    - memory_id: memory.player.belief.{target_id}.{subject_id}
+      memory_type: belief
+      content: Jiang believes the player is closing in on the medicine clue.
+      salience: 0.9
+      confidence: 0.8
+      metadata:
+        belief_subject: player_approaching_medicine_truth
+        belief_polarity: believes
+        clue_id: empty_capsules
+    - memory_id: memory.player.relationship.{target_id}.{subject_id}
+      memory_type: relationship
+      content: Jiang becomes more suspicious of the player around the medicine clue.
+      salience: 0.85
+      confidence: 0.8
+      metadata:
+        relationship_delta:
+          suspicion: 0.2
+          trust: -0.1
+        clue_id: empty_capsules
+    - memory_id: memory.player.strategy.{target_id}.{subject_id}
+      memory_type: strategy
+      content: Jiang is inclined to avoid the medicine topic.
+      salience: 0.95
+      confidence: 0.85
+      metadata:
+        strategy_id: avoid_medicine_topic
+        clue_id: empty_capsules
+  impression:
+    relationship_delta:
+      suspicion: 0.2
+      trust: -0.1
+    strategy_id: avoid_medicine_topic
+    traits:
+      medicine_topic_pressure: 0.2

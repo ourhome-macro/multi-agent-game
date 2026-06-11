@@ -7,6 +7,7 @@ from app.agents.gateway import AgentGateway
 from app.agents.llm_contract import validate_llm_agent_output
 from app.agents.memory import MemoryRetriever
 from app.agents.prompt_builder import PromptBuilder
+from app.agents.retrieval_planner import MemoryRetrievalPlan, RetrievalPlanner
 from app.agents.tools.runtime import ToolRuntime
 from app.domain.models import (
     AgentContext,
@@ -40,6 +41,7 @@ class AgentLoop:
         injection_guard: PromptInjectionGuard | None = None,
         runtime_tracer: RuntimeTracer | None = None,
         memory_retriever: MemoryRetriever | None = None,
+        retrieval_planner: RetrievalPlanner | None = None,
         context_budget_manager: ContextBudgetManager | None = None,
         tool_runtime: ToolRuntime | None = None,
     ) -> None:
@@ -48,6 +50,7 @@ class AgentLoop:
         self._injection_guard = injection_guard or PromptInjectionGuard()
         self._runtime_tracer = runtime_tracer or RuntimeTracer.disabled()
         self._memory_retriever = memory_retriever or MemoryRetriever()
+        self._retrieval_planner = retrieval_planner or RetrievalPlanner()
         self._context_budget_manager = (
             context_budget_manager or ContextBudgetManager()
         )
@@ -70,7 +73,13 @@ class AgentLoop:
         session: SessionState,
         action: PlayerAction,
     ) -> AgentContext:
-        return build_agent_context(case, session, action)
+        plan = self._retrieval_planner.plan(case=case, session=session, action=action)
+        return build_agent_context(
+            case,
+            session,
+            action,
+            retrieval_plan=plan,
+        )
 
     def run_turn(
         self,
@@ -80,12 +89,19 @@ class AgentLoop:
         action: PlayerAction,
     ) -> AgentTurnResult:
         phase_before = session.narrative.phase
-        context = self.build_context(case=case, session=session, action=action)
+        plan = self._retrieval_planner.plan(case=case, session=session, action=action)
+        context = build_agent_context(
+            case,
+            session,
+            action,
+            retrieval_plan=plan,
+        )
         security_review = self._injection_guard.review(action)
         retrieved_memories = self._memory_retriever.retrieve(
             case=case,
             session=session,
             action=action,
+            plan=plan,
         )
         context = context.model_copy(
             update={
@@ -93,7 +109,7 @@ class AgentLoop:
             }
         )
         memory_ids = [snapshot.memory_id for snapshot in retrieved_memories]
-        memory_projection = _memory_projection(retrieved_memories)
+        memory_projection = _memory_projection(plan, retrieved_memories)
         prompt_bundle = self._prompt_builder.build(context)
         budget = self._budget_prompt(prompt_bundle, context, memory_ids)
         if budget.compressed_history is not None:
@@ -110,6 +126,7 @@ class AgentLoop:
                 case=case,
                 session=session,
                 action=action,
+                plan=plan,
             ).summary
         ]
         trace = self._runtime_tracer.start_turn(
@@ -184,8 +201,12 @@ class AgentLoop:
         )
 
 
-def _memory_projection(memories: list[AgentMemorySnapshot]) -> list[dict[str, object]]:
-    return [
+def _memory_projection(
+    plan: MemoryRetrievalPlan,
+    memories: list[AgentMemorySnapshot],
+) -> dict[str, object]:
+    summary = plan.trace_summary(selected_count=len(memories))
+    summary["items"] = [
         {
             "memory_id": memory.memory_id,
             "memory_type": memory.memory_type,
@@ -196,3 +217,4 @@ def _memory_projection(memories: list[AgentMemorySnapshot]) -> list[dict[str, ob
         }
         for memory in memories
     ]
+    return summary

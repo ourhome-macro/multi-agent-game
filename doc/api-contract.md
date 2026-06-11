@@ -310,6 +310,21 @@ Rule Engine 会校验：
 - `forbidden_facts`
 - `solution_claims`
 
+## Runtime Trace
+
+运行时 trace schema v4 的 `memory_projection` 是对象，不是 memory content 列表。它包含本轮 AgentContext 使用的检索 skill 摘要：
+
+- `skill_id`
+- `included_memory_types`
+- `included_scopes`
+- `included_layers`
+- `forbidden_scopes`
+- `forbidden_layers`
+- `selected_count`
+- `items`
+
+`items` 只允许包含 `memory_id`、`memory_type`、`memory_scope`、`memory_layer`、`owner_character_id` 和 `visible_to_character_ids`。禁止写入 memory `content`、forbidden fact 文本、private 原文或玩家原始文本。`selected_count` 必须等于 `items.length`，用于审计 skill-driven retrieval 是否按计划收窄投影。
+
 ## 错误
 
 - 未知 `case_id`：404

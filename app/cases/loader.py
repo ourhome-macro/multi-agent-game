@@ -11,6 +11,7 @@ from app.cases.errors import CaseLoadError
 from app.domain.models import (
     CasePackage,
     DiscoverClueAction,
+    EventType,
     NarrativePhaseChangeAction,
     ProposedActionType,
     RelationshipChangeAction,
@@ -18,6 +19,16 @@ from app.domain.models import (
 )
 
 RELATIONSHIP_METRICS = {"trust", "suspicion", "fear", "intimacy", "hostility"}
+
+# Player action events a memory derivation rule may trigger on. These are the
+# event types wired into DerivedEventSystem's configured-rule dispatch.
+MEMORY_RULE_TRIGGER_EVENT_TYPES = {
+    EventType.PLAYER_ASKED_ABOUT.value,
+    EventType.PLAYER_PRESENTED_CLUE.value,
+}
+# Template variables a rule's memory_id / content may reference.
+MEMORY_RULE_TEMPLATE_VARS = {"target_id", "subject_id"}
+_TEMPLATE_TOKEN = re.compile(r"\{([^}]*)\}")
 
 
 class CaseLoader:
@@ -34,6 +45,10 @@ class CaseLoader:
             "relationships": self._read_yaml(case_dir / "relationships.yaml", default=[]),
             "forbidden_facts": self._read_yaml(case_dir / "forbidden_facts.yaml", default=[]),
             "mock_dialogues": self._read_yaml(case_dir / "mock_dialogues.yaml", default=[]),
+            "memory_derivation_rules": self._read_yaml(
+                case_dir / "memory_derivation_rules.yaml",
+                default=[],
+            ),
             "narrative_rules": self._read_yaml(case_dir / "narrative_rules.yaml"),
             "solution_claims": self._read_yaml(
                 case_dir / "solution_claims.yaml",
@@ -339,6 +354,13 @@ class CaseLoader:
                 f"Beat '{beat.id}' all_discovered",
             )
 
+        self._validate_memory_derivation_rules(
+            package,
+            character_ids=character_ids,
+            clue_ids=clue_ids,
+            scene_ids=scene_ids,
+        )
+
         unreachable_clue_ids = clue_ids - reachable_clue_ids
         if unreachable_clue_ids:
             raise CaseLoadError(
@@ -372,6 +394,69 @@ class CaseLoader:
         unknown_ids = sorted(set(referenced_ids) - world_info_ids)
         if unknown_ids:
             raise CaseLoadError(f"{label} references unknown world_info: {unknown_ids}")
+
+    def _validate_memory_derivation_rules(
+        self,
+        package: CasePackage,
+        *,
+        character_ids: set[str],
+        clue_ids: set[str],
+        scene_ids: set[str],
+    ) -> None:
+        _ = scene_ids
+        self._ensure_unique(
+            "memory derivation rule",
+            [rule.id for rule in package.memory_derivation_rules],
+            self._case_dir(package),
+        )
+        for rule in package.memory_derivation_rules:
+            if rule.trigger_action_type not in MEMORY_RULE_TRIGGER_EVENT_TYPES:
+                raise CaseLoadError(
+                    f"Memory derivation rule '{rule.id}' has unsupported "
+                    f"trigger_action_type '{rule.trigger_action_type}'"
+                )
+            if (
+                rule.target_character_id is not None
+                and rule.target_character_id not in character_ids
+            ):
+                raise CaseLoadError(
+                    f"Memory derivation rule '{rule.id}' references unknown "
+                    f"target_character_id '{rule.target_character_id}'"
+                )
+            if rule.subject_id is not None and rule.subject_id not in clue_ids:
+                raise CaseLoadError(
+                    f"Memory derivation rule '{rule.id}' references unknown "
+                    f"subject_id '{rule.subject_id}'"
+                )
+            if not rule.produces:
+                raise CaseLoadError(
+                    f"Memory derivation rule '{rule.id}' must produce at least one memory effect"
+                )
+            effect_ids = [effect.memory_id for effect in rule.produces]
+            self._ensure_unique(
+                f"memory effect in rule '{rule.id}'",
+                effect_ids,
+                self._case_dir(package),
+            )
+            for effect in rule.produces:
+                self._validate_memory_template(rule.id, "memory_id", effect.memory_id)
+                self._validate_memory_template(rule.id, "content", effect.content)
+
+    def _validate_memory_template(
+        self,
+        rule_id: str,
+        field_name: str,
+        value: str,
+    ) -> None:
+        for token in _TEMPLATE_TOKEN.findall(value):
+            if token not in MEMORY_RULE_TEMPLATE_VARS:
+                raise CaseLoadError(
+                    f"Memory derivation rule '{rule_id}' {field_name} uses unknown template "
+                    f"variable '{{{token}}}'"
+                )
+
+    def _case_dir(self, package: CasePackage) -> str:
+        return package.meta.id
 
     def _validate_world_info_claim_patterns(
         self,

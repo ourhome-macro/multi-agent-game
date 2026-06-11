@@ -16,13 +16,8 @@ from app.domain.models import (
 from app.runtime.character_fact_awareness import upsert_character_fact_awareness
 from app.runtime.events import EventRecorder
 from app.runtime.memory_derivations import (
-    MEDICINE_BELIEF_MEMORY_ID,
-    MEDICINE_RELATIONSHIP_MEMORY_ID,
-    MEDICINE_STRATEGY_ID,
-    MEDICINE_STRATEGY_MEMORY_ID,
-    MEDICINE_TOPIC_RULE_IDS,
-    memory_derivation_rule_ids_for_event,
     resolve_memory_derivation_effects,
+    resolve_memory_impression_effects,
 )
 
 CLUE_DISCOVERED_MEMORY_RULE_ID = "memory_rule.core.clue_discovered.episodic.v1"
@@ -96,7 +91,8 @@ class DerivedEventSystem:
                 if memory_event is not None:
                     events.append(memory_event)
                 events.extend(
-                    self._derive_medicine_topic_typed_memory_candidates(
+                    self._derive_configured_typed_memory_candidates(
+                        case=case,
                         session=session,
                         source_event=source_event,
                     )
@@ -124,7 +120,8 @@ class DerivedEventSystem:
                 if memory_event is not None:
                     events.append(memory_event)
                 events.extend(
-                    self._derive_medicine_topic_typed_memory_candidates(
+                    self._derive_configured_typed_memory_candidates(
+                        case=case,
                         session=session,
                         source_event=source_event,
                     )
@@ -482,15 +479,16 @@ class DerivedEventSystem:
             visible_to_character_ids=[target_id],
         )
 
-    def _derive_medicine_topic_typed_memory_candidates(
+    def _derive_configured_typed_memory_candidates(
         self,
         *,
+        case: CasePackage,
         session: SessionState,
         source_event: WorldEvent,
     ) -> list[WorldEvent]:
         target_id = str(source_event.payload["target_id"])
         events: list[WorldEvent] = []
-        for resolved_effect in resolve_memory_derivation_effects(source_event):
+        for resolved_effect in resolve_memory_derivation_effects(case, source_event):
             effect = resolved_effect.effect
             event = self._store_memory_candidate(
                 session=session,
@@ -597,6 +595,7 @@ class DerivedEventSystem:
             )
         )
         self._apply_impression_signal(impression, source_event)
+        self._apply_rule_impression_effects(impression, case, source_event)
         if source_event.id not in impression.source_event_ids:
             impression.source_event_ids.append(source_event.id)
         impression.confidence = _clamp01(impression.confidence + 0.1)
@@ -687,16 +686,6 @@ class DerivedEventSystem:
             _append_unique(impression.tags, "applies_pressure")
             impression.manipulation_risk = _clamp01(impression.manipulation_risk + 0.05)
         impression.trust_boundary = "Answer only within disclosed player knowledge."
-        if self._is_medicine_topic_rule_match(source_event):
-            impression.suspicion = _clamp_relationship(impression.suspicion + 0.2)
-            impression.trust = _clamp_relationship(impression.trust - 0.1)
-            impression.current_strategy = MEDICINE_STRATEGY_ID
-            impression.traits["medicine_topic_pressure"] = _clamp01(
-                impression.traits.get("medicine_topic_pressure", 0.0) + 0.2
-            )
-            _append_unique(impression.source_memory_ids, MEDICINE_BELIEF_MEMORY_ID)
-            _append_unique(impression.source_memory_ids, MEDICINE_RELATIONSHIP_MEMORY_ID)
-            _append_unique(impression.source_memory_ids, MEDICINE_STRATEGY_MEMORY_ID)
 
     def _apply_presented_clue_impression(
         self,
@@ -717,16 +706,6 @@ class DerivedEventSystem:
         impression.manipulation_risk = _clamp01(impression.manipulation_risk + 0.15)
         impression.usefulness = _clamp01(impression.usefulness + 0.15)
         impression.trust_boundary = "Avoid direct admissions unless evidence rules allow it."
-        if self._is_medicine_topic_rule_match(source_event):
-            impression.suspicion = _clamp_relationship(impression.suspicion + 0.2)
-            impression.trust = _clamp_relationship(impression.trust - 0.1)
-            impression.current_strategy = MEDICINE_STRATEGY_ID
-            impression.traits["medicine_topic_pressure"] = _clamp01(
-                impression.traits.get("medicine_topic_pressure", 0.0) + 0.3
-            )
-            _append_unique(impression.source_memory_ids, MEDICINE_BELIEF_MEMORY_ID)
-            _append_unique(impression.source_memory_ids, MEDICINE_RELATIONSHIP_MEMORY_ID)
-            _append_unique(impression.source_memory_ids, MEDICINE_STRATEGY_MEMORY_ID)
 
     def _apply_player_accused_impression(
         self,
@@ -810,8 +789,29 @@ class DerivedEventSystem:
             appended = True
         return appended
 
-    def _is_medicine_topic_rule_match(self, source_event: WorldEvent) -> bool:
-        return bool(memory_derivation_rule_ids_for_event(source_event) & MEDICINE_TOPIC_RULE_IDS)
+    def _apply_rule_impression_effects(
+        self,
+        impression: CharacterImpression,
+        case: CasePackage,
+        source_event: WorldEvent,
+    ) -> None:
+        for resolved in resolve_memory_impression_effects(case, source_event):
+            effect = resolved.impression
+            for metric, delta in effect.relationship_delta.items():
+                if metric == "suspicion":
+                    impression.suspicion = _clamp_relationship(impression.suspicion + delta)
+                elif metric == "trust":
+                    impression.trust = _clamp_relationship(impression.trust + delta)
+                elif metric == "fear":
+                    impression.fear = _clamp_relationship(impression.fear + delta)
+            if effect.strategy_id is not None:
+                impression.current_strategy = effect.strategy_id
+            for trait, delta in effect.traits.items():
+                impression.traits[trait] = _clamp01(
+                    impression.traits.get(trait, 0.0) + delta
+                )
+            for memory_id in resolved.produced_memory_ids:
+                _append_unique(impression.source_memory_ids, memory_id)
 
     def _store_memory_candidate(
         self,

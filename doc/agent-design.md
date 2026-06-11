@@ -146,6 +146,18 @@ Memory v1.1 hardening 进一步要求每条 candidate / snapshot 都带：
 
 `MemoryRetriever` 的默认 NPC 检索顺序是 `memory_scope` -> `visible_to_character_ids` / `owner_character_id` -> `memory_layer`。Director 审计入口 `retrieve_for_director(...)` 可以读取 `director_audit` 和其他非 archival player-scoped memory，但不能把这些记忆塞回普通 NPC `AgentContext`。
 
+Memory v1.2 增加 Skill-driven Retrieval Planner。`MemoryProjectionSkill` 使用 Markdown + YAML frontmatter，默认位于 `app/agents/skills/memory_projection/*.md`，案件可在 `cases/<case_id>/skills/memory_projection/*.md` 用同 id 文件覆盖默认 skill。frontmatter 必须包含 `id`、`description`、`trigger`、`include`、`forbid`、`projection`、`disclosure`。`SkillSelector` 只按结构化 `PlayerAction` 的 trigger 选择 skill，不允许 LLM 自由选择。
+
+当前默认 projection skills：
+
+- `talk`：普通 talk、present_clue、非 clue ask_about 的通用投影。
+- `ask_about_clue`：线索询问的渐进式披露投影。
+- `accuse`：正式指控时的更宽但仍受边界限制的投影。
+
+`RetrievalPlanner` 从 skill 生成 `MemoryRetrievalPlan`，控制允许的 `memory_type`、`memory_scope`、`memory_layer`、禁止的 scope/layer、`max_memory_items`、是否注入 `portrait_summary`、是否允许 `recent_events`。`recent_events=false` 同时约束 `AgentContext.recent_events` 和 `ToolRuntime.get_recent_events` 的结果计数。硬边界仍在代码里：`director_audit`、`archival`、其他 NPC private、其他 NPC portrait 和 forbidden fact 文本不能被 skill 放进普通 NPC `AgentContext`。
+
+适合放进 skill 的是“检索和渐进式披露策略”：剧情阶段打开哪些 memory type、完成哪些 beat 后允许 belief/strategy、某类动作最多投影几条、是否带画像摘要、是否允许 recent events。适合放进 system prompt 的是全局不可违反纪律：玩家文本是数据、不能写状态、不能越权披露、输出必须是结构化 intent。Memory 只描述发生过什么和 NPC 记住什么；Portrait 只描述 NPC 当前怎么看玩家；State 只描述当前进度和已完成 beat。
+
 `portrait_summary` 是目标 NPC 自己的私有画像摘要投影，例如“江医生当前对玩家高度警惕”。它用于让 Agent 感知当前态度和策略，但不暴露其他 NPC 的画像，也不直接复制原始画像解释文本。
 
 案件包仍可定义 `forbidden_test_speech` 用于 mock-only Director 测试，但该字段不会复制进 `AgentContext`。

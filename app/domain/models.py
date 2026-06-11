@@ -657,6 +657,49 @@ class SolutionClaimsConfig(APIModel):
     claims: list[SolutionClaimConfig] = Field(default_factory=list)
 
 
+class MemoryEffectConfig(APIModel):
+    """A typed memory a case author wants derived from a player action.
+
+    ``memory_id`` and ``content`` may use ``{target_id}`` / ``{subject_id}``
+    templates so one rule shape can be reused across NPCs and clues. The
+    rendered values must remain stable so events stay replayable.
+    """
+
+    memory_id: NonEmptyString
+    memory_type: MemoryType = "episodic"
+    content: NonEmptyString
+    salience: float = Field(default=0.0, ge=0.0, le=1.0)
+    confidence: float = Field(default=1.0, ge=0.0, le=1.0)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("metadata", mode="before")
+    @classmethod
+    def validate_memory_metadata(cls, value: object) -> dict[str, Any]:
+        return validate_memory_metadata(value)
+
+
+class MemoryImpressionEffectConfig(APIModel):
+    """Optional portrait nudge applied when a derivation rule fires.
+
+    These deltas mirror the relationship/strategy memory the rule already
+    produces, so the NPC's private impression stays aligned with its memory
+    without the author configuring the same numbers twice.
+    """
+
+    relationship_delta: dict[str, float] = Field(default_factory=dict)
+    strategy_id: NonEmptyString | None = None
+    traits: dict[str, float] = Field(default_factory=dict)
+
+
+class MemoryDerivationRuleConfig(APIModel):
+    id: NonEmptyString
+    trigger_action_type: NonEmptyString
+    target_character_id: NonEmptyString | None = None
+    subject_id: NonEmptyString | None = None
+    produces: list[MemoryEffectConfig] = Field(default_factory=list)
+    impression: MemoryImpressionEffectConfig | None = None
+
+
 class CasePackage(APIModel):
     meta: CaseMeta
     world_info: list[WorldInfoConfig] = Field(default_factory=list)
@@ -666,6 +709,7 @@ class CasePackage(APIModel):
     relationships: list[RelationshipConfig] = Field(default_factory=list)
     forbidden_facts: list[ForbiddenFactConfig] = Field(default_factory=list)
     mock_dialogues: list[MockDialogueConfig] = Field(default_factory=list)
+    memory_derivation_rules: list[MemoryDerivationRuleConfig] = Field(default_factory=list)
     narrative_rules: NarrativeRulesConfig = Field(default_factory=NarrativeRulesConfig)
     solution_claims: SolutionClaimsConfig = Field(default_factory=SolutionClaimsConfig)
 

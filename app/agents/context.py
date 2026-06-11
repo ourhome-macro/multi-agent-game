@@ -4,6 +4,8 @@ from app.agents.disclosure_strategy import (
     DISCLOSURE_MODE_ORDER,
     build_fact_disclosure_strategies,
 )
+from app.agents.memory import memory_allowed_by_plan, memory_content_matches_forbidden
+from app.agents.retrieval_planner import MemoryRetrievalPlan, RetrievalPlanner
 from app.domain.models import (
     AgentCharacterView,
     AgentContext,
@@ -28,7 +30,13 @@ def build_agent_context(
     case: CasePackage,
     session: SessionState,
     action: PlayerAction,
+    retrieval_plan: MemoryRetrievalPlan | None = None,
 ) -> AgentContext:
+    plan = retrieval_plan or RetrievalPlanner().plan(
+        case=case,
+        session=session,
+        action=action,
+    )
     dialogue = next(
         (item for item in case.mock_dialogues if item.character_id == action.target_id),
         None,
@@ -79,7 +87,12 @@ def build_agent_context(
         if character is not None
         else None
     )
-    portrait_summary = _portrait_summary(character, inner_context)
+    portrait_summary = (
+        _portrait_summary(character, inner_context)
+        if plan.inject_portrait_summary
+        else None
+    )
+    forbidden_terms = _forbidden_terms(case)
 
     return AgentContext(
         case_id=case.meta.id,
@@ -98,29 +111,48 @@ def build_agent_context(
             for item in session.relationship_thresholds_crossed
             if item.startswith(threshold_prefix)
         ),
-        recent_events=[
-            event
-            for event in session.events
-            if _event_visible_to_target(event, action.target_id)
-        ][-RECENT_EVENT_LIMIT:],
+        recent_events=(
+            [
+                event
+                for event in session.events
+                if _event_visible_to_target(
+                    event,
+                    action.target_id,
+                    plan=plan,
+                    forbidden_terms=forbidden_terms,
+                )
+            ][-RECENT_EVENT_LIMIT:]
+            if plan.allow_recent_events
+            else []
+        ),
         memory_candidates=sorted(
             (
                 candidate
                 for candidate in session.memory_candidates.values()
                 if candidate.subject_id == "player"
-                and _memory_injectable_to_agent(candidate, action.target_id)
+                and _memory_injectable_to_agent(
+                    candidate,
+                    action.target_id,
+                    plan=plan,
+                    forbidden_terms=forbidden_terms,
+                )
             ),
             key=lambda value: value.memory_id,
-        ),
+        )[: plan.max_memory_items],
         memory_snapshots=sorted(
             (
                 snapshot
                 for snapshot in session.memory_snapshots.values()
                 if snapshot.subject_id == "player"
-                and _memory_injectable_to_agent(snapshot, action.target_id)
+                and _memory_injectable_to_agent(
+                    snapshot,
+                    action.target_id,
+                    plan=plan,
+                    forbidden_terms=forbidden_terms,
+                )
             ),
             key=lambda value: value.memory_id,
-        ),
+        )[: plan.max_memory_items],
         blocked_fact_ids=blocked_fact_ids,
         revealable_fact_ids=revealable_fact_ids,
         asked_subject_type=asked_subject_type,
@@ -328,12 +360,22 @@ def _action_matches_related_clue(action: PlayerAction, related_clue_ids: list[st
     )
 
 
-def _memory_injectable_to_agent(snapshot: object, target_id: str) -> bool:
+def _memory_injectable_to_agent(
+    snapshot: object,
+    target_id: str,
+    *,
+    plan: MemoryRetrievalPlan | None,
+    forbidden_terms: tuple[str, ...],
+) -> bool:
     if not _memory_scope_injectable(snapshot):
         return False
     if not _memory_visible_to_target(snapshot, target_id):
         return False
-    return _memory_layer_injectable(snapshot)
+    if not _memory_layer_injectable(snapshot):
+        return False
+    if not memory_allowed_by_plan(snapshot, plan):
+        return False
+    return not memory_content_matches_forbidden(snapshot, forbidden_terms)
 
 
 def _memory_scope_injectable(snapshot: object) -> bool:
@@ -368,7 +410,13 @@ def _memory_layer_injectable(snapshot: object) -> bool:
     return layer != "archival"
 
 
-def _event_visible_to_target(event: object, target_id: str) -> bool:
+def _event_visible_to_target(
+    event: object,
+    target_id: str,
+    *,
+    plan: MemoryRetrievalPlan | None,
+    forbidden_terms: tuple[str, ...],
+) -> bool:
     event_type = getattr(event, "type", None)
     payload = getattr(event, "payload", {})
     actor_id = getattr(event, "actor_id", None)
@@ -383,7 +431,12 @@ def _event_visible_to_target(event: object, target_id: str) -> bool:
         EventType.MEMORY_CANDIDATE_CREATED,
         EventType.AGENT_MEMORY_SNAPSHOT_UPDATED,
     }:
-        return _memory_event_visible_to_target(payload, target_id)
+        return _memory_event_visible_to_target(
+            payload,
+            target_id,
+            plan=plan,
+            forbidden_terms=forbidden_terms,
+        )
     if event_type in {
         EventType.PLAYER_ASKED_ABOUT,
         EventType.PLAYER_PRESENTED_CLUE,
@@ -402,12 +455,22 @@ def _event_visible_to_target(event: object, target_id: str) -> bool:
     return True
 
 
-def _memory_event_visible_to_target(payload: dict[str, object], target_id: str) -> bool:
+def _memory_event_visible_to_target(
+    payload: dict[str, object],
+    target_id: str,
+    *,
+    plan: MemoryRetrievalPlan | None,
+    forbidden_terms: tuple[str, ...],
+) -> bool:
     if not _memory_event_scope_injectable(payload):
         return False
     if not _memory_event_target_visible(payload, target_id):
         return False
-    return _memory_event_layer_injectable(payload)
+    if not _memory_event_layer_injectable(payload):
+        return False
+    if not _memory_event_allowed_by_plan(payload, plan):
+        return False
+    return not _memory_event_matches_forbidden(payload, forbidden_terms)
 
 
 def _memory_event_scope_injectable(payload: dict[str, object]) -> bool:
@@ -442,6 +505,40 @@ def _memory_event_layer_injectable(payload: dict[str, object]) -> bool:
     if scope == "session":
         return layer == "working"
     return layer != "archival"
+
+
+def _memory_event_allowed_by_plan(
+    payload: dict[str, object],
+    plan: MemoryRetrievalPlan | None,
+) -> bool:
+    if plan is None:
+        return True
+    memory_type = str(payload.get("memory_type", "episodic"))
+    memory_scope = str(payload.get("memory_scope", "npc_private"))
+    memory_layer = str(payload.get("memory_layer", "working"))
+    return (
+        memory_type in set(plan.included_memory_types)
+        and memory_scope in set(plan.included_scopes)
+        and memory_layer in set(plan.included_layers)
+        and memory_scope not in set(plan.forbidden_scopes)
+        and memory_layer not in set(plan.forbidden_layers)
+    )
+
+
+def _memory_event_matches_forbidden(
+    payload: dict[str, object],
+    forbidden_terms: tuple[str, ...],
+) -> bool:
+    content = str(payload.get("content", ""))
+    return any(term and term in content for term in forbidden_terms)
+
+
+def _forbidden_terms(case: CasePackage) -> tuple[str, ...]:
+    terms: list[str] = []
+    for fact in case.forbidden_facts:
+        terms.append(fact.text)
+        terms.extend(fact.blocked_terms)
+    return tuple(term for term in terms if term)
 
 
 def _portrait_summary(

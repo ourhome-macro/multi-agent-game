@@ -1,32 +1,26 @@
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from typing import Any
 
-from app.domain.models import EventType, MemoryType, WorldEvent
+from app.domain.models import (
+    CasePackage,
+    EventType,
+    MemoryDerivationRuleConfig,
+    MemoryImpressionEffectConfig,
+    MemoryType,
+    WorldEvent,
+)
 
-JIANG_YANHUI_ID = "jiang_yanhui"
-EMPTY_CAPSULES_ID = "empty_capsules"
-MEDICINE_PRESENTED_CLUE_RULE_ID = (
-    "memory_rule.jiang_empty_capsules_medicine_pressure.presented_clue.v1"
-)
-MEDICINE_ASKED_ABOUT_RULE_ID = (
-    "memory_rule.jiang_empty_capsules_medicine_pressure.asked_about.v1"
-)
-MEDICINE_TOPIC_RULE_IDS = {
-    MEDICINE_PRESENTED_CLUE_RULE_ID,
-    MEDICINE_ASKED_ABOUT_RULE_ID,
+# Player action events runtime can resolve a subject from when deriving typed
+# memory. _event_subject_id only understands these; the loader rejects rules
+# that trigger on anything else.
+MEMORY_DERIVATION_TRIGGER_EVENTS = {
+    EventType.PLAYER_ASKED_ABOUT.value,
+    EventType.PLAYER_PRESENTED_CLUE.value,
 }
-MEDICINE_BELIEF_MEMORY_ID = (
-    f"memory.player.belief.{JIANG_YANHUI_ID}.{EMPTY_CAPSULES_ID}"
-)
-MEDICINE_RELATIONSHIP_MEMORY_ID = (
-    f"memory.player.relationship.{JIANG_YANHUI_ID}.{EMPTY_CAPSULES_ID}"
-)
-MEDICINE_STRATEGY_MEMORY_ID = (
-    f"memory.player.strategy.{JIANG_YANHUI_ID}.{EMPTY_CAPSULES_ID}"
-)
-MEDICINE_STRATEGY_ID = "avoid_medicine_topic"
+_TEMPLATE_TOKEN = re.compile(r"\{([^}]*)\}")
 
 
 @dataclass(frozen=True)
@@ -47,145 +41,113 @@ class ResolvedMemoryEffect:
 
 
 @dataclass(frozen=True)
-class MemoryDerivationRule:
-    id: str
-    trigger_action_type: str
-    target_character_id: str | None
-    subject_id: str | None
-    produces: tuple[MemoryEffect, ...]
-
-    def matches(self, source_event: WorldEvent) -> bool:
-        if source_event.type.value != self.trigger_action_type:
-            return False
-        if (
-            self.target_character_id is not None
-            and source_event.payload.get("target_id") != self.target_character_id
-        ):
-            return False
-        if self.subject_id is None:
-            return True
-        return _event_subject_id(source_event) == self.subject_id
+class ResolvedImpressionEffect:
+    rule_id: str
+    impression: MemoryImpressionEffectConfig
+    produced_memory_ids: tuple[str, ...]
 
 
-MEMORY_DERIVATION_RULES: tuple[MemoryDerivationRule, ...] = (
-    MemoryDerivationRule(
-        id=MEDICINE_PRESENTED_CLUE_RULE_ID,
-        trigger_action_type=EventType.PLAYER_PRESENTED_CLUE.value,
-        target_character_id=JIANG_YANHUI_ID,
-        subject_id=EMPTY_CAPSULES_ID,
-        produces=(
-            MemoryEffect(
-                memory_id=MEDICINE_BELIEF_MEMORY_ID,
-                memory_type="belief",
-                content="Jiang believes the player is closing in on the medicine clue.",
-                salience=0.9,
-                confidence=0.8,
-                metadata={
-                    "belief_subject": "player_approaching_medicine_truth",
-                    "belief_polarity": "believes",
-                    "clue_id": EMPTY_CAPSULES_ID,
-                },
-            ),
-            MemoryEffect(
-                memory_id=MEDICINE_RELATIONSHIP_MEMORY_ID,
-                memory_type="relationship",
-                content=(
-                    "Jiang becomes more suspicious of the player around the medicine clue."
-                ),
-                salience=0.85,
-                confidence=0.8,
-                metadata={
-                    "relationship_delta": {
-                        "suspicion": 0.2,
-                        "trust": -0.1,
-                    },
-                    "clue_id": EMPTY_CAPSULES_ID,
-                },
-            ),
-            MemoryEffect(
-                memory_id=MEDICINE_STRATEGY_MEMORY_ID,
-                memory_type="strategy",
-                content="Jiang is inclined to avoid the medicine topic.",
-                salience=0.95,
-                confidence=0.85,
-                metadata={
-                    "strategy_id": MEDICINE_STRATEGY_ID,
-                    "clue_id": EMPTY_CAPSULES_ID,
-                },
-            ),
-        ),
-    ),
-    MemoryDerivationRule(
-        id=MEDICINE_ASKED_ABOUT_RULE_ID,
-        trigger_action_type=EventType.PLAYER_ASKED_ABOUT.value,
-        target_character_id=JIANG_YANHUI_ID,
-        subject_id=EMPTY_CAPSULES_ID,
-        produces=(
-            MemoryEffect(
-                memory_id=MEDICINE_BELIEF_MEMORY_ID,
-                memory_type="belief",
-                content="Jiang believes the player is closing in on the medicine clue.",
-                salience=0.9,
-                confidence=0.8,
-                metadata={
-                    "belief_subject": "player_approaching_medicine_truth",
-                    "belief_polarity": "believes",
-                    "clue_id": EMPTY_CAPSULES_ID,
-                },
-            ),
-            MemoryEffect(
-                memory_id=MEDICINE_RELATIONSHIP_MEMORY_ID,
-                memory_type="relationship",
-                content=(
-                    "Jiang becomes more suspicious of the player around the medicine clue."
-                ),
-                salience=0.85,
-                confidence=0.8,
-                metadata={
-                    "relationship_delta": {
-                        "suspicion": 0.2,
-                        "trust": -0.1,
-                    },
-                    "clue_id": EMPTY_CAPSULES_ID,
-                },
-            ),
-            MemoryEffect(
-                memory_id=MEDICINE_STRATEGY_MEMORY_ID,
-                memory_type="strategy",
-                content="Jiang is inclined to avoid the medicine topic.",
-                salience=0.95,
-                confidence=0.85,
-                metadata={
-                    "strategy_id": MEDICINE_STRATEGY_ID,
-                    "clue_id": EMPTY_CAPSULES_ID,
-                },
-            ),
-        ),
-    ),
-)
+def _rule_matches(rule: MemoryDerivationRuleConfig, source_event: WorldEvent) -> bool:
+    if source_event.type.value != rule.trigger_action_type:
+        return False
+    if (
+        rule.target_character_id is not None
+        and source_event.payload.get("target_id") != rule.target_character_id
+    ):
+        return False
+    if rule.subject_id is None:
+        return True
+    return _event_subject_id(source_event) == rule.subject_id
 
 
-def resolve_memory_derivation_effects(source_event: WorldEvent) -> list[ResolvedMemoryEffect]:
-    effects: list[ResolvedMemoryEffect] = []
+def _matched_rules(
+    case: CasePackage,
+    source_event: WorldEvent,
+) -> list[MemoryDerivationRuleConfig]:
+    return [
+        rule
+        for rule in case.memory_derivation_rules
+        if _rule_matches(rule, source_event)
+    ]
+
+
+def resolve_memory_derivation_effects(
+    case: CasePackage,
+    source_event: WorldEvent,
+) -> list[ResolvedMemoryEffect]:
     source_memory_id = _source_memory_id(source_event)
     if source_memory_id is None:
-        return effects
-    for rule in MEMORY_DERIVATION_RULES:
-        if not rule.matches(source_event):
-            continue
-        effects.extend(
-            ResolvedMemoryEffect(
-                rule_id=rule.id,
-                source_memory_id=source_memory_id,
-                effect=effect,
+        return []
+    context = _template_context(source_event)
+    effects: list[ResolvedMemoryEffect] = []
+    for rule in _matched_rules(case, source_event):
+        for produced in rule.produces:
+            effects.append(
+                ResolvedMemoryEffect(
+                    rule_id=rule.id,
+                    source_memory_id=source_memory_id,
+                    effect=MemoryEffect(
+                        memory_id=_render(produced.memory_id, context),
+                        memory_type=produced.memory_type,
+                        content=_render(produced.content, context),
+                        salience=produced.salience,
+                        confidence=produced.confidence,
+                        metadata=dict(produced.metadata),
+                    ),
+                )
             )
-            for effect in rule.produces
-        )
     return effects
 
 
-def memory_derivation_rule_ids_for_event(source_event: WorldEvent) -> set[str]:
-    return {rule.id for rule in MEMORY_DERIVATION_RULES if rule.matches(source_event)}
+def resolve_memory_impression_effects(
+    case: CasePackage,
+    source_event: WorldEvent,
+) -> list[ResolvedImpressionEffect]:
+    context = _template_context(source_event)
+    resolved: list[ResolvedImpressionEffect] = []
+    for rule in _matched_rules(case, source_event):
+        if rule.impression is None:
+            continue
+        resolved.append(
+            ResolvedImpressionEffect(
+                rule_id=rule.id,
+                impression=rule.impression,
+                produced_memory_ids=tuple(
+                    _render(produced.memory_id, context) for produced in rule.produces
+                ),
+            )
+        )
+    return resolved
+
+
+def memory_derivation_rule_ids_for_event(
+    case: CasePackage,
+    source_event: WorldEvent,
+) -> set[str]:
+    return {rule.id for rule in _matched_rules(case, source_event)}
+
+
+def _template_context(source_event: WorldEvent) -> dict[str, str]:
+    context: dict[str, str] = {}
+    target_id = _optional_str(source_event.payload.get("target_id"))
+    if target_id is not None:
+        context["target_id"] = target_id
+    subject_id = _event_subject_id(source_event)
+    if subject_id is not None:
+        context["subject_id"] = subject_id
+    return context
+
+
+def _render(template: str, context: dict[str, str]) -> str:
+    def replace(match: re.Match[str]) -> str:
+        key = match.group(1)
+        if key not in context:
+            raise ValueError(
+                f"Memory derivation template references unavailable variable '{key}'"
+            )
+        return context[key]
+
+    return _TEMPLATE_TOKEN.sub(replace, template)
 
 
 def _event_subject_id(source_event: WorldEvent) -> str | None:
