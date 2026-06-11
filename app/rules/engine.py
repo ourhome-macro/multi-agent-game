@@ -6,6 +6,7 @@ from app.domain.models import (
     DiscoverClueAction,
     EventType,
     PlayerAction,
+    PresentationMode,
     ProposedActionType,
     RelationshipChangeAction,
     RelationshipState,
@@ -111,6 +112,7 @@ class RuleEngine:
         session: SessionState,
         action: PlayerAction,
     ) -> list[WorldEvent]:
+        presentation_mode = action.effective_presentation_mode or PresentationMode.PRIVATE
         if not self._is_known_character(case, action.target_id):
             return [
                 self._reject(
@@ -120,6 +122,7 @@ class RuleEngine:
                     payload={
                         "target_id": action.target_id,
                         "clue_id": action.clue_id,
+                        "presentation_mode": presentation_mode.value,
                         "text": action.text,
                     },
                     caused_by_event_id=None,
@@ -136,6 +139,7 @@ class RuleEngine:
                     payload={
                         "target_id": action.target_id,
                         "clue_id": clue_id,
+                        "presentation_mode": presentation_mode.value,
                         "text": action.text,
                     },
                     caused_by_event_id=None,
@@ -150,6 +154,7 @@ class RuleEngine:
                     payload={
                         "target_id": action.target_id,
                         "clue_id": clue_id,
+                        "presentation_mode": presentation_mode.value,
                         "text": action.text,
                     },
                     caused_by_event_id=None,
@@ -166,13 +171,20 @@ class RuleEngine:
                         "target_id": action.target_id,
                         "clue_id": clue_id,
                         "knowledge_id": knowledge_id,
+                        "presentation_mode": presentation_mode.value,
                         "text": action.text,
                     },
                     caused_by_event_id=None,
                 )
             ]
-        scene = self._scene_for_presented_clue(case, action.target_id, action.scene_id)
-        if action.scene_id is not None and scene is None:
+        scene = None
+        if presentation_mode == PresentationMode.SCENE_SHARED:
+            scene = self._scene_for_presented_clue(
+                case,
+                action.target_id,
+                action.scene_id,
+            )
+        if presentation_mode == PresentationMode.SCENE_SHARED and scene is None:
             return [
                 self._reject(
                     session=session,
@@ -183,6 +195,7 @@ class RuleEngine:
                         "clue_id": clue_id,
                         "knowledge_id": knowledge_id,
                         "scene_id": action.scene_id,
+                        "presentation_mode": presentation_mode.value,
                         "text": action.text,
                     },
                     caused_by_event_id=None,
@@ -192,6 +205,7 @@ class RuleEngine:
             "target_id": action.target_id,
             "clue_id": clue_id,
             "knowledge_id": knowledge_id,
+            "presentation_mode": presentation_mode.value,
             "text": action.text,
             "interaction_pressure": calculate_interaction_pressure(case, action),
         }

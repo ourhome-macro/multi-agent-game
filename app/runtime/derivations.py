@@ -420,6 +420,9 @@ class DerivedEventSystem:
         session: SessionState,
         source_event: WorldEvent,
     ) -> WorldEvent | None:
+        presentation_mode = source_event.payload.get("presentation_mode")
+        if presentation_mode is not None and presentation_mode != "scene_shared":
+            return None
         scene_id = source_event.payload.get("scene_id")
         if not isinstance(scene_id, str):
             return None

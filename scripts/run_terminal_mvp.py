@@ -10,7 +10,13 @@ if str(PROJECT) not in sys.path:
     sys.path.insert(0, str(PROJECT))
 
 from app.cases.loader import CaseLoader  # noqa: E402
-from app.domain.models import ActionType, CasePackage, PlayerAction, SubjectType  # noqa: E402
+from app.domain.models import (  # noqa: E402
+    ActionType,
+    CasePackage,
+    PlayerAction,
+    PresentationMode,
+    SubjectType,
+)
 from app.runtime.action_router import ActionRouter  # noqa: E402
 from app.runtime.service import create_runtime  # noqa: E402
 from app.runtime.tracing import RuntimeTracer  # noqa: E402
@@ -129,15 +135,36 @@ def parse_player_command(
             if len(parts) < 3:
                 return ParsedCommand(
                     command=command,
-                    error="usage: present <npc> <clue> [text]",
+                    error=(
+                        "usage: present <npc> <clue> "
+                        "[private [text] | public <scene> [text]]"
+                    ),
                 )
+            presentation_mode = PresentationMode.PRIVATE
+            scene_id = None
+            text_parts = parts[3:]
+            if text_parts:
+                mode_token = text_parts[0].lower()
+                if mode_token == "private":
+                    text_parts = text_parts[1:]
+                elif mode_token in {"public", "scene_shared"}:
+                    if len(text_parts) < 2:
+                        return ParsedCommand(
+                            command=command,
+                            error="usage: present <npc> <clue> public <scene> [text]",
+                        )
+                    presentation_mode = PresentationMode.SCENE_SHARED
+                    scene_id = text_parts[1]
+                    text_parts = text_parts[2:]
             return ParsedCommand(
                 command=command,
                 action=PlayerAction(
                     type=ActionType.PRESENT_CLUE,
                     target_id=parts[1],
                     clue_id=parts[2],
-                    text=" ".join(parts[3:]) if len(parts) > 3 else None,
+                    scene_id=scene_id,
+                    presentation_mode=presentation_mode,
+                    text=" ".join(text_parts) if text_parts else None,
                 ),
             )
         if command == "accuse":
@@ -198,7 +225,7 @@ def _print_help() -> None:
     print("inspect <hotspot>")
     print("talk <npc> <text>")
     print("ask <npc> clue|character|scene <id> [text]")
-    print("present <npc> <clue> [text]")
+    print("present <npc> <clue> [private [text] | public <scene> [text]]")
     print("accuse <npc> <claim> <evidence...>")
     print("state | events | memory | quit")
 
@@ -222,6 +249,7 @@ def _print_memory(session: object) -> None:
     for snapshot in session.memory_snapshots.values():
         print(
             f"{snapshot.memory_id} salience={snapshot.salience:g} "
+            f"scope={snapshot.memory_scope} layer={snapshot.memory_layer} "
             f"sources={','.join(snapshot.source_event_ids)}"
         )
         print(f"  {snapshot.content}")

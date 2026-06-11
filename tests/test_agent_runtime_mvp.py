@@ -143,7 +143,7 @@ def test_runtime_trace_writes_safe_jsonl_and_readable_log(tmp_path: Path) -> Non
 
     assert len(records) == 1
     record = records[0]
-    assert record["schema_version"] == 2
+    assert record["schema_version"] == 3
     assert record["timestamp"]
     assert record["turn_id"] == 1
     assert record["action_type"] == "talk"

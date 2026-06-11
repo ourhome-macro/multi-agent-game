@@ -11,6 +11,7 @@ from app.agents.tools.runtime import ToolRuntime
 from app.domain.models import (
     AgentContext,
     AgentIntent,
+    AgentMemorySnapshot,
     CasePackage,
     PlayerAction,
     PromptBundle,
@@ -92,6 +93,7 @@ class AgentLoop:
             }
         )
         memory_ids = [snapshot.memory_id for snapshot in retrieved_memories]
+        memory_projection = _memory_projection(retrieved_memories)
         prompt_bundle = self._prompt_builder.build(context)
         budget = self._budget_prompt(prompt_bundle, context, memory_ids)
         if budget.compressed_history is not None:
@@ -122,6 +124,7 @@ class AgentLoop:
             context_budget_ratio=budget.context_budget_ratio,
             compression_used=budget.compression_used,
             memory_ids_used=memory_ids,
+            memory_projection=memory_projection,
             tool_calls=tool_calls,
             security_flags=security_review.security_flags,
         )
@@ -179,3 +182,17 @@ class AgentLoop:
             status=status,
             error_category=error_category,
         )
+
+
+def _memory_projection(memories: list[AgentMemorySnapshot]) -> list[dict[str, object]]:
+    return [
+        {
+            "memory_id": memory.memory_id,
+            "memory_type": memory.memory_type,
+            "memory_scope": memory.memory_scope,
+            "memory_layer": memory.memory_layer,
+            "owner_character_id": memory.owner_character_id,
+            "visible_to_character_ids": list(memory.visible_to_character_ids),
+        }
+        for memory in memories
+    ]

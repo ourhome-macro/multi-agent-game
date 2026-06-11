@@ -25,6 +25,11 @@ class SubjectType(StrEnum):
     SCENE = "scene"
 
 
+class PresentationMode(StrEnum):
+    PRIVATE = "private"
+    SCENE_SHARED = "scene_shared"
+
+
 class AgentIntentType(StrEnum):
     ANSWER = "answer"
     CONCEAL = "conceal"
@@ -670,6 +675,7 @@ class PlayerAction(APIModel):
     target_id: NonEmptyString
     clue_id: NonEmptyString | None = None
     scene_id: NonEmptyString | None = None
+    presentation_mode: PresentationMode | None = None
     claim_id: NonEmptyString | None = None
     evidence_clue_ids: list[NonEmptyString] = Field(default_factory=list)
     subject_type: SubjectType | None = None
@@ -686,6 +692,8 @@ class PlayerAction(APIModel):
                 raise ValueError("clue_id is only valid for present_clue")
             if self.scene_id is not None:
                 raise ValueError("scene_id is only valid for present_clue")
+            if self.presentation_mode is not None:
+                raise ValueError("presentation_mode is only valid for present_clue")
             if self.claim_id is not None or self.evidence_clue_ids:
                 raise ValueError("claim fields are only valid for accuse")
             return self
@@ -696,6 +704,16 @@ class PlayerAction(APIModel):
                 raise ValueError("subject fields are only valid for ask_about")
             if self.claim_id is not None or self.evidence_clue_ids:
                 raise ValueError("claim fields are only valid for accuse")
+            if (
+                self.presentation_mode == PresentationMode.PRIVATE
+                and self.scene_id is not None
+            ):
+                raise ValueError("private present_clue cannot set scene_id")
+            if (
+                self.presentation_mode == PresentationMode.SCENE_SHARED
+                and self.scene_id is None
+            ):
+                raise ValueError("scene_shared present_clue requires scene_id")
             return self
         if self.type == ActionType.ACCUSE:
             if self.claim_id is None:
@@ -704,6 +722,8 @@ class PlayerAction(APIModel):
                 raise ValueError("clue_id is only valid for present_clue")
             if self.scene_id is not None:
                 raise ValueError("scene_id is only valid for present_clue")
+            if self.presentation_mode is not None:
+                raise ValueError("presentation_mode is only valid for present_clue")
             if self.subject_type is not None or self.subject_id is not None:
                 raise ValueError("subject fields are only valid for ask_about")
             return self
@@ -711,11 +731,23 @@ class PlayerAction(APIModel):
             raise ValueError("clue_id is only valid for present_clue")
         if self.scene_id is not None:
             raise ValueError("scene_id is only valid for present_clue")
+        if self.presentation_mode is not None:
+            raise ValueError("presentation_mode is only valid for present_clue")
         if self.claim_id is not None or self.evidence_clue_ids:
             raise ValueError("claim fields are only valid for accuse")
         if self.subject_type is not None or self.subject_id is not None:
             raise ValueError("subject fields are only valid for ask_about")
         return self
+
+    @property
+    def effective_presentation_mode(self) -> PresentationMode | None:
+        if self.type != ActionType.PRESENT_CLUE:
+            return None
+        if self.presentation_mode is not None:
+            return self.presentation_mode
+        if self.scene_id is not None:
+            return PresentationMode.SCENE_SHARED
+        return PresentationMode.PRIVATE
 
 
 class AgentIntent(APIModel):

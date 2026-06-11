@@ -946,6 +946,7 @@
       "target_id": "clerk",
       "clue_id": "blue_ledger_page",
       "knowledge_id": "player_knowledge.blue_ledger_records_midnight_boxes",
+      "presentation_mode": "private",
       "text": "Explain this ledger page.",
       "interaction_pressure": 0.9
     },

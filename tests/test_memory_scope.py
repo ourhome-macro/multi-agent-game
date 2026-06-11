@@ -5,7 +5,7 @@ from pathlib import Path
 from app.agents.context import build_agent_context
 from app.agents.memory import MemoryRetriever
 from app.cases.loader import CaseLoader
-from app.domain.models import ActionType, EventType, PlayerAction
+from app.domain.models import ActionType, EventType, PlayerAction, PresentationMode
 from app.runtime.replay import replay_events
 from app.runtime.service import create_runtime
 
@@ -88,6 +88,7 @@ def test_public_empty_capsules_memory_is_scene_shared_to_present_npcs() -> None:
             type=ActionType.PRESENT_CLUE,
             target_id=JIANG,
             clue_id=EMPTY_CAPSULES,
+            presentation_mode=PresentationMode.SCENE_SHARED,
             scene_id=STUDY,
             text="publicly present empty capsules",
         ),
@@ -178,6 +179,7 @@ def test_replay_preserves_scene_shared_scope_and_layer() -> None:
             type=ActionType.PRESENT_CLUE,
             target_id=JIANG,
             clue_id=EMPTY_CAPSULES,
+            presentation_mode=PresentationMode.SCENE_SHARED,
             scene_id=STUDY,
             text="publicly present empty capsules",
         ),

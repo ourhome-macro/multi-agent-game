@@ -323,6 +323,7 @@ def test_present_clue_success_triggers_mock_agent_and_rule_engine(
         "target_id": "butler",
         "clue_id": "scratched_drawer",
         "knowledge_id": "player_knowledge.desk_forced_open",
+        "presentation_mode": "private",
         "text": "What about these scratch marks?",
         "interaction_pressure": 0.9,
     }

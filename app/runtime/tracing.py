@@ -10,7 +10,7 @@ from uuid import uuid4
 
 from app.domain.models import ActionType, AgentIntent, PlayerAction, WorldEvent
 
-TRACE_SCHEMA_VERSION = 2
+TRACE_SCHEMA_VERSION = 3
 
 
 @dataclass
@@ -27,6 +27,7 @@ class RuntimeTraceDraft:
     context_budget_ratio: float = 0.0
     compression_used: bool = False
     memory_ids_used: list[str] = field(default_factory=list)
+    memory_projection: list[dict[str, object]] = field(default_factory=list)
     tool_calls: list[dict[str, object]] = field(default_factory=list)
     security_flags: list[str] = field(default_factory=list)
     trace_id: str = field(default_factory=lambda: str(uuid4()))
@@ -73,6 +74,7 @@ class RuntimeTracer:
         context_budget_ratio: float = 0.0,
         compression_used: bool = False,
         memory_ids_used: list[str] | None = None,
+        memory_projection: list[dict[str, object]] | None = None,
         tool_calls: list[dict[str, object]] | None = None,
         security_flags: list[str] | None = None,
     ) -> RuntimeTraceDraft:
@@ -89,6 +91,9 @@ class RuntimeTracer:
             context_budget_ratio=context_budget_ratio,
             compression_used=compression_used,
             memory_ids_used=memory_ids_used or [],
+            memory_projection=[
+                _sanitize_memory_projection(item) for item in (memory_projection or [])
+            ],
             tool_calls=[_sanitize_tool_call(item) for item in (tool_calls or [])],
             security_flags=security_flags or [],
         )
@@ -124,6 +129,7 @@ class RuntimeTracer:
             "context_budget_ratio": draft.context_budget_ratio,
             "compression_used": draft.compression_used,
             "memory_ids_used": draft.memory_ids_used,
+            "memory_projection": draft.memory_projection,
             "tool_calls": draft.tool_calls,
             "security_flags": draft.security_flags,
             "intent_type": intent.intent.value if intent is not None else None,
@@ -167,6 +173,20 @@ def _sanitize_tool_call(tool_call: dict[str, object]) -> dict[str, object]:
         "duration_ms": int(tool_call.get("duration_ms", 0)),
         "error_category": tool_call.get("error_category"),
         "result_count": int(tool_call.get("result_count", 0)),
+    }
+
+
+def _sanitize_memory_projection(item: dict[str, object]) -> dict[str, object]:
+    visible_to = item.get("visible_to_character_ids", [])
+    if not isinstance(visible_to, list):
+        visible_to = []
+    return {
+        "memory_id": str(item.get("memory_id", "")),
+        "memory_type": str(item.get("memory_type", "")),
+        "memory_scope": str(item.get("memory_scope", "")),
+        "memory_layer": str(item.get("memory_layer", "")),
+        "owner_character_id": item.get("owner_character_id"),
+        "visible_to_character_ids": [str(value) for value in visible_to],
     }
 
 

@@ -140,7 +140,7 @@ Memory v1.1 hardening 进一步要求每条 candidate / snapshot 都带：
 - `memory_scope`：`case`、`session`、`npc_private`、`scene_shared`、`director_audit`
 - `memory_layer`：`core`、`working`、`archival`
 
-现有 typed memory 默认是 `npc_private` + `working`。`player.presented_clue` 没有 `scene_id` 时仍按私下展示处理；如果事件带有合法 `scene_id` 和 `present_character_ids`，运行时额外生成 `scene_shared` memory，且 `visible_to_character_ids` 必须等于当前场景在场 NPC。
+现有 typed memory 默认是 `npc_private` + `working`。`player.presented_clue` 的展示范围由结构化 `presentation_mode` 决定：`private` 只生成目标 NPC 可见的私有互动记忆；`scene_shared` 必须带合法 `scene_id` 和 `present_character_ids`，运行时会额外生成 `scene_shared` memory，且 `visible_to_character_ids` 必须等于当前场景在场 NPC。自然语言 Router 不负责从玩家文本里推断公共场景。
 
 `build_agent_context(...)` 只允许注入 `case/core`、`session/working`、当前目标 NPC 可见的 `npc_private`、当前目标 NPC 可见的 `scene_shared` 和当前目标 NPC 自己的 `portrait_summary`。它必须禁止注入 `director_audit`、其他 NPC 的 `npc_private`、其他 NPC 的 portrait 和任何 `archival` memory。
 
@@ -291,7 +291,7 @@ Agent 也不能写 `FactDisclosureStrategy`。策略是上下文投影，不是�
 - `min_relationship`
 - `max_relationship`
 
-`present_clue` 不表示线索证明 NPC 有罪，只表示玩家用已知线索施压、试探或质询 NPC。真相推进仍属于 Rule Trigger System 和 narrative rules。
+`present_clue` 不表示线索证明 NPC 有罪，只表示玩家用已知线索施压、试探或质询 NPC。其 `presentation_mode` 来自 UI / API / REPL 的结构化动作契约，Agent 只能在 `AgentContext.player_action` 摘要中读取该字段，不能据此自行扩大可见 NPC 或写入记忆。真相推进仍属于 Rule Trigger System 和 narrative rules。
 
 `LLMAgentStub` 返回合法 `AgentIntent`，不调用外部模型，也不修改 `SessionState`。它用于在接入真实模型前锁定 LLM 合同。
 

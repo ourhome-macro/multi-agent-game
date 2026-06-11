@@ -97,12 +97,27 @@ Rule Engine 会校验：
   "type": "present_clue",
   "target_id": "butler",
   "clue_id": "scratched_drawer",
-  "scene_id": "study",
+  "presentation_mode": "private",
   "text": "What about these scratch marks?"
 }
 ```
 
+当众展示必须走显式结构化字段：
+
+```json
+{
+  "type": "present_clue",
+  "target_id": "jiang_yanhui",
+  "clue_id": "empty_capsules",
+  "presentation_mode": "scene_shared",
+  "scene_id": "study",
+  "text": "Show everyone the empty capsules."
+}
+```
+
 `present_clue` 表示玩家用已知线索向 NPC 施压或试探。它不表示该线索已经证明 NPC 有罪，也不直接推进真相或阶段。
+
+UI 推荐路径是“背包 / 已发现线索列表 -> 选择线索 -> 选择展示对象 -> 选择私下展示或当众展示”，然后由前端提交结构化 `PlayerAction`。自然语言 `ActionRouter` 只适合轻量兜底，不负责推断公共场景或在场 NPC。
 
 Rule Engine 会校验：
 
@@ -110,7 +125,9 @@ Rule Engine 会校验：
 - `clue_id` 存在于案件包
 - `clue_id` 已经被发现
 - 对应 `player_knowledge.<world_info_id>` 存在
-- 如果传入 `scene_id`，目标 NPC 必须位于该场景
+- `presentation_mode=private` 时禁止传入 `scene_id`
+- `presentation_mode=scene_shared` 时必须传入 `scene_id`
+- `presentation_mode=scene_shared` 时目标 NPC 必须位于该场景
 
 校验失败时返回 `accepted=false`，写入 `rule.rejected`，不会产生 `npc.replied` 或关系变化。
 
@@ -123,12 +140,13 @@ Rule Engine 会校验：
   "scene_id": "study",
   "present_character_ids": ["butler", "niece"],
   "knowledge_id": "player_knowledge.desk_forced_open",
+  "presentation_mode": "scene_shared",
   "text": "What about these scratch marks?",
   "interaction_pressure": 0.9
 }
 ```
 
-`scene_id` 和 `present_character_ids` 只在玩家明确当众展示线索时出现。没有 `scene_id` 时，后端按私下展示处理，不自动把同一静态场景里的 NPC 都加入可见范围。
+`player.presented_clue` payload 必须写出 `presentation_mode`。`scene_id` 和 `present_character_ids` 只在玩家明确当众展示线索时出现。没有 `scene_id` 且没有显式 `presentation_mode` 的旧请求仍按私下展示兼容处理；新客户端必须提交 `presentation_mode`，不能让后端从自然语言或静态场景自动扩散记忆。
 
 之后进入 `AgentGateway -> NarrativeDirector -> RuleEngine` 链路。
 

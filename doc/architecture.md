@@ -53,7 +53,7 @@ POST /sessions/{id}/actions
 
 `ask_about` 是结构化询问动作。Rule Engine 校验被询问对象，写入 `player.asked_about`，之后走与 `talk` 相同的 AgentGateway -> Director -> Rule Engine 链路。
 
-`present_clue` 是玩家向 NPC 施压或展示证据的动作。Rule Engine 会先校验：`target_id` 是已知角色、`clue_id` 存在、线索已被发现、且玩家已知账本里存在对应 `player_knowledge`。如果请求带 `scene_id`，还必须校验目标 NPC 位于该场景，并把场景在场 NPC 写入事件。合法时写入 `player.presented_clue`，再进入 Agent 链路。非法时写入 `rule.rejected`，不会产生 NPC 回复或关系变化。
+`present_clue` 是玩家向 NPC 施压或展示证据的结构化动作，不依赖自然语言 Router 判断展示范围。API / REPL / ActionService 统一使用 `presentation_mode` 表达入口语义：`private` 是私下展示，禁止带 `scene_id`；`scene_shared` 是当众展示，必须带 `scene_id`。Rule Engine 会先校验：`target_id` 是已知角色、`clue_id` 存在、线索已被发现、玩家已知账本里存在对应 `player_knowledge`，并在 `scene_shared` 时校验目标 NPC 位于该场景，然后把场景在场 NPC 写入事件。合法时写入 `player.presented_clue`，再进入 Agent 链路。非法时写入 `rule.rejected`，不会产生 NPC 回复或关系变化。
 
 `present_clue` 不等于证明真相，只表示玩家用某条已知线索进行施压或试探。叙事真相仍只能通过事件和 `RuleTriggerSystem` 推进。
 
@@ -107,9 +107,11 @@ Memory v1 在 `AgentMemorySnapshot` 上增加 `memory_type`，当前只支持 `e
 
 Memory v1.1 将 seed 逻辑抽为 `MemoryDerivationRule`，并要求派生出的 memory 带 `rule_id`、`source_event_ids` 和稳定 metadata 键。重复派生同一个 `source_event_id` 时不得重复写候选记忆，也不得重复叠加 portrait 数值。
 
-Memory v1.1 hardening 在 `MemoryCandidateState` 和 `AgentMemorySnapshot` 上增加 `memory_scope` 与 `memory_layer`。现有 typed memory 默认是 `npc_private` + `working`；线索发现记忆是 `case/core`；当 `player.presented_clue` 事件带合法 `scene_id` 和 `present_character_ids` 时，会额外生成 `scene_shared/working` 记忆；Director 拦截派生出的审计记忆是 `director_audit/working`。
+Memory v1.1 hardening 在 `MemoryCandidateState` 和 `AgentMemorySnapshot` 上增加 `memory_scope` 与 `memory_layer`。现有 typed memory 默认是 `npc_private` + `working`；线索发现记忆是 `case/core`；当 `player.presented_clue` 事件的 `presentation_mode=scene_shared` 且带合法 `scene_id` 和 `present_character_ids` 时，会额外生成 `scene_shared/working` 记忆；Director 拦截派生出的审计记忆是 `director_audit/working`。
 
 普通 NPC `AgentContext` 的 memory 投影只允许 `case/core`、`session/working`、当前目标 NPC 可见的 `npc_private` 和当前目标 NPC 可见的 `scene_shared`，并排除所有 `archival` 与 `director_audit`。`MemoryRetriever` 按 `memory_scope` -> `visible_to_character_ids` / `owner_character_id` -> `memory_layer` 的顺序过滤。Director 审计入口可以检索 `director_audit`，但这不等于把审计记忆注入 NPC。
+
+Runtime trace schema v3 会记录 `memory_projection`，只包含已注入记忆的 `memory_id`、`memory_type`、`memory_scope`、`memory_layer`、`owner_character_id` 和 `visible_to_character_ids`，不记录 memory content。真实 LLM backend 也使用同一投影摘要，便于审计 real turn 是否遵守 scope/layer 边界。
 
 `character_impression.updated` 是运行时派生的私有认知事件，来源包括 `player.asked_about`、`player.presented_clue`、`player.accused`、`relationship.threshold.crossed`、`director.blocked` 和 `accusation.evaluated`。LLM 可以读取目标 NPC 自己的画像视图，但不能直接写画像状态。
 

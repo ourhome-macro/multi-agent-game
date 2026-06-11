@@ -1259,6 +1259,11 @@ def _action_summary(action: PlayerAction) -> dict[str, Any]:
         "target_id": action.target_id,
         "clue_id": action.clue_id,
         "scene_id": action.scene_id,
+        "presentation_mode": (
+            action.effective_presentation_mode.value
+            if action.effective_presentation_mode
+            else None
+        ),
         "claim_id": action.claim_id,
         "evidence_clue_ids": list(action.evidence_clue_ids),
         "subject_type": action.subject_type.value if action.subject_type else None,

@@ -231,7 +231,8 @@ CharacterPrivateConfig
 
 - `target_id`
 - `clue_id`
-- `scene_id`，可选；只有玩家明确在某个场景当众展示时写入
+- `presentation_mode`：`private` 或 `scene_shared`
+- `scene_id`，只允许在 `presentation_mode=scene_shared` 时写入
 - `present_character_ids`，可选；由后端根据 `scene_id` 计算当前场景在场 NPC
 - `knowledge_id`
 - `text`
@@ -239,7 +240,7 @@ CharacterPrivateConfig
 
 该事件本身不修改线索状态。它是可审计的玩家施压/试探动作，会影响 `AgentContext`、MockAgent 回复选择、Director 检查和 Rule Engine 对 proposed actions 的处理。它不表示线索证明目标 NPC 有罪。
 
-如果 `present_clue` 带 `scene_id`，Rule Engine 必须校验目标 NPC 位于该场景，并把场景角色列表写入 `present_character_ids`。没有 `scene_id` 时，事件按私下展示处理，不能因为案件静态场景里有多名角色就默认扩散记忆。
+`presentation_mode=private` 表示私下展示，Rule Engine 禁止同时传入 `scene_id`，派生出的玩家互动记忆只对目标 NPC 可见。`presentation_mode=scene_shared` 表示当众展示，必须传入 `scene_id`；Rule Engine 必须校验目标 NPC 位于该场景，并把场景角色列表写入 `present_character_ids`。缺失 `presentation_mode` 的旧请求按 `scene_id` 做兼容推断，但新 UI / API / REPL 入口必须显式提交该字段，不能因为案件静态场景里有多名角色就默认扩散记忆。
 
 非法 `ask_about` 或 `present_clue` 会写入 `rule.rejected`，不会产生 NPC 回复或关系变化。
 
@@ -362,7 +363,7 @@ player.presented_clue target=jiang_yanhui clue=empty_capsules
   -> memory_scope=npc_private
   -> memory_layer=working
 
-player.presented_clue target=jiang_yanhui clue=empty_capsules scene_id=study
+player.presented_clue target=jiang_yanhui clue=empty_capsules presentation_mode=scene_shared scene_id=study
   -> scene_shared episodic: 玩家在 study 当众展示空胶囊
   -> visible_to_character_ids=[study.characters]
   -> memory_layer=working
