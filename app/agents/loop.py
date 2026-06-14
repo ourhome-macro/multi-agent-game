@@ -74,11 +74,18 @@ class AgentLoop:
         action: PlayerAction,
     ) -> AgentContext:
         plan = self._retrieval_planner.plan(case=case, session=session, action=action)
+        retrieved_memories = self._memory_retriever.retrieve(
+            case=case,
+            session=session,
+            action=action,
+            plan=plan,
+        )
         return build_agent_context(
             case,
             session,
             action,
             retrieval_plan=plan,
+            memory_snapshots=retrieved_memories,
         )
 
     def run_turn(
@@ -90,24 +97,20 @@ class AgentLoop:
     ) -> AgentTurnResult:
         phase_before = session.narrative.phase
         plan = self._retrieval_planner.plan(case=case, session=session, action=action)
-        context = build_agent_context(
-            case,
-            session,
-            action,
-            retrieval_plan=plan,
-        )
-        security_review = self._injection_guard.review(action)
         retrieved_memories = self._memory_retriever.retrieve(
             case=case,
             session=session,
             action=action,
             plan=plan,
         )
-        context = context.model_copy(
-            update={
-                "memory_snapshots": retrieved_memories,
-            }
+        context = build_agent_context(
+            case,
+            session,
+            action,
+            retrieval_plan=plan,
+            memory_snapshots=retrieved_memories,
         )
+        security_review = self._injection_guard.review(action)
         memory_ids = [snapshot.memory_id for snapshot in retrieved_memories]
         memory_projection = _memory_projection(plan, retrieved_memories)
         prompt_bundle = self._prompt_builder.build(context)
@@ -127,6 +130,7 @@ class AgentLoop:
                 session=session,
                 action=action,
                 plan=plan,
+                memory_snapshots=retrieved_memories,
             ).summary
         ]
         trace = self._runtime_tracer.start_turn(

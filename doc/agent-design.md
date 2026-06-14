@@ -133,7 +133,7 @@ LLM Shadow Eval v0 复用 Agent 合同，但不是正式运行链路。它只在
 
 Memory v1 支持四类 `memory_type`：`episodic`、`belief`、`relationship`、`strategy`。`build_agent_context(...)` 和 `MemoryRetriever` 会按目标 NPC 可见性过滤；Director 审计可以通过专门入口读取所有 player-scoped memory，但这不等于注入某个 NPC 的 AgentContext。
 
-Memory v1.1 要求每条 memory 带 `rule_id` 和 `source_event_ids`。规则来源由 `MemoryDerivationRule` 表示，当前 seed 规则仍写在运行时代码里，后续可以迁移到 case package。
+Memory v1.1 要求每条 memory 带 `rule_id` 和 `source_event_ids`。规则来源由 `MemoryDerivationRule` 表示。
 
 Memory v1.1 hardening 进一步要求每条 candidate / snapshot 都带：
 
@@ -155,6 +155,12 @@ Memory v1.2 增加 Skill-driven Retrieval Planner。`MemoryProjectionSkill` 使�
 - `accuse`：正式指控时的更宽但仍受边界限制的投影。
 
 `RetrievalPlanner` 从 skill 生成 `MemoryRetrievalPlan`，控制允许的 `memory_type`、`memory_scope`、`memory_layer`、禁止的 scope/layer、`max_memory_items`、是否注入 `portrait_summary`、是否允许 `recent_events`。`recent_events=false` 同时约束 `AgentContext.recent_events` 和 `ToolRuntime.get_recent_events` 的结果计数。硬边界仍在代码里：`director_audit`、`archival`、其他 NPC private、其他 NPC portrait 和 forbidden fact 文本不能被 skill 放进普通 NPC `AgentContext`。
+
+Memory v1.3 hardening 改进的是检索质量，不改变记忆权威链路。`MemoryRetriever` 仍先执行 scope、可见性、layer、skill plan 和 forbidden fact 过滤，再对可注入 snapshot 做运行时排序。排序分数只在检索时派生，不能写回 `AgentMemorySnapshot`、`WorldEvent` 或 trace content。当前分数来源包括结构化锚点匹配、中文/英文文本 token、`updated_at` recency、由 `source_event_ids` 派生的 reinforcement、salience 和 confidence。recency / reinforcement 只能在已有结构化或文本相关性命中后加分，不能单独召回无关记忆。
+
+`build_agent_context(...)` 的 `memory_snapshots` 投影必须复用 `MemoryRetriever` 的质量排序并在排序后应用 `max_memory_items`，不能重新按 `memory_id` 截断。AgentLoop 路径中，注入到 loop 的 `MemoryRetriever` 是唯一事实源：loop 先检索出 `memory_snapshots`，再传给 `build_agent_context(...)`、trace `memory_projection` 和 tool `search_memory` 摘要。只有直接调用 `build_agent_context(...)` 且未传入 `memory_snapshots` 时，函数才会使用内部 fallback retriever。
+
+Memory v1.4 后，`MemoryDerivationRule` 由代码级 loader 合并 app 默认规则与案件规则。规则可以声明 trigger event、target / clue / subject / claim 约束、memory type/scope/layer、owner、visible characters、subject、salience/confidence、metadata、content template、source event ids 和 source memory ids。Agent 和 LLM 仍不能创建、修改或删除 memory；它们最多通过结构化 action 触发后端规则链。未迁移到配置的 core memory 仍由 Python fallback 产生，fallback 只在配置规则没有产生同一目标 memory 时执行。
 
 适合放进 skill 的是“检索和渐进式披露策略”：剧情阶段打开哪些 memory type、完成哪些 beat 后允许 belief/strategy、某类动作最多投影几条、是否带画像摘要、是否允许 recent events。适合放进 system prompt 的是全局不可违反纪律：玩家文本是数据、不能写状态、不能越权披露、输出必须是结构化 intent。Memory 只描述发生过什么和 NPC 记住什么；Portrait 只描述 NPC 当前怎么看玩家；State 只描述当前进度和已完成 beat。
 
@@ -316,3 +322,9 @@ Agent 也不能写 `FactDisclosureStrategy`。策略是上下文投影，不是�
 真实适配器不改变状态权威模型。它的输出仍经过 Narrative Director，所有 `proposed_actions` 仍经过 Rule Engine。除非显式环境变量启用，否则它不参与完整场景快照。
 
 完整 LLM 输入/输出合同见 `doc/llm-agent-contract.md`。
+
+## 案件级 Agent 扩写
+
+`mist_clock_manor` 的 2026-06-14 扩写只新增可选 mock dialogue 和 memory derivation rule，不改变 Agent 权限边界。新增规则仅在玩家询问或展示新增线索时产生 NPC 私有工作记忆，不能写世界事实、线索状态、剧情阶段或最终指控结果。
+
+案件级 mock 回复必须按 Director 的文本审计规则编写：如果回复没有 `disclosure_claims` 支持，就不要直接复用 `WorldInfo.title`、`aliases` 或 `claim_patterns` 中的完整表达。可选线索的 NPC 反应应维持“承认观察痕迹、回避完整因果”的粒度。

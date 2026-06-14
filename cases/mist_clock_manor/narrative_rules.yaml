@@ -1,26 +1,28 @@
 phases:
   - id: opening
-    title: Opening
+    title: 开场
   - id: investigation
-    title: Investigation
+    title: 调查
   - id: confrontation
-    title: Confrontation
+    title: 对质
   - id: reconstruction
-    title: Reconstruction
+    title: 重建
   - id: resolved
-    title: Resolved
+    title: 结案
 
 beats:
+  # Optional side-scene clues thicken evidence but do not drive phase changes.
+  # The standard path still advances only through the core six evidence nodes.
   - id: sedative_found
     phase: opening
-    description: Player found that the wine contained sedative.
+    description: 玩家发现红酒中含有镇静剂。
     all_discovered:
       - bitter_wine
     next_phase: investigation
 
   - id: mechanism_exposed
     phase: investigation
-    description: Lock and tape evidence show the locked-room setup was staged.
+    description: 门锁和录音证据共同显示密室结构经过布置。
     all_completed:
       - sedative_found
     min_completed: 1
@@ -31,7 +33,7 @@ beats:
 
   - id: motive_chain_exposed
     phase: confrontation
-    description: Confession fragments, capsules, and power trace expose the full death chain.
+    description: 忏悔信残片、胶囊和断电痕迹把死亡链推到可重建状态。
     all_completed:
       - mechanism_exposed
     min_completed: 2
@@ -43,7 +45,7 @@ beats:
 
   - id: case_solved
     phase: reconstruction
-    description: Correct formal accusation resolves the shared causality case.
+    description: 正确的结构化指控确认共同因果链并结案。
     all_completed:
       - motive_chain_exposed
     trigger_event_type: accusation.evaluated

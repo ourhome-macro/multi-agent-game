@@ -120,3 +120,9 @@ LLM Shadow Eval v0 会调用同一个 `NarrativeDirector.validate(case, narrativ
 - 多个 `WorldInfo` 组合成核心真相的检查。
 - private 原文和近似复述检测。
 - 不同剧情阶段下的动态披露上限。
+
+## 案件文本编写约束
+
+`mist_clock_manor` 扩写后的可选线索同样会进入 `StateSummary` 和玩家旅程输出。案件作者不能把禁说事实挪到 clue title、clue description 或公开 `WorldInfo.description` 中规避 Director，因为这些字段本身就是公开投影内容。
+
+新增 mock dialogue 要避免直接复用 `WorldInfo.title`、`aliases` 或 `claim_patterns` 中的完整表达；如果将来需要让 NPC 在允许范围内触碰这些事实，必须让 Agent 输出匹配的 `disclosure_claims`，并通过 Director 校验。

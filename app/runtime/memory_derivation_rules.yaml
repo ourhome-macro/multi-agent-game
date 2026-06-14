@@ -1,0 +1,18 @@
+- id: memory_rule.core.presented_clue.episodic.v1
+  trigger_event_type: player.presented_clue
+  produces:
+    - memory_id_template: memory.player.presented_clue.{target_id}.{clue_id}
+      memory_type: episodic
+      memory_scope: npc_private
+      memory_layer: working
+      subject_id: player
+      owner_character_id: "{target_id}"
+      visible_to_character_ids:
+        - "{target_id}"
+      content_template: Player pressured {target_name} with clue '{clue_id}' at pressure {interaction_pressure}.
+      salience_from_event: interaction_pressure
+      min_salience: 0.6
+      confidence: 1.0
+      source_event_ids:
+        - "{source_event_id}"
+      source_memory_ids: []

@@ -6,8 +6,20 @@ import pytest
 
 from app.agents.memory import MemoryRetriever
 from app.cases.loader import CaseLoader
-from app.domain.models import ActionType, AgentMemorySnapshot, EventType, PlayerAction
-from app.runtime.derivations import PRESENTED_CLUE_MEMORY_RULE_ID
+from app.domain.models import (
+    ActionType,
+    AgentMemorySnapshot,
+    EventType,
+    NarrativeState,
+    PlayerAction,
+    SessionState,
+)
+from app.runtime.derivations import (
+    ASKED_ABOUT_MEMORY_RULE_ID,
+    PRESENTED_CLUE_MEMORY_RULE_ID,
+    DerivedEventSystem,
+)
+from app.runtime.events import EventRecorder
 from app.runtime.replay import replay_events
 from app.runtime.service import create_runtime
 
@@ -17,6 +29,9 @@ CASE_DIR = PROJECT_ROOT / "cases" / "mist_clock_manor"
 # Configured in cases/mist_clock_manor/memory_derivation_rules.yaml.
 MEDICINE_PRESENTED_CLUE_RULE_ID = (
     "memory_rule.jiang_empty_capsules_medicine_pressure.presented_clue.v1"
+)
+MEDICINE_ASKED_ABOUT_RULE_ID = (
+    "memory_rule.jiang_empty_capsules_medicine_pressure.asked_about.v1"
 )
 MEDICINE_STRATEGY_ID = "avoid_medicine_topic"
 
@@ -29,12 +44,64 @@ EPISODIC_MEMORY = f"memory.player.presented_clue.{JIANG}.{EMPTY_CAPSULES}"
 BELIEF_MEMORY = f"memory.player.belief.{JIANG}.{EMPTY_CAPSULES}"
 RELATIONSHIP_MEMORY = f"memory.player.relationship.{JIANG}.{EMPTY_CAPSULES}"
 STRATEGY_MEMORY = f"memory.player.strategy.{JIANG}.{EMPTY_CAPSULES}"
+SHEN_ASKED_MEMORY = f"memory.player.asked_about.{SHEN}.clue.{EMPTY_CAPSULES}"
 TYPED_MEMORY_IDS = {
     EPISODIC_MEMORY,
     BELIEF_MEMORY,
     RELATIONSHIP_MEMORY,
     STRATEGY_MEMORY,
 }
+
+
+def test_rule_loader_merges_app_default_and_case_memory_derivation_rules() -> None:
+    case = CaseLoader().load(CASE_DIR)
+
+    rule_ids = {rule.id for rule in case.memory_derivation_rules}
+
+    assert PRESENTED_CLUE_MEMORY_RULE_ID in rule_ids
+    assert MEDICINE_PRESENTED_CLUE_RULE_ID in rule_ids
+    assert MEDICINE_ASKED_ABOUT_RULE_ID in rule_ids
+
+
+def test_configured_rules_derive_all_supported_memory_types_from_presented_clue() -> None:
+    case = CaseLoader().load(CASE_DIR)
+    runtime = create_runtime([case])
+    session = runtime.session_store.create(case)
+
+    _discover_empty_capsules(runtime, session)
+    _present_empty_capsules_to_jiang(runtime, session)
+
+    memory_types = {
+        session.memory_snapshots[memory_id].memory_type
+        for memory_id in TYPED_MEMORY_IDS
+    }
+    assert memory_types == {"episodic", "belief", "relationship", "strategy"}
+
+
+def test_configured_presented_clue_core_memory_matches_python_fallback_semantics() -> None:
+    case = CaseLoader().load(CASE_DIR)
+    runtime = create_runtime([case])
+    session = runtime.session_store.create(case)
+
+    _discover_empty_capsules(runtime, session)
+    _present_empty_capsules_to_jiang(runtime, session)
+
+    source_event = _presented_clue_event(session.events)
+    configured_candidate = session.memory_candidates[EPISODIC_MEMORY]
+    fallback_case = case.model_copy(update={"memory_derivation_rules": []})
+    fallback_session = SessionState(
+        id="session.fallback_memory_derivation",
+        case_id=case.meta.id,
+        narrative=NarrativeState(phase=case.meta.initial_phase),
+        relationships={},
+    )
+    DerivedEventSystem(EventRecorder())._derive_presented_clue_memory_candidate(
+        fallback_case,
+        fallback_session,
+        source_event,
+    )
+
+    assert fallback_session.memory_candidates[EPISODIC_MEMORY] == configured_candidate
 
 
 def test_presenting_empty_capsules_to_jiang_creates_episodic_memory() -> None:
@@ -107,6 +174,52 @@ def test_empty_capsules_derives_jiang_strategy_memory() -> None:
     assert snapshot.source_event_ids == [presented_event.id]
     assert snapshot.metadata["strategy_id"] == MEDICINE_STRATEGY_ID
     assert EPISODIC_MEMORY in snapshot.source_memory_ids
+
+
+def test_memory_retriever_scoring_v1_hits_configured_derivation_by_anchor() -> None:
+    case = CaseLoader().load(CASE_DIR)
+    runtime = create_runtime([case])
+    session = runtime.session_store.create(case)
+
+    _discover_empty_capsules(runtime, session)
+    _present_empty_capsules_to_jiang(runtime, session)
+
+    memories = MemoryRetriever(max_results=20).retrieve(
+        case=case,
+        session=session,
+        action=PlayerAction(
+            type=ActionType.ASK_ABOUT,
+            target_id=JIANG,
+            subject_type="clue",
+            subject_id=EMPTY_CAPSULES,
+            text="continue asking about empty capsules",
+        ),
+    )
+
+    assert {BELIEF_MEMORY, RELATIONSHIP_MEMORY, STRATEGY_MEMORY} <= _memory_ids(memories)
+
+
+def test_unmatched_configured_rule_keeps_python_fallback_memory_derivation() -> None:
+    case = CaseLoader().load(CASE_DIR)
+    runtime = create_runtime([case])
+    session = runtime.session_store.create(case)
+
+    _discover_empty_capsules(runtime, session)
+    runtime.action_service.handle(
+        session=session,
+        action=PlayerAction(
+            type=ActionType.ASK_ABOUT,
+            target_id=SHEN,
+            subject_type="clue",
+            subject_id=EMPTY_CAPSULES,
+            text="ask Shen about empty capsules",
+        ),
+    )
+
+    snapshot = session.memory_snapshots[SHEN_ASKED_MEMORY]
+    assert snapshot.rule_id == ASKED_ABOUT_MEMORY_RULE_ID
+    assert snapshot.memory_type == "episodic"
+    assert snapshot.owner_character_id == SHEN
 
 
 def test_shen_cannot_retrieve_jiang_empty_capsule_typed_memories() -> None:

@@ -5,7 +5,7 @@ from time import perf_counter
 
 from app.agents.memory import MemoryRetriever
 from app.agents.retrieval_planner import MemoryRetrievalPlan
-from app.domain.models import CasePackage, PlayerAction, SessionState
+from app.domain.models import AgentMemorySnapshot, CasePackage, PlayerAction, SessionState
 
 
 @dataclass(frozen=True)
@@ -48,6 +48,7 @@ class ToolRuntime:
         session: SessionState,
         action: PlayerAction,
         plan: MemoryRetrievalPlan | None = None,
+        memory_snapshots: list[AgentMemorySnapshot] | None = None,
     ) -> ToolResult:
         started_at = perf_counter()
         if tool_name not in self._ALLOWED_TOOLS:
@@ -58,12 +59,16 @@ class ToolRuntime:
                 error_category="tool.not_allowed",
             )
         if tool_name == "search_memory":
-            result_count = len(
-                self._memory_retriever.retrieve(
-                    case=case,
-                    session=session,
-                    action=action,
-                    plan=plan,
+            result_count = (
+                len(memory_snapshots)
+                if memory_snapshots is not None
+                else len(
+                    self._memory_retriever.retrieve(
+                        case=case,
+                        session=session,
+                        action=action,
+                        plan=plan,
+                    )
                 )
             )
             return self._result(

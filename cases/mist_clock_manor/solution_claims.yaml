@@ -1,6 +1,8 @@
 claims:
   - id: shared_death_chain
     target_id: jiang_yanhui
+    # Keep this list stable for the standard scenario. Optional support clues
+    # reinforce the same claim through reconstruction text and side claims.
     required_evidence:
       - bitter_wine
       - delayed_lock_marks
@@ -27,5 +29,34 @@ claims:
       - sedative_wine
     allowed_phases:
       - confrontation
+      - reconstruction
+    result: incorrect
+
+  - id: qi_tape_single_cause
+    target_id: qi_yan
+    required_evidence:
+      - echo_tape
+      - tape_splice_mark
+      - muted_bell_hammer
+    required_world_info:
+      - recording_tape_swapped
+      - tape_was_edited_twice
+      - real_bell_was_muted
+    allowed_phases:
+      - confrontation
+      - reconstruction
+    result: incorrect
+
+  - id: shen_power_single_cause
+    target_id: shen_zhaoye
+    required_evidence:
+      - cut_power_trace
+      - backup_timer
+      - breaker_sequence_tag
+    required_world_info:
+      - power_cut_by_shen
+      - backup_timer_kept_recorder_power
+      - power_cut_was_prepared
+    allowed_phases:
       - reconstruction
     result: incorrect

@@ -4,11 +4,16 @@ from app.agents.disclosure_strategy import (
     DISCLOSURE_MODE_ORDER,
     build_fact_disclosure_strategies,
 )
-from app.agents.memory import memory_allowed_by_plan, memory_content_matches_forbidden
+from app.agents.memory import (
+    MemoryRetriever,
+    memory_allowed_by_plan,
+    memory_content_matches_forbidden,
+)
 from app.agents.retrieval_planner import MemoryRetrievalPlan, RetrievalPlanner
 from app.domain.models import (
     AgentCharacterView,
     AgentContext,
+    AgentMemorySnapshot,
     CasePackage,
     CharacterConfig,
     CharacterImpression,
@@ -31,6 +36,7 @@ def build_agent_context(
     session: SessionState,
     action: PlayerAction,
     retrieval_plan: MemoryRetrievalPlan | None = None,
+    memory_snapshots: list[AgentMemorySnapshot] | None = None,
 ) -> AgentContext:
     plan = retrieval_plan or RetrievalPlanner().plan(
         case=case,
@@ -93,6 +99,18 @@ def build_agent_context(
         else None
     )
     forbidden_terms = _forbidden_terms(case)
+    retrieved_memory_snapshots = (
+        memory_snapshots
+        if memory_snapshots is not None
+        else MemoryRetriever(
+            max_results=plan.max_memory_items,
+        ).retrieve(
+            case=case,
+            session=session,
+            action=action,
+            plan=plan,
+        )
+    )
 
     return AgentContext(
         case_id=case.meta.id,
@@ -139,20 +157,7 @@ def build_agent_context(
             ),
             key=lambda value: value.memory_id,
         )[: plan.max_memory_items],
-        memory_snapshots=sorted(
-            (
-                snapshot
-                for snapshot in session.memory_snapshots.values()
-                if snapshot.subject_id == "player"
-                and _memory_injectable_to_agent(
-                    snapshot,
-                    action.target_id,
-                    plan=plan,
-                    forbidden_terms=forbidden_terms,
-                )
-            ),
-            key=lambda value: value.memory_id,
-        )[: plan.max_memory_items],
+        memory_snapshots=retrieved_memory_snapshots,
         blocked_fact_ids=blocked_fact_ids,
         revealable_fact_ids=revealable_fact_ids,
         asked_subject_type=asked_subject_type,

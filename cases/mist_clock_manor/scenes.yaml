@@ -37,3 +37,70 @@
       description: 主电源被人为拉下，备用线路仍维持部分设备运转。
       discover_clues:
         - cut_power_trace
+    - id: desk_embossed_pages
+      name: 书桌压痕纸
+      description: 书桌暗格里压着几张白纸，纸面留下文件和手写数字的浅痕。
+      discover_clues:
+        - lock_test_scrap
+        - trust_indent_page
+    - id: medicine_drawer_liner
+      name: 药盒抽屉衬纸
+      description: 药盒下方的衬纸被人翻折过，边缘有细粉和旧药瓶标签。
+      discover_clues:
+        - capsule_powder_on_liner
+        - sedative_bottle_label
+    - id: editing_lamp
+      name: 剪辑台灯
+      description: 录音机旁的小台灯压着一截磁带废边，灯罩内侧有胶带印。
+      discover_clues:
+        - tape_splice_mark
+    - id: pocket_watch
+      name: 陆澜生的怀表
+      description: 怀表停在书桌边，表盖内侧夹着一张钟楼校时纸。
+      discover_clues:
+        - pocket_watch_offset
+
+- id: clock_tower
+  name: 钟楼
+  description: 山庄北侧的旧钟楼。雾水沿着铜齿轮滴落，钟声和停电的边界在这里变得模糊。
+  characters:
+    - shen_zhaoye
+  hotspots:
+    - id: tower_backup_line
+      name: 备用线路检修箱
+      description: 检修箱没有完全合上，里面的旧定时器还贴着褪色编号。
+      discover_clues:
+        - backup_timer
+        - breaker_sequence_tag
+    - id: tower_clockwork
+      name: 主钟齿轮组
+      description: 铜齿轮有新油痕，钟锤根部缠着一圈吸满雾水的棉布。
+      discover_clues:
+        - fresh_gear_oil
+        - muted_bell_hammer
+
+- id: gallery
+  name: 画廊
+  description: 陆澜生展示作品和奖项的长廊。每幅画都像被重新排列过，空白处比画像更刺眼。
+  characters:
+    - lin_qichi
+    - qi_yan
+  hotspots:
+    - id: covered_frame
+      name: 被遮住的旧剧照
+      description: 角落画框被说明卡挡住大半，玻璃下压着一张十年前的剧照。
+      discover_clues:
+        - covered_ruolan_photo
+        - altered_gallery_plaque
+    - id: archive_case
+      name: 旧档案展示柜
+      description: 展示柜底层塞着旧报纸和证物盒标签，锁扣没有真正扣紧。
+      discover_clues:
+        - lake_death_clipping
+        - incomplete_evidence_box
+    - id: side_door_carpet
+      name: 侧门地毯
+      description: 靠湖一侧的门缝灌入冷雾，地毯边缘留下湿泥和缺页的登记册。
+      discover_clues:
+        - gallery_mud_trace
+        - missing_visitor_log_page

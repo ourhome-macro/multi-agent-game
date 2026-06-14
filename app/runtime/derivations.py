@@ -83,20 +83,23 @@ class DerivedEventSystem:
                 )
                 if awareness_event is not None:
                     events.append(awareness_event)
-                memory_event = self._derive_asked_about_memory_candidate(
-                    case,
-                    session,
-                    source_event,
+                configured_events = self._derive_configured_memory_candidates(
+                    case=case,
+                    session=session,
+                    source_event=source_event,
                 )
-                if memory_event is not None:
-                    events.append(memory_event)
-                events.extend(
-                    self._derive_configured_typed_memory_candidates(
-                        case=case,
-                        session=session,
-                        source_event=source_event,
+                events.extend(configured_events)
+                if not self._configured_event_created_memory(
+                    configured_events,
+                    self._asked_about_memory_id(source_event),
+                ):
+                    memory_event = self._derive_asked_about_memory_candidate(
+                        case,
+                        session,
+                        source_event,
                     )
-                )
+                    if memory_event is not None:
+                        events.append(memory_event)
             elif source_event.type == EventType.PLAYER_PRESENTED_CLUE:
                 awareness_event = self._derive_character_awareness_from_presented_clue(
                     case,
@@ -105,27 +108,34 @@ class DerivedEventSystem:
                 )
                 if awareness_event is not None:
                     events.append(awareness_event)
-                memory_event = self._derive_presented_clue_memory_candidate(
-                    case,
-                    session,
-                    source_event,
+                configured_events = self._derive_configured_memory_candidates(
+                    case=case,
+                    session=session,
+                    source_event=source_event,
                 )
-                if memory_event is not None:
-                    events.append(memory_event)
-                memory_event = self._derive_scene_shared_presented_clue_memory_candidate(
-                    case,
-                    session,
-                    source_event,
-                )
-                if memory_event is not None:
-                    events.append(memory_event)
-                events.extend(
-                    self._derive_configured_typed_memory_candidates(
-                        case=case,
-                        session=session,
-                        source_event=source_event,
+                events.extend(configured_events)
+                if not self._configured_event_created_memory(
+                    configured_events,
+                    self._presented_clue_memory_id(source_event),
+                ):
+                    memory_event = self._derive_presented_clue_memory_candidate(
+                        case,
+                        session,
+                        source_event,
                     )
-                )
+                    if memory_event is not None:
+                        events.append(memory_event)
+                if not self._configured_event_created_memory(
+                    configured_events,
+                    self._scene_shared_presented_clue_memory_id(source_event),
+                ):
+                    memory_event = self._derive_scene_shared_presented_clue_memory_candidate(
+                        case,
+                        session,
+                        source_event,
+                    )
+                    if memory_event is not None:
+                        events.append(memory_event)
             elif source_event.type == EventType.PLAYER_ACCUSED:
                 awareness_events = self._derive_character_awareness_from_accusation(
                     case,
@@ -133,13 +143,23 @@ class DerivedEventSystem:
                     source_event,
                 )
                 events.extend(awareness_events)
-                memory_event = self._derive_player_accused_memory_candidate(
-                    case,
-                    session,
-                    source_event,
+                configured_events = self._derive_configured_memory_candidates(
+                    case=case,
+                    session=session,
+                    source_event=source_event,
                 )
-                if memory_event is not None:
-                    events.append(memory_event)
+                events.extend(configured_events)
+                if not self._configured_event_created_memory(
+                    configured_events,
+                    self._player_accused_memory_id(source_event),
+                ):
+                    memory_event = self._derive_player_accused_memory_candidate(
+                        case,
+                        session,
+                        source_event,
+                    )
+                    if memory_event is not None:
+                        events.append(memory_event)
             elif source_event.type == EventType.ACCUSATION_EVALUATED:
                 memory_event = self._derive_accusation_evaluated_memory_candidate(
                     case,
@@ -479,14 +499,60 @@ class DerivedEventSystem:
             visible_to_character_ids=[target_id],
         )
 
-    def _derive_configured_typed_memory_candidates(
+    def _configured_event_created_memory(
+        self,
+        events: list[WorldEvent],
+        memory_id: str | None,
+    ) -> bool:
+        if memory_id is None:
+            return False
+        return any(
+            event.type == EventType.MEMORY_CANDIDATE_CREATED
+            and event.payload.get("memory_id") == memory_id
+            for event in events
+        )
+
+    def _asked_about_memory_id(self, source_event: WorldEvent) -> str:
+        return (
+            "memory.player.asked_about."
+            f"{source_event.payload['target_id']}."
+            f"{source_event.payload['subject_type']}."
+            f"{source_event.payload['subject_id']}"
+        )
+
+    def _presented_clue_memory_id(self, source_event: WorldEvent) -> str:
+        return (
+            "memory.player.presented_clue."
+            f"{source_event.payload['target_id']}."
+            f"{source_event.payload['clue_id']}"
+        )
+
+    def _scene_shared_presented_clue_memory_id(
+        self,
+        source_event: WorldEvent,
+    ) -> str | None:
+        scene_id = source_event.payload.get("scene_id")
+        if not isinstance(scene_id, str):
+            return None
+        return (
+            "memory.player.scene_shared.presented_clue."
+            f"{scene_id}.{source_event.payload['clue_id']}"
+        )
+
+    def _player_accused_memory_id(self, source_event: WorldEvent) -> str:
+        return (
+            "memory.player.accused."
+            f"{source_event.payload['target_id']}."
+            f"{source_event.payload['claim_id']}"
+        )
+
+    def _derive_configured_memory_candidates(
         self,
         *,
         case: CasePackage,
         session: SessionState,
         source_event: WorldEvent,
     ) -> list[WorldEvent]:
-        target_id = str(source_event.payload["target_id"])
         events: list[WorldEvent] = []
         for resolved_effect in resolve_memory_derivation_effects(case, source_event):
             effect = resolved_effect.effect
@@ -496,11 +562,15 @@ class DerivedEventSystem:
                 memory_id=effect.memory_id,
                 rule_id=resolved_effect.rule_id,
                 memory_type=effect.memory_type,
+                memory_scope=effect.memory_scope,
+                memory_layer=effect.memory_layer,
+                subject_id=effect.subject_id,
                 content=effect.content,
                 salience=effect.salience,
-                owner_character_id=target_id,
-                visible_to_character_ids=[target_id],
-                source_memory_ids=[resolved_effect.source_memory_id],
+                owner_character_id=effect.owner_character_id,
+                visible_to_character_ids=effect.visible_to_character_ids,
+                source_event_ids=effect.source_event_ids,
+                source_memory_ids=effect.source_memory_ids,
                 confidence=effect.confidence,
                 metadata=effect.metadata,
             )
@@ -830,12 +900,20 @@ class DerivedEventSystem:
         source_memory_ids: list[str] | None = None,
         confidence: float = 1.0,
         metadata: dict[str, object] | None = None,
+        subject_id: str = "player",
+        source_event_ids: list[str] | None = None,
     ) -> WorldEvent | None:
+        stored_source_event_ids = source_event_ids or [source_event.id]
         current = session.memory_candidates.get(memory_id)
-        if current is not None and source_event.id in current.source_event_ids:
+        if current is not None and any(
+            event_id in current.source_event_ids for event_id in stored_source_event_ids
+        ):
             return None
         current_snapshot = session.memory_snapshots.get(memory_id)
-        if current_snapshot is not None and source_event.id in current_snapshot.source_event_ids:
+        if current_snapshot is not None and any(
+            event_id in current_snapshot.source_event_ids
+            for event_id in stored_source_event_ids
+        ):
             return None
         session.memory_candidates[memory_id] = MemoryCandidateState(
             memory_id=memory_id,
@@ -843,12 +921,12 @@ class DerivedEventSystem:
             memory_type=memory_type,
             memory_scope=memory_scope,
             memory_layer=memory_layer,
-            subject_id="player",
+            subject_id=subject_id,
             owner_character_id=owner_character_id,
             visible_to_character_ids=visible_to_character_ids,
             content=content,
             source_event_id=source_event.id,
-            source_event_ids=[source_event.id],
+            source_event_ids=stored_source_event_ids,
             source_memory_ids=source_memory_ids or [],
             visibility=["player"],
             salience=salience,
@@ -865,12 +943,12 @@ class DerivedEventSystem:
                 "memory_type": memory_type,
                 "memory_scope": memory_scope,
                 "memory_layer": memory_layer,
-                "subject_id": "player",
+                "subject_id": subject_id,
                 "owner_character_id": owner_character_id,
                 "visible_to_character_ids": visible_to_character_ids,
                 "content": content,
                 "source_event_id": source_event.id,
-                "source_event_ids": [source_event.id],
+                "source_event_ids": stored_source_event_ids,
                 "source_memory_ids": source_memory_ids or [],
                 "visibility": ["player"],
                 "salience": salience,

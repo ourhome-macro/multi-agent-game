@@ -658,24 +658,56 @@ class SolutionClaimsConfig(APIModel):
 
 
 class MemoryEffectConfig(APIModel):
-    """A typed memory a case author wants derived from a player action.
+    """A memory candidate a rule derives from a runtime event.
 
-    ``memory_id`` and ``content`` may use ``{target_id}`` / ``{subject_id}``
-    templates so one rule shape can be reused across NPCs and clues. The
-    rendered values must remain stable so events stay replayable.
+    ``memory_id`` / ``memory_id_template`` and ``content`` /
+    ``content_template`` may use controlled event variables. The rendered
+    values must remain stable so events stay replayable.
     """
 
-    memory_id: NonEmptyString
+    rule_id: NonEmptyString | None = None
+    memory_id: NonEmptyString | None = None
+    memory_id_template: NonEmptyString | None = None
     memory_type: MemoryType = "episodic"
-    content: NonEmptyString
+    memory_scope: MemoryScope = "npc_private"
+    memory_layer: MemoryLayer = "working"
+    subject_id: NonEmptyString = "player"
+    owner_character_id: NonEmptyString | None = "{target_id}"
+    visible_to_character_ids: list[NonEmptyString] = Field(
+        default_factory=lambda: ["{target_id}"]
+    )
+    content: NonEmptyString | None = None
+    content_template: NonEmptyString | None = None
     salience: float = Field(default=0.0, ge=0.0, le=1.0)
+    salience_from_event: NonEmptyString | None = None
+    min_salience: float | None = Field(default=None, ge=0.0, le=1.0)
     confidence: float = Field(default=1.0, ge=0.0, le=1.0)
+    source_event_ids: list[NonEmptyString] = Field(
+        default_factory=lambda: ["{source_event_id}"]
+    )
+    source_memory_ids: list[NonEmptyString] | None = None
     metadata: dict[str, Any] = Field(default_factory=dict)
 
     @field_validator("metadata", mode="before")
     @classmethod
     def validate_memory_metadata(cls, value: object) -> dict[str, Any]:
         return validate_memory_metadata(value)
+
+    @model_validator(mode="after")
+    def validate_templates(self) -> MemoryEffectConfig:
+        if self.memory_id is None and self.memory_id_template is None:
+            raise ValueError("memory effect must define memory_id or memory_id_template")
+        if self.content is None and self.content_template is None:
+            raise ValueError("memory effect must define content or content_template")
+        return self
+
+    @property
+    def memory_id_pattern(self) -> str:
+        return str(self.memory_id_template or self.memory_id)
+
+    @property
+    def content_pattern(self) -> str:
+        return str(self.content_template or self.content)
 
 
 class MemoryImpressionEffectConfig(APIModel):
@@ -693,11 +725,58 @@ class MemoryImpressionEffectConfig(APIModel):
 
 class MemoryDerivationRuleConfig(APIModel):
     id: NonEmptyString
-    trigger_action_type: NonEmptyString
+    trigger_action_type: NonEmptyString | None = None
+    trigger_event_type: NonEmptyString | None = None
+    target_id: NonEmptyString | None = None
     target_character_id: NonEmptyString | None = None
     subject_id: NonEmptyString | None = None
+    clue_id: NonEmptyString | None = None
+    claim_id: NonEmptyString | None = None
     produces: list[MemoryEffectConfig] = Field(default_factory=list)
     impression: MemoryImpressionEffectConfig | None = None
+
+    @model_validator(mode="after")
+    def validate_trigger(self) -> MemoryDerivationRuleConfig:
+        if self.trigger_event_type is None and self.trigger_action_type is None:
+            raise ValueError(
+                "memory derivation rule must define trigger_event_type "
+                "or trigger_action_type"
+            )
+        if (
+            self.trigger_event_type is not None
+            and self.trigger_action_type is not None
+            and self.trigger_event_type != self.trigger_action_type
+        ):
+            raise ValueError(
+                "trigger_event_type and trigger_action_type must match when both are set"
+            )
+        if (
+            self.target_id is not None
+            and self.target_character_id is not None
+            and self.target_id != self.target_character_id
+        ):
+            raise ValueError(
+                "target_id and target_character_id must match when both are set"
+            )
+        if (
+            self.clue_id is not None
+            and self.subject_id is not None
+            and self.clue_id != self.subject_id
+        ):
+            raise ValueError("clue_id and subject_id must match when both are set")
+        return self
+
+    @property
+    def trigger_type(self) -> str:
+        return str(self.trigger_event_type or self.trigger_action_type)
+
+    @property
+    def target_match_id(self) -> str | None:
+        return self.target_id or self.target_character_id
+
+    @property
+    def subject_match_id(self) -> str | None:
+        return self.clue_id or self.subject_id
 
 
 class CasePackage(APIModel):

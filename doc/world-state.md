@@ -319,13 +319,34 @@ Memory v1.1 将硬编码派生收口为 `MemoryDerivationRule`，并把记忆分
 ```text
 MemoryDerivationRule
   -> id
-  -> trigger_action_type
-  -> target_character_id
-  -> subject_id
+  -> trigger_event_type / trigger_action_type
+  -> target_id / target_character_id
+  -> clue_id / subject_id / claim_id
   -> produces: list[MemoryEffect]
 ```
 
 所有 `memory_candidate.created` 和 `agent_memory_snapshot.updated` 都必须带 `rule_id`、`memory_scope`、`memory_layer`，便于审计哪条规则产生了记忆，以及它属于哪个投影边界。每条 typed memory 必须带 `source_event_ids`，同一 `source_event_id` 对同一 memory / portrait 只能应用一次。
+
+Memory v1.4 中，`MemoryEffect` 可以声明完整候选记忆字段：
+
+- `rule_id`：可覆盖外层规则 id；默认使用外层 `MemoryDerivationRule.id`。
+- `memory_id` / `memory_id_template`
+- `memory_type`
+- `memory_scope`
+- `memory_layer`
+- `subject_id`
+- `owner_character_id`
+- `visible_to_character_ids`
+- `content` / `content_template`
+- `salience` 或 `salience_from_event` + `min_salience`
+- `confidence`
+- `source_event_ids`
+- `source_memory_ids`
+- `metadata`
+
+模板变量只来自受控 `WorldEvent.payload` 和安全 case lookup，例如 `{target_id}`、`{target_name}`、`{clue_id}`、`{clue_title}`、`{subject_type}`、`{subject_id}`、`{claim_id}`、`{interaction_pressure}`、`{knowledge_id}`、`{scene_id}`、`{source_event_id}`。模板渲染是纯确定性逻辑，不调用 LLM。
+
+规则来源顺序固定为：先加载 `app/runtime/memory_derivation_rules.yaml`，再加载案件包 `memory_derivation_rules.yaml`。`DerivedEventSystem` 优先应用配置规则；如果配置规则没有为当前事件产生目标 core memory，则保留旧 Python fallback。当前已配置化迁移 `player.presented_clue` 的 core episodic memory，以及 `mist_clock_manor` 中 `jiang_yanhui + empty_capsules` 的 belief / relationship / strategy memory。其他 core 派生在未迁移前继续走 fallback。
 
 当前 scope 语义：
 
@@ -407,6 +428,10 @@ player.asked_about target=shen_zhaoye subject=empty_capsules
 - 当前 NPC 自己的 `portrait_summary`
 
 Memory v1.2 的 `MemoryProjectionSkill` 和 `MemoryRetrievalPlan` 不是世界状态，不写入 `WorldEvent`，也不参与 replay 权威。它们只是在构造 `AgentContext` 时解释“当前动作、阶段和 completed beats 下应该投影哪些安全记忆”。Plan 可以收窄 memory type/scope/layer、限制条数、关闭画像摘要或 recent events；但不能让 `director_audit`、`archival`、其他 NPC private、其他 NPC portrait 或 forbidden fact 文本进入普通 NPC 上下文。
+
+Memory v1.3 的检索质量分数同样不是世界状态。`MemoryRetriever` 可以在过滤后使用结构化锚点、中文/英文 token、`updated_at` recency、`source_event_ids` reinforcement、salience 和 confidence 做排序，但这些分项不得写入 `memory_candidate.created`、`agent_memory_snapshot.updated`、snapshot `metadata` 或 replay 结果。recency 的“当前时间”来自事件流或已有 snapshot 时间，禁止使用 wall-clock `now()` 影响可复现性。
+
+AgentLoop 中的 `memory_snapshots`、`memory_ids_used`、trace `memory_projection` 和 tool `search_memory` 摘要必须来自同一次注入 retriever 的结果。`build_agent_context(...)` 只有在调用方未传入已检索 snapshot 时才执行内部 fallback 检索；该 fallback 是兼容路径，不是普通 turn 的事实源。
 
 运行时生成的 memory id 是语义化且稳定的，足以被案件配置的 mock dialogue 条件引用，例如：
 
@@ -526,3 +551,9 @@ Replay 直接应用 `character_impression.updated`，不得重新运行画像派
 `StateSummary`、`WorldEvent` payload 和 `player_journey.md` 也不得暴露 `inner_context` 或原始 private summaries。
 
 `director.blocked` 事件可以记录 `world_info_id`、`matched_by`、`detected_directness`、`pattern_id` 等审计元数据，但公开 payload 中的 `matched_text` 必须脱敏，不能把被拦截的禁说词、private 原文或敏感事实原文再次回显给玩家。
+
+## 案件扩写注意事项
+
+`mist_clock_manor` 的 2026-06-14 扩写采用“可选证据厚度层”写法：新增 `Clue` 和 `WorldInfo` 必须挂到新 hotspot 或标准路径不检查的 hotspot，除非同步更新 `scenarios/standard_path.yaml` 的 `expected_events`、`expected_phase` 和 `expected_player_world_info_ids`。
+
+可选线索允许产生新的 `PlayerKnowledge`，但不能无意成为核心 beat 的 `all_discovered` 条件；核心 phase 推进仍由原六条证据控制。新增公开线索标题、描述和 `WorldInfo.description` 必须按公开摘要处理，不能写 private summary、forbidden blocked term 组合或最终责任链结论。

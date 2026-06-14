@@ -8,6 +8,7 @@ import yaml
 from pydantic import ValidationError
 
 from app.cases.errors import CaseLoadError
+from app.cases.memory_rules import MemoryDerivationRuleLoader
 from app.domain.models import (
     CasePackage,
     DiscoverClueAction,
@@ -25,9 +26,22 @@ RELATIONSHIP_METRICS = {"trust", "suspicion", "fear", "intimacy", "hostility"}
 MEMORY_RULE_TRIGGER_EVENT_TYPES = {
     EventType.PLAYER_ASKED_ABOUT.value,
     EventType.PLAYER_PRESENTED_CLUE.value,
+    EventType.PLAYER_ACCUSED.value,
 }
 # Template variables a rule's memory_id / content may reference.
-MEMORY_RULE_TEMPLATE_VARS = {"target_id", "subject_id"}
+MEMORY_RULE_TEMPLATE_VARS = {
+    "claim_id",
+    "clue_id",
+    "clue_title",
+    "interaction_pressure",
+    "knowledge_id",
+    "scene_id",
+    "source_event_id",
+    "subject_id",
+    "subject_type",
+    "target_id",
+    "target_name",
+}
 _TEMPLATE_TOKEN = re.compile(r"\{([^}]*)\}")
 
 
@@ -45,10 +59,7 @@ class CaseLoader:
             "relationships": self._read_yaml(case_dir / "relationships.yaml", default=[]),
             "forbidden_facts": self._read_yaml(case_dir / "forbidden_facts.yaml", default=[]),
             "mock_dialogues": self._read_yaml(case_dir / "mock_dialogues.yaml", default=[]),
-            "memory_derivation_rules": self._read_yaml(
-                case_dir / "memory_derivation_rules.yaml",
-                default=[],
-            ),
+            "memory_derivation_rules": MemoryDerivationRuleLoader().load(case_dir),
             "narrative_rules": self._read_yaml(case_dir / "narrative_rules.yaml"),
             "solution_claims": self._read_yaml(
                 case_dir / "solution_claims.yaml",
@@ -410,37 +421,70 @@ class CaseLoader:
             self._case_dir(package),
         )
         for rule in package.memory_derivation_rules:
-            if rule.trigger_action_type not in MEMORY_RULE_TRIGGER_EVENT_TYPES:
+            if rule.trigger_type not in MEMORY_RULE_TRIGGER_EVENT_TYPES:
                 raise CaseLoadError(
                     f"Memory derivation rule '{rule.id}' has unsupported "
-                    f"trigger_action_type '{rule.trigger_action_type}'"
+                    f"trigger type '{rule.trigger_type}'"
                 )
-            if (
-                rule.target_character_id is not None
-                and rule.target_character_id not in character_ids
-            ):
+            if rule.target_match_id is not None and rule.target_match_id not in character_ids:
                 raise CaseLoadError(
                     f"Memory derivation rule '{rule.id}' references unknown "
-                    f"target_character_id '{rule.target_character_id}'"
+                    f"target_id '{rule.target_match_id}'"
                 )
-            if rule.subject_id is not None and rule.subject_id not in clue_ids:
+            if rule.subject_match_id is not None and rule.subject_match_id not in clue_ids:
                 raise CaseLoadError(
                     f"Memory derivation rule '{rule.id}' references unknown "
-                    f"subject_id '{rule.subject_id}'"
+                    f"subject_id '{rule.subject_match_id}'"
+                )
+            if rule.claim_id is not None and rule.trigger_type != EventType.PLAYER_ACCUSED.value:
+                raise CaseLoadError(
+                    f"Memory derivation rule '{rule.id}' uses claim_id but does not trigger "
+                    f"on '{EventType.PLAYER_ACCUSED.value}'"
                 )
             if not rule.produces:
                 raise CaseLoadError(
                     f"Memory derivation rule '{rule.id}' must produce at least one memory effect"
                 )
-            effect_ids = [effect.memory_id for effect in rule.produces]
+            effect_ids = [effect.memory_id_pattern for effect in rule.produces]
             self._ensure_unique(
                 f"memory effect in rule '{rule.id}'",
                 effect_ids,
                 self._case_dir(package),
             )
             for effect in rule.produces:
-                self._validate_memory_template(rule.id, "memory_id", effect.memory_id)
-                self._validate_memory_template(rule.id, "content", effect.content)
+                self._validate_memory_template(
+                    rule.id,
+                    "memory_id",
+                    effect.memory_id_pattern,
+                )
+                self._validate_memory_template(
+                    rule.id,
+                    "content",
+                    effect.content_pattern,
+                )
+                self._validate_memory_template(
+                    rule.id,
+                    "owner_character_id",
+                    effect.owner_character_id or "",
+                )
+                for visible_id in effect.visible_to_character_ids:
+                    self._validate_memory_template(
+                        rule.id,
+                        "visible_to_character_ids",
+                        visible_id,
+                    )
+                for source_event_id in effect.source_event_ids:
+                    self._validate_memory_template(
+                        rule.id,
+                        "source_event_ids",
+                        source_event_id,
+                    )
+                for source_memory_id in effect.source_memory_ids or []:
+                    self._validate_memory_template(
+                        rule.id,
+                        "source_memory_ids",
+                        source_memory_id,
+                    )
 
     def _validate_memory_template(
         self,

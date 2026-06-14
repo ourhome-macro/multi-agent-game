@@ -253,6 +253,8 @@ Rule Engine 会校验：
 - `confidence`
 - `metadata`
 
+Memory v1.4 后，payload 结构不变，但 `rule_id` 可能来自 app 默认 `MemoryDerivationRule`、案件包 `memory_derivation_rules.yaml`，或未迁移规则的 Python fallback。外部消费者只能依赖 payload 字段本身，不应假设某个 `rule_id` 必然来自代码或 YAML。
+
 `agent_memory_snapshot.updated` 是运行时派生的稳定记忆快照更新，actor 是 `memory_snapshot_system`。payload 包含上述结构化记忆字段，并额外包含 `operation`。
 
 兼容旧事件时，缺失的 `memory_scope` 默认按 `npc_private` 处理，缺失的 `memory_layer` 默认按 `working` 处理。新事件必须显式写入这两个字段。普通 NPC 上下文不会注入 `director_audit` 或 `archival` memory；Director 审计入口可以检索 `director_audit` memory，但仍不产生状态写入权限。

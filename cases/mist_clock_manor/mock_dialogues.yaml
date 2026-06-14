@@ -46,6 +46,12 @@
         - empty_capsules
       speech: 我愿意承担下药的后果，但那不是全部真相。
       intent: answer
+    - asked_subject_type: clue
+      asked_subject_id: sedative_bottle_label
+      requires_discovered:
+        - sedative_bottle_label
+      speech: 标签只能说明那种苦味从哪里来，不能替任何人把动机写完。
+      intent: conceal
 
 - character_id: qi_yan
   default_speech: 他毁掉别人的东西时，总能把话说得像是在培养你。
@@ -79,6 +85,18 @@
         - memory.player.clue_discovered.echo_tape
       speech: 你已经听见那卷磁带了。钟声不是钟楼来的，这一点我也解释不了。
       intent: probe
+    - asked_subject_type: clue
+      asked_subject_id: tape_splice_mark
+      requires_discovered:
+        - tape_splice_mark
+      speech: 接口不止一处。有人把声音当成刀，却不肯承认刀柄还被别人握过。
+      intent: panic
+    - asked_subject_type: clue
+      asked_subject_id: altered_gallery_plaque
+      requires_discovered:
+        - altered_gallery_plaque
+      speech: 那块牌子改过很多次。陆澜生最擅长把别人的名字磨成自己的注脚。
+      intent: answer
 
 - character_id: jiang_yanhui
   default_speech: 从事实层面说，现在任何结论都还太早。
@@ -117,6 +135,18 @@
         - burned_confession
       speech: 陆澜生想让若岚再死一次。我承认我越过了边界，但我不会替他说那是悔过。
       intent: answer
+    - asked_subject_type: clue
+      asked_subject_id: lock_test_scrap
+      requires_discovered:
+        - lock_test_scrap
+      speech: 纸上的数字不是钟点，而是等待的长度。它能解释现场为什么迟了一步。
+      intent: probe
+    - asked_subject_type: clue
+      asked_subject_id: covered_ruolan_photo
+      requires_discovered:
+        - covered_ruolan_photo
+      speech: 有人用说明卡遮住她，好像遮住一张脸就能遮住一段债。
+      intent: conceal
 
 - character_id: shen_zhaoye
   default_speech: 时间不对。证据也不支持一个人完成所有动作。
@@ -142,3 +172,15 @@
           target_id: player
           deltas:
             trust: 0.4
+    - asked_subject_type: clue
+      asked_subject_id: backup_timer
+      requires_discovered:
+        - backup_timer
+      speech: 主闸不是边界。案发当晚，真正要看的不是黑暗，而是什么东西还在等时间。
+      intent: answer
+    - asked_subject_type: clue
+      asked_subject_id: lake_death_clipping
+      requires_discovered:
+        - lake_death_clipping
+      speech: 旧报道和山庄纪要对不上。十年前，我没有把这个缺口追到底。
+      intent: answer

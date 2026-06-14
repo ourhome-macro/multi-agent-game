@@ -1,32 +1,62 @@
 - id: memory_rule.jiang_empty_capsules_medicine_pressure.presented_clue.v1
-  trigger_action_type: player.presented_clue
-  target_character_id: jiang_yanhui
-  subject_id: empty_capsules
+  trigger_event_type: player.presented_clue
+  target_id: jiang_yanhui
+  clue_id: empty_capsules
   produces:
-    - memory_id: memory.player.belief.{target_id}.{subject_id}
+    - memory_id_template: memory.player.belief.{target_id}.{clue_id}
       memory_type: belief
-      content: Jiang believes the player is closing in on the medicine clue.
+      memory_scope: npc_private
+      memory_layer: working
+      subject_id: player
+      owner_character_id: "{target_id}"
+      visible_to_character_ids:
+        - "{target_id}"
+      content_template: Jiang believes the player is closing in on the medicine clue.
       salience: 0.9
       confidence: 0.8
+      source_event_ids:
+        - "{source_event_id}"
+      source_memory_ids:
+        - memory.player.presented_clue.{target_id}.{clue_id}
       metadata:
         belief_subject: player_approaching_medicine_truth
         belief_polarity: believes
         clue_id: empty_capsules
-    - memory_id: memory.player.relationship.{target_id}.{subject_id}
+    - memory_id_template: memory.player.relationship.{target_id}.{clue_id}
       memory_type: relationship
-      content: Jiang becomes more suspicious of the player around the medicine clue.
+      memory_scope: npc_private
+      memory_layer: working
+      subject_id: player
+      owner_character_id: "{target_id}"
+      visible_to_character_ids:
+        - "{target_id}"
+      content_template: Jiang becomes more suspicious of the player around the medicine clue.
       salience: 0.85
       confidence: 0.8
+      source_event_ids:
+        - "{source_event_id}"
+      source_memory_ids:
+        - memory.player.presented_clue.{target_id}.{clue_id}
       metadata:
         relationship_delta:
           suspicion: 0.2
           trust: -0.1
         clue_id: empty_capsules
-    - memory_id: memory.player.strategy.{target_id}.{subject_id}
+    - memory_id_template: memory.player.strategy.{target_id}.{clue_id}
       memory_type: strategy
-      content: Jiang is inclined to avoid the medicine topic.
+      memory_scope: npc_private
+      memory_layer: working
+      subject_id: player
+      owner_character_id: "{target_id}"
+      visible_to_character_ids:
+        - "{target_id}"
+      content_template: Jiang is inclined to avoid the medicine topic.
       salience: 0.95
       confidence: 0.85
+      source_event_ids:
+        - "{source_event_id}"
+      source_memory_ids:
+        - memory.player.presented_clue.{target_id}.{clue_id}
       metadata:
         strategy_id: avoid_medicine_topic
         clue_id: empty_capsules
@@ -39,34 +69,64 @@
       medicine_topic_pressure: 0.3
 
 - id: memory_rule.jiang_empty_capsules_medicine_pressure.asked_about.v1
-  trigger_action_type: player.asked_about
-  target_character_id: jiang_yanhui
-  subject_id: empty_capsules
+  trigger_event_type: player.asked_about
+  target_id: jiang_yanhui
+  clue_id: empty_capsules
   produces:
-    - memory_id: memory.player.belief.{target_id}.{subject_id}
+    - memory_id_template: memory.player.belief.{target_id}.{clue_id}
       memory_type: belief
-      content: Jiang believes the player is closing in on the medicine clue.
+      memory_scope: npc_private
+      memory_layer: working
+      subject_id: player
+      owner_character_id: "{target_id}"
+      visible_to_character_ids:
+        - "{target_id}"
+      content_template: Jiang believes the player is closing in on the medicine clue.
       salience: 0.9
       confidence: 0.8
+      source_event_ids:
+        - "{source_event_id}"
+      source_memory_ids:
+        - memory.player.asked_about.{target_id}.{subject_type}.{subject_id}
       metadata:
         belief_subject: player_approaching_medicine_truth
         belief_polarity: believes
         clue_id: empty_capsules
-    - memory_id: memory.player.relationship.{target_id}.{subject_id}
+    - memory_id_template: memory.player.relationship.{target_id}.{clue_id}
       memory_type: relationship
-      content: Jiang becomes more suspicious of the player around the medicine clue.
+      memory_scope: npc_private
+      memory_layer: working
+      subject_id: player
+      owner_character_id: "{target_id}"
+      visible_to_character_ids:
+        - "{target_id}"
+      content_template: Jiang becomes more suspicious of the player around the medicine clue.
       salience: 0.85
       confidence: 0.8
+      source_event_ids:
+        - "{source_event_id}"
+      source_memory_ids:
+        - memory.player.asked_about.{target_id}.{subject_type}.{subject_id}
       metadata:
         relationship_delta:
           suspicion: 0.2
           trust: -0.1
         clue_id: empty_capsules
-    - memory_id: memory.player.strategy.{target_id}.{subject_id}
+    - memory_id_template: memory.player.strategy.{target_id}.{clue_id}
       memory_type: strategy
-      content: Jiang is inclined to avoid the medicine topic.
+      memory_scope: npc_private
+      memory_layer: working
+      subject_id: player
+      owner_character_id: "{target_id}"
+      visible_to_character_ids:
+        - "{target_id}"
+      content_template: Jiang is inclined to avoid the medicine topic.
       salience: 0.95
       confidence: 0.85
+      source_event_ids:
+        - "{source_event_id}"
+      source_memory_ids:
+        - memory.player.asked_about.{target_id}.{subject_type}.{subject_id}
       metadata:
         strategy_id: avoid_medicine_topic
         clue_id: empty_capsules
@@ -77,3 +137,103 @@
     strategy_id: avoid_medicine_topic
     traits:
       medicine_topic_pressure: 0.2
+
+- id: memory_rule.qi_tape_splice_pressure.asked_about.v1
+  trigger_event_type: player.asked_about
+  target_id: qi_yan
+  clue_id: tape_splice_mark
+  produces:
+    - memory_id_template: memory.player.belief.{target_id}.{clue_id}
+      memory_type: belief
+      memory_scope: npc_private
+      memory_layer: working
+      subject_id: player
+      owner_character_id: "{target_id}"
+      visible_to_character_ids:
+        - "{target_id}"
+      content_template: 祁宴认为玩家已经注意到录音接口不止一处。
+      salience: 0.85
+      confidence: 0.75
+      source_event_ids:
+        - "{source_event_id}"
+      source_memory_ids:
+        - memory.player.asked_about.{target_id}.{subject_type}.{subject_id}
+      metadata:
+        belief_subject: player_noticed_tape_splice_sequence
+        belief_polarity: believes
+        clue_id: tape_splice_mark
+    - memory_id_template: memory.player.strategy.{target_id}.{clue_id}
+      memory_type: strategy
+      memory_scope: npc_private
+      memory_layer: working
+      subject_id: player
+      owner_character_id: "{target_id}"
+      visible_to_character_ids:
+        - "{target_id}"
+      content_template: 祁宴倾向于承认局部行为，同时把后续处理推回给其他证据。
+      salience: 0.9
+      confidence: 0.8
+      source_event_ids:
+        - "{source_event_id}"
+      source_memory_ids:
+        - memory.player.asked_about.{target_id}.{subject_type}.{subject_id}
+      metadata:
+        strategy_id: admit_partial_tape_contact
+        clue_id: tape_splice_mark
+  impression:
+    relationship_delta:
+      suspicion: 0.1
+      fear: 0.1
+    strategy_id: admit_partial_tape_contact
+    traits:
+      tape_topic_pressure: 0.2
+
+- id: memory_rule.jiang_lock_test_pressure.presented_clue.v1
+  trigger_event_type: player.presented_clue
+  target_id: jiang_yanhui
+  clue_id: lock_test_scrap
+  produces:
+    - memory_id_template: memory.player.belief.{target_id}.{clue_id}
+      memory_type: belief
+      memory_scope: npc_private
+      memory_layer: working
+      subject_id: player
+      owner_character_id: "{target_id}"
+      visible_to_character_ids:
+        - "{target_id}"
+      content_template: 江雁回认为玩家正在把门锁时间差与死亡延误联系起来。
+      salience: 0.9
+      confidence: 0.8
+      source_event_ids:
+        - "{source_event_id}"
+      source_memory_ids:
+        - memory.player.presented_clue.{target_id}.{clue_id}
+      metadata:
+        belief_subject: player_connecting_lock_delay_to_timing
+        belief_polarity: believes
+        clue_id: lock_test_scrap
+    - memory_id_template: memory.player.strategy.{target_id}.{clue_id}
+      memory_type: strategy
+      memory_scope: npc_private
+      memory_layer: working
+      subject_id: player
+      owner_character_id: "{target_id}"
+      visible_to_character_ids:
+        - "{target_id}"
+      content_template: 江雁回倾向于承认时间差存在，但避免给出完整因果。
+      salience: 0.95
+      confidence: 0.85
+      source_event_ids:
+        - "{source_event_id}"
+      source_memory_ids:
+        - memory.player.presented_clue.{target_id}.{clue_id}
+      metadata:
+        strategy_id: concede_timing_not_causality
+        clue_id: lock_test_scrap
+  impression:
+    relationship_delta:
+      suspicion: 0.2
+      trust: -0.05
+    strategy_id: concede_timing_not_causality
+    traits:
+      lock_topic_pressure: 0.25

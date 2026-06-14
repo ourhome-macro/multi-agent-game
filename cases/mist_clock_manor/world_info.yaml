@@ -114,3 +114,197 @@
   claim_patterns:
     - "江若岚.*(不是意外|被掩盖)"
     - "陆澜生.*害死.*江若岚"
+
+# Optional support facts. These are public-safe anchors for additional evidence;
+# the final responsibility chain is still guarded by forbidden_facts.yaml.
+- id: backup_timer_kept_recorder_power
+  title: 备用线路维持了小型计时装置
+  description: 钟楼备用线路没有经过主闸，停电后仍可能让小型计时装置按预设时间运行。
+  category: physical_fact
+  sensitivity: medium
+  aliases:
+    - 备用线路仍在供电
+    - 旧定时器还在走
+  claim_patterns:
+    - "备用线路.*(供电|定时器)"
+    - "定时器.*(仍在|还在).*走"
+
+- id: power_cut_was_prepared
+  title: 断电顺序被预先熟悉
+  description: 主闸旁的纸牌和工具位置显示，案发前有人熟悉过配电顺序。
+  category: physical_fact
+  sensitivity: medium
+  aliases:
+    - 主闸顺序被标记
+    - 配电顺序被预先看过
+  claim_patterns:
+    - "主闸.*(顺序|标记)"
+    - "配电.*预先"
+
+- id: clock_tower_serviced_before_death
+  title: 钟楼齿轮在案发前被维护
+  description: 主钟齿轮和钟油痕迹说明，钟楼在案发前经历过短暂维护。
+  category: physical_fact
+  sensitivity: low
+  aliases:
+    - 齿轮有新油痕
+    - 钟楼被临时维护
+  claim_patterns:
+    - "齿轮.*(新油|油痕)"
+    - "钟楼.*(维护|检修)"
+
+- id: real_bell_was_muted
+  title: 真实钟锤被临时消音
+  description: 钟锤上缠着棉布，真正的钟楼报时可能没有按常规传到书房。
+  category: physical_fact
+  sensitivity: medium
+  aliases:
+    - 钟锤被棉布缠住
+    - 钟楼报时被削弱
+  claim_patterns:
+    - "钟锤.*棉布"
+    - "钟楼报时.*(削弱|没传到)"
+
+- id: lock_delay_tested
+  title: 延时门锁经过试验
+  description: 试验残页记录了卡榫回弹时间，说明书房门锁的异常不是一次性偶然损伤。
+  category: physical_fact
+  sensitivity: high
+  aliases:
+    - 门锁延迟经过试验
+    - 卡榫回弹时间被记录
+  claim_patterns:
+    - "门锁.*(试验|测试)"
+    - "卡榫.*(回弹|延迟)"
+
+- id: trust_terms_pressured_guests
+  title: 信托条款压迫在场者表态
+  description: 信托条款把继承利益与旧案表态绑定，陆澜生用文件迫使众人接受同一套说法。
+  category: social_fact
+  sensitivity: medium
+  aliases:
+    - 信托条款逼人表态
+    - 基金和旧案表态绑定
+  claim_patterns:
+    - "信托.*(表态|承认)"
+    - "基金.*旧案.*(绑定|表态)"
+
+- id: capsule_powder_removed
+  title: 胶囊被拆开处理过
+  description: 抽屉衬纸上的药粉和压痕说明，至少有胶囊曾被拆开后重新放回。
+  category: physical_fact
+  sensitivity: high
+  aliases:
+    - 胶囊被拆开
+    - 抽屉里有药粉
+  claim_patterns:
+    - "胶囊.*(拆开|处理)"
+    - "抽屉.*药粉"
+
+- id: sedative_source_matches_wine
+  title: 镇静剂来源与红酒苦味吻合
+  description: 助眠药瓶标签与红酒残液的苦味相互印证，支持红酒含有镇静剂的判断。
+  category: physical_fact
+  sensitivity: medium
+  aliases:
+    - 助眠药苦味吻合
+    - 药瓶标签对应红酒
+  claim_patterns:
+    - "助眠药.*(苦味|红酒)"
+    - "药瓶标签.*红酒"
+
+- id: tape_was_edited_twice
+  title: 磁带至少经历两次剪接
+  description: 磁带接口有新旧两层胶带，说明录音内容并非单次替换完成。
+  category: physical_fact
+  sensitivity: medium
+  aliases:
+    - 磁带剪接不止一次
+    - 录音内容多次处理
+  claim_patterns:
+    - "磁带.*(两次|多次).*剪接"
+    - "录音.*多次处理"
+
+- id: fake_chime_confused_death_time
+  title: 假钟声干扰死亡时间判断
+  description: 怀表停针与钟楼校时纸相差数分钟，死亡时间不能只按听到的钟声判断。
+  category: physical_fact
+  sensitivity: medium
+  aliases:
+    - 假钟声干扰时间
+    - 怀表和校时纸不一致
+  claim_patterns:
+    - "假钟声.*时间"
+    - "怀表.*校时纸.*(不一致|相差)"
+
+- id: ruolan_erased_from_archive
+  title: 江若岚在山庄档案中被遮去
+  description: 画廊旧照遮住江若岚的位置，山庄长期回避她留下的舞台痕迹。
+  category: social_fact
+  sensitivity: low
+  aliases:
+    - 江若岚剧照被遮住
+    - 山庄回避若岚痕迹
+  claim_patterns:
+    - "江若岚.*(剧照|旧照).*遮"
+    - "若岚.*痕迹.*回避"
+
+- id: ruolan_credit_rewritten
+  title: 旧剧本署名被改写
+  description: 说明牌上作品来源被刮改，陆澜生与旧剧本署名之间存在争议。
+  category: social_fact
+  sensitivity: medium
+  aliases:
+    - 旧剧本署名被刮改
+    - 作品来源有争议
+  claim_patterns:
+    - "署名.*(刮改|改写)"
+    - "作品来源.*争议"
+
+- id: old_lake_report_inconsistent
+  title: 十年前坠湖报道前后不一致
+  description: 剪报与山庄纪要在时间、天气和证人说法上不一致，旧案记录存在裂缝。
+  category: case_truth
+  sensitivity: medium
+  aliases:
+    - 坠湖报道不一致
+    - 旧案记录有裂缝
+  claim_patterns:
+    - "坠湖.*(报道|剪报).*(不一致|矛盾)"
+    - "旧案记录.*裂缝"
+
+- id: old_case_file_incomplete
+  title: 旧案证物登记不完整
+  description: 旧证物盒编号跳页，说明当年的调查材料没有形成完整闭环。
+  category: physical_fact
+  sensitivity: medium
+  aliases:
+    - 证物登记缺页
+    - 旧案材料不完整
+  claim_patterns:
+    - "证物.*(缺页|不完整)"
+    - "旧案材料.*不完整"
+
+- id: lake_mud_trace_recent
+  title: 湖岸方向近期有人经过
+  description: 画廊地毯边的湿泥接近湖岸土色，只能证明有人近期走过湖边。
+  category: physical_fact
+  sensitivity: low
+  aliases:
+    - 湿泥来自湖岸方向
+    - 有人近期走过湖边
+  claim_patterns:
+    - "湿泥.*湖岸"
+    - "近期.*湖边"
+
+- id: manor_log_page_removed
+  title: 山庄访客登记缺页
+  description: 访客登记册旧页被整齐撕走，山庄在旧案前后的来访记录不完整。
+  category: physical_fact
+  sensitivity: low
+  aliases:
+    - 访客登记缺页
+    - 来访记录不完整
+  claim_patterns:
+    - "访客登记.*缺页"
+    - "来访记录.*不完整"
