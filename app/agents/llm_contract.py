@@ -5,19 +5,23 @@ from typing import Any
 from app.domain.models import (
     AgentContext,
     AgentIntent,
+    CompressedHistoryContext,
     DisclosureMode,
+    EventType,
     FactDisclosureStrategy,
     LLMAgentContractInput,
     LLMDisclosureConstraint,
     ProposedActionType,
     SelfKnowledgeItem,
+    WorldEvent,
 )
 
 
 def build_llm_agent_input(context: AgentContext) -> LLMAgentContractInput:
+    safe_context = _project_context_for_llm(context)
     return LLMAgentContractInput(
-        agent_context=context,
-        disclosure_constraints=_build_disclosure_constraints(context),
+        agent_context=safe_context,
+        disclosure_constraints=_build_disclosure_constraints(safe_context),
     )
 
 
@@ -63,6 +67,95 @@ def _build_disclosure_constraints(context: AgentContext) -> list[LLMDisclosureCo
         for fact_id in context.blocked_fact_ids
     )
     return constraints
+
+
+def _project_context_for_llm(context: AgentContext) -> AgentContext:
+    selected_memory_ids = {memory.memory_id for memory in context.memory_snapshots}
+    recent_events = _project_recent_events_for_llm(
+        context.recent_events,
+        selected_memory_ids=selected_memory_ids,
+    )
+    return context.model_copy(
+        update={
+            "memory_candidates": [],
+            "recent_events": recent_events,
+            "compressed_history": _project_compressed_history_for_llm(
+                context.compressed_history,
+                selected_memory_ids=selected_memory_ids,
+                projected_recent_event_ids={event.id for event in recent_events},
+            ),
+        }
+    )
+
+
+def _project_recent_events_for_llm(
+    events: list[WorldEvent],
+    *,
+    selected_memory_ids: set[str],
+) -> list[WorldEvent]:
+    projected: list[WorldEvent] = []
+    for event in events:
+        if event.type not in _MEMORY_EVENT_TYPES:
+            projected.append(event)
+            continue
+        payload = event.payload
+        memory_id = payload.get("memory_id") if isinstance(payload, dict) else None
+        if not isinstance(memory_id, str) or memory_id not in selected_memory_ids:
+            continue
+        projected.append(
+            event.model_copy(
+                update={
+                    "payload": {
+                        "memory_id": memory_id,
+                        "memory_type": payload.get("memory_type"),
+                        "memory_scope": payload.get("memory_scope"),
+                        "memory_layer": payload.get("memory_layer"),
+                        "owner_character_id": payload.get("owner_character_id"),
+                        "visible_to_character_ids": payload.get(
+                            "visible_to_character_ids",
+                            [],
+                        ),
+                        "selected_for_llm": True,
+                        "content_redacted": True,
+                    }
+                }
+            )
+        )
+    return projected
+
+
+def _project_compressed_history_for_llm(
+    compressed_history: CompressedHistoryContext | None,
+    *,
+    selected_memory_ids: set[str],
+    projected_recent_event_ids: set[str],
+) -> CompressedHistoryContext | None:
+    if compressed_history is None:
+        return None
+    return CompressedHistoryContext(
+        summary=(
+            "Compressed history is available only as selected event and memory ids; "
+            "memory content remains limited to memory_snapshots."
+        ),
+        important_event_ids=[
+            event_id
+            for event_id in compressed_history.important_event_ids
+            if event_id in projected_recent_event_ids
+        ],
+        important_memory_ids=[
+            memory_id
+            for memory_id in compressed_history.important_memory_ids
+            if memory_id in selected_memory_ids
+        ],
+        open_threads=[],
+        risk_notes=[],
+    )
+
+
+_MEMORY_EVENT_TYPES = {
+    EventType.MEMORY_CANDIDATE_CREATED,
+    EventType.AGENT_MEMORY_SNAPSHOT_UPDATED,
+}
 
 
 def _constraint_from_self_knowledge(item: SelfKnowledgeItem) -> LLMDisclosureConstraint:

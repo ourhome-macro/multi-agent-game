@@ -16,3 +16,22 @@
       source_event_ids:
         - "{source_event_id}"
       source_memory_ids: []
+
+- id: memory_rule.core.asked_about.episodic.v1
+  trigger_event_type: player.asked_about
+  produces:
+    - memory_id_template: memory.player.asked_about.{target_id}.{subject_type}.{subject_id}
+      memory_type: episodic
+      memory_scope: npc_private
+      memory_layer: working
+      subject_id: player
+      owner_character_id: "{target_id}"
+      visible_to_character_ids:
+        - "{target_id}"
+      content_template: Player asked {target_name} about {subject_type} '{subject_id}' with pressure {interaction_pressure}.
+      salience_from_event: interaction_pressure
+      min_salience: 0.4
+      confidence: 1.0
+      source_event_ids:
+        - "{source_event_id}"
+      source_memory_ids: []

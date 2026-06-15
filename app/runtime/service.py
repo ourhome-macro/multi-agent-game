@@ -21,6 +21,7 @@ from app.runtime.budget import ContextBudgetManager
 from app.runtime.derivations import DerivedEventSystem
 from app.runtime.errors import ActionValidationError
 from app.runtime.events import EventRecorder
+from app.runtime.memory_archival import MemoryArchivalSystem
 from app.runtime.memory_snapshots import MemorySnapshotSystem
 from app.runtime.tracing import RuntimeTracer
 from app.storage.memory import InMemoryCaseStore, InMemorySessionStore, build_state_summary
@@ -47,6 +48,7 @@ class ActionService:
         trigger_system: RuleTriggerSystem,
         derived_event_system: DerivedEventSystem,
         memory_snapshot_system: MemorySnapshotSystem,
+        memory_archival_system: MemoryArchivalSystem,
     ) -> None:
         self._case_store = case_store
         self._recorder = recorder
@@ -56,6 +58,7 @@ class ActionService:
         self._trigger_system = trigger_system
         self._derived_event_system = derived_event_system
         self._memory_snapshot_system = memory_snapshot_system
+        self._memory_archival_system = memory_archival_system
 
     @property
     def agent_loop(self) -> AgentLoop:
@@ -85,6 +88,12 @@ class ActionService:
             trigger_source_event_id = new_events[-1].id
             new_events.extend(self._derive_events(case, session, new_events))
             new_events.extend(self._evaluate_triggers(case, session, trigger_source_event_id))
+            new_events.extend(
+                self._archive_stale_memories(
+                    session=session,
+                    caused_by_event_id=trigger_source_event_id,
+                )
+            )
             return ActionResponse(
                 session_id=session.id,
                 accepted=True,
@@ -172,9 +181,14 @@ class ActionService:
                     new_events=new_events,
                     state=build_state_summary(case, session),
                 )
-
-            turn = self._agent_loop.run_turn(case=case, session=session, action=action)
             trigger_source_event_id = new_events[-1].id
+            new_events.extend(
+                self._archive_stale_memories(
+                    session=session,
+                    caused_by_event_id=trigger_source_event_id,
+                )
+            )
+            turn = self._agent_loop.run_turn(case=case, session=session, action=action)
             new_events.extend(self._derive_events(case, session, new_events))
             new_events.extend(self._evaluate_triggers(case, session, trigger_source_event_id))
             self._agent_loop.finish_trace(
@@ -218,6 +232,12 @@ class ActionService:
         player_event: WorldEvent,
         new_events: list[WorldEvent],
     ) -> ActionResponse:
+        new_events.extend(
+            self._archive_stale_memories(
+                session=session,
+                caused_by_event_id=player_event.id,
+            )
+        )
         turn = self._agent_loop.run_turn(case=case, session=session, action=action)
         context = turn.context
         intent = turn.intent
@@ -359,6 +379,17 @@ class ActionService:
                 events.extend(self._memory_snapshot_system.apply(session=session, event=event))
         return events
 
+    def _archive_stale_memories(
+        self,
+        *,
+        session: SessionState,
+        caused_by_event_id: str | None,
+    ) -> list[WorldEvent]:
+        return self._memory_archival_system.apply(
+            session=session,
+            caused_by_event_id=caused_by_event_id,
+        )
+
 
 def create_runtime(
     case_packages: list[CasePackage],
@@ -391,6 +422,7 @@ def create_runtime(
         trigger_system=RuleTriggerSystem(recorder),
         derived_event_system=DerivedEventSystem(recorder),
         memory_snapshot_system=MemorySnapshotSystem(recorder),
+        memory_archival_system=MemoryArchivalSystem(recorder),
     )
     return RuntimeContainer(
         case_store=case_store,

@@ -142,7 +142,7 @@ Memory v1.1 hardening 进一步要求每条 candidate / snapshot 都带：
 
 现有 typed memory 默认是 `npc_private` + `working`。`player.presented_clue` 的展示范围由结构化 `presentation_mode` 决定：`private` 只生成目标 NPC 可见的私有互动记忆；`scene_shared` 必须带合法 `scene_id` 和 `present_character_ids`，运行时会额外生成 `scene_shared` memory，且 `visible_to_character_ids` 必须等于当前场景在场 NPC。自然语言 Router 不负责从玩家文本里推断公共场景。
 
-`build_agent_context(...)` 只允许注入 `case/core`、`session/working`、当前目标 NPC 可见的 `npc_private`、当前目标 NPC 可见的 `scene_shared` 和当前目标 NPC 自己的 `portrait_summary`。它必须禁止注入 `director_audit`、其他 NPC 的 `npc_private`、其他 NPC 的 portrait 和任何 `archival` memory。
+`build_agent_context(...)` 的常规投影只允许注入 `case/core`、`session/working`、当前目标 NPC 可见的 `npc_private`、当前目标 NPC 可见的 `scene_shared` 和当前目标 NPC 自己的 `portrait_summary`。它必须禁止注入 `director_audit`、其他 NPC 的 `npc_private` 和其他 NPC 的 portrait。`archival` memory 只有在 `MemoryRetriever` 冷召回选中后才能进入 `memory_snapshots`，不能由 skill 或 prompt 直接强塞。
 
 `MemoryRetriever` 的默认 NPC 检索顺序是 `memory_scope` -> `visible_to_character_ids` / `owner_character_id` -> `memory_layer`。Director 审计入口 `retrieve_for_director(...)` 可以读取 `director_audit` 和其他非 archival player-scoped memory，但不能把这些记忆塞回普通 NPC `AgentContext`。
 
@@ -154,11 +154,15 @@ Memory v1.2 增加 Skill-driven Retrieval Planner。`MemoryProjectionSkill` 使�
 - `ask_about_clue`：线索询问的渐进式披露投影。
 - `accuse`：正式指控时的更宽但仍受边界限制的投影。
 
-`RetrievalPlanner` 从 skill 生成 `MemoryRetrievalPlan`，控制允许的 `memory_type`、`memory_scope`、`memory_layer`、禁止的 scope/layer、`max_memory_items`、是否注入 `portrait_summary`、是否允许 `recent_events`。`recent_events=false` 同时约束 `AgentContext.recent_events` 和 `ToolRuntime.get_recent_events` 的结果计数。硬边界仍在代码里：`director_audit`、`archival`、其他 NPC private、其他 NPC portrait 和 forbidden fact 文本不能被 skill 放进普通 NPC `AgentContext`。
+`RetrievalPlanner` 从 skill 生成 `MemoryRetrievalPlan`，控制允许的 `memory_type`、`memory_scope`、常规 `memory_layer`、禁止的 scope/layer、`max_memory_items`、是否注入 `portrait_summary`、是否允许 `recent_events`。`recent_events=false` 同时约束 `AgentContext.recent_events` 和 `ToolRuntime.get_recent_events` 的结果计数。硬边界仍在代码里：`director_audit`、其他 NPC private、其他 NPC portrait 和 forbidden fact 文本不能被 skill 放进普通 NPC `AgentContext`。`archival` 即使出现在 skill 的 forbidden layer 中，也可在代码级冷召回路径被选中；该路径只在常规 working/core 没有相关命中时触发，并且不放宽其他边界。
 
 Memory v1.3 hardening 改进的是检索质量，不改变记忆权威链路。`MemoryRetriever` 仍先执行 scope、可见性、layer、skill plan 和 forbidden fact 过滤，再对可注入 snapshot 做运行时排序。排序分数只在检索时派生，不能写回 `AgentMemorySnapshot`、`WorldEvent` 或 trace content。当前分数来源包括结构化锚点匹配、中文/英文文本 token、`updated_at` recency、由 `source_event_ids` 派生的 reinforcement、salience 和 confidence。recency / reinforcement 只能在已有结构化或文本相关性命中后加分，不能单独召回无关记忆。
 
 `build_agent_context(...)` 的 `memory_snapshots` 投影必须复用 `MemoryRetriever` 的质量排序并在排序后应用 `max_memory_items`，不能重新按 `memory_id` 截断。AgentLoop 路径中，注入到 loop 的 `MemoryRetriever` 是唯一事实源：loop 先检索出 `memory_snapshots`，再传给 `build_agent_context(...)`、trace `memory_projection` 和 tool `search_memory` 摘要。只有直接调用 `build_agent_context(...)` 且未传入 `memory_snapshots` 时，函数才会使用内部 fallback retriever。
+
+Memory v1.3 P0 hardening 进一步收紧真实 LLM 输入边界：运行时内部 `AgentContext` 可以为了兼容 mock、调试和直接调用保留 `memory_candidates` 与 `recent_events`，但 `build_llm_agent_input(...)` 会构造安全投影后再进入真实 LLM 合同。该投影清空 `memory_candidates`，移除未被本轮 retriever 选中的 memory events，并对已选中 memory events 的 payload 脱敏。真实 LLM 可读取的记忆事实内容只能来自同一批 selected `memory_snapshots[].content`；recent event、compressed history、tool summary 和 trace 都不能成为第二条记忆内容通道。
+
+Memory P2 后，归档不再只是“可 replay 但永不注入”。`MemoryArchivalSystem` 在 agent-backed action 构造上下文前，把陈旧且未强化的 working memory 通过 `agent_memory_snapshot.updated(operation=archived)` 降级为 `archival`。`MemoryRetriever` 先执行常规 `core/working` 检索；只有没有任何结构化或文本相关命中时，才对当前 NPC 可见的 archival memory 做冷召回。被冷召回的 archival memory 仍然是 selected `memory_snapshots` 的一部分，因此 P0 的 LLM 安全投影继续适用。
 
 Memory v1.4 后，`MemoryDerivationRule` 由代码级 loader 合并 app 默认规则与案件规则。规则可以声明 trigger event、target / clue / subject / claim 约束、memory type/scope/layer、owner、visible characters、subject、salience/confidence、metadata、content template、source event ids 和 source memory ids。Agent 和 LLM 仍不能创建、修改或删除 memory；它们最多通过结构化 action 触发后端规则链。未迁移到配置的 core memory 仍由 Python fallback 产生，fallback 只在配置规则没有产生同一目标 memory 时执行。
 
@@ -218,7 +222,7 @@ PromptBuilder 只把 `portrait_summary` 和 inner context 的 id 级摘要写入
 - 其他 NPC 的 private impressions
 - 其他 NPC 的 private typed memory
 - `director_audit` memory
-- `archival` memory
+- 未被 `MemoryRetriever` 冷召回选中的 `archival` memory
 - 线索 `truth_status`
 - 带原文或 blocked terms 的 `forbidden_facts`
 - 通过 memory snapshots 泄露的角色秘密、目标或内部知识

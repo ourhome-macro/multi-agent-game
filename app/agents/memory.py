@@ -110,10 +110,7 @@ class MemoryRetriever:
             snapshot
             for snapshot in session.memory_snapshots.values()
             if snapshot.subject_id == "player"
-            and _scope_allowed(
-                snapshot,
-                enforce_target_visibility=enforce_target_visibility,
-            )
+            and _scope_allowed(snapshot, enforce_target_visibility=enforce_target_visibility)
             and (
                 not enforce_target_visibility
                 or _visible_to_target(snapshot, action.target_id)
@@ -133,6 +130,21 @@ class MemoryRetriever:
             for score, snapshot in scored
             if score.has_relevance
         ]
+        if not scored and enforce_target_visibility:
+            archival_scored = self._score_archival_cold_recall(
+                case=case,
+                session=session,
+                action=action,
+                plan=plan,
+                forbidden_terms=forbidden_terms,
+                query=query,
+            )
+            if archival_scored:
+                archival_scored.sort(
+                    key=lambda item: item[0].sort_key,
+                    reverse=True,
+                )
+                return [snapshot for _, snapshot in archival_scored[:max_results]]
         if not scored:
             scored = [
                 (_fallback_score(snapshot), snapshot)
@@ -144,6 +156,34 @@ class MemoryRetriever:
             reverse=True,
         )
         return [snapshot for _, snapshot in scored[:max_results]]
+
+    def _score_archival_cold_recall(
+        self,
+        *,
+        case: CasePackage,
+        session: SessionState,
+        action: PlayerAction,
+        plan: MemoryRetrievalPlan | None,
+        forbidden_terms: tuple[str, ...],
+        query: RetrievalQuery,
+    ) -> list[tuple[RetrievalScore, AgentMemorySnapshot]]:
+        candidates = [
+            snapshot
+            for snapshot in session.memory_snapshots.values()
+            if snapshot.subject_id == "player"
+            and _scope_allowed(snapshot, enforce_target_visibility=True)
+            and _visible_to_target(snapshot, action.target_id)
+            and _archival_layer_allowed(snapshot)
+            and memory_allowed_by_plan(snapshot, plan, allow_archival_layer=True)
+            and not memory_content_matches_forbidden(snapshot, forbidden_terms)
+        ]
+        now = _retrieval_now(session, candidates)
+        return [
+            (score, snapshot)
+            for snapshot in candidates
+            for score in [self._score(snapshot, query, now)]
+            if score.has_relevance
+        ]
 
     def _score(
         self,
@@ -196,18 +236,25 @@ def _tokens(text: str) -> set[str]:
 def memory_allowed_by_plan(
     snapshot: object,
     plan: MemoryRetrievalPlan | None,
+    *,
+    allow_archival_layer: bool = False,
 ) -> bool:
     if plan is None:
         return True
     memory_type = str(getattr(snapshot, "memory_type", "episodic"))
     memory_scope = str(getattr(snapshot, "memory_scope", "npc_private"))
     memory_layer = str(getattr(snapshot, "memory_layer", "working"))
+    layer_included = memory_layer in set(plan.included_layers)
+    layer_forbidden = memory_layer in set(plan.forbidden_layers)
+    if allow_archival_layer and memory_layer == "archival":
+        layer_included = True
+        layer_forbidden = False
     return (
         memory_type in set(plan.included_memory_types)
         and memory_scope in set(plan.included_scopes)
-        and memory_layer in set(plan.included_layers)
+        and layer_included
         and memory_scope not in set(plan.forbidden_scopes)
-        and memory_layer not in set(plan.forbidden_layers)
+        and not layer_forbidden
     )
 
 
@@ -269,6 +316,10 @@ def _layer_allowed(snapshot: AgentMemorySnapshot) -> bool:
     if snapshot.memory_scope == "session":
         return snapshot.memory_layer == "working"
     return snapshot.memory_layer != "archival"
+
+
+def _archival_layer_allowed(snapshot: AgentMemorySnapshot) -> bool:
+    return snapshot.memory_layer == "archival"
 
 
 def _build_query(case: CasePackage, action: PlayerAction) -> RetrievalQuery:

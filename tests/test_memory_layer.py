@@ -48,7 +48,7 @@ def test_session_working_memory_is_injected_as_public_context() -> None:
     assert SESSION_WORKING_MEMORY in _context_memory_ids(shen_context)
 
 
-def test_archival_memory_is_replayed_but_not_default_injected() -> None:
+def test_archival_memory_is_replayed_and_cold_recalled_without_working_hit() -> None:
     case = CaseLoader().load(CASE_DIR)
     runtime = create_runtime([case])
     session = runtime.session_store.create(case)
@@ -70,8 +70,8 @@ def test_archival_memory_is_replayed_but_not_default_injected() -> None:
     )
     replayed = replay_events(case, session.events)
 
-    assert SESSION_ARCHIVAL_MEMORY not in _context_memory_ids(context)
-    assert SESSION_ARCHIVAL_MEMORY not in _memory_ids(retrieved)
+    assert SESSION_ARCHIVAL_MEMORY in _context_memory_ids(context)
+    assert SESSION_ARCHIVAL_MEMORY in _memory_ids(retrieved)
     assert (
         replayed.memory_candidates[SESSION_ARCHIVAL_MEMORY].memory_layer
         == "archival"

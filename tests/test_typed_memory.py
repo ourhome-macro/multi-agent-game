@@ -9,10 +9,12 @@ from app.cases.loader import CaseLoader
 from app.domain.models import (
     ActionType,
     AgentMemorySnapshot,
+    CasePackage,
     EventType,
     NarrativeState,
     PlayerAction,
     SessionState,
+    WorldEvent,
 )
 from app.runtime.derivations import (
     ASKED_ABOUT_MEMORY_RULE_ID,
@@ -20,6 +22,7 @@ from app.runtime.derivations import (
     DerivedEventSystem,
 )
 from app.runtime.events import EventRecorder
+from app.runtime.memory_snapshots import MemorySnapshotSystem
 from app.runtime.replay import replay_events
 from app.runtime.service import create_runtime
 
@@ -59,6 +62,7 @@ def test_rule_loader_merges_app_default_and_case_memory_derivation_rules() -> No
     rule_ids = {rule.id for rule in case.memory_derivation_rules}
 
     assert PRESENTED_CLUE_MEMORY_RULE_ID in rule_ids
+    assert ASKED_ABOUT_MEMORY_RULE_ID in rule_ids
     assert MEDICINE_PRESENTED_CLUE_RULE_ID in rule_ids
     assert MEDICINE_ASKED_ABOUT_RULE_ID in rule_ids
 
@@ -102,6 +106,100 @@ def test_configured_presented_clue_core_memory_matches_python_fallback_semantics
     )
 
     assert fallback_session.memory_candidates[EPISODIC_MEMORY] == configured_candidate
+
+
+def test_configured_asked_about_core_memory_matches_python_fallback_semantics() -> None:
+    case = CaseLoader().load(CASE_DIR)
+    source_event = _asked_about_event(case, target_id=SHEN, subject_id=EMPTY_CAPSULES)
+    configured_session = _empty_session(case, "session.configured_asked_about")
+    configured_events = DerivedEventSystem(EventRecorder()).derive(
+        case=case,
+        session=configured_session,
+        source_events=[source_event],
+    )
+    configured_candidate = configured_session.memory_candidates[SHEN_ASKED_MEMORY]
+
+    fallback_case = case.model_copy(update={"memory_derivation_rules": []})
+    fallback_session = _empty_session(case, "session.fallback_asked_about")
+    DerivedEventSystem(EventRecorder())._derive_asked_about_memory_candidate(
+        fallback_case,
+        fallback_session,
+        source_event,
+    )
+
+    assert _memory_candidate_count(configured_events, SHEN_ASKED_MEMORY) == 1
+    assert fallback_session.memory_candidates[SHEN_ASKED_MEMORY] == configured_candidate
+
+
+def test_configured_asked_about_core_memory_suppresses_python_fallback() -> None:
+    case = CaseLoader().load(CASE_DIR)
+    session = _empty_session(case, "session.asked_about_no_duplicate")
+    source_event = _asked_about_event(case, target_id=SHEN, subject_id=EMPTY_CAPSULES)
+    derivation_system = DerivedEventSystem(EventRecorder())
+
+    first_events = derivation_system.derive(
+        case=case,
+        session=session,
+        source_events=[source_event],
+    )
+    second_events = derivation_system.derive(
+        case=case,
+        session=session,
+        source_events=[source_event],
+    )
+
+    assert _memory_candidate_count(first_events, SHEN_ASKED_MEMORY) == 1
+    assert _memory_candidate_count(second_events, SHEN_ASKED_MEMORY) == 0
+    assert _session_memory_candidate_count(session, SHEN_ASKED_MEMORY, source_event.id) == 1
+
+
+def test_asked_about_python_fallback_still_works_when_config_rules_are_disabled() -> None:
+    case = CaseLoader().load(CASE_DIR)
+    fallback_case = case.model_copy(update={"memory_derivation_rules": []})
+    session = _empty_session(case, "session.asked_about_fallback")
+    source_event = _asked_about_event(case, target_id=SHEN, subject_id=EMPTY_CAPSULES)
+
+    events = DerivedEventSystem(EventRecorder()).derive(
+        case=fallback_case,
+        session=session,
+        source_events=[source_event],
+    )
+
+    assert _memory_candidate_count(events, SHEN_ASKED_MEMORY) == 1
+    snapshot = session.memory_candidates[SHEN_ASKED_MEMORY]
+    assert snapshot.rule_id == ASKED_ABOUT_MEMORY_RULE_ID
+    assert snapshot.memory_type == "episodic"
+    assert snapshot.owner_character_id == SHEN
+
+
+def test_configured_asked_about_core_memory_replays_equivalently() -> None:
+    case = CaseLoader().load(CASE_DIR)
+    recorder = EventRecorder()
+    snapshot_system = MemorySnapshotSystem(recorder)
+    session = _empty_session(case, "session.asked_about_replay")
+    source_event = recorder.append(
+        session,
+        actor_id="player",
+        event_type=EventType.PLAYER_ASKED_ABOUT,
+        payload=_asked_about_payload(target_id=SHEN, subject_id=EMPTY_CAPSULES),
+    )
+
+    derived_events = DerivedEventSystem(recorder).derive(
+        case=case,
+        session=session,
+        source_events=[source_event],
+    )
+    for event in derived_events:
+        snapshot_system.apply(session=session, event=event)
+
+    replayed = replay_events(case, session.events)
+
+    assert replayed.memory_candidates[SHEN_ASKED_MEMORY] == session.memory_candidates[
+        SHEN_ASKED_MEMORY
+    ]
+    assert replayed.memory_snapshots[SHEN_ASKED_MEMORY] == session.memory_snapshots[
+        SHEN_ASKED_MEMORY
+    ]
 
 
 def test_presenting_empty_capsules_to_jiang_creates_episodic_memory() -> None:
@@ -199,7 +297,7 @@ def test_memory_retriever_scoring_v1_hits_configured_derivation_by_anchor() -> N
     assert {BELIEF_MEMORY, RELATIONSHIP_MEMORY, STRATEGY_MEMORY} <= _memory_ids(memories)
 
 
-def test_unmatched_configured_rule_keeps_python_fallback_memory_derivation() -> None:
+def test_default_asked_about_rule_creates_core_episodic_memory() -> None:
     case = CaseLoader().load(CASE_DIR)
     runtime = create_runtime([case])
     session = runtime.session_store.create(case)
@@ -381,5 +479,63 @@ def _presented_clue_event(events: list[object]) -> object:
     return next(event for event in events if event.type == EventType.PLAYER_PRESENTED_CLUE)
 
 
+def _asked_about_event(
+    case: CasePackage,
+    *,
+    target_id: str,
+    subject_id: str,
+) -> WorldEvent:
+    session = _empty_session(case, "session.source_asked_about")
+    return EventRecorder().append(
+        session,
+        actor_id="player",
+        event_type=EventType.PLAYER_ASKED_ABOUT,
+        payload=_asked_about_payload(target_id=target_id, subject_id=subject_id),
+    )
+
+
+def _asked_about_payload(*, target_id: str, subject_id: str) -> dict[str, object]:
+    return {
+        "target_id": target_id,
+        "subject_type": "clue",
+        "subject_id": subject_id,
+        "text": "ask about clue",
+        "interaction_pressure": 0.5,
+        "knowledge_id": f"player_knowledge.{subject_id}",
+    }
+
+
+def _empty_session(case: CasePackage, session_id: str) -> SessionState:
+    return SessionState(
+        id=session_id,
+        case_id=case.meta.id,
+        narrative=NarrativeState(phase=case.meta.initial_phase),
+        relationships={},
+    )
+
+
 def _memory_ids(memories: list[object]) -> set[str]:
     return {str(memory.memory_id) for memory in memories}
+
+
+def _memory_candidate_count(events: list[object], memory_id: str) -> int:
+    return sum(
+        1
+        for event in events
+        if event.type == EventType.MEMORY_CANDIDATE_CREATED
+        and event.payload.get("memory_id") == memory_id
+    )
+
+
+def _session_memory_candidate_count(
+    session: SessionState,
+    memory_id: str,
+    source_event_id: str,
+) -> int:
+    return sum(
+        1
+        for event in session.events
+        if event.type == EventType.MEMORY_CANDIDATE_CREATED
+        and event.payload.get("memory_id") == memory_id
+        and source_event_id in event.payload.get("source_event_ids", [])
+    )

@@ -27,20 +27,31 @@ class LLMAgentContractInput(BaseModel):
 
 `output_contract` 是给真实 LLM 的机器可读输出边界，不是状态。它包含允许的 top-level keys、`AgentIntent.intent` 枚举、fallback intent、允许的 proposed action 类型、允许的 disclosure modes、允许的 rhetoric tactics，以及“speech 触碰 WorldInfo 必须提交 disclosure claim”的规则。
 
-`agent_context` 包含：
+`agent_context` 在进入 `LLMAgentContractInput` 前会先做真实 LLM 安全投影。该投影包含：
 
 - 当前 `PlayerAction`
 - 目标 NPC 公开画像
 - 目标 NPC 专属 `CharacterInnerContext`
 - 目标 NPC 专属 `inner_portraits`
-- `memory_snapshots`
+- 本轮 `MemoryRetriever` 选中的 `memory_snapshots`
 - `relationship_to_player`
 - 玩家已知
-- 近期事件
+- 已过滤的近期事件
 - blocked/revealable forbidden fact ids
 - 行为压力和敏感度元数据
 
 它不得包含原始 `CasePackage`、原始 `SessionState`、其他 NPC 的 private 数据、其他 NPC 的 impressions、线索 `truth_status`、禁说事实原文、blocked terms 或 solution claims。
+
+### Memory 投影硬边界
+
+普通 `AgentLoop` 路径中，真实 LLM 可见的记忆内容只能来自同一次 `MemoryRetriever.retrieve(...)` 选中的 `memory_snapshots`。`build_agent_context(...)` 为兼容 mock 和直接调用仍可保留内部 `memory_candidates` 与 `recent_events`，但 `build_llm_agent_input(...)` 会在构造合同前执行安全投影：
+
+- `agent_context.memory_candidates` 清空，不把未选中 candidate 的 `content` 传给 LLM。
+- `memory_candidate.created` 和 `agent_memory_snapshot.updated` 近期事件只保留本轮已选中 `memory_id` 对应的脱敏元数据；未选中 memory event 直接从 LLM contract 移除。
+- 已选中 memory event 的 `payload.content`、`metadata`、source payload 等可承载事实内容的字段不会进入合同；事实内容以 `memory_snapshots[].content` 为唯一来源。
+- `compressed_history` 进入 LLM contract 时只保留投影后仍可见的 event id 和本轮已选中的 memory id，不携带压缩摘要中的记忆内容。
+
+因此真实适配器、schema repair 请求和 OpenAI-compatible chat fallback 都不能通过 `memory_candidates`、recent memory event payload 或 compressed history 绕过同一批 selected `memory_snapshots`。Replay 仍是权威；memory snapshot 只是从 `WorldEvent` 派生出的投影。
 
 ## 披露约束
 

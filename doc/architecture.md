@@ -34,6 +34,7 @@ OPENAI_API_KEY=...
 POST /sessions/{id}/actions
   -> PlayerAction
   -> SessionState
+  -> MemoryArchivalSystem.apply (agent-backed actions before context build)
   -> build AgentContext
   -> AgentGateway.generate(context)
   -> AgentIntent
@@ -77,6 +78,7 @@ POST /sessions/{id}/actions
 - `app/cases/memory_rules.py`：加载 app 默认与案件包 `memory_derivation_rules.yaml`。
 - `app/runtime/memory_derivations.py`：解析 `MemoryDerivationRule` 并渲染完整 memory candidate 字段。
 - `app/runtime/memory_snapshots.py`：把记忆候选归并成稳定 Agent 记忆快照。
+- `app/runtime/memory_archival.py`：把陈旧且未强化的 working memory 事件化降级为 archival。
 - `app/runtime/replay.py`：从 `WorldEvent` 重建 `SessionState`。
 - `app/storage/memory.py`：内存案件/会话存储与 `StateSummary` 构造。
 
@@ -110,11 +112,13 @@ Memory v1.1 将 seed 逻辑抽为 `MemoryDerivationRule`，并要求派生出的
 
 Memory v1.1 hardening 在 `MemoryCandidateState` 和 `AgentMemorySnapshot` 上增加 `memory_scope` 与 `memory_layer`。现有 typed memory 默认是 `npc_private` + `working`；线索发现记忆是 `case/core`；当 `player.presented_clue` 事件的 `presentation_mode=scene_shared` 且带合法 `scene_id` 和 `present_character_ids` 时，会额外生成 `scene_shared/working` 记忆；Director 拦截派生出的审计记忆是 `director_audit/working`。
 
-普通 NPC `AgentContext` 的 memory 投影只允许 `case/core`、`session/working`、当前目标 NPC 可见的 `npc_private` 和当前目标 NPC 可见的 `scene_shared`，并排除所有 `archival` 与 `director_audit`。`MemoryRetriever` 按 `memory_scope` -> `visible_to_character_ids` / `owner_character_id` -> `memory_layer` 的顺序过滤。Director 审计入口可以检索 `director_audit`，但这不等于把审计记忆注入 NPC。
+普通 NPC `AgentContext` 的常规 memory 投影只允许 `case/core`、`session/working`、当前目标 NPC 可见的 `npc_private` 和当前目标 NPC 可见的 `scene_shared`，并排除 `director_audit`。`MemoryRetriever` 按 `memory_scope` -> `visible_to_character_ids` / `owner_character_id` -> `memory_layer` 的顺序过滤。Director 审计入口可以检索 `director_audit`，但这不等于把审计记忆注入 NPC。
 
 Memory v1.2 在 `AgentLoop` 前置加入 `RetrievalPlanner`。Planner 通过 `SkillLoader` 加载 app-level 和 case-level `MemoryProjectionSkill`，通过 `SkillSelector` 按结构化 `PlayerAction` 选择 skill，再生成 `MemoryRetrievalPlan`。Plan 控制 memory type/scope/layer、禁止项、最大条数、`portrait_summary` 和 `recent_events`，但不能突破代码级硬边界。默认 skill 覆盖 `talk`、`ask_about_clue`、`accuse`；案件级同 id skill 可以覆盖默认 skill。
 
-Memory v1.3 在不改变事件链路的前提下强化检索排序。`MemoryRetriever` 在过滤后使用结构化动作锚点、case clue title 推导、中文/英文 token、recency、reinforcement、salience 和 confidence 排序；`build_agent_context(...)` 的 snapshot 投影复用同一排序。recency 和 reinforcement 都是检索时派生量，不写回 snapshot，不改变 replay 权威，也不启用 archival search。
+Memory v1.3 在不改变事件链路的前提下强化检索排序。`MemoryRetriever` 在过滤后使用结构化动作锚点、case clue title 推导、中文/英文 token、recency、reinforcement、salience 和 confidence 排序；`build_agent_context(...)` 的 snapshot 投影复用同一排序。recency 和 reinforcement 都是检索时派生量，不写回 snapshot，不改变 replay 权威。
+
+Memory P2 接入 archival 生命周期。`MemoryArchivalSystem` 会在 agent-backed action 构造 `AgentContext` 前，将超过 7 天未更新且未被多个 source event 强化的 `session/npc_private/scene_shared` working memory 写成 `agent_memory_snapshot.updated(operation=archived, memory_layer=archival)`。`MemoryRetriever` 只有在常规 `core/working` 检索没有相关命中时，才对 archival 做一次冷召回；冷召回不放宽 NPC 可见性、scope、type、forbidden fact 或 `max_memory_items`。
 
 AgentLoop 会先调用其注入的 `MemoryRetriever`，再把同一批 `memory_snapshots` 传入 `build_agent_context(...)`。因此普通 turn 的 AgentContext、`memory_ids_used`、trace `memory_projection` 和 `search_memory` tool summary 都来自同一批检索结果。`build_agent_context(...)` 保留内部 retriever 仅作为非 loop 调用路径的兼容 fallback。
 

@@ -1,11 +1,16 @@
 from __future__ import annotations
 
+import json
+from typing import Any
+
 import pytest
 
 from app.agents.context import build_agent_context
 from app.agents.gateway import AgentGateway
+from app.agents.llm_contract import build_llm_agent_input
 from app.agents.loop import AgentLoop
 from app.agents.memory import MemoryRetriever
+from app.agents.real_llm_agent import OpenAILLMAgent
 from app.agents.retrieval_planner import MemoryRetrievalPlan
 from app.domain.models import (
     ActionType,
@@ -17,11 +22,15 @@ from app.domain.models import (
     CasePackage,
     CharacterConfig,
     ClueConfig,
+    CompressedHistoryContext,
+    EventType,
     ForbiddenFactConfig,
+    MemoryCandidateState,
     NarrativeState,
     PlayerAction,
     SceneConfig,
     SessionState,
+    WorldEvent,
 )
 
 CASE_ID = "memory_retrieval_quality"
@@ -368,6 +377,96 @@ def test_agent_loop_uses_injected_retriever_as_single_context_and_trace_source(
     assert turn.trace.tool_calls[0]["result_count"] == 1
 
 
+def test_llm_contract_uses_selected_memory_snapshots_as_only_memory_content_source() -> None:
+    selected = _memory(
+        memory_id="memory.quality.llm.selected",
+        content="SELECTED_SAFE_MEMORY_CONTENT",
+        salience=0.2,
+    )
+    session = _session_with_unselected_memory_surface(selected)
+    context = build_agent_context(
+        _case(),
+        session,
+        PlayerAction(type=ActionType.TALK, target_id=JIANG, text="anything"),
+        retrieval_plan=_plan(max_memory_items=5, allow_recent_events=True),
+        memory_snapshots=[selected],
+    ).model_copy(
+        update={
+            "compressed_history": _compressed_history_for_test(selected.memory_id),
+        }
+    )
+
+    raw_context = context.model_dump_json()
+    assert "UNSELECTED_MEMORY_CANDIDATE_SECRET" in raw_context
+    assert "UNSELECTED_RECENT_MEMORY_EVENT_SECRET" in raw_context
+    assert "SELECTED_RECENT_MEMORY_EVENT_PAYLOAD" in raw_context
+
+    contract = build_llm_agent_input(context)
+    serialized_contract = contract.model_dump_json()
+
+    assert contract.agent_context.memory_candidates == []
+    assert "SELECTED_SAFE_MEMORY_CONTENT" in serialized_contract
+    assert selected.memory_id in serialized_contract
+    assert "UNSELECTED_MEMORY_CANDIDATE_SECRET" not in serialized_contract
+    assert "UNSELECTED_RECENT_MEMORY_EVENT_SECRET" not in serialized_contract
+    assert "SELECTED_RECENT_MEMORY_EVENT_PAYLOAD" not in serialized_contract
+    assert "memory.quality.llm.unselected" not in serialized_contract
+    assert contract.agent_context.compressed_history is not None
+    assert contract.agent_context.compressed_history.important_memory_ids == [
+        selected.memory_id
+    ]
+
+
+def test_openai_llm_request_payload_uses_sanitized_memory_projection() -> None:
+    selected = _memory(
+        memory_id="memory.quality.openai.selected",
+        content="SELECTED_OPENAI_MEMORY_CONTENT",
+        salience=0.2,
+    )
+    session = _session_with_unselected_memory_surface(selected)
+    context = build_agent_context(
+        _case(),
+        session,
+        PlayerAction(type=ActionType.TALK, target_id=JIANG, text="anything"),
+        retrieval_plan=_plan(max_memory_items=5, allow_recent_events=True),
+        memory_snapshots=[selected],
+    ).model_copy(
+        update={
+            "compressed_history": _compressed_history_for_test(selected.memory_id),
+        }
+    )
+    client = _RecordingOpenAIClient(
+        {
+            "output_text": json.dumps(
+                {
+                    "speech": "Within retrieval bounds.",
+                    "intent": "answer",
+                    "emotional_shift": {},
+                    "proposed_actions": [],
+                    "memory_refs": [selected.memory_id],
+                    "disclosure_claims": [],
+                }
+            )
+        }
+    )
+
+    intent = OpenAILLMAgent(
+        api_key="test-key",
+        model="test-model",
+        client=client,
+    ).generate(context)
+
+    assert intent.memory_refs == [selected.memory_id]
+    assert client.request_payload is not None
+    serialized_request = json.dumps(client.request_payload, ensure_ascii=False)
+    assert "SELECTED_OPENAI_MEMORY_CONTENT" in serialized_request
+    assert selected.memory_id in serialized_request
+    assert "UNSELECTED_MEMORY_CANDIDATE_SECRET" not in serialized_request
+    assert "UNSELECTED_RECENT_MEMORY_EVENT_SECRET" not in serialized_request
+    assert "SELECTED_RECENT_MEMORY_EVENT_PAYLOAD" not in serialized_request
+    assert "memory.quality.llm.unselected" not in serialized_request
+
+
 def test_director_audit_stays_out_of_regular_retrieve_but_director_can_see_it() -> None:
     audit = _memory(
         memory_id="memory.quality.director_audit.blocked_output",
@@ -400,7 +499,7 @@ def test_director_audit_stays_out_of_regular_retrieve_but_director_can_see_it() 
     assert audit.memory_id in _memory_ids(director_memories)
 
 
-def test_archival_memory_remains_unavailable_by_default() -> None:
+def test_archival_memory_is_cold_recalled_when_working_has_no_relevant_hit() -> None:
     archival = _memory(
         memory_id=f"memory.quality.archival.{EMPTY_CAPSULES}",
         content="空胶囊的旧归档总结。",
@@ -413,7 +512,7 @@ def test_archival_memory_remains_unavailable_by_default() -> None:
         PlayerAction(type=ActionType.TALK, target_id=JIANG, text="空胶囊"),
     )
 
-    assert archival.memory_id not in _memory_ids(memories)
+    assert _memory_ids(memories) == [archival.memory_id]
 
 
 def test_forbidden_fact_content_is_not_retrieved_even_when_chinese_query_matches() -> None:
@@ -497,6 +596,101 @@ def _session(snapshots: list[AgentMemorySnapshot]) -> SessionState:
     )
 
 
+def _session_with_unselected_memory_surface(
+    selected: AgentMemorySnapshot,
+) -> SessionState:
+    session = _session([selected])
+    unselected_memory_id = "memory.quality.llm.unselected"
+    session.memory_candidates[unselected_memory_id] = MemoryCandidateState(
+        memory_id=unselected_memory_id,
+        rule_id="memory_rule.test.llm_hardening.v1",
+        memory_type="episodic",
+        memory_scope="npc_private",
+        memory_layer="working",
+        subject_id="player",
+        owner_character_id=JIANG,
+        visible_to_character_ids=[JIANG],
+        content="UNSELECTED_MEMORY_CANDIDATE_SECRET",
+        source_event_id="event.unselected.candidate.source",
+        source_event_ids=["event.unselected.candidate.source"],
+        salience=0.99,
+    )
+    session.events.extend(
+        [
+            _memory_event(
+                event_id="event.unselected.memory_candidate",
+                event_type=EventType.MEMORY_CANDIDATE_CREATED,
+                memory_id=unselected_memory_id,
+                content="UNSELECTED_RECENT_MEMORY_EVENT_SECRET",
+            ),
+            _memory_event(
+                event_id="event.selected.memory_snapshot",
+                event_type=EventType.AGENT_MEMORY_SNAPSHOT_UPDATED,
+                memory_id=selected.memory_id,
+                content="SELECTED_RECENT_MEMORY_EVENT_PAYLOAD",
+            ),
+        ]
+    )
+    session.events.append(
+        WorldEvent(
+            id="event.regular.visible",
+            case_id=CASE_ID,
+            session_id=session.id,
+            actor_id="player",
+            type=EventType.PLAYER_TALKED,
+            payload={"target_id": JIANG, "text": "regular event remains visible"},
+            created_at="2026-06-10T09:00:00Z",
+        )
+    )
+    return session
+
+
+def _compressed_history_for_test(selected_memory_id: str) -> CompressedHistoryContext:
+    return CompressedHistoryContext(
+        summary="UNSELECTED_MEMORY_CANDIDATE_SECRET was compressed here.",
+        important_event_ids=[
+            "event.unselected.memory_candidate",
+            "event.selected.memory_snapshot",
+            "event.regular.visible",
+        ],
+        important_memory_ids=["memory.quality.llm.unselected", selected_memory_id],
+        open_threads=["UNSELECTED_RECENT_MEMORY_EVENT_SECRET"],
+        risk_notes=["SELECTED_RECENT_MEMORY_EVENT_PAYLOAD"],
+    )
+
+
+def _memory_event(
+    *,
+    event_id: str,
+    event_type: EventType,
+    memory_id: str,
+    content: str,
+) -> WorldEvent:
+    return WorldEvent(
+        id=event_id,
+        case_id=CASE_ID,
+        session_id="session.memory_retrieval_quality",
+        actor_id="memory_derivation",
+        type=event_type,
+        payload={
+            "memory_id": memory_id,
+            "rule_id": "memory_rule.test.llm_hardening.v1",
+            "memory_type": "episodic",
+            "memory_scope": "npc_private",
+            "memory_layer": "working",
+            "subject_id": "player",
+            "owner_character_id": JIANG,
+            "visible_to_character_ids": [JIANG],
+            "content": content,
+            "source_event_id": f"source.{event_id}",
+            "source_event_ids": [f"source.{event_id}"],
+            "salience": 0.9,
+            "confidence": 1.0,
+        },
+        created_at="2026-06-10T09:00:00Z",
+    )
+
+
 def _memory(
     *,
     memory_id: str,
@@ -535,7 +729,11 @@ def _memory(
     )
 
 
-def _plan(*, max_memory_items: int) -> MemoryRetrievalPlan:
+def _plan(
+    *,
+    max_memory_items: int,
+    allow_recent_events: bool = False,
+) -> MemoryRetrievalPlan:
     return MemoryRetrievalPlan(
         skill_id="test.memory_retrieval_quality",
         included_memory_types=("episodic", "belief", "relationship", "strategy"),
@@ -545,7 +743,7 @@ def _plan(*, max_memory_items: int) -> MemoryRetrievalPlan:
         forbidden_layers=("archival",),
         max_memory_items=max_memory_items,
         inject_portrait_summary=False,
-        allow_recent_events=False,
+        allow_recent_events=allow_recent_events,
     )
 
 
@@ -567,3 +765,26 @@ def _assert_selected_before_or_without_unrelated(
     assert expected_relevant in memory_ids
     if unrelated in memory_ids:
         assert memory_ids.index(expected_relevant) < memory_ids.index(unrelated)
+
+
+class _RecordingOpenAIResponse:
+    def __init__(self, payload: dict[str, Any]) -> None:
+        self._payload = payload
+
+    def raise_for_status(self) -> None:
+        return None
+
+    def json(self) -> dict[str, Any]:
+        return self._payload
+
+
+class _RecordingOpenAIClient:
+    def __init__(self, payload: dict[str, Any]) -> None:
+        self._response = _RecordingOpenAIResponse(payload)
+        self.request_payload: dict[str, Any] | None = None
+
+    def post(self, _url: str, **kwargs: Any) -> _RecordingOpenAIResponse:
+        request_payload = kwargs.get("json")
+        if isinstance(request_payload, dict):
+            self.request_payload = request_payload
+        return self._response

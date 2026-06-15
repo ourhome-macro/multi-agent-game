@@ -346,7 +346,25 @@ Memory v1.4 中，`MemoryEffect` 可以声明完整候选记忆字段：
 
 模板变量只来自受控 `WorldEvent.payload` 和安全 case lookup，例如 `{target_id}`、`{target_name}`、`{clue_id}`、`{clue_title}`、`{subject_type}`、`{subject_id}`、`{claim_id}`、`{interaction_pressure}`、`{knowledge_id}`、`{scene_id}`、`{source_event_id}`。模板渲染是纯确定性逻辑，不调用 LLM。
 
-规则来源顺序固定为：先加载 `app/runtime/memory_derivation_rules.yaml`，再加载案件包 `memory_derivation_rules.yaml`。`DerivedEventSystem` 优先应用配置规则；如果配置规则没有为当前事件产生目标 core memory，则保留旧 Python fallback。当前已配置化迁移 `player.presented_clue` 的 core episodic memory，以及 `mist_clock_manor` 中 `jiang_yanhui + empty_capsules` 的 belief / relationship / strategy memory。其他 core 派生在未迁移前继续走 fallback。
+规则来源顺序固定为：先加载 `app/runtime/memory_derivation_rules.yaml`，再加载案件包 `memory_derivation_rules.yaml`。`DerivedEventSystem` 优先应用配置规则；如果配置规则没有为当前事件产生目标 core memory，则保留旧 Python fallback。fallback 判定必须按目标 `memory_id` 执行，而不是只看是否存在同 trigger 规则；否则案件包规则和默认 core 规则的模板不一致时会重复派生语义相同的记忆。
+
+当前已配置化迁移的默认 core episodic memory：
+
+- `player.presented_clue` -> `memory.player.presented_clue.{target_id}.{clue_id}`
+- `player.asked_about` -> `memory.player.asked_about.{target_id}.{subject_type}.{subject_id}`
+
+当前仍保留 Python fallback 的 core memory：
+
+- `clue.discovered` -> `memory.player.clue_discovered.{clue_id}`
+- `relationship.threshold.crossed` -> `memory.player.relationship_threshold.{source_id}.player.{metric}.{state}`
+- `director.blocked` -> `memory.player.director_blocked.{target_id}.{blocked_fact_id}`
+- scene-shared `player.presented_clue` -> `memory.player.scene_shared.presented_clue.{scene_id}.{clue_id}`
+- `player.accused` -> `memory.player.accused.{target_id}.{claim_id}`
+- `accusation.evaluated` -> `memory.player.accusation_evaluated.{target_id}.{claim_id}.{result}`
+
+`player.accused` 暂不迁移到 YAML，因为旧 fallback 的 content 包含 `evidence_clue_ids` 的 Python list 字符串，而当前模板变量白名单和渲染上下文只覆盖标量事件字段。迁移前必须先补稳定的数组渲染契约，否则无法保证 `content` 与旧硬编码语义完全等价。
+
+案件包规则继续用于特定剧情认知，例如 `mist_clock_manor` 中 `jiang_yanhui + empty_capsules` 的 belief / relationship / strategy memory。
 
 当前 scope 语义：
 
@@ -360,7 +378,7 @@ Memory v1.4 中，`MemoryEffect` 可以声明完整候选记忆字段：
 
 - `core`：可长期作为案件级稳定锚点使用。
 - `working`：默认运行时工作记忆。
-- `archival`：事件和 replay 必须保留，但默认不注入 NPC `AgentContext`，当前也不做真正 archival search。
+- `archival`：事件和 replay 必须保留，普通检索不会直接参与 working 排序；只有当常规 `core/working` 检索没有相关命中时，才进入冷召回。
 
 `metadata` 仍以 dict 形式存储以保持事件 JSON 简洁，但键名受模型校验约束。当前允许的稳定键只有：
 
@@ -394,6 +412,16 @@ player.presented_clue target=jiang_yanhui clue=empty_capsules presentation_mode=
 
 `MemorySnapshotSystem` 只消费 `memory_candidate.created`，更新 `session.memory_snapshots`，并写入 `agent_memory_snapshot.updated`。Agent、LLM 和 `AgentIntent.proposed_actions` 都不能写记忆快照。
 
+Memory P2 增加 `MemoryArchivalSystem`。它不消费 LLM 输出，只在运行时已有事件时间线上检查 `AgentMemorySnapshot`：
+
+- 只归档 `session`、`npc_private`、`scene_shared` 中的 `working` memory。
+- `case/core`、`director_audit`、已经是 `archival` 的 memory 不会被降级。
+- 默认只有超过 7 天未更新，且 `source_event_ids` 未达到 2 个独立来源的 memory 会被降级。
+- 降级必须写入 `agent_memory_snapshot.updated`，`operation=archived`，并把 `memory_layer` 改为 `archival`。
+- Replay 直接应用该 snapshot update 事件，不重新计算归档策略。
+
+Agent-backed action 会在构造 `AgentContext` 前执行归档检查，因此本轮检索看到的是已降级后的 snapshot。这个过程仍然是事件化状态变化，不是检索器静默改状态。
+
 NPC 记忆隔离规则：
 
 - `owner_character_id` 表示这条记忆属于哪个 NPC 的可检索经历。
@@ -401,7 +429,7 @@ NPC 记忆隔离规则：
 - 玩家与某个 NPC 的互动记忆默认只对该 NPC 可见。
 - 线索发现记忆默认作为 `case/core` 玩家已知探索状态，对案件内 NPC 可见，但仍只暴露 clue/world info 的安全摘要。
 - Director 审计视角可以通过专门检索入口查看所有非 archival 的 player-scoped 记忆摘要，包括 `director_audit`；这不等于把记忆注入某个 NPC 上下文。
-- 普通 NPC `AgentContext` 禁止注入 `director_audit`、其他 NPC 的 `npc_private`、其他 NPC 的 portrait 和 `archival` memory。
+- 普通 NPC `AgentContext` 禁止注入 `director_audit`、其他 NPC 的 `npc_private`、其他 NPC 的 portrait。`archival` memory 只能通过冷召回进入上下文，且必须继续满足当前 NPC 的 scope、owner / visible_to、memory type、forbidden fact 过滤。
 
 示例：
 
@@ -419,7 +447,7 @@ player.asked_about target=shen_zhaoye subject=empty_capsules
 
 `MemoryRetriever.retrieve(...)` 必须按 `action.target_id` 过滤可见性。`MemoryRetriever.retrieve_for_director(...)` 是 Director 审计入口，可以看到所有 player-scoped 记忆摘要，但不能绕过 Director/Rule Engine 造成状态变化。
 
-`MemoryRetriever` 的过滤顺序固定为：先过滤 `memory_scope`，再过滤 `visible_to_character_ids` / `owner_character_id`，最后过滤 `memory_layer`。`build_agent_context(...)` 只允许注入：
+`MemoryRetriever` 的过滤顺序固定为：先过滤 `memory_scope`，再过滤 `visible_to_character_ids` / `owner_character_id`，最后过滤 `memory_layer`。常规检索只允许注入：
 
 - `case/core`
 - `session/working`
@@ -427,9 +455,11 @@ player.asked_about target=shen_zhaoye subject=empty_capsules
 - 当前 NPC 可见的 `scene_shared`
 - 当前 NPC 自己的 `portrait_summary`
 
+如果常规检索没有任何结构化或文本相关命中，`MemoryRetriever` 会执行一次 archival cold recall。冷召回只放宽 `memory_layer=archival`，不放宽 `memory_scope`、NPC 可见性、memory type、forbidden fact 或 `max_memory_items`。若 archival 也没有相关命中，则不会因为 salience 高而召回无关 archival memory。
+
 Memory v1.2 的 `MemoryProjectionSkill` 和 `MemoryRetrievalPlan` 不是世界状态，不写入 `WorldEvent`，也不参与 replay 权威。它们只是在构造 `AgentContext` 时解释“当前动作、阶段和 completed beats 下应该投影哪些安全记忆”。Plan 可以收窄 memory type/scope/layer、限制条数、关闭画像摘要或 recent events；但不能让 `director_audit`、`archival`、其他 NPC private、其他 NPC portrait 或 forbidden fact 文本进入普通 NPC 上下文。
 
-Memory v1.3 的检索质量分数同样不是世界状态。`MemoryRetriever` 可以在过滤后使用结构化锚点、中文/英文 token、`updated_at` recency、`source_event_ids` reinforcement、salience 和 confidence 做排序，但这些分项不得写入 `memory_candidate.created`、`agent_memory_snapshot.updated`、snapshot `metadata` 或 replay 结果。recency 的“当前时间”来自事件流或已有 snapshot 时间，禁止使用 wall-clock `now()` 影响可复现性。
+Memory v1.3 的检索质量分数同样不是世界状态。`MemoryRetriever` 可以在过滤后使用结构化锚点、中文/英文 token、`updated_at` recency、`source_event_ids` reinforcement、salience 和 confidence 做排序，但这些分项不得写入 `memory_candidate.created`、`agent_memory_snapshot.updated`、snapshot `metadata` 或 replay 结果。recency 的“当前时间”来自事件流或已有 snapshot 时间，禁止使用 wall-clock `now()` 影响可复现性。P2 的归档判断同样使用事件流和 snapshot 时间；只有归档事件本身的 `created_at` 由 `EventRecorder` 生成并进入事件日志。
 
 AgentLoop 中的 `memory_snapshots`、`memory_ids_used`、trace `memory_projection` 和 tool `search_memory` 摘要必须来自同一次注入 retriever 的结果。`build_agent_context(...)` 只有在调用方未传入已检索 snapshot 时才执行内部 fallback 检索；该 fallback 是兼容路径，不是普通 turn 的事实源。
 
