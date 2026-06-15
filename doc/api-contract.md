@@ -150,6 +150,15 @@ Rule Engine 会校验：
 
 之后进入 `AgentGateway -> NarrativeDirector -> RuleEngine` 链路。
 
+### LLM fallback 观测字段
+
+当启用真实 LLM backend 时，`ActionResponse` 会额外返回：
+
+- `llm_fallback_used`：本轮是否使用真实 LLM 安全降级。
+- `llm_error`：脱敏错误摘要，包含 `backend`、`error_type`、`error_message_sanitized`、`fallback_used` 和 `schema_validation_errors`。
+
+这些字段不表示 action 被规则层拒绝。它们只说明 Agent 生成阶段发生了可观测错误，后端已使用无 `proposed_actions` 的安全回复继续走 Director / Rule Engine 边界。
+
 ### accuse
 
 ```json
@@ -255,10 +264,14 @@ Rule Engine 会校验：
 
 Memory v1.4 后，payload 结构不变，但 `rule_id` 可能来自 app 默认 `MemoryDerivationRule`、案件包 `memory_derivation_rules.yaml`，或未迁移规则的 Python fallback。外部消费者只能依赖 payload 字段本身，不应假设某个 `rule_id` 必然来自代码或 YAML。
 
-`agent_memory_snapshot.updated` 是运行时派生的稳定记忆快照更新。payload 包含上述结构化记忆字段，并额外包含 `operation`。
+`agent_memory_snapshot.updated` 是运行时派生的稳定记忆快照更新。payload 包含上述结构化记忆字段，并额外包含 `operation` / `last_operation`。
 
-- `operation=created` / `updated`：actor 是 `memory_snapshot_system`，来源是 `memory_candidate.created` 聚合。
-- `operation=archived`：actor 是 `memory_archival_system`，表示 P2 归档策略把已有 working snapshot 降级为 `memory_layer=archival`。payload 还会包含 `archived_from_layer` 和 `archival_policy` 审计字段。
+- `operation=create`：创建新记忆。
+- `operation=reinforce`：已有记忆被同类来源强化，不重写 canonical content。
+- `operation=revise` / `supersede`：已有记忆被明确修订或替代。
+- `operation=archive`：actor 是 `memory_archival_system`，表示 P2 归档策略把已有 working snapshot 降级为 `memory_layer=archival`。payload 还会包含 `archived_from_layer` 和 `archival_policy` 审计字段。
+
+旧事件中的 `created` / `updated` / `archived` 会在模型层兼容解析，但新事件必须写 canonical v2 operation。
 
 兼容旧事件时，缺失的 `memory_scope` 默认按 `npc_private` 处理，缺失的 `memory_layer` 默认按 `working` 处理。新事件必须显式写入这两个字段。普通 NPC 上下文不会注入 `director_audit` memory；`archival` memory 只能在常规 `core/working` 检索没有相关命中时通过冷召回进入 selected `memory_snapshots`。Director 审计入口可以检索 `director_audit` memory，但仍不产生状态写入权限。
 
@@ -270,6 +283,12 @@ Memory v1.4 后，payload 结构不变，但 `rule_id` 可能来自 app 默认 `
 - `belief_polarity`
 - `emotion_delta`
 - `clue_id`
+- `world_info_id`
+- `claim_id`
+- `scene_id`
+- `topic_tags`
+- `privacy_reason`
+- `decay_policy`
 
 `character_impression.updated` 记录运行时派生的 NPC -> player 私有画像，不由 Agent 或 LLM 直接生成。当前画像兼容 `NPCPortraitState`，包含 `owner_character_id`、`subject_id`、`trust`、`suspicion`、`fear`、`traits`、`current_strategy` 和 `source_memory_ids`，同时保留解释性 `CharacterImpression` 字段。
 
@@ -329,6 +348,13 @@ Memory v1.4 后，payload 结构不变，但 `rule_id` 可能来自 app 默认 `
 - `items`
 
 `items` 只允许包含 `memory_id`、`memory_type`、`memory_scope`、`memory_layer`、`owner_character_id` 和 `visible_to_character_ids`。禁止写入 memory `content`、forbidden fact 文本、private 原文或玩家原始文本。`selected_count` 必须等于 `items.length`，用于审计 skill-driven retrieval 是否按计划收窄投影。
+
+真实 LLM fallback 会写入 trace：
+
+- `llm_fallback_used`
+- `llm_error_type`
+- `llm_error_message_sanitized`
+- `schema_validation_errors`
 
 ## 错误
 

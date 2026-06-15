@@ -388,8 +388,39 @@ Memory v1.4 中，`MemoryEffect` 可以声明完整候选记忆字段：
 - `belief_polarity`
 - `emotion_delta`
 - `clue_id`
+- `world_info_id`
+- `claim_id`
+- `scene_id`
+- `topic_tags`
+- `privacy_reason`
+- `decay_policy`
 
 禁止新增 `strategy`、`current_strategy`、`npc_strategy`、`deltas` 等漂移键。
+
+Memory v2 在模型层显式引入 `MemoryOperation`：
+
+- `create`：创建新的候选/快照。
+- `reinforce`：同一记忆被新事件强化，只合并来源、metadata 和 salience/confidence，不重写 canonical content。
+- `revise`：更新 canonical content，用于纠正或收紧已有记忆表述。
+- `supersede`：用新表述替代旧记忆，来源链仍保留在 `source_memory_ids` / `source_event_ids`。
+- `archive`：把工作记忆降为 `archival`，不删除事件日志。
+
+兼容规则：历史事件里的 `created`、`updated`、`reinforced`、`revised`、`superseded`、`archived`、`seeded` 会在模型校验时归一到 v2 operation。`MemoryArchivalSystem` 现有事件仍可写 `operation=archived`；模型会把它解释为 `archive`，避免历史 replay 和当前归档事件断裂。
+
+`AgentMemorySnapshot` 记录 `last_operation`，用于审计最后一次快照变化的语义。`MemoryCandidateState` 记录 `operation`，由 `MemorySnapshotSystem` 解释并写入 `agent_memory_snapshot.updated.operation`。当前迁移只改变内存模型和事件 reducer，不改变 Postgres schema。
+
+metadata v2 不允许无约束 dict 漂移：
+
+- ID 型字段必须是非空字符串：`world_info_id`、`claim_id`、`scene_id`、`clue_id`、`belief_subject`、`strategy_id`、`privacy_reason`。
+- `topic_tags` 必须是字符串列表，并去重保序。
+- `decay_policy` 只能是 `standard`、`sticky`、`ephemeral`、`never_archive`，或只包含 `name`、`archive_after_days`、`reinforced_event_count` 的对象。
+
+迁移路径：
+
+1. 旧规则不配置 `operation` 时按 `create` 处理；同一 `memory_id` 已存在时，`MemorySnapshotSystem` 会自动把重复 create 降为 `reinforce`。
+2. 新规则需要纠错或替代时再显式配置 `revise` / `supersede`。
+3. 归档事件继续兼容 `archived`，后续存储层迁移完成后可统一写 `archive`。
+4. 新案件应优先补 `world_info_id`、`claim_id`、`scene_id` 和 `topic_tags`，让检索、审计和后续索引不用解析自然语言 content。
 
 当前 seed 规则示例：
 
@@ -417,7 +448,7 @@ Memory P2 增加 `MemoryArchivalSystem`。它不消费 LLM 输出，只在运行
 - 只归档 `session`、`npc_private`、`scene_shared` 中的 `working` memory。
 - `case/core`、`director_audit`、已经是 `archival` 的 memory 不会被降级。
 - 默认只有超过 7 天未更新，且 `source_event_ids` 未达到 2 个独立来源的 memory 会被降级。
-- 降级必须写入 `agent_memory_snapshot.updated`，`operation=archived`，并把 `memory_layer` 改为 `archival`。
+- 降级必须写入 `agent_memory_snapshot.updated`，`operation=archive`，并把 `memory_layer` 改为 `archival`。
 - Replay 直接应用该 snapshot update 事件，不重新计算归档策略。
 
 Agent-backed action 会在构造 `AgentContext` 前执行归档检查，因此本轮检索看到的是已降级后的 snapshot。这个过程仍然是事件化状态变化，不是检索器静默改状态。
@@ -462,6 +493,8 @@ Memory v1.2 的 `MemoryProjectionSkill` 和 `MemoryRetrievalPlan` 不是世界�
 Memory v1.3 的检索质量分数同样不是世界状态。`MemoryRetriever` 可以在过滤后使用结构化锚点、中文/英文 token、`updated_at` recency、`source_event_ids` reinforcement、salience 和 confidence 做排序，但这些分项不得写入 `memory_candidate.created`、`agent_memory_snapshot.updated`、snapshot `metadata` 或 replay 结果。recency 的“当前时间”来自事件流或已有 snapshot 时间，禁止使用 wall-clock `now()` 影响可复现性。P2 的归档判断同样使用事件流和 snapshot 时间；只有归档事件本身的 `created_at` 由 `EventRecorder` 生成并进入事件日志。
 
 AgentLoop 中的 `memory_snapshots`、`memory_ids_used`、trace `memory_projection` 和 tool `search_memory` 摘要必须来自同一次注入 retriever 的结果。`build_agent_context(...)` 只有在调用方未传入已检索 snapshot 时才执行内部 fallback 检索；该 fallback 是兼容路径，不是普通 turn 的事实源。
+
+Memory Retrieval Matrix 是评测层，不是世界状态。矩阵只声明某个 `case_id + phase + PlayerAction + target_id` 下 expected / forbidden 的 `memory_id` 集合，并读取 `MemoryRetriever` 或 `AgentContext.memory_snapshots` 的结果做断言。它不得写入 `SessionState`、`WorldEvent`、`AgentMemorySnapshot.metadata` 或 replay 结果。换检索算法、embedding、reranker 或 projection skill 时，应使用同一矩阵确认召回集合没有漂移；如果业务需要锁定排序，必须另加排序评测，不能把排序假设隐式塞进 expected 集合。
 
 运行时生成的 memory id 是语义化且稳定的，足以被案件配置的 mock dialogue 条件引用，例如：
 

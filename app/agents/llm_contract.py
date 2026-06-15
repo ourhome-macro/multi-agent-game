@@ -17,6 +17,18 @@ from app.domain.models import (
 )
 
 
+class LLMAgentPolicyViolationError(ValueError):
+    pass
+
+
+class LLMAgentPrivateLeakError(ValueError):
+    pass
+
+
+class LLMAgentSchemaError(ValueError):
+    pass
+
+
 def build_llm_agent_input(context: AgentContext) -> LLMAgentContractInput:
     safe_context = _project_context_for_llm(context)
     return LLMAgentContractInput(
@@ -29,10 +41,19 @@ def validate_llm_agent_output(
     payload: dict[str, Any],
     contract_input: LLMAgentContractInput | None = None,
 ) -> AgentIntent:
+    if contract_input is not None:
+        allowed_keys = set(contract_input.output_contract.allowed_top_level_keys)
+        extra_keys = sorted(set(payload) - allowed_keys)
+        if extra_keys:
+            raise LLMAgentSchemaError(
+                "LLM Agent output contained unsupported top-level keys"
+            )
     intent = AgentIntent.model_validate(payload)
     for action in intent.proposed_actions:
         if action.type == ProposedActionType.NARRATIVE_PHASE_CHANGE:
-            raise ValueError("LLM Agent output must not propose narrative phase changes")
+            raise LLMAgentPolicyViolationError(
+                "LLM Agent output must not propose narrative phase changes"
+            )
     if contract_input is not None:
         _reject_raw_private_echo(intent, contract_input)
         _validate_disclosure_claims(intent, contract_input)
@@ -209,7 +230,9 @@ def _reject_raw_private_echo(
         if item.disclosure_policy.direct_quote_allowed:
             continue
         if item.summary and item.summary in serialized_output:
-            raise ValueError("LLM Agent output must not quote raw private data")
+            raise LLMAgentPrivateLeakError(
+                "LLM Agent output must not quote raw private data"
+            )
     for portrait in inner_context.inner_portraits:
         for value in [
             portrait.personality_impression,
@@ -217,7 +240,9 @@ def _reject_raw_private_echo(
             portrait.trust_boundary,
         ]:
             if value and value in serialized_output:
-                raise ValueError("LLM Agent output must not quote raw private data")
+                raise LLMAgentPrivateLeakError(
+                    "LLM Agent output must not quote raw private data"
+                )
 
 
 def _validate_disclosure_claims(
@@ -232,12 +257,22 @@ def _validate_disclosure_claims(
     for claim in intent.disclosure_claims:
         constraint = world_info_constraints.get(claim.world_info_id)
         if constraint is None:
-            raise ValueError("LLM Agent output disclosed unconstrained world_info")
+            raise LLMAgentPolicyViolationError(
+                "LLM Agent output disclosed unconstrained world_info"
+            )
         if claim.mode == DisclosureMode.FULL:
-            raise ValueError("LLM Agent output must not request full reveal")
+            raise LLMAgentPolicyViolationError(
+                "LLM Agent output must not request full reveal"
+            )
         if claim.mode not in set(constraint.allowed_modes):
-            raise ValueError("LLM Agent output disclosure mode is not allowed")
+            raise LLMAgentPolicyViolationError(
+                "LLM Agent output disclosure mode is not allowed"
+            )
         if claim.mode in set(constraint.forbidden_modes):
-            raise ValueError("LLM Agent output disclosure mode is forbidden")
+            raise LLMAgentPolicyViolationError(
+                "LLM Agent output disclosure mode is forbidden"
+            )
         if set(claim.claim_refs) & set(constraint.must_not_claim):
-            raise ValueError("LLM Agent output violates must_not_claim")
+            raise LLMAgentPolicyViolationError(
+                "LLM Agent output violates must_not_claim"
+            )

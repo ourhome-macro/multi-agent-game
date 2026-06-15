@@ -37,7 +37,8 @@
 
 1. 禁说词检查：如果台词在 `reveal_phase` 之前包含某个禁说事实的 `blocked_terms`，Director 会拒绝该回复。
 2. 事实披露检查：如果 `AgentIntent.disclosure_claims` 声明了某个 `WorldInfo` 的披露行为，Director 会对照目标 NPC 当前的 `FactDisclosureStrategy` 校验。
-3. 最终台词审计：Director 会独立检测 `speech` 是否命中 `WorldInfo.title`、`WorldInfo.aliases`、`WorldInfo.claim_patterns` 或禁说词映射的事实锚点。
+3. 结构化事实网关检查：Director 会读取 `WorldInfo.claim_graph`，校验 safe fragment、forbidden inference 和 unlock condition。
+4. 最终台词审计：Director 会独立检测 `speech` 是否命中 `WorldInfo.title`、`WorldInfo.aliases`、`WorldInfo.claim_patterns`、safe fragment alias/pattern、forbidden inference alias/pattern 或禁说词映射的事实锚点。
 
 事实披露检查会拒绝：
 
@@ -109,6 +110,18 @@ LLM Shadow Eval v0 会调用同一个 `NarrativeDirector.validate(case, narrativ
 这意味着 Director 在影子评测中仍是唯一审计门，但不是状态写入者。任何 block 只进入 `doc/case/<case_id>/llm_shadow_report.json` 和 `.md`，不能影响当前 `SessionState`、玩家已知、NPC 认知或剧情阶段。
 
 影子报告不得包含 forbidden fact 原文、blocked terms、private 原文或 solution claim 公开文本。候选 `speech` 不公开写入报告，只记录长度和脱敏标记；玩家 action 自由文本也只记录长度和脱敏标记。
+
+## 结构化事实网关
+
+`WorldInfo.claim_graph` 是 Director 的规则层事实网关，不是 prompt 文案。它把一个事实锚点拆成：
+
+- `safe_fragments`：允许被 hint/partial 的安全事实片段。
+- `unlock_conditions`：片段可说之前需要满足的 phase、beat、player knowledge、clue 或 world info 条件。
+- `forbidden_inferences`：即使没有命中旧 `forbidden_facts.blocked_terms`，也必须阻止的组合推断。
+
+`NarrativeDirector.fact_gateway_summary(...)` 可生成前置摘要，列出当前可披露片段、被锁片段和禁推断。当前摘要尚未注入 `AgentContext`，但后置校验已经生效。
+
+结构化网关和旧 forbidden terms 并存：旧案件不配置 `claim_graph` 时仍按原逻辑运行；新案件应逐步把核心案件真相拆成 safe fragments 和 forbidden inferences，避免仅靠字符串禁词守门。
 
 ## 当前限制
 

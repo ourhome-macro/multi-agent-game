@@ -160,6 +160,8 @@ Memory v1.3 hardening 改进的是检索质量，不改变记忆权威链路。`
 
 `build_agent_context(...)` 的 `memory_snapshots` 投影必须复用 `MemoryRetriever` 的质量排序并在排序后应用 `max_memory_items`，不能重新按 `memory_id` 截断。AgentLoop 路径中，注入到 loop 的 `MemoryRetriever` 是唯一事实源：loop 先检索出 `memory_snapshots`，再传给 `build_agent_context(...)`、trace `memory_projection` 和 tool `search_memory` 摘要。只有直接调用 `build_agent_context(...)` 且未传入 `memory_snapshots` 时，函数才会使用内部 fallback retriever。
 
+Memory Retrieval Matrix 是 Agent 记忆投影的回归评测入口。它可以直接验证 `MemoryRetriever.retrieve(...)`，也可以验证已构造的 `AgentContext.memory_snapshots`。前者用于锁定底层召回和隔离边界；后者用于锁定当前 projection skill 在特定 phase 下实际给普通 NPC 的记忆集合。新增或替换 BM25、embedding、reranker、排序权重、projection skill 时，必须确认同一矩阵里的 `expected_memory_ids` 与 `forbidden_memory_ids` 不漂移，尤其是 `npc_private`、`scene_shared`、`director_audit` 和 `archival` 的边界。
+
 Memory v1.3 P0 hardening 进一步收紧真实 LLM 输入边界：运行时内部 `AgentContext` 可以为了兼容 mock、调试和直接调用保留 `memory_candidates` 与 `recent_events`，但 `build_llm_agent_input(...)` 会构造安全投影后再进入真实 LLM 合同。该投影清空 `memory_candidates`，移除未被本轮 retriever 选中的 memory events，并对已选中 memory events 的 payload 脱敏。真实 LLM 可读取的记忆事实内容只能来自同一批 selected `memory_snapshots[].content`；recent event、compressed history、tool summary 和 trace 都不能成为第二条记忆内容通道。
 
 Memory P2 后，归档不再只是“可 replay 但永不注入”。`MemoryArchivalSystem` 在 agent-backed action 构造上下文前，把陈旧且未强化的 working memory 通过 `agent_memory_snapshot.updated(operation=archived)` 降级为 `archival`。`MemoryRetriever` 先执行常规 `core/working` 检索；只有没有任何结构化或文本相关命中时，才对当前 NPC 可见的 archival memory 做冷召回。被冷召回的 archival memory 仍然是 selected `memory_snapshots` 的一部分，因此 P0 的 LLM 安全投影继续适用。
@@ -319,13 +321,39 @@ Agent 也不能写 `FactDisclosureStrategy`。策略是上下文投影，不是�
 
 `OpenAILLMAgent` 是最小真实后端适配器。它构造 `LLMAgentContractInput`，请求符合 `AgentIntent` 的严格 JSON，运行 `validate_llm_agent_output`，返回校验后的 intent。任何失败都会返回无 `proposed_actions` 的安全拒答。失败包括缺少 API key、HTTP 错误、JSON 错误、schema 错误、private 原文回显、直接提议剧情阶段变化。
 
+真实 LLM fallback 不是静默兜底。`OpenAILLMAgent.generate(...)` 会在安全拒答的 `AgentIntent.llm_error` 中记录机器可读错误摘要：
+
+- `network_error`
+- `timeout`
+- `invalid_json`
+- `schema_error`
+- `policy_violation`
+- `private_leak_detected`
+- `configuration_error`
+- `unknown_error`
+
+`RuntimeTracer` 会把 `llm_fallback_used`、`llm_error_type`、`llm_error_message_sanitized` 和 `schema_validation_errors` 写入 trace；`ActionResponse` 同步返回 `llm_fallback_used` 和脱敏 `llm_error`。这些字段只用于观测和排障，不授予 Agent 任何状态写入权限。
+
 `LLMAgentContractInput.disclosure_constraints` 会同时包含 private self-knowledge 约束和 `world_info` 级事实披露策略约束。`world_info` 约束会带 `allowed_modes`、`forbidden_modes`、`rhetoric_tactics`、`must_not_claim` 和 `safe_fact_refs`，用于告诉 LLM：你可以怎么说，但不能说到哪里。`LLMAgentContractInput.output_contract` 额外提供机器可读枚举边界：合法 intent、合法 proposed action、合法 disclosure mode 和“speech 触碰 WorldInfo 必须自报 claim”的规则。
 
 真实 LLM 输出必须包含 `disclosure_claims`。合同校验器会先拒绝越权 claim；Narrative Director 会再次根据最终文本、`WorldInfo` 文本审计字段和 `FactDisclosureStrategy` 执法。这样 strategy 不再只是提示，而是后置安全门。真实适配器的动态 schema 会把 `disclosure_claims.world_info_id` 收窄到当前可声明的 `world_info` 约束，并禁止 `full` 作为真实 LLM 输出模式。
 
 真实适配器不改变状态权威模型。它的输出仍经过 Narrative Director，所有 `proposed_actions` 仍经过 Rule Engine。除非显式环境变量启用，否则它不参与完整场景快照。
 
-完整 LLM 输入/输出合同见 `doc/llm-agent-contract.md`。
+## 记忆检索 v2
+
+Memory v2 将检索拆成可审计管线：
+
+- hard filter：先执行 scope、owner/visible、layer、plan、forbidden content 过滤。
+- keyword/BM25：只在通过硬边界的候选中做关键词相关性排序。
+- embedding scorer：预留可插拔接口，当前默认不调用外部服务。
+- reranker：预留二阶段排序接口，当前默认保持 deterministic 顺序。
+
+普通 NPC 不会因为 `salience` 高就召回无关记忆。若 working/core 没有结构化、关键词或 embedding 相关命中，结果为空；只有 archival cold recall 可以在 working/core 无命中时尝试，但仍必须满足当前 NPC 可见性、scope、type、forbidden fact 和 plan 约束。
+
+记忆矩阵评测见 `doc/evaluations/memory-retrieval-matrix-2026-06-15.md`。新增检索策略、embedding 或 reranker 之前，必须用矩阵确认“应召回 / 不应召回”的 memory_id 没有漂移。
+
+完整 LLM 输入/输出合同见 `doc/agents/llm-agent-contract.md`。
 
 ## 案件级 Agent 扩写
 

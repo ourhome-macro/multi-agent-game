@@ -4,6 +4,11 @@ import re
 from dataclasses import dataclass
 from enum import StrEnum
 
+from app.director.fact_gateway import (
+    FactGateway,
+    FactGatewaySummary,
+    FactGatewayViolation,
+)
 from app.domain.models import (
     ActionType,
     AgentContext,
@@ -12,6 +17,7 @@ from app.domain.models import (
     DirectorDecision,
     DisclosureClaim,
     DisclosureMode,
+    FactDisclosureStrategy,
     NarrativeState,
     PlayerAction,
     SessionState,
@@ -43,6 +49,14 @@ class DetectedWorldInfoMention:
 
 
 class NarrativeDirector:
+    def fact_gateway_summary(
+        self,
+        case: CasePackage,
+        narrative: NarrativeState,
+        context: AgentContext | None = None,
+    ) -> FactGatewaySummary:
+        return FactGateway(case=case, narrative=narrative, context=context).summarize()
+
     def precheck_player_action(
         self,
         case: CasePackage,
@@ -109,6 +123,14 @@ class NarrativeDirector:
             disclosure_decision = self._validate_disclosure_claims(context, intent)
             if not disclosure_decision.allowed:
                 return disclosure_decision
+        fact_gateway = FactGateway(case=case, narrative=narrative, context=context)
+        claim_violation = fact_gateway.validate_disclosure_claims(intent)
+        if claim_violation is not None:
+            return _blocked_fact_gateway_violation(claim_violation)
+        speech_violation = fact_gateway.validate_speech(intent)
+        if speech_violation is not None:
+            return _blocked_fact_gateway_violation(speech_violation)
+        if context is not None:
             touched_decision = self._validate_touched_world_info(case, context, intent)
             if not touched_decision.allowed:
                 return touched_decision
@@ -241,7 +263,7 @@ def detect_world_info_mentions(
     return _dedupe_mentions(mentions)
 
 
-def _world_info_constraints_by_id(context: AgentContext) -> dict[str, object]:
+def _world_info_constraints_by_id(context: AgentContext) -> dict[str, FactDisclosureStrategy]:
     if context.inner_context is None:
         return {}
     return {
@@ -285,6 +307,26 @@ def _blocked_mention(
         matched_by=mention.matched_by,
         matched_text=mention.matched_text,
         pattern_id=mention.pattern_id,
+        safe_fallback_used=True,
+    )
+
+
+def _blocked_fact_gateway_violation(
+    violation: FactGatewayViolation,
+) -> DirectorDecision:
+    return DirectorDecision(
+        allowed=False,
+        reason=violation.reason,
+        blocked_fact_id=violation.forbidden_inference_id
+        or violation.fragment_id
+        or violation.world_info_id,
+        safe_speech=SAFE_SPEECH,
+        world_info_id=violation.world_info_id,
+        claimed_mode=violation.claimed_mode,
+        detected_directness=MentionDirectness.DIRECT_CLAIM,
+        matched_by=violation.matched_by,
+        matched_text=violation.matched_text,
+        pattern_id=violation.pattern_id,
         safe_fallback_used=True,
     )
 

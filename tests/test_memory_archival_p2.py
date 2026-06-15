@@ -91,7 +91,7 @@ def test_archival_system_archives_only_stale_unreinforced_working_memories() -> 
         archive_target.memory_id
     ]
     assert events[0].type == EventType.AGENT_MEMORY_SNAPSHOT_UPDATED
-    assert events[0].payload["operation"] == "archived"
+    assert events[0].payload["operation"] == "archive"
     assert events[0].payload["memory_layer"] == "archival"
     assert session.memory_snapshots[archive_target.memory_id].memory_layer == "archival"
     assert session.memory_snapshots[recent.memory_id].memory_layer == "working"
@@ -233,7 +233,7 @@ def test_runtime_archives_before_agent_retrieval_and_allows_cold_recall() -> Non
         event
         for event in response.new_events
         if event.type == EventType.AGENT_MEMORY_SNAPSHOT_UPDATED
-        and event.payload.get("operation") == "archived"
+        and event.payload.get("operation") == "archive"
     ]
     assert [event.payload["memory_id"] for event in archival_events] == [
         stale.memory_id

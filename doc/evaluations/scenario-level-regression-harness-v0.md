@@ -121,3 +121,23 @@ PlayerAction sequence
 - 数据库或向量检索。
 
 本轮只把已有运行链路变成剧情级回归评测，让后续新增 Agent 能力前先有稳定的组合验收网。
+## Memory Retrieval Matrix
+
+Scenario-Level Harness 验证完整玩家路径、状态副作用、Director 拦截和 replay 一致性；Memory Retrieval Matrix 验证单个阶段、单个玩家问法下的记忆召回集合。两者边界不同，不能互相替代。
+
+新增的 `app/evaluations/memory_retrieval_matrix.py` 用 `MemoryRetrievalMatrixEntry` 锁定：
+
+- `case_id`
+- `phase`
+- `action`
+- `target_id`
+- `subject`
+- `clue`
+- `claim`
+- `expected_memory_ids`
+- `forbidden_memory_ids`
+- `notes`
+
+它可直接验证 `MemoryRetriever.retrieve(...)`，也可验证 `AgentContext.memory_snapshots`。前者用于检索算法回归，后者用于 projection skill 和阶段投影回归。换 BM25、embedding、reranker、检索排序或 memory projection skill 前后，必须跑同一组矩阵，确认 expected / forbidden 集合不漂移。
+
+当前 `mist_clock_manor` 的基线矩阵覆盖 `opening + jiang_yanhui + empty_capsules`：江雁回应召回自己的 belief / relationship / strategy typed memory；沈照夜的 private memory 和 `director_audit` 不得进入普通 NPC 召回。详细格式和扩展规则见 `doc/evaluations/memory-retrieval-matrix-2026-06-15.md`。

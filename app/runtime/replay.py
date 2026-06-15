@@ -7,6 +7,7 @@ from app.domain.models import (
     CharacterImpression,
     EventType,
     MemoryCandidateState,
+    MemoryOperation,
     NarrativeState,
     PlayerKnowledgeAcquisition,
     PlayerKnowledgeSourceType,
@@ -14,6 +15,7 @@ from app.domain.models import (
     RelationshipState,
     SessionState,
     WorldEvent,
+    normalize_memory_operation,
 )
 from app.rules.engine import relationship_key, relationship_threshold_key
 from app.runtime.character_fact_awareness import build_initial_character_fact_awareness
@@ -144,6 +146,14 @@ def _apply_event(session: SessionState, event: WorldEvent) -> None:
         fallback_content = candidate.content if candidate is not None else ""
         content = str(event.payload.get("content") or fallback_content)
         created_at = current.created_at if current is not None else event.created_at
+        operation = normalize_memory_operation(
+            event.payload.get("operation") or event.payload.get("last_operation")
+        )
+        if current is not None and operation not in {
+            MemoryOperation.REVISE,
+            MemoryOperation.SUPERSEDE,
+        }:
+            content = current.content
         snapshot = AgentMemorySnapshot(
             memory_id=memory_id,
             rule_id=_optional_str(event.payload.get("rule_id")),
@@ -165,12 +175,13 @@ def _apply_event(session: SessionState, event: WorldEvent) -> None:
                     candidate.memory_layer if candidate is not None else "working",
                 )
             ),
+            last_operation=operation,
             subject_id=_optional_str(event.payload.get("subject_id")),
             owner_character_id=_optional_str(event.payload.get("owner_character_id")),
             visible_to_character_ids=[
                 str(item) for item in event.payload.get("visible_to_character_ids", [])
             ],
-            content=current.content if current is not None else content,
+            content=content,
             source_event_ids=[str(item) for item in event.payload["source_event_ids"]],
             source_memory_ids=[
                 str(item) for item in event.payload.get("source_memory_ids", [])

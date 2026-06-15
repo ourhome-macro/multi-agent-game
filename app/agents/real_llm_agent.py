@@ -8,7 +8,13 @@ from urllib.parse import urljoin
 import httpx
 from pydantic import ValidationError
 
-from app.agents.llm_contract import build_llm_agent_input, validate_llm_agent_output
+from app.agents.llm_contract import (
+    LLMAgentPolicyViolationError,
+    LLMAgentPrivateLeakError,
+    LLMAgentSchemaError,
+    build_llm_agent_input,
+    validate_llm_agent_output,
+)
 from app.agents.prompt_builder import load_agent_system_prompt
 from app.domain.models import (
     AgentContext,
@@ -18,11 +24,15 @@ from app.domain.models import (
     LLMAgentContractInput,
     LLMAgentOutputContract,
     LLMDisclosureConstraint,
+    LLMErrorSummary,
+    LLMErrorType,
+    LLMSchemaValidationError,
 )
 
 OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses"
 DEFAULT_OPENAI_BASE_URL = "https://api.openai.com/v1"
 DEFAULT_OPENAI_MODEL = "gpt-4.1-mini"
+OPENAI_BACKEND_NAME = "openai"
 LLM_API_STYLE_ENV = "LLM_API_STYLE"
 LLM_ALLOW_JSON_OBJECT_FALLBACK_ENV = "LLM_ALLOW_JSON_OBJECT_FALLBACK"
 LLM_API_STYLE_RESPONSES = "responses"
@@ -65,12 +75,25 @@ class OpenAILLMAgent:
 
     def generate(self, context: AgentContext) -> AgentIntent:
         if not self._api_key:
-            return self._safe_fallback(context)
+            return self._safe_fallback(
+                context,
+                error_summary=LLMErrorSummary(
+                    backend=OPENAI_BACKEND_NAME,
+                    error_type=LLMErrorType.CONFIGURATION_ERROR,
+                    error_message_sanitized=(
+                        "OPENAI_API_KEY is required for real LLM generation"
+                    ),
+                    fallback_used=True,
+                ),
+            )
 
         try:
             return self.generate_strict(context)
-        except Exception:
-            return self._safe_fallback(context)
+        except Exception as exc:
+            return self._safe_fallback(
+                context,
+                error_summary=_llm_error_summary(exc, backend=OPENAI_BACKEND_NAME),
+            )
 
     def generate_strict(self, context: AgentContext) -> AgentIntent:
         if not self._api_key:
@@ -78,6 +101,7 @@ class OpenAILLMAgent:
         contract_input = build_llm_agent_input(context)
         response_payload = self._create_response(contract_input)
         for attempt in range(self._schema_repair_attempts + 1):
+            output_payload: dict[str, Any] = {}
             try:
                 output_payload = self._extract_json_payload(response_payload)
                 return validate_llm_agent_output(output_payload, contract_input)
@@ -89,7 +113,17 @@ class OpenAILLMAgent:
                     invalid_text=_extract_text_output(response_payload),
                     error_summary=_json_error_summary(exc),
                 )
-            except (ValidationError, ValueError) as exc:
+            except ValidationError as exc:
+                if attempt >= self._schema_repair_attempts:
+                    raise
+                response_payload = self._create_schema_repair_response(
+                    contract_input=contract_input,
+                    invalid_output=output_payload,
+                    error_summary=_schema_error_summary(exc),
+                )
+            except LLMAgentPrivateLeakError:
+                raise
+            except ValueError as exc:
                 if attempt >= self._schema_repair_attempts:
                     raise
                 response_payload = self._create_schema_repair_response(
@@ -399,14 +433,105 @@ class OpenAILLMAgent:
             and exc.response.status_code in {400, 404, 405, 422}
         )
 
-    def _safe_fallback(self, context: AgentContext) -> AgentIntent:
+    def _safe_fallback(
+        self,
+        context: AgentContext,
+        *,
+        error_summary: LLMErrorSummary,
+    ) -> AgentIntent:
         return AgentIntent(
             speech=f"{context.target_agent_id} cannot answer through the LLM backend.",
             intent=AgentIntentType.REFUSE,
             emotional_shift={},
             proposed_actions=[],
             memory_refs=[],
+            disclosure_claims=[],
+            llm_error=error_summary,
         )
+
+
+def _llm_error_summary(exc: Exception, *, backend: str) -> LLMErrorSummary:
+    error_type = _classify_llm_error(exc)
+    return LLMErrorSummary(
+        backend=backend,
+        error_type=error_type,
+        error_message_sanitized=_sanitized_llm_error_message(exc, error_type),
+        fallback_used=True,
+        schema_validation_errors=_schema_validation_error_details(exc),
+    )
+
+
+def _classify_llm_error(exc: Exception) -> LLMErrorType:
+    if isinstance(exc, httpx.TimeoutException):
+        return LLMErrorType.TIMEOUT
+    if isinstance(exc, httpx.HTTPStatusError | httpx.TransportError):
+        return LLMErrorType.NETWORK_ERROR
+    if isinstance(exc, json.JSONDecodeError):
+        return LLMErrorType.INVALID_JSON
+    if isinstance(exc, LLMAgentPrivateLeakError):
+        return LLMErrorType.PRIVATE_LEAK_DETECTED
+    if isinstance(exc, LLMAgentPolicyViolationError):
+        return LLMErrorType.POLICY_VIOLATION
+    if isinstance(exc, ValidationError | LLMAgentSchemaError):
+        return LLMErrorType.SCHEMA_ERROR
+    if isinstance(exc, ValueError):
+        return LLMErrorType.INVALID_JSON
+    if isinstance(exc, RuntimeError) and "OPENAI_API_KEY" in str(exc):
+        return LLMErrorType.CONFIGURATION_ERROR
+    return LLMErrorType.UNKNOWN_ERROR
+
+
+def _sanitized_llm_error_message(exc: Exception, error_type: LLMErrorType) -> str:
+    if isinstance(exc, httpx.TimeoutException):
+        return "LLM provider request timed out"
+    if isinstance(exc, httpx.HTTPStatusError):
+        return f"LLM provider returned HTTP {exc.response.status_code}"
+    if isinstance(exc, httpx.TransportError):
+        return f"LLM provider transport error: {type(exc).__name__}"
+    if isinstance(exc, json.JSONDecodeError):
+        return f"LLM output was not valid JSON: {_json_error_summary(exc)}"
+    if isinstance(exc, ValidationError):
+        return _schema_error_summary(exc)
+    if isinstance(
+        exc,
+        LLMAgentSchemaError | LLMAgentPolicyViolationError | LLMAgentPrivateLeakError,
+    ):
+        return _trim_sanitized_message(str(exc))
+    if error_type == LLMErrorType.INVALID_JSON:
+        return "LLM response did not contain a valid AgentIntent JSON object"
+    if error_type == LLMErrorType.CONFIGURATION_ERROR:
+        return "OPENAI_API_KEY is required for real LLM generation"
+    return f"Unhandled LLM error: {type(exc).__name__}"
+
+
+def _schema_validation_error_details(exc: Exception) -> list[LLMSchemaValidationError]:
+    if isinstance(exc, ValidationError):
+        return [
+            LLMSchemaValidationError(
+                loc=[str(part) for part in error.get("loc", [])],
+                error_type=str(error.get("type", "unknown")),
+                message_sanitized=_trim_sanitized_message(str(error.get("msg", ""))),
+            )
+            for error in exc.errors()[:8]
+        ]
+    if isinstance(exc, LLMAgentSchemaError):
+        return [
+            LLMSchemaValidationError(
+                loc=[],
+                error_type="schema_error",
+                message_sanitized=_trim_sanitized_message(str(exc)),
+            )
+        ]
+    return []
+
+
+def _trim_sanitized_message(message: str, *, limit: int = 180) -> str:
+    normalized = " ".join(message.split())
+    if not normalized:
+        return "LLM error"
+    if len(normalized) <= limit:
+        return normalized
+    return normalized[:limit] + "...[truncated]"
 
 
 def _parse_json_object_text(text: str, source: str) -> dict[str, Any]:

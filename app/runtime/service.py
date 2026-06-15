@@ -206,6 +206,8 @@ class ActionService:
                 accepted=True,
                 new_events=new_events,
                 state=build_state_summary(case, session),
+                llm_fallback_used=_llm_fallback_used(turn.intent),
+                llm_error=turn.intent.llm_error,
             )
 
         raise ValueError(f"Unsupported action type: {action.type}")
@@ -319,6 +321,8 @@ class ActionService:
             speech=speech,
             director_blocked=director_blocked,
             director_reason=director_reason,
+            llm_fallback_used=_llm_fallback_used(intent),
+            llm_error=intent.llm_error,
             new_events=new_events,
             state=build_state_summary(case, session),
         )
@@ -446,3 +450,8 @@ def _reason_category(reason: str | None) -> str | None:
     if not normalized:
         return None
     return normalized[:80]
+
+
+def _llm_fallback_used(intent: object) -> bool:
+    llm_error = getattr(intent, "llm_error", None)
+    return bool(llm_error is not None and getattr(llm_error, "fallback_used", False))

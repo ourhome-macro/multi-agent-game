@@ -2,7 +2,7 @@
 
 ## 定位
 
-这份文档不是代码协议，也不是 YAML 字段手册。字段级规则仍看 `doc/case-package-protocol.md`。
+这份文档不是代码协议，也不是 YAML 字段手册。字段级规则仍看 `doc/case-authoring/case-package-protocol.md`。
 
 这里定义的是案件创作顺序、事实拆分方法、剧情闭环标准和验收口径。目标是让第一个真实案件能稳定落进当前后端运行时，而不是边写案件边发明新系统。
 

@@ -140,7 +140,11 @@ class RuntimeTracer:
             "phase_before": draft.phase_before,
             "phase_after": phase_after,
             "status": status,
-            "error_category": error_category,
+            "error_category": error_category or _llm_error_type(intent),
+            "llm_fallback_used": _llm_fallback_used(intent),
+            "llm_error_type": _llm_error_type(intent),
+            "llm_error_message_sanitized": _llm_error_message(intent),
+            "schema_validation_errors": _llm_schema_validation_errors(intent),
             "player_text_hash": _hash_text(draft.action.text),
             "player_text_length": len(draft.action.text or ""),
             "claim_hash": _hash_text(draft.action.text)
@@ -238,6 +242,8 @@ def _render_log_record(record: dict[str, object]) -> str:
         f"action={record['action_type']} target={record['target_agent_id']} "
         f"backend={record['agent_backend']} model={record.get('model')} "
         f"status={record['status']} error={record.get('error_category')} "
+        f"llm_fallback={str(record.get('llm_fallback_used')).lower()} "
+        f"llm_error={record.get('llm_error_type')} "
         f"duration={record['duration_ms']}ms context={record['context_budget_ratio']} "
         f"tokens={record['context_tokens_estimated']} "
         f"compression={str(record['compression_used']).lower()} memories={memories} "
@@ -253,3 +259,32 @@ def _render_log_record(record: dict[str, object]) -> str:
 
 def _single_line_text(value: str) -> str:
     return value.replace("\r", "\\r").replace("\n", "\\n")
+
+
+def _llm_fallback_used(intent: AgentIntent | None) -> bool:
+    return bool(
+        intent is not None
+        and intent.llm_error is not None
+        and intent.llm_error.fallback_used
+    )
+
+
+def _llm_error_type(intent: AgentIntent | None) -> str | None:
+    if intent is None or intent.llm_error is None:
+        return None
+    return intent.llm_error.error_type.value
+
+
+def _llm_error_message(intent: AgentIntent | None) -> str | None:
+    if intent is None or intent.llm_error is None:
+        return None
+    return intent.llm_error.error_message_sanitized
+
+
+def _llm_schema_validation_errors(intent: AgentIntent | None) -> list[dict[str, object]]:
+    if intent is None or intent.llm_error is None:
+        return []
+    return [
+        error.model_dump(mode="json")
+        for error in intent.llm_error.schema_validation_errors
+    ]

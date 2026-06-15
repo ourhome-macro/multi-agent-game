@@ -2,7 +2,13 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 
-from app.domain.models import AgentMemorySnapshot, EventType, SessionState, WorldEvent
+from app.domain.models import (
+    AgentMemorySnapshot,
+    EventType,
+    MemoryOperation,
+    SessionState,
+    WorldEvent,
+)
 from app.runtime.events import EventRecorder
 
 DEFAULT_ARCHIVE_AFTER_DAYS = 7
@@ -69,7 +75,7 @@ class MemoryArchivalSystem:
     ) -> WorldEvent:
         payload = _snapshot_payload(snapshot)
         payload["memory_layer"] = "archival"
-        payload["operation"] = "archived"
+        payload["operation"] = "archive"
         payload["archived_from_layer"] = snapshot.memory_layer
         payload["archival_policy"] = {
             "archive_after_days": self._archive_after.days,
@@ -85,6 +91,7 @@ class MemoryArchivalSystem:
         session.memory_snapshots[snapshot.memory_id] = snapshot.model_copy(
             update={
                 "memory_layer": "archival",
+                "last_operation": MemoryOperation.ARCHIVE,
                 "last_updated_event_id": event.id,
                 "updated_at": event.created_at,
             }

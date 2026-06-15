@@ -1,9 +1,17 @@
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
 from datetime import UTC, datetime
 
+from app.agents.memory_retrieval import (
+    EmbeddingScorer,
+    LocalBM25KeywordScorer,
+    MemoryHardFilter,
+    MemoryReranker,
+    MemoryRetrievalPipeline,
+    MemorySearchQuery,
+    MemorySearchResult,
+)
 from app.agents.retrieval_planner import MemoryRetrievalPlan
 from app.domain.models import (
     AgentMemorySnapshot,
@@ -26,41 +34,17 @@ TEXT_SCORE_CAP = 1.5
 STRUCTURED_SCORE_CAP = 5.0
 
 
-@dataclass(frozen=True)
-class RetrievalQuery:
-    anchors: frozenset[str]
-    text_tokens: frozenset[str]
-
-
-@dataclass(frozen=True)
-class RetrievalScore:
-    total: float
-    structured: float
-    text: float
-    recency: float
-    reinforcement: float
-    salience: float
-    confidence: float
-    updated_at: str
-    memory_id: str
-    has_relevance: bool
-
-    @property
-    def sort_key(self) -> tuple[float, float, float, float, float, str, str]:
-        return (
-            self.total,
-            self.structured,
-            self.salience,
-            self.reinforcement,
-            self.confidence,
-            self.updated_at,
-            self.memory_id,
-        )
-
-
 class MemoryRetriever:
-    def __init__(self, *, max_results: int = 8) -> None:
+    def __init__(
+        self,
+        *,
+        max_results: int = 8,
+        embedding_scorer: EmbeddingScorer | None = None,
+        reranker: MemoryReranker | None = None,
+    ) -> None:
         self._max_results = max_results
+        self._embedding_scorer = embedding_scorer
+        self._reranker = reranker
 
     def retrieve(
         self,
@@ -105,118 +89,160 @@ class MemoryRetriever:
         max_results = plan.max_memory_items if plan is not None else self._max_results
         if max_results <= 0:
             return []
-        forbidden_terms = _forbidden_terms(case) if enforce_target_visibility else ()
-        candidates = [
-            snapshot
-            for snapshot in session.memory_snapshots.values()
-            if snapshot.subject_id == "player"
-            and _scope_allowed(snapshot, enforce_target_visibility=enforce_target_visibility)
-            and (
-                not enforce_target_visibility
-                or _visible_to_target(snapshot, action.target_id)
-            )
-            and _layer_allowed(snapshot)
-            and memory_allowed_by_plan(snapshot, plan)
-            and not memory_content_matches_forbidden(snapshot, forbidden_terms)
-        ]
-        query = _build_query(case, action)
-        now = _retrieval_now(session, candidates)
-        scored = [
-            (self._score(snapshot, query, now), snapshot)
-            for snapshot in candidates
-        ]
-        scored = [
-            (score, snapshot)
-            for score, snapshot in scored
-            if score.has_relevance
-        ]
-        if not scored and enforce_target_visibility:
-            archival_scored = self._score_archival_cold_recall(
-                case=case,
-                session=session,
-                action=action,
-                plan=plan,
-                forbidden_terms=forbidden_terms,
-                query=query,
-            )
-            if archival_scored:
-                archival_scored.sort(
-                    key=lambda item: item[0].sort_key,
-                    reverse=True,
-                )
-                return [snapshot for _, snapshot in archival_scored[:max_results]]
-        if not scored:
-            scored = [
-                (_fallback_score(snapshot), snapshot)
-                for snapshot in candidates
-                if snapshot.salience > 0
-            ]
-        scored.sort(
-            key=lambda item: item[0].sort_key,
-            reverse=True,
-        )
-        return [snapshot for _, snapshot in scored[:max_results]]
 
-    def _score_archival_cold_recall(
+        query = _build_query(case, action)
+        forbidden_terms = _forbidden_terms(case) if enforce_target_visibility else ()
+        snapshots = list(session.memory_snapshots.values())
+        working_filters = _working_hard_filters(
+            enforce_target_visibility=enforce_target_visibility,
+            target_id=action.target_id,
+            plan=plan,
+            forbidden_terms=forbidden_terms,
+        )
+        working_candidates = _filter_snapshots(snapshots, working_filters)
+        scored = self._search_candidates(
+            snapshots=snapshots,
+            query=query,
+            now=_retrieval_now(session, working_candidates),
+            hard_filters=working_filters,
+        )
+        if scored or not enforce_target_visibility:
+            return [result.snapshot for result in scored[:max_results]]
+
+        archival_filters = _archival_hard_filters(
+            target_id=action.target_id,
+            plan=plan,
+            forbidden_terms=forbidden_terms,
+        )
+        archival_candidates = _filter_snapshots(snapshots, archival_filters)
+        archival_scored = self._search_candidates(
+            snapshots=snapshots,
+            query=query,
+            now=_retrieval_now(session, archival_candidates),
+            hard_filters=archival_filters,
+        )
+        return [result.snapshot for result in archival_scored[:max_results]]
+
+    def _search_candidates(
         self,
         *,
-        case: CasePackage,
-        session: SessionState,
-        action: PlayerAction,
-        plan: MemoryRetrievalPlan | None,
-        forbidden_terms: tuple[str, ...],
-        query: RetrievalQuery,
-    ) -> list[tuple[RetrievalScore, AgentMemorySnapshot]]:
-        candidates = [
-            snapshot
-            for snapshot in session.memory_snapshots.values()
-            if snapshot.subject_id == "player"
-            and _scope_allowed(snapshot, enforce_target_visibility=True)
-            and _visible_to_target(snapshot, action.target_id)
-            and _archival_layer_allowed(snapshot)
-            and memory_allowed_by_plan(snapshot, plan, allow_archival_layer=True)
-            and not memory_content_matches_forbidden(snapshot, forbidden_terms)
-        ]
-        now = _retrieval_now(session, candidates)
-        return [
-            (score, snapshot)
-            for snapshot in candidates
-            for score in [self._score(snapshot, query, now)]
-            if score.has_relevance
-        ]
-
-    def _score(
-        self,
-        snapshot: AgentMemorySnapshot,
-        query: RetrievalQuery,
+        snapshots: list[AgentMemorySnapshot],
+        query: MemorySearchQuery,
         now: datetime | None,
-    ) -> RetrievalScore:
-        structured = _structured_score(snapshot, query)
-        text = _text_score(snapshot, query)
-        has_relevance = structured > 0 or text > 0
-        recency = _recency_score(snapshot, now) if has_relevance else 0.0
-        reinforcement = _reinforcement_score(snapshot) if has_relevance else 0.0
-        confidence = snapshot.confidence * 0.15 if has_relevance else 0.0
-        total = (
-            snapshot.salience
-            + structured
-            + text
-            + recency
-            + reinforcement
-            + confidence
+        hard_filters: tuple[MemoryHardFilter, ...],
+    ) -> list[MemorySearchResult]:
+        pipeline = MemoryRetrievalPipeline(
+            structured_scorer=_structured_score,
+            keyword_scorer_factory=lambda candidates: LocalBM25KeywordScorer(
+                candidates,
+                tokenizer=_tokens,
+                haystack_builder=_snapshot_haystack,
+                cap=TEXT_SCORE_CAP,
+                b=0.0,
+            ),
+            recency_scorer=lambda snapshot: _recency_score(snapshot, now),
+            reinforcement_scorer=_reinforcement_score,
+            embedding_scorer=self._embedding_scorer,
+            reranker=self._reranker,
         )
-        return RetrievalScore(
-            total=total if has_relevance else 0.0,
-            structured=structured,
-            text=text,
-            recency=recency,
-            reinforcement=reinforcement,
-            salience=snapshot.salience,
-            confidence=snapshot.confidence,
-            updated_at=snapshot.updated_at or snapshot.created_at or "",
-            memory_id=snapshot.memory_id,
-            has_relevance=has_relevance,
+        return pipeline.search(
+            query=query,
+            snapshots=snapshots,
+            hard_filters=hard_filters,
         )
+
+
+def _working_hard_filters(
+    *,
+    enforce_target_visibility: bool,
+    target_id: str,
+    plan: MemoryRetrievalPlan | None,
+    forbidden_terms: tuple[str, ...],
+) -> tuple[MemoryHardFilter, ...]:
+    return (
+        MemoryHardFilter(
+            "subject_is_player",
+            lambda snapshot: snapshot.subject_id == "player",
+        ),
+        MemoryHardFilter(
+            "scope_allowed",
+            lambda snapshot: _scope_allowed(
+                snapshot,
+                enforce_target_visibility=enforce_target_visibility,
+            ),
+        ),
+        MemoryHardFilter(
+            "visible_to_target",
+            lambda snapshot: (
+                not enforce_target_visibility
+                or _visible_to_target(snapshot, target_id)
+            ),
+        ),
+        MemoryHardFilter("layer_allowed", _layer_allowed),
+        MemoryHardFilter(
+            "plan_allowed",
+            lambda snapshot: memory_allowed_by_plan(snapshot, plan),
+        ),
+        MemoryHardFilter(
+            "forbidden_content_absent",
+            lambda snapshot: not memory_content_matches_forbidden(
+                snapshot,
+                forbidden_terms,
+            ),
+        ),
+    )
+
+
+def _archival_hard_filters(
+    *,
+    target_id: str,
+    plan: MemoryRetrievalPlan | None,
+    forbidden_terms: tuple[str, ...],
+) -> tuple[MemoryHardFilter, ...]:
+    return (
+        MemoryHardFilter(
+            "subject_is_player",
+            lambda snapshot: snapshot.subject_id == "player",
+        ),
+        MemoryHardFilter(
+            "scope_allowed",
+            lambda snapshot: _scope_allowed(
+                snapshot,
+                enforce_target_visibility=True,
+            ),
+        ),
+        MemoryHardFilter(
+            "visible_to_target",
+            lambda snapshot: _visible_to_target(snapshot, target_id),
+        ),
+        MemoryHardFilter("archival_layer", _archival_layer_allowed),
+        MemoryHardFilter(
+            "plan_allowed",
+            lambda snapshot: memory_allowed_by_plan(
+                snapshot,
+                plan,
+                allow_archival_layer=True,
+            ),
+        ),
+        MemoryHardFilter(
+            "forbidden_content_absent",
+            lambda snapshot: not memory_content_matches_forbidden(
+                snapshot,
+                forbidden_terms,
+            ),
+        ),
+    )
+
+
+def _filter_snapshots(
+    snapshots: list[AgentMemorySnapshot],
+    hard_filters: tuple[MemoryHardFilter, ...],
+) -> list[AgentMemorySnapshot]:
+    return [
+        snapshot
+        for snapshot in snapshots
+        if all(hard_filter.predicate(snapshot) for hard_filter in hard_filters)
+    ]
 
 
 def _tokens(text: str) -> set[str]:
@@ -322,7 +348,7 @@ def _archival_layer_allowed(snapshot: AgentMemorySnapshot) -> bool:
     return snapshot.memory_layer == "archival"
 
 
-def _build_query(case: CasePackage, action: PlayerAction) -> RetrievalQuery:
+def _build_query(case: CasePackage, action: PlayerAction) -> MemorySearchQuery:
     raw_anchors = [
         action.clue_id,
         action.claim_id,
@@ -343,7 +369,7 @@ def _build_query(case: CasePackage, action: PlayerAction) -> RetrievalQuery:
         ):
             raw_anchors.append(clue.id)
             raw_anchors.extend(clue.reveals_world_info)
-    return RetrievalQuery(
+    return MemorySearchQuery(
         anchors=frozenset(
             anchor
             for anchor in (_normalize_text(str(item)) for item in raw_anchors)
@@ -353,7 +379,7 @@ def _build_query(case: CasePackage, action: PlayerAction) -> RetrievalQuery:
     )
 
 
-def _structured_score(snapshot: AgentMemorySnapshot, query: RetrievalQuery) -> float:
+def _structured_score(snapshot: AgentMemorySnapshot, query: MemorySearchQuery) -> float:
     if not query.anchors:
         return 0.0
     score = 0.0
@@ -375,17 +401,6 @@ def _structured_score(snapshot: AgentMemorySnapshot, query: RetrievalQuery) -> f
     return min(score, STRUCTURED_SCORE_CAP)
 
 
-def _text_score(snapshot: AgentMemorySnapshot, query: RetrievalQuery) -> float:
-    if not query.text_tokens:
-        return 0.0
-    haystack = _snapshot_haystack(snapshot)
-    score = 0.0
-    for token in query.text_tokens:
-        if token in haystack:
-            score += 0.45
-    return min(score, TEXT_SCORE_CAP)
-
-
 def _snapshot_haystack(snapshot: AgentMemorySnapshot) -> str:
     values = [
         snapshot.memory_id,
@@ -399,17 +414,34 @@ def _snapshot_haystack(snapshot: AgentMemorySnapshot) -> str:
 def _metadata_string_values(metadata: dict[str, object]) -> set[str]:
     values: set[str] = set()
     for value in metadata.values():
-        normalized = _normalize_text(_stringify_metadata_value(value))
-        if normalized:
-            values.add(normalized)
+        for item in _metadata_value_strings(value):
+            normalized = _normalize_text(item)
+            if normalized:
+                values.add(normalized)
     return values
+
+
+def _metadata_value_strings(value: object) -> list[str]:
+    if isinstance(value, dict):
+        values: list[str] = []
+        for item in value.values():
+            values.extend(_metadata_value_strings(item))
+        values.append(_stringify_metadata_value(value))
+        return values
+    if isinstance(value, list):
+        values = []
+        for item in value:
+            values.extend(_metadata_value_strings(item))
+        values.append(_stringify_metadata_value(value))
+        return values
+    if value is None:
+        return []
+    return [str(value)]
 
 
 def _stringify_metadata_value(value: object) -> str:
     if isinstance(value, dict):
-        return " ".join(
-            _stringify_metadata_value(item) for item in value.values()
-        )
+        return " ".join(_stringify_metadata_value(item) for item in value.values())
     if isinstance(value, list):
         return " ".join(_stringify_metadata_value(item) for item in value)
     if value is None:
@@ -484,21 +516,6 @@ def _parse_datetime(value: str | None) -> datetime | None:
     if parsed.tzinfo is None:
         return parsed.replace(tzinfo=UTC)
     return parsed.astimezone(UTC)
-
-
-def _fallback_score(snapshot: AgentMemorySnapshot) -> RetrievalScore:
-    return RetrievalScore(
-        total=snapshot.salience,
-        structured=0.0,
-        text=0.0,
-        recency=0.0,
-        reinforcement=0.0,
-        salience=snapshot.salience,
-        confidence=snapshot.confidence,
-        updated_at=snapshot.updated_at or snapshot.created_at or "",
-        memory_id=snapshot.memory_id,
-        has_relevance=False,
-    )
 
 
 def _normalize_text(value: str) -> str:

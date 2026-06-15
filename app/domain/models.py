@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from enum import StrEnum
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any, Literal, cast
 from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -39,6 +39,17 @@ class AgentIntentType(StrEnum):
     PANIC = "panic"
 
 
+class LLMErrorType(StrEnum):
+    NETWORK_ERROR = "network_error"
+    TIMEOUT = "timeout"
+    INVALID_JSON = "invalid_json"
+    SCHEMA_ERROR = "schema_error"
+    POLICY_VIOLATION = "policy_violation"
+    PRIVATE_LEAK_DETECTED = "private_leak_detected"
+    CONFIGURATION_ERROR = "configuration_error"
+    UNKNOWN_ERROR = "unknown_error"
+
+
 class DefensiveStyle(StrEnum):
     EVASIVE = "evasive"
     HOSTILE = "hostile"
@@ -68,6 +79,22 @@ class DisclosureMode(StrEnum):
     HINT = "hint"
     PARTIAL = "partial"
     FULL = "full"
+
+
+def default_agent_disclosure_modes() -> list[DisclosureMode]:
+    return [mode for mode in DisclosureMode if mode != DisclosureMode.FULL]
+
+
+def default_safe_fragment_disclosure_modes() -> list[DisclosureMode]:
+    return [DisclosureMode.HINT, DisclosureMode.PARTIAL]
+
+
+def default_forbidden_inference_blocked_modes() -> list[DisclosureMode]:
+    return [
+        DisclosureMode.HINT,
+        DisclosureMode.PARTIAL,
+        DisclosureMode.FULL,
+    ]
 
 
 class RhetoricTactic(StrEnum):
@@ -154,6 +181,41 @@ MemoryScope = Literal[
 ]
 MemoryLayer = Literal["core", "working", "archival"]
 BeliefPolarity = Literal["believes", "suspects", "knows", "doubts"]
+
+
+class MemoryOperation(StrEnum):
+    CREATE = "create"
+    REINFORCE = "reinforce"
+    REVISE = "revise"
+    SUPERSEDE = "supersede"
+    ARCHIVE = "archive"
+
+
+LEGACY_MEMORY_OPERATION_ALIASES = {
+    "created": MemoryOperation.CREATE,
+    "updated": MemoryOperation.REINFORCE,
+    "reinforced": MemoryOperation.REINFORCE,
+    "revised": MemoryOperation.REVISE,
+    "superseded": MemoryOperation.SUPERSEDE,
+    "archived": MemoryOperation.ARCHIVE,
+    "seeded": MemoryOperation.CREATE,
+}
+
+ALLOWED_MEMORY_DECAY_POLICY_NAMES = frozenset(
+    {
+        "standard",
+        "sticky",
+        "ephemeral",
+        "never_archive",
+    }
+)
+ALLOWED_MEMORY_DECAY_POLICY_KEYS = frozenset(
+    {
+        "name",
+        "archive_after_days",
+        "reinforced_event_count",
+    }
+)
 ALLOWED_MEMORY_METADATA_KEYS = frozenset(
     {
         "relationship_delta",
@@ -162,6 +224,12 @@ ALLOWED_MEMORY_METADATA_KEYS = frozenset(
         "belief_polarity",
         "emotion_delta",
         "clue_id",
+        "world_info_id",
+        "claim_id",
+        "scene_id",
+        "topic_tags",
+        "privacy_reason",
+        "decay_policy",
     }
 )
 
@@ -483,9 +551,7 @@ class LLMAgentOutputContract(APIModel):
         ]
     )
     allowed_disclosure_modes: list[DisclosureMode] = Field(
-        default_factory=lambda: [
-            mode for mode in DisclosureMode if mode != DisclosureMode.FULL
-        ]
+        default_factory=default_agent_disclosure_modes
     )
     allowed_rhetoric_tactics: list[RhetoricTactic] = Field(
         default_factory=lambda: list(RhetoricTactic)
@@ -502,6 +568,59 @@ class DisclosureClaim(APIModel):
     claim_refs: list[NonEmptyString] = Field(default_factory=list)
 
 
+class LLMSchemaValidationError(APIModel):
+    loc: list[str] = Field(default_factory=list)
+    error_type: str = "unknown"
+    message_sanitized: str = ""
+
+
+class LLMErrorSummary(APIModel):
+    backend: NonEmptyString
+    error_type: LLMErrorType
+    error_message_sanitized: NonEmptyString
+    fallback_used: bool = True
+    schema_validation_errors: list[LLMSchemaValidationError] = Field(default_factory=list)
+
+
+class FactUnlockConditionConfig(APIModel):
+    phases: list[NonEmptyString] = Field(default_factory=list)
+    completed_beats: list[NonEmptyString] = Field(default_factory=list)
+    discovered_clues: list[NonEmptyString] = Field(default_factory=list)
+    player_knowledge_ids: list[NonEmptyString] = Field(default_factory=list)
+    player_world_info_ids: list[NonEmptyString] = Field(default_factory=list)
+
+
+class SafeFactFragmentConfig(APIModel):
+    id: NonEmptyString
+    summary: NonEmptyString
+    aliases: list[NonEmptyString] = Field(default_factory=list)
+    claim_patterns: list[NonEmptyString] = Field(default_factory=list)
+    allowed_modes: list[DisclosureMode] = Field(
+        default_factory=default_safe_fragment_disclosure_modes
+    )
+    unlock_conditions: FactUnlockConditionConfig = Field(
+        default_factory=FactUnlockConditionConfig
+    )
+
+
+class ForbiddenInferenceConfig(APIModel):
+    id: NonEmptyString
+    summary: str = ""
+    trigger_fragment_ids: list[NonEmptyString] = Field(default_factory=list)
+    trigger_world_info_ids: list[NonEmptyString] = Field(default_factory=list)
+    aliases: list[NonEmptyString] = Field(default_factory=list)
+    claim_patterns: list[NonEmptyString] = Field(default_factory=list)
+    blocked_modes: list[DisclosureMode] = Field(
+        default_factory=default_forbidden_inference_blocked_modes
+    )
+    unlock_conditions: FactUnlockConditionConfig | None = None
+
+
+class ClaimGraphConfig(APIModel):
+    safe_fragments: list[SafeFactFragmentConfig] = Field(default_factory=list)
+    forbidden_inferences: list[ForbiddenInferenceConfig] = Field(default_factory=list)
+
+
 class WorldInfoConfig(APIModel):
     id: NonEmptyString
     title: NonEmptyString
@@ -510,6 +629,7 @@ class WorldInfoConfig(APIModel):
     sensitivity: WorldInfoSensitivity = WorldInfoSensitivity.MEDIUM
     aliases: list[NonEmptyString] = Field(default_factory=list)
     claim_patterns: list[NonEmptyString] = Field(default_factory=list)
+    claim_graph: ClaimGraphConfig = Field(default_factory=ClaimGraphConfig)
 
 
 class SceneHotspotConfig(APIModel):
@@ -671,6 +791,7 @@ class MemoryEffectConfig(APIModel):
     memory_type: MemoryType = "episodic"
     memory_scope: MemoryScope = "npc_private"
     memory_layer: MemoryLayer = "working"
+    operation: MemoryOperation = MemoryOperation.CREATE
     subject_id: NonEmptyString = "player"
     owner_character_id: NonEmptyString | None = "{target_id}"
     visible_to_character_ids: list[NonEmptyString] = Field(
@@ -692,6 +813,11 @@ class MemoryEffectConfig(APIModel):
     @classmethod
     def validate_memory_metadata(cls, value: object) -> dict[str, Any]:
         return validate_memory_metadata(value)
+
+    @field_validator("operation", mode="before")
+    @classmethod
+    def validate_memory_operation(cls, value: object) -> MemoryOperation:
+        return normalize_memory_operation(value)
 
     @model_validator(mode="after")
     def validate_templates(self) -> MemoryEffectConfig:
@@ -880,6 +1006,7 @@ class AgentIntent(APIModel):
     proposed_actions: list[ProposedAction] = Field(default_factory=list)
     memory_refs: list[str] = Field(default_factory=list)
     disclosure_claims: list[DisclosureClaim] = Field(default_factory=list)
+    llm_error: LLMErrorSummary | None = None
 
     @field_validator("proposed_actions", mode="before")
     @classmethod
@@ -952,6 +1079,7 @@ class MemoryCandidateState(APIModel):
     memory_type: MemoryType = "episodic"
     memory_scope: MemoryScope = "npc_private"
     memory_layer: MemoryLayer = "working"
+    operation: MemoryOperation = MemoryOperation.CREATE
     subject_id: NonEmptyString
     owner_character_id: NonEmptyString | None = None
     visible_to_character_ids: list[NonEmptyString] = Field(default_factory=list)
@@ -969,6 +1097,11 @@ class MemoryCandidateState(APIModel):
     def validate_memory_metadata(cls, value: object) -> dict[str, Any]:
         return validate_memory_metadata(value)
 
+    @field_validator("operation", mode="before")
+    @classmethod
+    def validate_memory_operation(cls, value: object) -> MemoryOperation:
+        return normalize_memory_operation(value)
+
 
 class AgentMemorySnapshot(APIModel):
     memory_id: NonEmptyString
@@ -976,6 +1109,7 @@ class AgentMemorySnapshot(APIModel):
     memory_type: MemoryType = "episodic"
     memory_scope: MemoryScope = "npc_private"
     memory_layer: MemoryLayer = "working"
+    last_operation: MemoryOperation = MemoryOperation.CREATE
     subject_id: NonEmptyString | None = None
     owner_character_id: NonEmptyString | None = None
     visible_to_character_ids: list[NonEmptyString] = Field(default_factory=list)
@@ -994,6 +1128,27 @@ class AgentMemorySnapshot(APIModel):
     @classmethod
     def validate_memory_metadata(cls, value: object) -> dict[str, Any]:
         return validate_memory_metadata(value)
+
+    @field_validator("last_operation", mode="before")
+    @classmethod
+    def validate_memory_operation(cls, value: object) -> MemoryOperation:
+        return normalize_memory_operation(value)
+
+
+def normalize_memory_operation(value: object) -> MemoryOperation:
+    if isinstance(value, MemoryOperation):
+        return value
+    if value is None:
+        return MemoryOperation.CREATE
+    normalized = str(value).casefold()
+    alias = LEGACY_MEMORY_OPERATION_ALIASES.get(normalized)
+    if alias is not None:
+        return alias
+    return MemoryOperation(normalized)
+
+
+def serialize_memory_operation(operation: MemoryOperation) -> str:
+    return operation.value
 
 
 class CompressedHistoryContext(APIModel):
@@ -1134,12 +1289,14 @@ class ActionResponse(APIModel):
     speech: str | None = None
     director_blocked: bool = False
     director_reason: str | None = None
+    llm_fallback_used: bool = False
+    llm_error: LLMErrorSummary | None = None
     new_events: list[WorldEvent]
     state: StateSummary
 
 
 def clamp_relationship_metric(value: object) -> float:
-    numeric_value = float(value)
+    numeric_value = float(cast(Any, value))
     clamped = min(max(numeric_value, RELATIONSHIP_MIN), RELATIONSHIP_MAX)
     return round(clamped, 4)
 
@@ -1170,9 +1327,24 @@ def validate_memory_metadata(value: object) -> dict[str, Any]:
         "doubts",
     }:
         raise ValueError("belief_polarity is not supported")
-    for key in ("strategy_id", "belief_subject", "clue_id"):
+    for key in (
+        "strategy_id",
+        "belief_subject",
+        "clue_id",
+        "world_info_id",
+        "claim_id",
+        "scene_id",
+        "privacy_reason",
+    ):
         if key in metadata and metadata[key] is not None:
-            metadata[key] = str(metadata[key])
+            metadata[key] = _validate_metadata_string(metadata[key], key)
+    if "topic_tags" in metadata:
+        metadata["topic_tags"] = _validate_metadata_string_list(
+            metadata["topic_tags"],
+            "topic_tags",
+        )
+    if "decay_policy" in metadata:
+        metadata["decay_policy"] = _validate_decay_policy(metadata["decay_policy"])
     return metadata
 
 
@@ -1180,6 +1352,80 @@ def _validate_metric_delta(value: object, field_name: str) -> dict[str, float]:
     if not isinstance(value, dict):
         raise ValueError(f"{field_name} must be an object")
     return {str(key): clamp_relationship_metric(item) for key, item in value.items()}
+
+
+def _validate_metadata_string(value: object, field_name: str) -> str:
+    if not isinstance(value, str):
+        raise ValueError(f"{field_name} must be a string")
+    normalized = value.strip()
+    if not normalized:
+        raise ValueError(f"{field_name} must be non-empty")
+    return normalized
+
+
+def _validate_metadata_string_list(value: object, field_name: str) -> list[str]:
+    if not isinstance(value, list):
+        raise ValueError(f"{field_name} must be a list")
+    normalized: list[str] = []
+    for item in value:
+        text = _validate_metadata_string(item, field_name)
+        if text not in normalized:
+            normalized.append(text)
+    return normalized
+
+
+def _validate_decay_policy(value: object) -> str | dict[str, int | str]:
+    if isinstance(value, str):
+        normalized = _validate_metadata_string(value, "decay_policy")
+        if normalized not in ALLOWED_MEMORY_DECAY_POLICY_NAMES:
+            raise ValueError(f"decay_policy is not supported: {normalized}")
+        return normalized
+    if not isinstance(value, dict):
+        raise ValueError("decay_policy must be a string or object")
+    policy = {str(key): item for key, item in value.items()}
+    unknown_keys = set(policy) - ALLOWED_MEMORY_DECAY_POLICY_KEYS
+    if unknown_keys:
+        raise ValueError(
+            f"Unsupported memory decay_policy keys: {sorted(unknown_keys)}"
+        )
+    normalized_policy: dict[str, int | str] = {}
+    if "name" in policy:
+        name = _validate_metadata_string(policy["name"], "decay_policy.name")
+        if name not in ALLOWED_MEMORY_DECAY_POLICY_NAMES:
+            raise ValueError(f"decay_policy.name is not supported: {name}")
+        normalized_policy["name"] = name
+    if "archive_after_days" in policy:
+        archive_after_days = _validate_non_negative_int(
+            policy["archive_after_days"],
+            "decay_policy.archive_after_days",
+        )
+        normalized_policy["archive_after_days"] = archive_after_days
+    if "reinforced_event_count" in policy:
+        reinforced_event_count = _validate_positive_int(
+            policy["reinforced_event_count"],
+            "decay_policy.reinforced_event_count",
+        )
+        normalized_policy["reinforced_event_count"] = reinforced_event_count
+    return normalized_policy
+
+
+def _validate_non_negative_int(value: object, field_name: str) -> int:
+    if isinstance(value, bool):
+        raise ValueError(f"{field_name} must be an integer")
+    try:
+        number = int(cast(Any, value))
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{field_name} must be an integer") from exc
+    if number < 0:
+        raise ValueError(f"{field_name} must be non-negative")
+    return number
+
+
+def _validate_positive_int(value: object, field_name: str) -> int:
+    number = _validate_non_negative_int(value, field_name)
+    if number <= 0:
+        raise ValueError(f"{field_name} must be positive")
+    return number
 
 
 def normalize_private_items(value: object, prefix: str) -> object:

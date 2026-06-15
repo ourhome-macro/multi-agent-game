@@ -27,3 +27,11 @@ env/
 *.bak
 *.pyc
 .shadow_eval/
+tmp/
+temp/
+pytest_tmp*/
+pytest_tmp_*/
+*.sqlite
+*.sqlite3
+pytest/
+pytest_tmp_agent_matrix/probe.txt

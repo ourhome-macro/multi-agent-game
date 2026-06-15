@@ -13,10 +13,12 @@ from app.domain.models import (
     CasePackage,
     DiscoverClueAction,
     EventType,
+    FactUnlockConditionConfig,
     NarrativePhaseChangeAction,
     ProposedActionType,
     RelationshipChangeAction,
     SubjectType,
+    WorldInfoConfig,
 )
 
 RELATIONSHIP_METRICS = {"trust", "suspicion", "fear", "intimacy", "hostility"}
@@ -113,6 +115,14 @@ class CaseLoader:
         )
         for world_info in package.world_info:
             self._validate_world_info_claim_patterns(world_info.id, world_info.claim_patterns)
+            self._validate_world_info_claim_graph(
+                world_info,
+                case_dir=case_dir,
+                world_info_ids=world_info_ids,
+                clue_ids=clue_ids,
+                phase_ids=phase_ids,
+                beat_ids=beat_ids,
+            )
         self._ensure_unique("clue", [clue.id for clue in package.clues], case_dir)
         self._ensure_unique("scene", [scene.id for scene in package.scenes], case_dir)
         self._ensure_unique(
@@ -379,7 +389,7 @@ class CaseLoader:
                 f"{sorted(unreachable_clue_ids)}"
             )
 
-    def _ensure_unique(self, label: str, ids: list[str], case_dir: Path) -> None:
+    def _ensure_unique(self, label: str, ids: list[str], case_dir: Path | str) -> None:
         duplicates = sorted({item_id for item_id in ids if ids.count(item_id) > 1})
         if duplicates:
             raise CaseLoadError(
@@ -515,6 +525,99 @@ class CaseLoader:
                     f"WorldInfo '{world_info_id}' has invalid claim_pattern "
                     f"'{pattern}': {exc}"
                 ) from exc
+
+    def _validate_world_info_claim_graph(
+        self,
+        world_info: WorldInfoConfig,
+        *,
+        case_dir: Path,
+        world_info_ids: set[str],
+        clue_ids: set[str],
+        phase_ids: set[str],
+        beat_ids: set[str],
+    ) -> None:
+        graph = world_info.claim_graph
+
+        fragment_ids = [fragment.id for fragment in graph.safe_fragments]
+        self._ensure_unique(
+            f"safe fragment in WorldInfo '{world_info.id}'",
+            fragment_ids,
+            case_dir,
+        )
+        fragment_id_set = set(fragment_ids)
+        for fragment in graph.safe_fragments:
+            self._validate_world_info_claim_patterns(
+                f"{world_info.id}.safe_fragment.{fragment.id}",
+                fragment.claim_patterns,
+            )
+            self._validate_unlock_conditions(
+                fragment.unlock_conditions,
+                label=f"WorldInfo '{world_info.id}' safe fragment '{fragment.id}'",
+                clue_ids=clue_ids,
+                phase_ids=phase_ids,
+                beat_ids=beat_ids,
+                world_info_ids=world_info_ids,
+            )
+
+        inference_ids = [inference.id for inference in graph.forbidden_inferences]
+        self._ensure_unique(
+            f"forbidden inference in WorldInfo '{world_info.id}'",
+            inference_ids,
+            case_dir,
+        )
+        for inference in graph.forbidden_inferences:
+            self._validate_world_info_claim_patterns(
+                f"{world_info.id}.forbidden_inference.{inference.id}",
+                inference.claim_patterns,
+            )
+            unknown_fragments = sorted(set(inference.trigger_fragment_ids) - fragment_id_set)
+            if unknown_fragments:
+                raise CaseLoadError(
+                    f"WorldInfo '{world_info.id}' forbidden inference '{inference.id}' "
+                    f"references unknown safe fragments: {unknown_fragments}"
+                )
+            self._ensure_known_world_info(
+                world_info_ids,
+                inference.trigger_world_info_ids,
+                f"WorldInfo '{world_info.id}' forbidden inference '{inference.id}' "
+                "trigger_world_info_ids",
+            )
+            if inference.unlock_conditions is not None:
+                self._validate_unlock_conditions(
+                    inference.unlock_conditions,
+                    label=f"WorldInfo '{world_info.id}' forbidden inference '{inference.id}'",
+                    clue_ids=clue_ids,
+                    phase_ids=phase_ids,
+                    beat_ids=beat_ids,
+                    world_info_ids=world_info_ids,
+                )
+
+    def _validate_unlock_conditions(
+        self,
+        conditions: FactUnlockConditionConfig,
+        *,
+        label: str,
+        clue_ids: set[str],
+        phase_ids: set[str],
+        beat_ids: set[str],
+        world_info_ids: set[str],
+    ) -> None:
+        unknown_phases = sorted(set(conditions.phases) - phase_ids)
+        if unknown_phases:
+            raise CaseLoadError(f"{label} references unknown phases: {unknown_phases}")
+        self._ensure_known_clues(
+            clue_ids,
+            conditions.discovered_clues,
+            f"{label} discovered_clues",
+        )
+        unknown_beats = sorted(set(conditions.completed_beats) - beat_ids)
+        if unknown_beats:
+            raise CaseLoadError(f"{label} references unknown completed beats: {unknown_beats}")
+        self._ensure_known_world_info(
+            world_info_ids,
+            conditions.player_world_info_ids,
+            f"{label} player_world_info_ids",
+        )
 
     def _validate_proposed_action(
         self,

@@ -4,8 +4,11 @@ from app.domain.models import (
     AgentMemorySnapshot,
     EventType,
     MemoryCandidateState,
+    MemoryOperation,
     SessionState,
     WorldEvent,
+    normalize_memory_operation,
+    serialize_memory_operation,
 )
 from app.runtime.events import EventRecorder
 
@@ -22,7 +25,12 @@ class MemorySnapshotSystem:
 
         candidate = self._candidate_from_event(event)
         current = session.memory_snapshots.get(candidate.memory_id)
-        operation = "created" if current is None else "updated"
+        operation = candidate.operation
+        if (
+            operation == MemoryOperation.CREATE
+            and current is not None
+        ):
+            operation = MemoryOperation.REINFORCE
         snapshot = self._reduce_candidate(current, candidate, event)
         session.memory_snapshots[snapshot.memory_id] = snapshot
 
@@ -36,6 +44,7 @@ class MemorySnapshotSystem:
                 "memory_type": snapshot.memory_type,
                 "memory_scope": snapshot.memory_scope,
                 "memory_layer": snapshot.memory_layer,
+                "last_operation": serialize_memory_operation(operation),
                 "subject_id": snapshot.subject_id,
                 "owner_character_id": snapshot.owner_character_id,
                 "visible_to_character_ids": snapshot.visible_to_character_ids,
@@ -46,13 +55,14 @@ class MemorySnapshotSystem:
                 "confidence": snapshot.confidence,
                 "visibility": snapshot.visibility,
                 "metadata": snapshot.metadata,
-                "operation": operation,
+                "operation": serialize_memory_operation(operation),
             },
             caused_by_event_id=event.id,
         )
         snapshot.last_updated_event_id = snapshot_event.id
         snapshot.updated_at = snapshot_event.created_at
-        if operation == "created":
+        snapshot.last_operation = operation
+        if current is None:
             snapshot.created_at = snapshot_event.created_at
         return [snapshot_event]
 
@@ -68,6 +78,7 @@ class MemorySnapshotSystem:
             memory_type=str(event.payload.get("memory_type", "episodic")),
             memory_scope=str(event.payload.get("memory_scope", "npc_private")),
             memory_layer=str(event.payload.get("memory_layer", "working")),
+            operation=normalize_memory_operation(event.payload.get("operation")),
             subject_id=str(event.payload["subject_id"]),
             owner_character_id=_optional_str(event.payload.get("owner_character_id")),
             visible_to_character_ids=[
@@ -91,6 +102,12 @@ class MemorySnapshotSystem:
         candidate: MemoryCandidateState,
         event: WorldEvent,
     ) -> AgentMemorySnapshot:
+        operation = candidate.operation
+        if (
+            operation == MemoryOperation.CREATE
+            and current is not None
+        ):
+            operation = MemoryOperation.REINFORCE
         source_event_ids = list(current.source_event_ids) if current is not None else []
         for event_id in candidate.source_event_ids or [candidate.source_event_id]:
             if event_id not in source_event_ids:
@@ -103,6 +120,14 @@ class MemorySnapshotSystem:
                 source_memory_ids.append(memory_id)
         metadata = dict(current.metadata) if current is not None else {}
         metadata.update(candidate.metadata)
+        content = current.content if current is not None else candidate.content
+        if operation in {MemoryOperation.REVISE, MemoryOperation.SUPERSEDE}:
+            content = candidate.content
+        memory_layer = (
+            current.memory_layer if current is not None else candidate.memory_layer
+        )
+        if operation == MemoryOperation.ARCHIVE:
+            memory_layer = "archival"
 
         return AgentMemorySnapshot(
             memory_id=candidate.memory_id,
@@ -113,9 +138,8 @@ class MemorySnapshotSystem:
             memory_scope=(
                 current.memory_scope if current is not None else candidate.memory_scope
             ),
-            memory_layer=(
-                current.memory_layer if current is not None else candidate.memory_layer
-            ),
+            memory_layer=memory_layer,
+            last_operation=operation,
             subject_id=candidate.subject_id,
             owner_character_id=(
                 current.owner_character_id
@@ -127,7 +151,7 @@ class MemorySnapshotSystem:
                 if current is not None
                 else list(candidate.visible_to_character_ids)
             ),
-            content=current.content if current is not None else candidate.content,
+            content=content,
             source_event_ids=source_event_ids,
             source_memory_ids=source_memory_ids,
             salience=max(current.salience if current is not None else 0.0, candidate.salience),
