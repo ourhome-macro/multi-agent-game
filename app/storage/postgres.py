@@ -114,14 +114,6 @@ class PostgresEventStore:
         with _transaction(self._connection):
             with _cursor(self._connection) as cursor:
                 current_sequence = self._lock_session(cursor, session)
-                if (
-                    expected_current_sequence is not None
-                    and current_sequence != expected_current_sequence
-                ):
-                    raise StaleSessionSequenceError(
-                        "Session event stream advanced from "
-                        f"{expected_current_sequence} to {current_sequence}"
-                    )
                 if idempotency_key is not None:
                     replayed = self._claim_or_replay_idempotency_key(
                         cursor,
@@ -131,6 +123,14 @@ class PostgresEventStore:
                     )
                     if replayed is not None:
                         return replayed
+                if (
+                    expected_current_sequence is not None
+                    and current_sequence != expected_current_sequence
+                ):
+                    raise StaleSessionSequenceError(
+                        "Session event stream advanced from "
+                        f"{expected_current_sequence} to {current_sequence}"
+                    )
 
                 stored = self._append_locked(
                     cursor,
@@ -155,32 +155,67 @@ class PostgresEventStore:
                 return stored
 
     def load(self, session_id: str) -> list[WorldEvent]:
-        with _cursor(self._connection) as cursor:
-            cursor.execute(
-                """
-                SELECT id, case_id, session_id, actor_id, type, payload,
-                       caused_by_event_id, created_at, sequence, schema_version
-                FROM world_events
-                WHERE session_id = %s
-                ORDER BY sequence
-                """,
-                (session_id,),
-            )
-            return [_event_from_row(row) for row in cursor.fetchall()]
+        with _transaction(self._connection):
+            with _cursor(self._connection) as cursor:
+                cursor.execute(
+                    """
+                    SELECT id, case_id, session_id, actor_id, type, payload,
+                           caused_by_event_id, created_at, sequence, schema_version
+                    FROM world_events
+                    WHERE session_id = %s
+                    ORDER BY sequence
+                    """,
+                    (session_id,),
+                )
+                return [_event_from_row(row) for row in cursor.fetchall()]
 
     def load_stored(self, session_id: str) -> list[StoredWorldEvent]:
-        with _cursor(self._connection) as cursor:
-            cursor.execute(
-                """
-                SELECT id, case_id, session_id, actor_id, type, payload,
-                       caused_by_event_id, created_at, sequence, schema_version
-                FROM world_events
-                WHERE session_id = %s
-                ORDER BY sequence
-                """,
-                (session_id,),
-            )
-            return [_stored_event_from_row(row) for row in cursor.fetchall()]
+        with _transaction(self._connection):
+            with _cursor(self._connection) as cursor:
+                cursor.execute(
+                    """
+                    SELECT id, case_id, session_id, actor_id, type, payload,
+                           caused_by_event_id, created_at, sequence, schema_version
+                    FROM world_events
+                    WHERE session_id = %s
+                    ORDER BY sequence
+                    """,
+                    (session_id,),
+                )
+                return [_stored_event_from_row(row) for row in cursor.fetchall()]
+
+    def load_idempotent_response(
+        self,
+        *,
+        session_id: str,
+        idempotency_key: str,
+        request_hash: str,
+    ) -> list[StoredWorldEvent] | None:
+        with _transaction(self._connection):
+            with _cursor(self._connection) as cursor:
+                cursor.execute(
+                    """
+                    SELECT request_hash, response_event_ids, committed_at
+                    FROM idempotency_keys
+                    WHERE session_id = %s AND idempotency_key = %s
+                    """,
+                    (session_id, idempotency_key),
+                )
+                row = cursor.fetchone()
+                if row is None:
+                    return None
+                stored_hash = str(_row_get(row, "request_hash", 0))
+                if stored_hash != request_hash:
+                    raise IdempotencyConflictError(
+                        f"Idempotency key {idempotency_key!r} was reused "
+                        "with a different request"
+                    )
+                response_event_ids = _string_list(_row_get(row, "response_event_ids", 1))
+                if not response_event_ids:
+                    raise IdempotencyInProgressError(
+                        f"Idempotency key {idempotency_key!r} exists without committed events"
+                    )
+                return self._load_by_ids(cursor, session_id, response_event_ids)
 
     def append_runtime_trace(self, record: dict[str, object]) -> str:
         trace_id = str(record.get("trace_id") or uuid4())
@@ -603,20 +638,24 @@ class PostgresSessionStore:
         session.events.append(created_event)
         return session
 
-    def get(self, session_id: str, package: CasePackage) -> SessionState:
-        with _cursor(self._connection) as cursor:
-            cursor.execute(
-                """
-                SELECT case_id
-                FROM app_sessions
-                WHERE id = %s
-                """,
-                (session_id,),
-            )
-            row = cursor.fetchone()
+    def get_case_id(self, session_id: str) -> str:
+        with _transaction(self._connection):
+            with _cursor(self._connection) as cursor:
+                cursor.execute(
+                    """
+                    SELECT case_id
+                    FROM app_sessions
+                    WHERE id = %s
+                    """,
+                    (session_id,),
+                )
+                row = cursor.fetchone()
         if row is None:
             raise UnknownSessionError(f"Unknown session_id: {session_id}")
-        case_id = str(_row_get(row, "case_id", 0))
+        return str(_row_get(row, "case_id", 0))
+
+    def get(self, session_id: str, package: CasePackage) -> SessionState:
+        case_id = self.get_case_id(session_id)
         if case_id != package.meta.id:
             raise PostgresPersistenceError(
                 f"Session {session_id} belongs to case {case_id}, not {package.meta.id}"

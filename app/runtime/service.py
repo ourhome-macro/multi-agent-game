@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Protocol
 
 from app.agents.gateway import AgentGateway
 from app.agents.loop import AgentLoop, AgentTurnResult
@@ -27,6 +28,29 @@ from app.runtime.tracing import RuntimeTracer
 from app.storage.memory import InMemoryCaseStore, InMemorySessionStore, build_state_summary
 
 
+class RuntimeSessionBackend(Protocol):
+    def create_session(self, case: CasePackage) -> SessionState:
+        ...
+
+    def get_session(self, session_id: str) -> SessionState:
+        ...
+
+    def handle_action(
+        self,
+        *,
+        session_id: str,
+        action: PlayerAction,
+        idempotency_key: str | None = None,
+    ) -> ActionResponse:
+        ...
+
+    def get_events(self, session_id: str) -> list[WorldEvent]:
+        ...
+
+    def close(self) -> None:
+        ...
+
+
 @dataclass(frozen=True)
 class RuntimeContainer:
     case_store: InMemoryCaseStore
@@ -34,6 +58,42 @@ class RuntimeContainer:
     action_service: ActionService
     rule_engine: RuleEngine
     agent_loop: AgentLoop
+    session_backend: RuntimeSessionBackend | None = None
+
+    def create_session(self, case: CasePackage) -> SessionState:
+        if self.session_backend is not None:
+            return self.session_backend.create_session(case)
+        return self.session_store.create(case)
+
+    def get_session(self, session_id: str) -> SessionState:
+        if self.session_backend is not None:
+            return self.session_backend.get_session(session_id)
+        return self.session_store.get(session_id)
+
+    def handle_action(
+        self,
+        *,
+        session_id: str,
+        action: PlayerAction,
+        idempotency_key: str | None = None,
+    ) -> ActionResponse:
+        if self.session_backend is not None:
+            return self.session_backend.handle_action(
+                session_id=session_id,
+                action=action,
+                idempotency_key=idempotency_key,
+            )
+        session = self.session_store.get(session_id)
+        return self.action_service.handle(session=session, action=action)
+
+    def get_events(self, session_id: str) -> list[WorldEvent]:
+        if self.session_backend is not None:
+            return self.session_backend.get_events(session_id)
+        return self.session_store.get(session_id).events
+
+    def close(self) -> None:
+        if self.session_backend is not None:
+            self.session_backend.close()
 
 
 class ActionService:

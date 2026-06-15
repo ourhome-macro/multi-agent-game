@@ -1,6 +1,6 @@
 ﻿# API 契约
 
-当前 API 覆盖内存版后端叙事运行时。它默认不调用真实 LLM，也不把 session 持久化到数据库。
+当前 API 默认使用内存版后端叙事运行时，便于本地开发和测试。生产环境可以通过 `AGENT_RUNTIME=postgres` 切换到 PostgreSQL event stream 运行时，让 session 创建、action 事件、投影恢复走数据库权威链路。
 
 ## 接口列表
 
@@ -30,6 +30,21 @@
 ## PlayerAction
 
 所有玩家动作目标统一使用 `target_id`。如果请求使用旧字段 `target`，会被 422 拒绝。
+
+生产客户端提交 action 时应带 `Idempotency-Key` 请求头：
+
+```http
+POST /sessions/{session_id}/actions
+Idempotency-Key: action-001
+```
+
+在 PostgreSQL runtime 下，后端会用结构化 `PlayerAction` 计算 request hash。同一 session 内重复提交相同 `Idempotency-Key` 和相同 action，会直接 replay 原响应事件，不再次运行 Agent/LLM，也不会产生第二批 `WorldEvent`。
+
+冲突语义：
+
+- 相同 `Idempotency-Key` 携带不同 action：返回 `409 Conflict`。
+- 相同 session 的事件流在本轮 action 生成后被其他请求推进：返回 `409 Conflict`。
+- 幂等键已占用但尚未提交响应事件：返回 `409 Conflict`。
 
 ### inspect
 

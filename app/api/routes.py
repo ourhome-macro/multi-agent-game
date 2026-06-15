@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, status
 
 from app.domain.models import (
     ActionResponse,
@@ -16,6 +16,13 @@ from app.domain.models import (
 from app.runtime.errors import ActionValidationError
 from app.runtime.service import RuntimeContainer
 from app.storage.memory import build_state_summary
+from app.storage.postgres import (
+    IdempotencyConflictError,
+    IdempotencyInProgressError,
+    PostgresPersistenceError,
+    StaleSessionSequenceError,
+    UnknownSessionError,
+)
 
 
 def get_runtime() -> RuntimeContainer:
@@ -47,7 +54,7 @@ def create_router(runtime_dependency: Callable[[], RuntimeContainer] = get_runti
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=str(exc),
             ) from exc
-        session = runtime.session_store.create(case)
+        session = runtime.create_session(case)
         return CreateSessionResponse(
             session_id=session.id,
             state=build_state_summary(case, session),
@@ -59,9 +66,9 @@ def create_router(runtime_dependency: Callable[[], RuntimeContainer] = get_runti
         runtime: RuntimeContainer = runtime_dep,
     ) -> StateSummary:
         try:
-            session = runtime.session_store.get(session_id)
+            session = runtime.get_session(session_id)
             case = runtime.case_store.get(session.case_id)
-        except KeyError as exc:
+        except (KeyError, UnknownSessionError) as exc:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=str(exc),
@@ -72,21 +79,39 @@ def create_router(runtime_dependency: Callable[[], RuntimeContainer] = get_runti
     def submit_action(
         session_id: str,
         action: PlayerAction,
+        idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
         runtime: RuntimeContainer = runtime_dep,
     ) -> ActionResponse:
         try:
-            session = runtime.session_store.get(session_id)
-        except KeyError as exc:
+            return runtime.handle_action(
+                session_id=session_id,
+                action=action,
+                idempotency_key=idempotency_key,
+            )
+        except (KeyError, UnknownSessionError) as exc:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=str(exc),
             ) from exc
-        try:
-            return runtime.action_service.handle(session=session, action=action)
         except ActionValidationError as exc:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=exc.message,
+            ) from exc
+        except StaleSessionSequenceError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=str(exc),
+            ) from exc
+        except (IdempotencyConflictError, IdempotencyInProgressError) as exc:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=str(exc),
+            ) from exc
+        except PostgresPersistenceError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=str(exc),
             ) from exc
 
     @router.get("/sessions/{session_id}/events", response_model=list[WorldEvent])
@@ -95,12 +120,11 @@ def create_router(runtime_dependency: Callable[[], RuntimeContainer] = get_runti
         runtime: RuntimeContainer = runtime_dep,
     ) -> list[WorldEvent]:
         try:
-            session = runtime.session_store.get(session_id)
-        except KeyError as exc:
+            return runtime.get_events(session_id)
+        except (KeyError, UnknownSessionError) as exc:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=str(exc),
             ) from exc
-        return session.events
 
     return router

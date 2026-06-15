@@ -9,6 +9,9 @@ ignore = []
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
+markers = [
+    "postgres: integration tests that require a local PostgreSQL database",
+]
 
 [tool.mypy]
 python_version = "3.11"

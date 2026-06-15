@@ -16,6 +16,7 @@
 - [architecture/](architecture/)：结构草案、持久化方案和历史架构材料。
 - [case-authoring/](case-authoring/)：案件包、场景脚本、作者协议。
 - [case/](case/)：具体案件的重建、运行产物和评测报告。
+- [frontend/](frontend/)：前端交互、证据板、UI 状态和外部产品参考。
 - [narrative/](narrative/)：叙事披露策略、测试矩阵。
 - [evaluations/](evaluations/)：评测框架、shadow eval、CI 验收。
 - [planning/](planning/)：历史路线图和 MVP 规划。
