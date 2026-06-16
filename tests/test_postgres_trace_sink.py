@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 
 import app.main as app_main
+from app.agents.memory import MemoryRetriever
 from app.domain.models import (
     ActionType,
     AgentIntent,
@@ -16,6 +17,7 @@ from app.domain.models import (
     PlayerAction,
 )
 from app.runtime.tracing import JsonlRuntimeTraceSink, PostgresTraceSink, RuntimeTracer
+from app.storage.postgres import PostgresMemoryStore
 
 
 def test_postgres_trace_sink_appends_complete_record() -> None:
@@ -132,6 +134,7 @@ def test_postgres_runtime_builder_buffers_trace_for_transactional_flush(
 
     monkeypatch.setenv(app_main.RUNTIME_MODE_ENV, app_main.POSTGRES_RUNTIME_MODE)
     monkeypatch.delenv(app_main.APPLY_SCHEMA_ENV, raising=False)
+    monkeypatch.setenv(app_main.SKIP_SCHEMA_CHECK_ENV, "1")
     monkeypatch.setattr(app_main, "connect_postgres", fake_connect_postgres)
     monkeypatch.setattr(app_main, "PostgresEventStore", fake_event_store)
 
@@ -145,6 +148,51 @@ def test_postgres_runtime_builder_buffers_trace_for_transactional_flush(
     trace_buffer = runtime.session_backend.action_runtime.trace_buffer
     assert trace_buffer is not None
     assert trace_buffer.drain() == [_trace_record()]
+
+
+def test_postgres_runtime_builder_checks_schema_before_start(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fake_connection = _FakeConnection()
+    checked: list[object] = []
+
+    def fake_connect_postgres() -> _FakeConnection:
+        return fake_connection
+
+    def fake_ensure_schema(connection: object) -> object:
+        checked.append(connection)
+        return object()
+
+    monkeypatch.setenv(app_main.RUNTIME_MODE_ENV, app_main.POSTGRES_RUNTIME_MODE)
+    monkeypatch.delenv(app_main.APPLY_SCHEMA_ENV, raising=False)
+    monkeypatch.delenv(app_main.SKIP_SCHEMA_CHECK_ENV, raising=False)
+    monkeypatch.setattr(app_main, "connect_postgres", fake_connect_postgres)
+    monkeypatch.setattr(app_main, "ensure_postgres_schema", fake_ensure_schema)
+    monkeypatch.setattr(app_main, "PostgresEventStore", lambda connection: _RecordingTraceStore())
+
+    runtime = app_main.build_runtime()
+
+    assert checked == [fake_connection]
+    assert runtime.session_backend is not None
+
+
+def test_postgres_runtime_builder_uses_postgres_memory_store(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fake_connection = _FakeConnection()
+
+    monkeypatch.setenv(app_main.RUNTIME_MODE_ENV, app_main.POSTGRES_RUNTIME_MODE)
+    monkeypatch.delenv(app_main.APPLY_SCHEMA_ENV, raising=False)
+    monkeypatch.setenv(app_main.SKIP_SCHEMA_CHECK_ENV, "1")
+    monkeypatch.setattr(app_main, "connect_postgres", lambda: fake_connection)
+    monkeypatch.setattr(app_main, "PostgresEventStore", lambda connection: _RecordingTraceStore())
+
+    runtime = app_main.build_runtime()
+
+    retriever = runtime.agent_loop._memory_retriever  # noqa: SLF001
+    assert isinstance(retriever, MemoryRetriever)
+    assert isinstance(retriever._memory_store, PostgresMemoryStore)  # noqa: SLF001
+    assert retriever._memory_store._connection is fake_connection  # noqa: SLF001
 
 
 def _trace_record() -> dict[str, object]:

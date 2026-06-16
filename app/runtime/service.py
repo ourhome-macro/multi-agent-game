@@ -6,6 +6,7 @@ from typing import Protocol
 
 from app.agents.gateway import AgentGateway
 from app.agents.loop import AgentLoop, AgentTurnResult
+from app.agents.memory import MemoryRetriever
 from app.agents.retrieval_planner import RetrievalPlanner
 from app.director.narrative_director import NarrativeDirector
 from app.domain.models import (
@@ -13,6 +14,7 @@ from app.domain.models import (
     ActionType,
     CasePackage,
     EventType,
+    NpcSkillProjection,
     PlayerAction,
     SessionState,
     WorldEvent,
@@ -293,32 +295,19 @@ class ActionService:
                     state=build_state_summary(case, session),
                 )
             trigger_source_event_id = new_events[-1].id
+            new_events.extend(self._derive_events(case, session, new_events))
+            new_events.extend(self._evaluate_triggers(case, session, trigger_source_event_id))
             new_events.extend(
                 self._archive_stale_memories(
                     session=session,
                     caused_by_event_id=trigger_source_event_id,
                 )
             )
-            turn = self._agent_loop.run_turn(case=case, session=session, action=action)
-            new_events.extend(self._derive_events(case, session, new_events))
-            new_events.extend(self._evaluate_triggers(case, session, trigger_source_event_id))
-            self._agent_loop.finish_trace(
-                turn,
-                director_allowed=True,
-                director_reason_category=None,
-                rule_rejections=[],
-                new_events=new_events,
-                phase_after=session.narrative.phase,
-                public_speech=None,
-                public_speech_source=None,
-            )
             return ActionResponse(
                 session_id=session.id,
                 accepted=True,
                 new_events=new_events,
                 state=build_state_summary(case, session),
-                llm_fallback_used=_llm_fallback_used(turn.intent),
-                llm_error=turn.intent.llm_error,
             )
 
         raise ValueError(f"Unsupported action type: {action.type}")
@@ -429,6 +418,14 @@ class ActionService:
             )
         )
         turn = self._agent_loop.run_turn(case=case, session=session, action=action)
+        new_events.extend(
+            self._record_npc_skill_events(
+                session=session,
+                action=action,
+                turn=turn,
+                caused_by_event_id=player_event.id,
+            )
+        )
         context = turn.context
         intent = turn.intent
         decision = self._director.validate(case, session.narrative, intent, context)
@@ -541,6 +538,58 @@ class ActionService:
             public_speech_source=public_speech_source,
         )
 
+    def _record_npc_skill_events(
+        self,
+        *,
+        session: SessionState,
+        action: PlayerAction,
+        turn: AgentTurnResult,
+        caused_by_event_id: str,
+    ) -> list[WorldEvent]:
+        events: list[WorldEvent] = []
+        selected = [
+            _safe_npc_skill_selection_payload(projection)
+            for projection in turn.npc_skill_selection.projections
+        ]
+        if selected:
+            events.append(
+                self._recorder.append(
+                    session,
+                    actor_id=action.target_id,
+                    event_type=EventType.NPC_SKILL_SELECTED,
+                    payload={
+                        "target_id": action.target_id,
+                        "action_type": action.type.value,
+                        "selected_skill_ids": [
+                            str(item["skill_id"]) for item in selected
+                        ],
+                        "selected_skills": selected,
+                    },
+                    caused_by_event_id=caused_by_event_id,
+                )
+            )
+        rejected = [
+            {"skill_id": skill_id, "reason": reason}
+            for skill_id, reason in sorted(
+                turn.npc_skill_selection.rejected_reasons.items()
+            )
+        ]
+        if rejected:
+            events.append(
+                self._recorder.append(
+                    session,
+                    actor_id=action.target_id,
+                    event_type=EventType.NPC_SKILL_REJECTED,
+                    payload={
+                        "target_id": action.target_id,
+                        "action_type": action.type.value,
+                        "rejected_skills": rejected,
+                    },
+                    caused_by_event_id=caused_by_event_id,
+                )
+            )
+        return events
+
     def _evaluate_triggers(
         self,
         case: CasePackage,
@@ -588,6 +637,7 @@ def create_runtime(
     *,
     agent_gateway: AgentGateway | None = None,
     runtime_tracer: RuntimeTracer | None = None,
+    memory_retriever: MemoryRetriever | None = None,
     retrieval_planner: RetrievalPlanner | None = None,
     context_limit_tokens: int = 8000,
 ) -> RuntimeContainer:
@@ -601,6 +651,7 @@ def create_runtime(
     agent_loop = AgentLoop(
         agent_gateway=agent_gateway or AgentGateway.from_env(),
         runtime_tracer=runtime_tracer or RuntimeTracer.disabled(),
+        memory_retriever=memory_retriever,
         retrieval_planner=retrieval_planner,
         context_budget_manager=ContextBudgetManager(
             context_limit_tokens=context_limit_tokens,
@@ -651,3 +702,20 @@ def _precheck_summary(allowed: bool, reason: str | None) -> str:
 def _llm_fallback_used(intent: object) -> bool:
     llm_error = getattr(intent, "llm_error", None)
     return bool(llm_error is not None and getattr(llm_error, "fallback_used", False))
+
+
+def _safe_npc_skill_selection_payload(
+    projection: NpcSkillProjection,
+) -> dict[str, object]:
+    return {
+        "skill_id": projection.skill_id,
+        "type": projection.type.value,
+        "level": projection.level,
+        "signature": projection.signature,
+        "safe_fragment_refs": list(projection.safe_fragment_refs),
+        "allowed_intents": [item.value for item in projection.allowed_intents],
+        "allowed_tactics": [item.value for item in projection.allowed_tactics],
+        "allowed_proposed_actions": [
+            item.value for item in projection.allowed_proposed_actions
+        ],
+    }

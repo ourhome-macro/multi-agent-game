@@ -4,12 +4,21 @@
 CREATE TABLE IF NOT EXISTS schema_migrations (
     name text PRIMARY KEY,
     version integer NOT NULL CHECK (version > 0),
+    checksum text NULL,
     description text NOT NULL,
     applied_at timestamptz NOT NULL DEFAULT now()
 );
 
-INSERT INTO schema_migrations (name, version, description)
-VALUES ('postgres_runtime_schema', 1, 'Initial PostgreSQL runtime schema')
+ALTER TABLE schema_migrations
+    ADD COLUMN IF NOT EXISTS checksum text NULL;
+
+INSERT INTO schema_migrations (name, version, checksum, description)
+VALUES (
+    '001_initial_runtime_schema',
+    1,
+    NULL,
+    'Initial PostgreSQL runtime schema'
+)
 ON CONFLICT (name) DO UPDATE
 SET version = GREATEST(schema_migrations.version, EXCLUDED.version),
     description = EXCLUDED.description,
@@ -92,6 +101,12 @@ CREATE TABLE IF NOT EXISTS memory_snapshots (
 
 CREATE INDEX IF NOT EXISTS idx_memory_snapshots_owner
     ON memory_snapshots(session_id, owner_character_id);
+
+CREATE INDEX IF NOT EXISTS idx_memory_snapshots_retrieval_filters
+    ON memory_snapshots(session_id, memory_scope, memory_layer, memory_type, updated_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_memory_snapshots_owner_visibility
+    ON memory_snapshots(session_id, memory_scope, owner_character_id, memory_layer);
 
 CREATE INDEX IF NOT EXISTS idx_memory_snapshots_visible_gin
     ON memory_snapshots USING gin (visible_to_character_ids);

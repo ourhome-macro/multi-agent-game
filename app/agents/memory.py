@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
 from datetime import UTC, datetime
+from typing import Protocol
 
 from app.agents.memory_retrieval import (
     EmbeddingScorer,
@@ -34,6 +36,53 @@ TEXT_SCORE_CAP = 1.5
 STRUCTURED_SCORE_CAP = 5.0
 
 
+@dataclass(frozen=True)
+class MemoryStoreQuery:
+    session_id: str
+    target_id: str
+    phase: str
+    enforce_target_visibility: bool = True
+    scopes: tuple[str, ...] = ()
+    layers: tuple[str, ...] = ()
+    memory_types: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class MemoryStoreTraceSummary:
+    backend: str
+    requested_filters: dict[str, object]
+    candidate_count: int
+
+
+class MemoryStore(Protocol):
+    backend_name: str
+
+    def fetch_candidates(
+        self,
+        *,
+        session: SessionState,
+        query: MemoryStoreQuery,
+    ) -> list[AgentMemorySnapshot]:
+        ...
+
+
+class InMemoryMemoryStore:
+    backend_name = "in_memory"
+
+    def fetch_candidates(
+        self,
+        *,
+        session: SessionState,
+        query: MemoryStoreQuery,
+    ) -> list[AgentMemorySnapshot]:
+        snapshots = list(session.memory_snapshots.values())
+        return [
+            snapshot
+            for snapshot in snapshots
+            if _store_query_matches(snapshot, query)
+        ]
+
+
 class MemoryRetriever:
     def __init__(
         self,
@@ -41,10 +90,17 @@ class MemoryRetriever:
         max_results: int = 8,
         embedding_scorer: EmbeddingScorer | None = None,
         reranker: MemoryReranker | None = None,
+        memory_store: MemoryStore | None = None,
     ) -> None:
         self._max_results = max_results
         self._embedding_scorer = embedding_scorer
         self._reranker = reranker
+        self._memory_store = memory_store or InMemoryMemoryStore()
+        self._last_store_trace_summary: MemoryStoreTraceSummary | None = None
+
+    @property
+    def last_store_trace_summary(self) -> MemoryStoreTraceSummary | None:
+        return self._last_store_trace_summary
 
     def retrieve(
         self,
@@ -92,7 +148,6 @@ class MemoryRetriever:
 
         query = _build_query(case, action)
         forbidden_terms = _forbidden_terms(case) if enforce_target_visibility else ()
-        snapshots = list(session.memory_snapshots.values())
         working_filters = _working_hard_filters(
             enforce_target_visibility=enforce_target_visibility,
             target_id=action.target_id,
@@ -100,6 +155,18 @@ class MemoryRetriever:
             plan=plan,
             forbidden_terms=forbidden_terms,
         )
+        working_store_query = _store_query(
+            session=session,
+            target_id=action.target_id,
+            enforce_target_visibility=enforce_target_visibility,
+            scopes=_allowed_scopes_for_store(
+                enforce_target_visibility=enforce_target_visibility,
+                plan=plan,
+            ),
+            layers=_working_layers_for_store(plan),
+            memory_types=_memory_types_for_store(plan),
+        )
+        snapshots = self._fetch_store_candidates(session, working_store_query)
         working_candidates = _filter_snapshots(snapshots, working_filters)
         scored = self._search_candidates(
             snapshots=snapshots,
@@ -116,14 +183,46 @@ class MemoryRetriever:
             plan=plan,
             forbidden_terms=forbidden_terms,
         )
-        archival_candidates = _filter_snapshots(snapshots, archival_filters)
+        archival_store_query = _store_query(
+            session=session,
+            target_id=action.target_id,
+            enforce_target_visibility=True,
+            scopes=_allowed_scopes_for_store(
+                enforce_target_visibility=True,
+                plan=plan,
+            ),
+            layers=("archival",),
+            memory_types=_memory_types_for_store(plan),
+        )
+        archival_snapshots = self._fetch_store_candidates(session, archival_store_query)
+        archival_candidates = _filter_snapshots(archival_snapshots, archival_filters)
         archival_scored = self._search_candidates(
-            snapshots=snapshots,
+            snapshots=archival_snapshots,
             query=query,
             now=_retrieval_now(session, archival_candidates),
             hard_filters=archival_filters,
         )
         return [result.snapshot for result in archival_scored[:max_results]]
+
+    def _fetch_store_candidates(
+        self,
+        session: SessionState,
+        query: MemoryStoreQuery,
+    ) -> list[AgentMemorySnapshot]:
+        snapshots = self._memory_store.fetch_candidates(session=session, query=query)
+        self._last_store_trace_summary = MemoryStoreTraceSummary(
+            backend=self._memory_store.backend_name,
+            requested_filters={
+                "session_id": query.session_id,
+                "target_id": query.target_id,
+                "phase": query.phase,
+                "scopes": list(query.scopes),
+                "layers": list(query.layers),
+                "memory_types": list(query.memory_types),
+            },
+            candidate_count=len(snapshots),
+        )
+        return snapshots
 
     def _search_candidates(
         self,
@@ -201,6 +300,71 @@ def _working_hard_filters(
     )
 
 
+def _store_query(
+    *,
+    session: SessionState,
+    target_id: str,
+    enforce_target_visibility: bool,
+    scopes: tuple[str, ...],
+    layers: tuple[str, ...],
+    memory_types: tuple[str, ...],
+) -> MemoryStoreQuery:
+    return MemoryStoreQuery(
+        session_id=session.id,
+        target_id=target_id,
+        phase=session.narrative.phase,
+        enforce_target_visibility=enforce_target_visibility,
+        scopes=scopes,
+        layers=layers,
+        memory_types=memory_types,
+    )
+
+
+def _allowed_scopes_for_store(
+    *,
+    enforce_target_visibility: bool,
+    plan: MemoryRetrievalPlan | None,
+) -> tuple[str, ...]:
+    allowed = (
+        AGENT_MEMORY_SCOPES
+        if enforce_target_visibility
+        else DIRECTOR_MEMORY_SCOPES
+    )
+    if plan is not None:
+        allowed = allowed & set(plan.included_scopes)
+        allowed = allowed - set(plan.forbidden_scopes)
+    return tuple(sorted(allowed))
+
+
+def _working_layers_for_store(plan: MemoryRetrievalPlan | None) -> tuple[str, ...]:
+    layers = {"core", "working"}
+    if plan is not None:
+        layers = layers & set(plan.included_layers)
+        layers = layers - set(plan.forbidden_layers)
+    return tuple(sorted(layers))
+
+
+def _memory_types_for_store(plan: MemoryRetrievalPlan | None) -> tuple[str, ...]:
+    if plan is None:
+        return ()
+    return tuple(sorted(set(plan.included_memory_types)))
+
+
+def _store_query_matches(
+    snapshot: AgentMemorySnapshot,
+    query: MemoryStoreQuery,
+) -> bool:
+    if query.scopes and snapshot.memory_scope not in set(query.scopes):
+        return False
+    if query.layers and snapshot.memory_layer not in set(query.layers):
+        return False
+    if query.memory_types and snapshot.memory_type not in set(query.memory_types):
+        return False
+    if query.enforce_target_visibility and not _visible_to_target(snapshot, query.target_id):
+        return False
+    return _phase_allowed(snapshot, query.phase)
+
+
 def _archival_hard_filters(
     *,
     target_id: str,
@@ -261,7 +425,11 @@ def _filter_snapshots(
 
 def _tokens(text: str) -> set[str]:
     normalized = _normalize_text(text)
-    tokens = {token.casefold() for token in LATIN_TOKEN_PATTERN.findall(normalized)}
+    tokens: set[str] = set()
+    for token in LATIN_TOKEN_PATTERN.findall(normalized):
+        normalized_token = token.casefold()
+        tokens.add(normalized_token)
+        tokens.update(_identifier_token_parts(normalized_token))
     for run in CJK_RUN_PATTERN.findall(text):
         if len(run) >= 2:
             tokens.add(run)
@@ -379,10 +547,14 @@ def _phase_allowed(snapshot: AgentMemorySnapshot, phase: str) -> bool:
 
 def _build_query(case: CasePackage, action: PlayerAction) -> MemorySearchQuery:
     raw_anchors = [
-        action.clue_id,
-        action.claim_id,
-        action.subject_id,
-        *(action.evidence_clue_ids or []),
+        item
+        for item in (
+            action.clue_id,
+            action.claim_id,
+            action.subject_id,
+            *(action.evidence_clue_ids or []),
+        )
+        if item is not None
     ]
     action_text = action.text or ""
     action_text_normalized = _normalize_text(action_text)
@@ -390,14 +562,18 @@ def _build_query(case: CasePackage, action: PlayerAction) -> MemorySearchQuery:
     for clue in case.clues:
         clue_title = _normalize_text(clue.title)
         clue_id = _normalize_text(clue.id)
+        clue_id_tokens = _tokens(clue.id)
         title_tokens = _tokens(clue.title)
         if (
             clue_id in action_text_normalized
             or (clue_title and clue_title in action_text_normalized)
+            or bool(clue_id_tokens & action_tokens)
             or bool(title_tokens & action_tokens)
         ):
             raw_anchors.append(clue.id)
             raw_anchors.extend(clue.reveals_world_info)
+    if not raw_anchors:
+        raw_anchors.append(action.target_id)
     return MemorySearchQuery(
         anchors=frozenset(
             anchor
@@ -491,11 +667,19 @@ def _identifier_contains(identifier: str, anchor: str) -> bool:
         return False
     if identifier == anchor:
         return True
-    return anchor in {
-        part
-        for part in re.split(r"[^A-Za-z0-9_]+", identifier)
-        if part
-    }
+    return anchor in _identifier_token_parts(identifier)
+
+
+def _identifier_token_parts(identifier: str) -> set[str]:
+    parts: set[str] = set()
+    for chunk in re.split(r"[^A-Za-z0-9_]+", identifier.casefold()):
+        if not chunk:
+            continue
+        parts.add(chunk)
+        for part in chunk.split("_"):
+            if part:
+                parts.add(part)
+    return parts
 
 
 def _recency_score(

@@ -365,6 +365,15 @@ Memory v2 将检索拆成可审计管线：
 
 普通 NPC 不会因为 `salience` 高就召回无关记忆。`salience` 可留在快照中供审计和叙事解释，但不作为相关性总分来源；只有结构化锚点、关键词/topic/source 命中或 embedding 命中能让候选进入排序。若 working/core 没有相关命中，结果为空；只有 archival cold recall 可以在 working/core 无命中时尝试，但仍必须满足当前 NPC 可见性、scope、type、source provenance、phase、forbidden fact 和 plan 约束。
 
+2026-06-16 的召回修复进一步明确了结构化锚点来源：
+
+- `PlayerAction` 的 `clue_id`、`claim_id`、`subject_id`、`evidence_clue_ids` 是强锚点。
+- 玩家自然语言会与案件 `Clue.id`、`Clue.title` 做匹配；`snake_case` ID 会拆成 token，例如 `scratched_drawer` 可被 `drawer` 命中。
+- 当已经从动作或文本解析出具体 clue / world_info / claim 锚点时，`target_id` 不再作为召回锚点，避免“同一个 NPC 可见的无关 case/core 记忆”被带入上下文。
+- 只有完全没有具体锚点时，`target_id` 才作为弱入口，用于召回与当前 NPC 直接相关的私有互动记忆。
+
+这条规则的目标是保证“渐进式披露”按线索和事实推进，而不是按 NPC 身份或 salience 扩散。
+
 记忆矩阵评测见 `doc/evaluations/memory-retrieval-matrix-2026-06-15.md`。新增检索策略、embedding 或 reranker 之前，必须用矩阵确认“应召回 / 不应召回”的 memory_id 没有漂移。
 
 完整 LLM 输入/输出合同见 `doc/agents/llm-agent-contract.md`。
@@ -392,3 +401,10 @@ P0 硬链路详见 `doc/architecture/p0-hard-chain-2026-06-16.md`。
 `mist_clock_manor` 的 2026-06-14 扩写只新增可选 mock dialogue 和 memory derivation rule，不改变 Agent 权限边界。新增规则仅在玩家询问或展示新增线索时产生 NPC 私有工作记忆，不能写世界事实、线索状态、剧情阶段或最终指控结果。
 
 案件级 mock 回复必须按 Director 的文本审计规则编写：如果回复没有 `disclosure_claims` 支持，就不要直接复用 `WorldInfo.title`、`aliases` 或 `claim_patterns` 中的完整表达。可选线索的 NPC 反应应维持“承认观察痕迹、回避完整因果”的粒度。
+## NPC Skill 事件化第一阶段
+
+- NPC Skill 是后端领域能力授权，不是 prompt 标签；selector 产出的 projection 会进入 AgentContext，同时由 runtime 写入 `npc_skill.selected` / `npc_skill.rejected` WorldEvent。
+- `npc_skill.selected` 表示本轮 LLM 调用前已由后端授权的 skill 投影。即使后续 Narrative Director 拦截输出，该事件仍保留，用于审计“允许生成的边界”和“最终被阻断的内容”之间的差异。
+- selected payload 只允许记录 `skill_id`、`type`、`level`、`signature`、`safe_fragment_refs`、`allowed_intents`、`allowed_tactics`、`allowed_proposed_actions`、`target_id` 和 `action_type`。禁止写 skill 正文、safe summary、private 原文、memory content、玩家原文。
+- `npc_skill.rejected` 只记录 selector 明确产出的 `skill_id` 与稳定 reason，例如 `trigger_mismatch`、`clue_locked`、`owner_mismatch`。第一阶段不推断额外拒绝原因，也不让 LLM 自报或伪造 skill 状态。
+- `npc_skill.cooldown.updated` 仅作为事件类型预留；当前阶段不落 cooldown 状态，避免在没有完整恢复策略前引入伪状态。

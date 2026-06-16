@@ -90,6 +90,9 @@ def _assert_full_scenario_state(case: object, session: object, expected_final_ph
         EventType.RULE_REJECTED,
     ):
         assert expected_type in event_types
+    if getattr(case, "npc_skills", []):
+        assert EventType.NPC_SKILL_SELECTED in event_types
+        assert EventType.NPC_SKILL_REJECTED in event_types
 
     summary = build_state_summary(case, session)
     replayed = replay_events(case, session.events)
@@ -127,6 +130,10 @@ def _assert_journey_matches_snapshot(case: object, session: object, journey_path
         "`resolved`",
     ):
         assert required_text in journey
+    if any(event.type == EventType.NPC_SKILL_SELECTED for event in session.events):
+        assert "`npc_skill.selected`" in journey
+    if any(event.type == EventType.NPC_SKILL_REJECTED for event in session.events):
+        assert "`npc_skill.rejected`" in journey
     for fact in case.forbidden_facts:
         assert fact.id not in journey
         assert fact.text not in journey

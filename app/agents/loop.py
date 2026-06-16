@@ -7,6 +7,7 @@ from app.agents.disclosure_strategy import DISCLOSURE_MODE_ORDER
 from app.agents.gateway import AgentGateway
 from app.agents.llm_contract import build_llm_agent_input, validate_llm_agent_output
 from app.agents.memory import MemoryRetriever
+from app.agents.npc_skills import NpcSkillSelection, NpcSkillSelector
 from app.agents.prompt_builder import PromptBuilder
 from app.agents.retrieval_planner import MemoryRetrievalPlan, RetrievalPlanner
 from app.agents.tools.runtime import ToolRuntime
@@ -34,6 +35,7 @@ class AgentTurnResult:
     trace: RuntimeTraceDraft
     security_flags: list[str]
     memory_ids_used: list[str]
+    npc_skill_selection: NpcSkillSelection
 
 
 class AgentLoop:
@@ -80,6 +82,11 @@ class AgentLoop:
         action: PlayerAction,
     ) -> AgentContext:
         plan = self._retrieval_planner.plan(case=case, session=session, action=action)
+        npc_skill_selection = NpcSkillSelector().select(
+            case=case,
+            session=session,
+            action=action,
+        )
         retrieved_memories = self._memory_retriever.retrieve(
             case=case,
             session=session,
@@ -92,6 +99,7 @@ class AgentLoop:
             action,
             retrieval_plan=plan,
             memory_snapshots=retrieved_memories,
+            npc_skill_selection=npc_skill_selection,
         )
         return self._attach_director_generation_constraints(
             case=case,
@@ -108,6 +116,11 @@ class AgentLoop:
     ) -> AgentTurnResult:
         phase_before = session.narrative.phase
         plan = self._retrieval_planner.plan(case=case, session=session, action=action)
+        npc_skill_selection = NpcSkillSelector().select(
+            case=case,
+            session=session,
+            action=action,
+        )
         retrieved_memories = self._memory_retriever.retrieve(
             case=case,
             session=session,
@@ -120,6 +133,7 @@ class AgentLoop:
             action,
             retrieval_plan=plan,
             memory_snapshots=retrieved_memories,
+            npc_skill_selection=npc_skill_selection,
         )
         context = self._attach_director_generation_constraints(
             case=case,
@@ -128,7 +142,12 @@ class AgentLoop:
         )
         security_review = self._injection_guard.review(action)
         memory_ids = [snapshot.memory_id for snapshot in retrieved_memories]
-        memory_projection = _memory_projection(plan, retrieved_memories, context)
+        memory_projection = _memory_projection(
+            plan,
+            retrieved_memories,
+            context,
+            store_trace_summary=_memory_store_trace_summary(self._memory_retriever),
+        )
         npc_skill_projection = _npc_skill_projection(context)
         prompt_bundle = self._prompt_builder.build(context)
         budget = self._budget_prompt(prompt_bundle, context, memory_ids)
@@ -174,6 +193,7 @@ class AgentLoop:
             trace=trace,
             security_flags=security_review.security_flags,
             memory_ids_used=memory_ids,
+            npc_skill_selection=npc_skill_selection,
         )
 
     def _validate_agent_intent(
@@ -260,6 +280,7 @@ def _memory_projection(
     plan: MemoryRetrievalPlan,
     memories: list[AgentMemorySnapshot],
     context: AgentContext | None = None,
+    store_trace_summary: object | None = None,
 ) -> dict[str, object]:
     summary = plan.trace_summary(selected_count=len(memories))
     summary["items"] = [
@@ -277,7 +298,24 @@ def _memory_projection(
         summary["director_safe_fragment_refs"] = [
             fragment.ref for fragment in context.director_safe_fragments
         ]
+    if store_trace_summary is not None:
+        summary["store"] = {
+            "backend": getattr(store_trace_summary, "backend", ""),
+            "candidate_count": int(getattr(store_trace_summary, "candidate_count", 0)),
+            "requested_filters": getattr(
+                store_trace_summary,
+                "requested_filters",
+                {},
+            ),
+        }
     return summary
+
+
+def _memory_store_trace_summary(memory_retriever: MemoryRetriever) -> object | None:
+    try:
+        return memory_retriever.last_store_trace_summary
+    except AttributeError:
+        return None
 
 
 def _npc_skill_projection(context: AgentContext) -> dict[str, object]:

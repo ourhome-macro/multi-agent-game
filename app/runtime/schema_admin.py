@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 from collections.abc import Callable, Iterable, Iterator, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -17,6 +18,8 @@ from app.storage.postgres import ConnectionLike, PostgresEventStore, _stored_eve
 
 SCHEMA_NAME = "postgres_runtime_schema"
 CURRENT_SCHEMA_VERSION = 1
+INITIAL_MIGRATION_ID = "001_initial_runtime_schema"
+INITIAL_MIGRATION_DESCRIPTION = "Initial PostgreSQL runtime schema"
 CORE_TABLES = (
     "schema_migrations",
     "app_sessions",
@@ -43,17 +46,20 @@ REBUILD_PROJECTION_SQL = (
 @dataclass(frozen=True)
 class SchemaCheckResult:
     ok: bool
-    schema_name: str
+    migration_id: str
     expected_version: int
     installed_version: int | None
+    expected_checksum: str
+    installed_checksum: str | None
     missing_tables: tuple[str, ...]
+    checksum_mismatch: bool = False
 
     @property
     def message(self) -> str:
         if self.ok:
             return (
-                f"{self.schema_name} schema version {self.installed_version} is installed; "
-                "core tables are present."
+                f"{self.migration_id} schema version {self.installed_version} is installed; "
+                "core tables are present and checksum matches."
             )
         problems: list[str] = []
         if self.installed_version is None:
@@ -63,6 +69,8 @@ class SchemaCheckResult:
                 f"schema version {self.installed_version} is older than "
                 f"expected {self.expected_version}"
             )
+        if self.checksum_mismatch:
+            problems.append("schema checksum mismatch")
         if self.missing_tables:
             problems.append("missing tables: " + ", ".join(self.missing_tables))
         return "; ".join(problems)
@@ -87,39 +95,64 @@ def apply_postgres_schema(
     schema_path: Path | str = SCHEMA_PATH,
 ) -> SchemaCheckResult:
     apply_schema(connection, schema_path)
-    return check_postgres_schema(connection)
+    _record_initial_migration(connection, schema_path=schema_path)
+    return check_postgres_schema(connection, schema_path=schema_path)
 
 
 def check_postgres_schema(
     connection: ConnectionLike,
     *,
+    schema_path: Path | str = SCHEMA_PATH,
     expected_version: int = CURRENT_SCHEMA_VERSION,
     core_tables: Sequence[str] = CORE_TABLES,
 ) -> SchemaCheckResult:
     existing_tables = _fetch_existing_tables(connection, core_tables)
-    installed_version = (
-        _fetch_schema_version(connection) if "schema_migrations" in existing_tables else None
+    migration = (
+        _fetch_migration(connection, INITIAL_MIGRATION_ID)
+        if "schema_migrations" in existing_tables
+        else None
     )
+    installed_version = migration.version if migration is not None else None
+    installed_checksum = migration.checksum if migration is not None else None
+    expected_checksum = schema_checksum(schema_path)
     missing_tables = tuple(table for table in core_tables if table not in existing_tables)
+    checksum_mismatch = (
+        installed_checksum is not None
+        and installed_checksum != expected_checksum
+    )
     ok = (
         installed_version is not None
         and installed_version >= expected_version
+        and installed_checksum == expected_checksum
         and not missing_tables
+        and not checksum_mismatch
     )
     return SchemaCheckResult(
         ok=ok,
-        schema_name=SCHEMA_NAME,
+        migration_id=INITIAL_MIGRATION_ID,
         expected_version=expected_version,
         installed_version=installed_version,
+        expected_checksum=expected_checksum,
+        installed_checksum=installed_checksum,
         missing_tables=missing_tables,
+        checksum_mismatch=checksum_mismatch,
     )
 
 
-def ensure_postgres_schema(connection: ConnectionLike) -> SchemaCheckResult:
-    result = check_postgres_schema(connection)
+def ensure_postgres_schema(
+    connection: ConnectionLike,
+    *,
+    schema_path: Path | str = SCHEMA_PATH,
+) -> SchemaCheckResult:
+    result = check_postgres_schema(connection, schema_path=schema_path)
     if not result.ok:
         raise SchemaCheckError(result)
     return result
+
+
+def schema_checksum(schema_path: Path | str = SCHEMA_PATH) -> str:
+    content = Path(schema_path).read_bytes()
+    return "sha256:" + hashlib.sha256(content).hexdigest()
 
 
 def rebuild_projection_tables(
@@ -171,8 +204,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         help="Environment variable to read when --database-url is omitted.",
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
-    subparsers.add_parser("apply", help="Apply app/storage/schema.sql and verify it.")
-    subparsers.add_parser("check", help="Verify schema version and core table presence.")
+    subparsers.add_parser("apply", help="Apply app/storage/schema.sql and record checksum.")
+    subparsers.add_parser("check", help="Verify schema version, checksum and core table presence.")
     rebuild = subparsers.add_parser(
         "rebuild-projection",
         help="Show or run the projection table rebuild placeholder.",
@@ -231,21 +264,65 @@ def _fetch_existing_tables(
             return {str(_row_get(row, "table_name", 0)) for row in cursor.fetchall()}
 
 
-def _fetch_schema_version(connection: ConnectionLike) -> int | None:
+@dataclass(frozen=True)
+class _MigrationRow:
+    version: int
+    checksum: str | None
+
+
+def _record_initial_migration(
+    connection: ConnectionLike,
+    *,
+    schema_path: Path | str,
+) -> None:
+    checksum = schema_checksum(schema_path)
     with _transaction(connection):
         with _cursor(connection) as cursor:
             cursor.execute(
                 """
-                SELECT version
-                FROM schema_migrations
+                INSERT INTO schema_migrations (name, version, checksum, description)
+                VALUES (%s, %s, %s, %s)
+                ON CONFLICT (name) DO UPDATE
+                SET version = EXCLUDED.version,
+                    checksum = EXCLUDED.checksum,
+                    description = EXCLUDED.description,
+                    applied_at = now()
+                """,
+                (
+                    INITIAL_MIGRATION_ID,
+                    CURRENT_SCHEMA_VERSION,
+                    checksum,
+                    INITIAL_MIGRATION_DESCRIPTION,
+                ),
+            )
+            cursor.execute(
+                """
+                DELETE FROM schema_migrations
                 WHERE name = %s
                 """,
                 (SCHEMA_NAME,),
             )
+
+
+def _fetch_migration(connection: ConnectionLike, migration_id: str) -> _MigrationRow | None:
+    with _transaction(connection):
+        with _cursor(connection) as cursor:
+            cursor.execute(
+                """
+                SELECT version, checksum
+                FROM schema_migrations
+                WHERE name = %s
+                """,
+                (migration_id,),
+            )
             row = cursor.fetchone()
     if row is None:
         return None
-    return int(_row_get(row, "version", 0))
+    checksum = _row_get(row, "checksum", 1)
+    return _MigrationRow(
+        version=int(_row_get(row, "version", 0)),
+        checksum=str(checksum) if checksum is not None else None,
+    )
 
 
 @contextmanager

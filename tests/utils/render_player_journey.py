@@ -223,6 +223,15 @@ def _timeline_text(event: WorldEvent, id_map: dict[str, str]) -> str:
         )
     if event.type == EventType.PLAYER_PRESENTED_CLUE:
         return f"Player presented clue `{payload['clue_id']}` to `{payload['target_id']}`."
+    if event.type == EventType.NPC_SKILL_SELECTED:
+        selected_ids = ", ".join(str(item) for item in payload["selected_skill_ids"])
+        return f"NPC skill selected for `{payload['target_id']}`: `{selected_ids}`."
+    if event.type == EventType.NPC_SKILL_REJECTED:
+        rejected = payload.get("rejected_skills", [])
+        rejected_ids = ", ".join(str(item["skill_id"]) for item in rejected)
+        return f"NPC skill rejected for `{payload['target_id']}`: `{rejected_ids}`."
+    if event.type == EventType.NPC_SKILL_COOLDOWN_UPDATED:
+        return f"NPC skill cooldown updated for `{payload['target_id']}`."
     if event.type == EventType.NPC_REPLIED:
         return f"NPC replied: \"{payload['speech']}\""
     if event.type == EventType.RELATIONSHIP_CHANGED:

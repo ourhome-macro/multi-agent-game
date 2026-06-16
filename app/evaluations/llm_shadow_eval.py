@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import json
 import os
 from collections.abc import Mapping, Sequence
@@ -47,6 +48,7 @@ GenerationStatus = Literal["ok", "skipped", "failed"]
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_CASE_REPORT_ROOT = PROJECT_ROOT / "doc" / "case"
 DEFAULT_SUMMARY_DIR = PROJECT_ROOT / "doc" / "evaluations" / "llm_shadow"
+DEFAULT_DRIFT_RUNS = 20
 SHADOW_EVAL_ENV = "LLM_SHADOW_EVAL"
 RAW_TRANSCRIPT_ENV = "LLM_SHADOW_WRITE_RAW"
 RAW_TRANSCRIPT_DIR_ENV = "LLM_SHADOW_RAW_DIR"
@@ -185,6 +187,54 @@ class LLMShadowEvalReport:
         }
 
 
+@dataclass(frozen=True)
+class LLMShadowDriftRun:
+    run_index: int
+    report: LLMShadowEvalReport
+
+    def model_dump(self) -> dict[str, Any]:
+        summary = summarize_shadow_steps(self.report.steps)
+        return {
+            "run_index": self.run_index,
+            "case_id": self.report.case_id,
+            "scenario_path": self.report.scenario_path,
+            "scenario_id": self.report.scenario_id,
+            "llm_backend": self.report.llm_backend,
+            "real_shadow_enabled": self.report.real_shadow_enabled,
+            **summary,
+            "step_fingerprints": [
+                _step_drift_fingerprint(step) for step in self.report.steps
+            ],
+        }
+
+
+@dataclass(frozen=True)
+class LLMShadowDriftReport:
+    case_id: str
+    scenario_path: str
+    scenario_id: str
+    generated_at: str
+    llm_backend: ShadowBackend
+    real_shadow_enabled: bool
+    run_count: int
+    runs: list[LLMShadowDriftRun]
+
+    def model_dump(self) -> dict[str, Any]:
+        return {
+            "case_id": self.case_id,
+            "scenario_path": self.scenario_path,
+            "scenario_id": self.scenario_id,
+            "generated_at": self.generated_at,
+            "llm_backend": self.llm_backend,
+            "backend": self.llm_backend,
+            "real_shadow_enabled": self.real_shadow_enabled,
+            "real_backend_enabled": self.real_shadow_enabled,
+            "run_count": self.run_count,
+            "summary": summarize_shadow_drift_runs(self.runs),
+            "runs": [run.model_dump() for run in self.runs],
+        }
+
+
 def run_standard_path_shadow_eval(
     *,
     case_dir: Path,
@@ -234,6 +284,50 @@ def run_all_standard_path_shadow_evals(
     ]
     write_shadow_summary(reports, summary_dir=summary_dir)
     return reports
+
+
+def run_shadow_drift_eval(
+    *,
+    case_dir: Path,
+    runs: int = DEFAULT_DRIFT_RUNS,
+    scenario_path: Path | None = None,
+    backend: ShadowBackend | None = None,
+    report_root: Path = DEFAULT_CASE_REPORT_ROOT,
+    step_index: int | None = None,
+) -> LLMShadowDriftReport:
+    if runs < 1:
+        raise ValueError("Drift run count must be at least 1")
+    load_dotenv()
+    case = CaseLoader().load(case_dir)
+    selected_scenario_path = scenario_path or case_dir / "scenarios" / "standard_path.yaml"
+    scenario = read_scenario_yaml(selected_scenario_path)
+    selected_backend = backend or shadow_backend_from_env()
+    drift_runs = [
+        LLMShadowDriftRun(
+            run_index=index,
+            report=run_shadow_eval(
+                case=case,
+                scenario=scenario,
+                scenario_path=selected_scenario_path,
+                backend=selected_backend,
+                real_shadow_enabled=real_shadow_eval_enabled(),
+                step_index=step_index,
+            ),
+        )
+        for index in range(1, runs + 1)
+    ]
+    report = LLMShadowDriftReport(
+        case_id=case.meta.id,
+        scenario_path=_display_path(selected_scenario_path),
+        scenario_id=f"{selected_scenario_path.stem}_shadow_drift",
+        generated_at=datetime.now(UTC).isoformat(),
+        llm_backend=selected_backend,
+        real_shadow_enabled=real_shadow_eval_enabled(),
+        run_count=runs,
+        runs=drift_runs,
+    )
+    write_shadow_drift_report(report, report_root=report_root)
+    return report
 
 
 def run_shadow_eval(
@@ -430,6 +524,23 @@ def write_shadow_redteam_report(
     return json_path, md_path
 
 
+def write_shadow_drift_report(
+    report: LLMShadowDriftReport,
+    *,
+    report_root: Path = DEFAULT_CASE_REPORT_ROOT,
+) -> tuple[Path, Path]:
+    output_dir = report_root / report.case_id
+    output_dir.mkdir(parents=True, exist_ok=True)
+    json_path = output_dir / "llm_shadow_drift_report.json"
+    md_path = output_dir / "llm_shadow_drift_report.md"
+    json_path.write_text(
+        json.dumps(report.model_dump(), ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    md_path.write_text(render_shadow_drift_markdown(report), encoding="utf-8")
+    return json_path, md_path
+
+
 def build_shadow_summary(reports: list[LLMShadowEvalReport]) -> dict[str, Any]:
     all_steps = [step for report in reports for step in report.steps]
     return {
@@ -445,6 +556,59 @@ def build_shadow_summary(reports: list[LLMShadowEvalReport]) -> dict[str, Any]:
                 **summarize_shadow_steps(report.steps),
             }
             for report in reports
+        ],
+    }
+
+
+def summarize_shadow_drift_runs(runs: Sequence[LLMShadowDriftRun]) -> dict[str, Any]:
+    run_payloads = [run.model_dump() for run in runs]
+    all_steps = [step for run in runs for step in run.report.steps]
+    step_keys = sorted(
+        {
+            (step.step_index, step.step_id)
+            for run in runs
+            for step in run.report.steps
+        },
+        key=lambda item: (item[0], item[1]),
+    )
+    return {
+        "run_count": len(runs),
+        "total_shadow_calls": len(all_steps),
+        "calls_per_run_min": min(
+            (payload["total_shadow_calls"] for payload in run_payloads),
+            default=0,
+        ),
+        "calls_per_run_max": max(
+            (payload["total_shadow_calls"] for payload in run_payloads),
+            default=0,
+        ),
+        "runs_with_schema_failure": sum(
+            payload["schema_failure_count"] > 0 for payload in run_payloads
+        ),
+        "runs_with_director_block": sum(
+            payload["director_block_count"] > 0 for payload in run_payloads
+        ),
+        "runs_with_missing_disclosure_claim": sum(
+            payload["missing_disclosure_claim_count"] > 0 for payload in run_payloads
+        ),
+        "runs_with_speech_world_info_touch": sum(
+            payload["speech_touched_world_info_count"] > 0
+            for payload in run_payloads
+        ),
+        "runs_with_fallback": sum(
+            payload["fallback_count"] > 0 for payload in run_payloads
+        ),
+        "runs_with_skips": sum(
+            payload["skipped_count"] > 0 for payload in run_payloads
+        ),
+        "runs_with_state_pollution": sum(
+            not payload["state_unchanged"] for payload in run_payloads
+        ),
+        "state_unchanged": all(payload["state_unchanged"] for payload in run_payloads),
+        "failure_category_run_counts": _failure_category_run_counts(runs),
+        "step_drift": [
+            _step_drift_summary(runs, step_index=step_index, step_id=step_id)
+            for step_index, step_id in step_keys
         ],
     }
 
@@ -1215,6 +1379,43 @@ def render_shadow_summary_markdown(payload: Mapping[str, Any]) -> str:
     return "\n".join(lines).rstrip() + "\n"
 
 
+def render_shadow_drift_markdown(report: LLMShadowDriftReport) -> str:
+    summary = summarize_shadow_drift_runs(report.runs)
+    lines = [
+        f"# LLM Shadow Drift Report: {report.case_id}",
+        "",
+        f"- Scenario: `{report.scenario_path}`",
+        f"- Backend: `{report.llm_backend}`",
+        f"- Real shadow enabled: `{str(report.real_shadow_enabled).lower()}`",
+        f"- Run count: `{report.run_count}`",
+        "",
+        "## Summary",
+        "",
+        *_drift_summary_lines(summary),
+        "",
+        "## Step Drift",
+        "",
+    ]
+    for step in summary["step_drift"]:
+        lines.extend(
+            [
+                f"### Step {step['step_index']}: {step['step_id']}",
+                "",
+                f"- Observations: `{step['observations']}`",
+                f"- Variant count: `{step['variant_count']}`",
+                f"- Schema failures: `{step['schema_failure_count']}`",
+                f"- Director blocks: `{step['director_block_count']}`",
+                f"- Missing disclosure claims: `{step['missing_disclosure_claim_count']}`",
+                f"- Speech touched WorldInfo: `{step['speech_touched_world_info_count']}`",
+                f"- Fallbacks: `{step['fallback_count']}`",
+                f"- Skips: `{step['skipped_count']}`",
+                f"- State pollution: `{step['state_pollution_count']}`",
+                "",
+            ]
+        )
+    return "\n".join(lines).rstrip() + "\n"
+
+
 def _summary_lines(summary: Mapping[str, Any]) -> list[str]:
     keys = [
         "total_shadow_calls",
@@ -1236,6 +1437,116 @@ def _summary_lines(summary: Mapping[str, Any]) -> list[str]:
             for category, count in sorted(counts.items())
         )
     return lines
+
+
+def _drift_summary_lines(summary: Mapping[str, Any]) -> list[str]:
+    keys = [
+        "run_count",
+        "total_shadow_calls",
+        "calls_per_run_min",
+        "calls_per_run_max",
+        "runs_with_schema_failure",
+        "runs_with_director_block",
+        "runs_with_missing_disclosure_claim",
+        "runs_with_speech_world_info_touch",
+        "runs_with_fallback",
+        "runs_with_skips",
+        "runs_with_state_pollution",
+        "state_unchanged",
+    ]
+    lines = [f"- {key}: `{str(summary[key]).lower()}`" for key in keys if key in summary]
+    counts = summary.get("failure_category_run_counts")
+    if isinstance(counts, Mapping):
+        lines.extend(
+            f"- failure_category_run.{category}: `{count}`"
+            for category, count in sorted(counts.items())
+        )
+    return lines
+
+
+def _step_drift_fingerprint(step: LLMShadowEvalStep) -> dict[str, Any]:
+    return {
+        "step_index": step.step_index,
+        "step_id": step.step_id,
+        "action_type": step.action_type,
+        "target_id": step.target_id,
+        "llm_success": step.llm_success,
+        "schema_valid": step.schema_valid,
+        "director_blocked": step.director_blocked,
+        "block_reason": step.block_reason,
+        "rejected_world_info_ids": step.rejected_world_info_ids,
+        "disclosure_claim_count": step.disclosure_claim_count,
+        "missing_disclosure_claim": step.missing_disclosure_claim,
+        "missing_disclosure_claim_world_info_ids": (
+            step.missing_disclosure_claim_world_info_ids
+        ),
+        "speech_touched_world_info": step.speech_touched_world_info,
+        "fallback_used": step.fallback_used,
+        "skipped": step.skipped,
+        "skip_reason": step.skip_reason,
+        "state_unchanged": step.state_unchanged,
+        "intent": step.generated_intent.get("intent"),
+        "speech_length": step.generated_intent.get("speech_length"),
+        "proposed_action_types": step.generated_intent.get("proposed_action_types", []),
+        "failure_categories": step.failure_categories,
+    }
+
+
+def _step_drift_summary(
+    runs: Sequence[LLMShadowDriftRun],
+    *,
+    step_index: int,
+    step_id: str,
+) -> dict[str, Any]:
+    steps = [
+        step
+        for run in runs
+        for step in run.report.steps
+        if step.step_index == step_index and step.step_id == step_id
+    ]
+    fingerprints = [_step_drift_fingerprint(step) for step in steps]
+    variant_counts = _count_json_variants(fingerprints)
+    return {
+        "step_index": step_index,
+        "step_id": step_id,
+        "observations": len(steps),
+        "variant_count": len(variant_counts),
+        "schema_failure_count": sum(not step.schema_valid and not step.skipped for step in steps),
+        "director_block_count": sum(step.director_blocked for step in steps),
+        "missing_disclosure_claim_count": sum(step.missing_disclosure_claim for step in steps),
+        "speech_touched_world_info_count": sum(step.speech_touched_world_info for step in steps),
+        "fallback_count": sum(step.fallback_used for step in steps),
+        "skipped_count": sum(step.skipped for step in steps),
+        "state_pollution_count": sum(not step.state_unchanged for step in steps),
+        "failure_category_counts": _failure_category_counts(steps),
+        "variant_counts": variant_counts,
+    }
+
+
+def _failure_category_run_counts(runs: Sequence[LLMShadowDriftRun]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for run in runs:
+        categories = {
+            category
+            for step in run.report.steps
+            for category in step.failure_categories
+        }
+        for category in categories:
+            counts[category] = counts.get(category, 0) + 1
+    return dict(sorted(counts.items()))
+
+
+def _count_json_variants(values: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    counts: dict[str, int] = {}
+    payloads: dict[str, Mapping[str, Any]] = {}
+    for value in values:
+        key = json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+        counts[key] = counts.get(key, 0) + 1
+        payloads[key] = value
+    return [
+        {"count": counts[key], "fingerprint": payloads[key]}
+        for key in sorted(counts, key=lambda item: (-counts[item], item))
+    ]
 
 
 def _intent_summary(intent: AgentIntent) -> dict[str, Any]:

@@ -443,6 +443,16 @@ metadata v2 不允许无约束 dict 漂移：
 - `non_authoritative` 必须是布尔值；它只允许存储非权威无来源材料，不允许普通检索把它注入 NPC 上下文。
 - `decay_policy` 只能是 `standard`、`sticky`、`ephemeral`、`never_archive`，或只包含 `name`、`archive_after_days`、`reinforced_event_count` 的对象。
 
+2026-06-16 起，运行时派生的 clue 相关 memory 必须自动补齐结构化 metadata，不能只依赖自然语言 `content` 做召回：
+
+- `clue.discovered` -> `memory.player.clue_discovered.{clue_id}` 必须包含 `clue_id`、可用的首个 `world_info_id` 和 `topic_tags`。
+- `player.asked_about` 的 clue subject memory 必须包含同一套 clue metadata。
+- `player.presented_clue` 的私有 memory 必须包含同一套 clue metadata，并写 `privacy_reason=private_presentation`。
+- scene-shared `player.presented_clue` memory 必须额外写 `scene_id` 和 `privacy_reason=scene_shared_presentation`。
+- `topic_tags` 由 `clue_id` 的 snake_case 分词、完整 `clue_id`、`related_events`、`related_characters` 去重保序生成。
+
+配置化 `MemoryDerivationRule` 与 Python fallback 必须产生一致的默认 metadata。案件规则可以显式覆盖或补充 metadata，但不能移除 `clue_id` 这类召回锚点，否则会破坏 matrix 评测和可回放检索。
+
 迁移路径：
 
 1. 旧规则不配置 `operation` 时按 `create` 处理；同一 `memory_id` 已存在时，`MemorySnapshotSystem` 会自动把重复 create 降为 `reinforce`。
@@ -516,9 +526,13 @@ player.asked_about target=shen_zhaoye subject=empty_capsules
 
 如果常规检索没有任何结构化或文本相关命中，`MemoryRetriever` 会执行一次 archival cold recall。冷召回只放宽 `memory_layer=archival`，不放宽 `memory_scope`、NPC 可见性、memory type、forbidden fact 或 `max_memory_items`。若 archival 也没有相关命中，则不会因为 salience 高而召回无关 archival memory。
 
+Memory DB-backed retrieval 第一阶段只改变候选读取来源，不改变世界状态权威。`MemoryStore` 是 `MemoryRetriever` 的读侧接口；默认 `InMemoryMemoryStore` 从 replay 后的 `session.memory_snapshots` 读取，PostgreSQL runtime builder 注入 `PostgresMemoryStore` 从 PostgreSQL `memory_snapshots` 投影表读取。Postgres 查询可以按 `session_id`、目标 NPC 可见性、scope、layer、memory type 和 metadata phase 做预筛，但不能替代代码级 hard filters，也不能让 LLM、Agent 或数据库查询直接修改 memory。store trace 只能记录 backend、请求过滤项和候选数量，禁止记录 memory content 或未选中内容。
+
 Memory v1.2 的 `MemoryProjectionSkill` 和 `MemoryRetrievalPlan` 不是世界状态，不写入 `WorldEvent`，也不参与 replay 权威。它们只是在构造 `AgentContext` 时解释“当前动作、阶段和 completed beats 下应该投影哪些安全记忆”。Plan 可以收窄 memory type/scope/layer、限制条数、关闭画像摘要或 recent events；但不能让 `director_audit`、`archival`、其他 NPC private、其他 NPC portrait 或 forbidden fact 文本进入普通 NPC 上下文。
 
 Memory v1.3 的检索质量分数同样不是世界状态。`MemoryRetriever` 可以在过滤后使用结构化锚点、中文/英文 token、`updated_at` recency、`source_event_ids` reinforcement、salience 和 confidence 做排序，但这些分项不得写入 `memory_candidate.created`、`agent_memory_snapshot.updated`、snapshot `metadata` 或 replay 结果。recency 的“当前时间”来自事件流或已有 snapshot 时间，禁止使用 wall-clock `now()` 影响可复现性。P2 的归档判断同样使用事件流和 snapshot 时间；只有归档事件本身的 `created_at` 由 `EventRecorder` 生成并进入事件日志。
+
+结构化召回规则：`MemoryRetriever` 会从动作字段和玩家文本中提取 clue / world_info / claim 锚点。英文和数字 token 会拆分 snake_case，例如 `scratched_drawer` 可由 `drawer` 或 `scratched` 命中；中文仍按连续文本和 2/3 字窗口分词。只有当本轮没有任何具体结构化锚点时，才允许使用 `target_id` 作为弱锚点。这样可以让 `memory.player.clue_discovered.scratched_drawer` 被 “drawer scratches” 命中，同时避免同一 NPC 可见的 `dustless_frame` 被无关注入。
 
 AgentLoop 中的 `memory_snapshots`、`memory_ids_used`、trace `memory_projection` 和 tool `search_memory` 摘要必须来自同一次注入 retriever 的结果。`build_agent_context(...)` 只有在调用方未传入已检索 snapshot 时才执行内部 fallback 检索；该 fallback 是兼容路径，不是普通 turn 的事实源。
 
@@ -654,3 +668,10 @@ P0 硬链路要求：prompt、LLM output contract、`disclosure_claims` 和 repa
 `mist_clock_manor` 的 2026-06-14 扩写采用“可选证据厚度层”写法：新增 `Clue` 和 `WorldInfo` 必须挂到新 hotspot 或标准路径不检查的 hotspot，除非同步更新 `scenarios/standard_path.yaml` 的 `expected_events`、`expected_phase` 和 `expected_player_world_info_ids`。
 
 可选线索允许产生新的 `PlayerKnowledge`，但不能无意成为核心 beat 的 `all_discovered` 条件；核心 phase 推进仍由原六条证据控制。新增公开线索标题、描述和 `WorldInfo.description` 必须按公开摘要处理，不能写 private summary、forbidden blocked term 组合或最终责任链结论。
+## NPC Skill WorldEvent 边界
+
+- `npc_skill.selected` 和 `npc_skill.rejected` 是审计事件，不直接改变世界事实、线索、关系或剧情阶段。
+- replay 必须保留这些事件在 `SessionState.events` 中；第一阶段没有新增 session projection，因此回放时不产生额外状态副作用。
+- selected/rejected 的 `caused_by_event_id` 指向触发本轮 agent-backed turn 的玩家/规则事件，用来还原技能授权与玩家动作之间的因果链。
+- payload 必须保持可公开审计的安全投影：只写 skill id、refs、枚举型允许范围和拒绝原因，不写玩家原文、safe fragment summary、角色 private summary、memory content 或 prompt 文本。
+- cooldown 状态尚未产品化。`npc_skill.cooldown.updated` 可作为后续恢复型状态事件使用，但在引入前必须定义 replay projection 和测试。

@@ -352,6 +352,7 @@ class DerivedEventSystem:
             visible_to_character_ids=self._all_character_ids(case),
             memory_scope="case",
             memory_layer="core",
+            metadata=self._clue_memory_metadata(case, clue_id),
         )
 
     def _derive_relationship_memory_candidate(
@@ -431,6 +432,7 @@ class DerivedEventSystem:
             salience=max(0.4, pressure),
             owner_character_id=target_id,
             visible_to_character_ids=[target_id],
+            metadata=self._default_memory_metadata(case, source_event),
         )
 
     def _derive_scene_shared_presented_clue_memory_candidate(
@@ -475,6 +477,11 @@ class DerivedEventSystem:
             ],
             memory_scope="scene_shared",
             memory_layer="working",
+            metadata={
+                **self._clue_memory_metadata(case, clue_id),
+                "scene_id": scene_id,
+                "privacy_reason": "scene_shared_presentation",
+            },
         )
 
     def _derive_presented_clue_memory_candidate(
@@ -499,6 +506,10 @@ class DerivedEventSystem:
             salience=max(0.6, pressure),
             owner_character_id=target_id,
             visible_to_character_ids=[target_id],
+            metadata={
+                **self._clue_memory_metadata(case, clue_id),
+                "privacy_reason": "private_presentation",
+            },
         )
 
     def _configured_event_created_memory(
@@ -575,7 +586,10 @@ class DerivedEventSystem:
                 source_event_ids=effect.source_event_ids,
                 source_memory_ids=effect.source_memory_ids,
                 confidence=effect.confidence,
-                metadata=effect.metadata,
+                metadata={
+                    **self._default_memory_metadata(case, source_event),
+                    **effect.metadata,
+                },
             )
             if event is not None:
                 events.append(event)
@@ -636,6 +650,50 @@ class DerivedEventSystem:
             (item.display_name for item in case.characters if item.id == character_id),
             character_id,
         )
+
+    def _clue_memory_metadata(
+        self,
+        case: CasePackage,
+        clue_id: str,
+    ) -> dict[str, object]:
+        clue = next((item for item in case.clues if item.id == clue_id), None)
+        if clue is None:
+            return {"clue_id": clue_id, "topic_tags": _identifier_topic_tags(clue_id)}
+        metadata: dict[str, object] = {
+            "clue_id": clue_id,
+            "topic_tags": _ordered_unique(
+                [
+                    *_identifier_topic_tags(clue_id),
+                    *clue.related_events,
+                    *clue.related_characters,
+                ]
+            ),
+        }
+        if clue.reveals_world_info:
+            metadata["world_info_id"] = clue.reveals_world_info[0]
+        return metadata
+
+    def _default_memory_metadata(
+        self,
+        case: CasePackage,
+        source_event: WorldEvent,
+    ) -> dict[str, object]:
+        clue_id = source_event.payload.get("clue_id")
+        if source_event.type == EventType.PLAYER_ASKED_ABOUT:
+            subject_type = source_event.payload.get("subject_type")
+            subject_id = source_event.payload.get("subject_id")
+            clue_id = subject_id if subject_type == "clue" else None
+        if not isinstance(clue_id, str):
+            return {}
+
+        metadata = self._clue_memory_metadata(case, clue_id)
+        if source_event.type == EventType.PLAYER_PRESENTED_CLUE:
+            metadata.setdefault("privacy_reason", "private_presentation")
+            scene_id = source_event.payload.get("scene_id")
+            if isinstance(scene_id, str):
+                metadata["scene_id"] = scene_id
+                metadata["privacy_reason"] = "scene_shared_presentation"
+        return metadata
 
     def _all_character_ids(self, case: CasePackage) -> list[str]:
         return [character.id for character in case.characters]
@@ -968,6 +1026,23 @@ class DerivedEventSystem:
 def _append_unique(items: list[str], item: str) -> None:
     if item not in items:
         items.append(item)
+
+
+def _identifier_topic_tags(identifier: str) -> list[str]:
+    tags: list[str] = []
+    for part in identifier.split("_"):
+        if part:
+            _append_unique(tags, part)
+    if identifier:
+        _append_unique(tags, identifier)
+    return tags
+
+
+def _ordered_unique(items: list[str]) -> list[str]:
+    unique: list[str] = []
+    for item in items:
+        _append_unique(unique, item)
+    return unique
 
 
 def _clamp01(value: float) -> float:

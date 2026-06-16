@@ -6,7 +6,7 @@ from collections.abc import Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Any, Protocol
+from typing import TYPE_CHECKING, Any, Protocol
 from uuid import uuid4
 
 from app.domain.models import (
@@ -27,6 +27,9 @@ from app.rules.engine import relationship_key
 from app.runtime.character_fact_awareness import build_initial_character_fact_awareness
 from app.runtime.events import make_event
 from app.runtime.replay import replay_events
+
+if TYPE_CHECKING:
+    from app.agents.memory import MemoryStoreQuery
 
 DEFAULT_SCHEMA_VERSION = 1
 
@@ -618,6 +621,102 @@ class PostgresEventStore:
         )
 
 
+class PostgresMemoryStore:
+    """Read-side candidate store for AgentMemorySnapshot retrieval.
+
+    This is deliberately a first-stage filter over the existing projection table. The
+    authoritative scope/layer/visibility checks still live in MemoryRetriever.
+    """
+
+    backend_name = "postgres"
+
+    def __init__(self, connection: ConnectionLike) -> None:
+        self._connection = connection
+
+    def fetch_candidates(
+        self,
+        *,
+        session: SessionState,
+        query: "MemoryStoreQuery",
+    ) -> list[AgentMemorySnapshot]:
+        _ = session
+        clauses = ["session_id = %s"]
+        params: list[object] = [query.session_id]
+
+        if query.scopes:
+            clauses.append("memory_scope = ANY(%s)")
+            params.append(list(query.scopes))
+        if query.layers:
+            clauses.append("memory_layer = ANY(%s)")
+            params.append(list(query.layers))
+        if query.memory_types:
+            clauses.append("memory_type = ANY(%s)")
+            params.append(list(query.memory_types))
+        if query.enforce_target_visibility:
+            clauses.append(
+                """
+                (
+                    (
+                        memory_scope IN ('case', 'session')
+                        AND (
+                            cardinality(visible_to_character_ids) = 0
+                            OR owner_character_id = %s
+                            OR %s = ANY(visible_to_character_ids)
+                        )
+                    )
+                    OR (
+                        memory_scope IN ('npc_private', 'scene_shared')
+                        AND (
+                            owner_character_id = %s
+                            OR %s = ANY(visible_to_character_ids)
+                        )
+                    )
+                )
+                """
+            )
+            params.extend(
+                [
+                    query.target_id,
+                    query.target_id,
+                    query.target_id,
+                    query.target_id,
+                ]
+            )
+        clauses.append(
+            """
+            (
+                NOT (metadata ? 'phase_id')
+                OR metadata->>'phase_id' = %s
+            )
+            """
+        )
+        params.append(query.phase)
+        clauses.append(
+            """
+            (
+                NOT (metadata ? 'phase_ids')
+                OR metadata->'phase_ids' ? %s
+            )
+            """
+        )
+        params.append(query.phase)
+
+        sql = f"""
+            SELECT
+                memory_id, rule_id, memory_type, memory_scope, memory_layer,
+                last_operation, subject_id, owner_character_id, visible_to_character_ids,
+                content, source_event_ids, source_memory_ids, salience, confidence,
+                visibility, metadata, last_updated_event_id, created_at, updated_at
+            FROM memory_snapshots
+            WHERE {" AND ".join(f"({clause})" for clause in clauses)}
+            ORDER BY updated_at DESC, memory_id
+        """
+        with _transaction(self._connection):
+            with _cursor(self._connection) as cursor:
+                cursor.execute(sql, tuple(params))
+                return [_memory_snapshot_from_row(row) for row in cursor.fetchall()]
+
+
 class PostgresSessionStore:
     def __init__(
         self,
@@ -788,6 +887,32 @@ def _stored_event_from_row(row: Any) -> StoredWorldEvent:
         event=event,
         sequence=int(_row_get(row, "sequence", 8)),
         schema_version=int(_row_get(row, "schema_version", 9)),
+    )
+
+
+def _memory_snapshot_from_row(row: Any) -> AgentMemorySnapshot:
+    return AgentMemorySnapshot(
+        memory_id=str(_row_get(row, "memory_id", 0)),
+        rule_id=_optional_text(_row_get(row, "rule_id", 1)),
+        memory_type=str(_row_get(row, "memory_type", 2)),
+        memory_scope=str(_row_get(row, "memory_scope", 3)),
+        memory_layer=str(_row_get(row, "memory_layer", 4)),
+        last_operation=_row_get(row, "last_operation", 5),
+        subject_id=_optional_text(_row_get(row, "subject_id", 6)),
+        owner_character_id=_optional_text(_row_get(row, "owner_character_id", 7)),
+        visible_to_character_ids=_string_list(
+            _row_get(row, "visible_to_character_ids", 8)
+        ),
+        content=str(_row_get(row, "content", 9)),
+        source_event_ids=_string_list(_row_get(row, "source_event_ids", 10)),
+        source_memory_ids=_string_list(_row_get(row, "source_memory_ids", 11)),
+        salience=float(_row_get(row, "salience", 12)),
+        confidence=float(_row_get(row, "confidence", 13)),
+        visibility=str(_row_get(row, "visibility", 14)),
+        metadata=_json_object(_row_get(row, "metadata", 15)),
+        last_updated_event_id=str(_row_get(row, "last_updated_event_id", 16)),
+        created_at=_datetime_to_iso(_row_get(row, "created_at", 17)),
+        updated_at=_datetime_to_iso(_row_get(row, "updated_at", 18)),
     )
 
 

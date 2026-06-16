@@ -59,6 +59,7 @@ def test_fake_case_001_scenario_level_evaluation_harness() -> None:
                 ),
                 expected_events=[
                     EventType.PLAYER_ASKED_ABOUT,
+                    EventType.NPC_SKILL_SELECTED,
                     EventType.NPC_REPLIED,
                     EventType.RELATIONSHIP_CHANGED,
                     EventType.CHARACTER_IMPRESSION_UPDATED,
@@ -80,6 +81,7 @@ def test_fake_case_001_scenario_level_evaluation_harness() -> None:
                 ),
                 expected_events=[
                     EventType.PLAYER_PRESENTED_CLUE,
+                    EventType.NPC_SKILL_SELECTED,
                     EventType.NPC_REPLIED,
                     EventType.RELATIONSHIP_CHANGED,
                     EventType.RELATIONSHIP_THRESHOLD_CROSSED,
@@ -104,6 +106,7 @@ def test_fake_case_001_scenario_level_evaluation_harness() -> None:
                 ),
                 expected_events=[
                     EventType.PLAYER_TALKED,
+                    EventType.NPC_SKILL_REJECTED,
                     EventType.NPC_REPLIED,
                     EventType.RELATIONSHIP_CHANGED,
                 ],
@@ -135,6 +138,7 @@ def test_fake_case_001_scenario_level_evaluation_harness() -> None:
                 ),
                 expected_events=[
                     EventType.PLAYER_TALKED,
+                    EventType.NPC_SKILL_REJECTED,
                     EventType.NPC_REPLIED,
                     EventType.RELATIONSHIP_CHANGED,
                 ],
@@ -154,6 +158,7 @@ def test_fake_case_001_scenario_level_evaluation_harness() -> None:
                 ),
                 expected_events=[
                     EventType.PLAYER_TALKED,
+                    EventType.NPC_SKILL_REJECTED,
                     EventType.DIRECTOR_BLOCKED,
                     EventType.CHARACTER_IMPRESSION_UPDATED,
                     EventType.MEMORY_CANDIDATE_CREATED,

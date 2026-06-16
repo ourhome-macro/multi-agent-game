@@ -87,7 +87,18 @@
       ],
       "salience": 0.8,
       "confidence": 1.0,
-      "metadata": {}
+      "metadata": {
+        "clue_id": "inward_tide_mark",
+        "topic_tags": [
+          "inward",
+          "tide",
+          "mark",
+          "inward_tide_mark",
+          "night_tide_entry",
+          "dockmaster"
+        ],
+        "world_info_id": "warehouse_opened_after_tide"
+      }
     },
     "caused_by_event_id": "event_003",
     "created_at": "timestamp"
@@ -119,7 +130,18 @@
       "salience": 0.8,
       "confidence": 1.0,
       "visibility": "private",
-      "metadata": {},
+      "metadata": {
+        "clue_id": "inward_tide_mark",
+        "topic_tags": [
+          "inward",
+          "tide",
+          "mark",
+          "inward_tide_mark",
+          "night_tide_entry",
+          "dockmaster"
+        ],
+        "world_info_id": "warehouse_opened_after_tide"
+      },
       "operation": "create"
     },
     "caused_by_event_id": "event_005",
@@ -341,7 +363,18 @@
       ],
       "salience": 0.6,
       "confidence": 1.0,
-      "metadata": {}
+      "metadata": {
+        "clue_id": "inward_tide_mark",
+        "topic_tags": [
+          "inward",
+          "tide",
+          "mark",
+          "inward_tide_mark",
+          "night_tide_entry",
+          "dockmaster"
+        ],
+        "world_info_id": "warehouse_opened_after_tide"
+      }
     },
     "caused_by_event_id": "event_009",
     "created_at": "timestamp"
@@ -372,7 +405,18 @@
       "salience": 0.6,
       "confidence": 1.0,
       "visibility": "private",
-      "metadata": {},
+      "metadata": {
+        "clue_id": "inward_tide_mark",
+        "topic_tags": [
+          "inward",
+          "tide",
+          "mark",
+          "inward_tide_mark",
+          "night_tide_entry",
+          "dockmaster"
+        ],
+        "world_info_id": "warehouse_opened_after_tide"
+      },
       "operation": "create"
     },
     "caused_by_event_id": "event_015",
@@ -769,7 +813,18 @@
       ],
       "salience": 0.8,
       "confidence": 1.0,
-      "metadata": {}
+      "metadata": {
+        "clue_id": "inward_broken_lamp",
+        "topic_tags": [
+          "inward",
+          "broken",
+          "lamp",
+          "inward_broken_lamp",
+          "lamp_knocked_inside",
+          "dockmaster"
+        ],
+        "world_info_id": "lamp_broken_from_inside_entry"
+      }
     },
     "caused_by_event_id": "event_029",
     "created_at": "timestamp"
@@ -801,7 +856,18 @@
       "salience": 0.8,
       "confidence": 1.0,
       "visibility": "private",
-      "metadata": {},
+      "metadata": {
+        "clue_id": "inward_broken_lamp",
+        "topic_tags": [
+          "inward",
+          "broken",
+          "lamp",
+          "inward_broken_lamp",
+          "lamp_knocked_inside",
+          "dockmaster"
+        ],
+        "world_info_id": "lamp_broken_from_inside_entry"
+      },
       "operation": "create"
     },
     "caused_by_event_id": "event_031",
@@ -882,7 +948,18 @@
       ],
       "salience": 0.8,
       "confidence": 1.0,
-      "metadata": {}
+      "metadata": {
+        "clue_id": "blue_ledger_page",
+        "topic_tags": [
+          "blue",
+          "ledger",
+          "page",
+          "blue_ledger_page",
+          "hidden_ledger",
+          "clerk"
+        ],
+        "world_info_id": "blue_ledger_records_midnight_boxes"
+      }
     },
     "caused_by_event_id": "event_034",
     "created_at": "timestamp"
@@ -914,7 +991,18 @@
       "salience": 0.8,
       "confidence": 1.0,
       "visibility": "private",
-      "metadata": {},
+      "metadata": {
+        "clue_id": "blue_ledger_page",
+        "topic_tags": [
+          "blue",
+          "ledger",
+          "page",
+          "blue_ledger_page",
+          "hidden_ledger",
+          "clerk"
+        ],
+        "world_info_id": "blue_ledger_records_midnight_boxes"
+      },
       "operation": "create"
     },
     "caused_by_event_id": "event_036",
@@ -1140,7 +1228,19 @@
       ],
       "salience": 0.9,
       "confidence": 1.0,
-      "metadata": {}
+      "metadata": {
+        "clue_id": "blue_ledger_page",
+        "topic_tags": [
+          "blue",
+          "ledger",
+          "page",
+          "blue_ledger_page",
+          "hidden_ledger",
+          "clerk"
+        ],
+        "world_info_id": "blue_ledger_records_midnight_boxes",
+        "privacy_reason": "private_presentation"
+      }
     },
     "caused_by_event_id": "event_040",
     "created_at": "timestamp"
@@ -1171,7 +1271,19 @@
       "salience": 0.9,
       "confidence": 1.0,
       "visibility": "private",
-      "metadata": {},
+      "metadata": {
+        "clue_id": "blue_ledger_page",
+        "topic_tags": [
+          "blue",
+          "ledger",
+          "page",
+          "blue_ledger_page",
+          "hidden_ledger",
+          "clerk"
+        ],
+        "world_info_id": "blue_ledger_records_midnight_boxes",
+        "privacy_reason": "private_presentation"
+      },
       "operation": "create"
     },
     "caused_by_event_id": "event_046",

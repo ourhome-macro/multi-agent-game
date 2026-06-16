@@ -258,7 +258,33 @@ def _sanitize_memory_projection(projection: dict[str, object]) -> dict[str, obje
         "director_safe_fragment_refs": _string_list(
             projection.get("director_safe_fragment_refs", []),
         ),
+        "store": _sanitize_memory_store_projection(projection.get("store", {})),
         "items": [_sanitize_memory_projection_item(item) for item in items],
+    }
+
+
+def _sanitize_memory_store_projection(value: object) -> dict[str, object]:
+    if not isinstance(value, dict):
+        return {}
+    return {
+        "backend": str(value.get("backend", "")),
+        "candidate_count": int(value.get("candidate_count", 0)),
+        "requested_filters": _sanitize_memory_store_filters(
+            value.get("requested_filters", {}),
+        ),
+    }
+
+
+def _sanitize_memory_store_filters(value: object) -> dict[str, object]:
+    if not isinstance(value, dict):
+        return {}
+    return {
+        "session_id": str(value.get("session_id", "")),
+        "target_id": str(value.get("target_id", "")),
+        "phase": str(value.get("phase", "")),
+        "scopes": _string_list(value.get("scopes", [])),
+        "layers": _string_list(value.get("layers", [])),
+        "memory_types": _string_list(value.get("memory_types", [])),
     }
 
 

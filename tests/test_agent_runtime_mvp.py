@@ -45,7 +45,9 @@ class RecordingAgent:
         )
 
 
-def test_agent_loop_runs_for_npc_actions_but_not_inspect(tmp_path: Path) -> None:
+def test_agent_loop_runs_for_dialogue_actions_but_not_inspect_or_accuse(
+    tmp_path: Path,
+) -> None:
     case = CaseLoader().load(CASE_DIR)
     agent = RecordingAgent()
     runtime = create_runtime(
@@ -108,7 +110,6 @@ def test_agent_loop_runs_for_npc_actions_but_not_inspect(tmp_path: Path) -> None
         ActionType.TALK,
         ActionType.ASK_ABOUT,
         ActionType.PRESENT_CLUE,
-        ActionType.ACCUSE,
     ]
 
 

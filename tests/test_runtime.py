@@ -313,8 +313,9 @@ def test_present_clue_success_triggers_mock_agent_and_rule_engine(
     assert payload["accepted"] is True
     assert "scratch marks" in payload["speech"]
     event_types = [event["type"] for event in payload["new_events"]]
-    assert event_types[:3] == [
+    assert event_types[:4] == [
         "player.presented_clue",
+        "npc_skill.selected",
         "npc.replied",
         "relationship.changed",
     ]
@@ -507,8 +508,9 @@ def test_ask_about_discovered_sensitive_clue_triggers_guarded_reply(
     assert payload["accepted"] is True
     assert "drawer" in payload["speech"]
     event_types = [event["type"] for event in payload["new_events"]]
-    assert event_types[:3] == [
+    assert event_types[:4] == [
         "player.asked_about",
+        "npc_skill.selected",
         "npc.replied",
         "relationship.changed",
     ]
@@ -521,7 +523,7 @@ def test_ask_about_discovered_sensitive_clue_triggers_guarded_reply(
         "interaction_pressure": 0.6,
         "knowledge_id": "player_knowledge.desk_forced_open",
     }
-    reply_event = payload["new_events"][1]
+    reply_event = payload["new_events"][2]
     assert reply_event["payload"]["intent"] == "probe"
 
 
@@ -3295,6 +3297,7 @@ def test_events_order_is_stable_for_mixed_action_sequence(client: TestClient) ->
         "narrative.beat.completed",
         "narrative.phase.changed",
         "player.talked",
+        "npc_skill.rejected",
         "npc.replied",
         "relationship.changed",
         "relationship.threshold.crossed",
@@ -3302,6 +3305,7 @@ def test_events_order_is_stable_for_mixed_action_sequence(client: TestClient) ->
         "memory_candidate.created",
         "agent_memory_snapshot.updated",
         "player.talked",
+        "npc_skill.rejected",
         "director.blocked",
         "character_impression.updated",
         "memory_candidate.created",
