@@ -1,0 +1,61 @@
+- id: butler_drawer_pressure_deflection
+  owner_character_ids:
+    - butler
+  type: dialogue
+  level: 1
+  priority: high
+  signature: true
+  triggers:
+    action_types:
+      - ask_about
+      - present_clue
+    subject_types:
+      - clue
+    clue_ids:
+      - scratched_drawer
+    topic_tags:
+      - drawer
+  unlock_conditions:
+    phases:
+      - investigation
+      - reveal
+      - resolved
+    required_discovered_clues:
+      - scratched_drawer
+    required_player_knowledge:
+      - player_knowledge.desk_forced_open
+    required_world_info_ids:
+      - desk_forced_open
+    required_pressure_min: 0.4
+  disclosure:
+    world_info_ids:
+      - desk_forced_open
+    max_mode: partial
+    allowed_tactics:
+      - answer_adjacent_truth
+      - shift_focus
+      - qualify_certainty
+    safe_fragment_refs:
+      - desk_forced_open.safe_fragment:drawer_was_forced
+  memory:
+    include_types:
+      - episodic
+      - belief
+      - relationship
+      - strategy
+    include_scopes:
+      - npc_private
+      - scene_shared
+    include_layers:
+      - working
+    topic_tags:
+      - drawer
+    max_items: 3
+  proposed_action_policy:
+    allowed:
+      - relationship.change
+    max_relationship_delta:
+      suspicion: 0.2
+      trust: 0.1
+  cooldown:
+    turns: 0

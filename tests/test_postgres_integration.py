@@ -317,7 +317,7 @@ def test_postgres_trace_is_not_persisted_when_action_append_hits_stale_sequence(
             expected_current_sequence=1,
             runtime_traces=[
                 {
-                    "schema_version": 4,
+                    "schema_version": 5,
                     "trace_id": f"trace-{uuid4()}",
                     "timestamp": "2026-06-15T00:00:00+00:00",
                     "case_id": session.case_id,
@@ -328,6 +328,7 @@ def test_postgres_trace_is_not_persisted_when_action_append_hits_stale_sequence(
                     "agent_backend": "mock",
                     "director_allowed": True,
                     "memory_projection": {},
+                    "npc_skill_projection": {},
                     "error_category": "timeout",
                     "llm_error_type": "timeout",
                     "llm_fallback_used": True,

@@ -397,7 +397,7 @@ Memory v1.4 后，payload 结构不变，但 `rule_id` 可能来自 app 默认 `
 
 ## Runtime Trace
 
-运行时 trace schema v4 的 `memory_projection` 是对象，不是 memory content 列表。它包含本轮 AgentContext 使用的检索 skill 摘要：
+运行时 trace schema v5 的 `memory_projection` 是对象，不是 memory content 列表。它包含本轮 AgentContext 使用的检索 skill 摘要：
 
 - `skill_id`
 - `included_memory_types`
@@ -409,6 +409,23 @@ Memory v1.4 后，payload 结构不变，但 `rule_id` 可能来自 app 默认 `
 - `items`
 
 `items` 只允许包含 `memory_id`、`memory_type`、`memory_scope`、`memory_layer`、`owner_character_id` 和 `visible_to_character_ids`。禁止写入 memory `content`、forbidden fact 文本、private 原文或玩家原始文本。`selected_count` 必须等于 `items.length`，用于审计 skill-driven retrieval 是否按计划收窄投影。
+
+schema v5 增加 `npc_skill_projection`，用于审计本轮 NPC skill 渐进披露选择。它只允许记录：
+
+- `selected_skill_ids`
+- `skill_safe_fragment_refs`
+- `items[].skill_id`
+- `items[].type`
+- `items[].level`
+- `items[].signature`
+- `items[].allowed_intents`
+- `items[].allowed_tactics`
+- `items[].max_disclosure_mode_by_world_info`
+- `items[].safe_fragment_refs`
+- `items[].memory_plan_id`
+- `items[].allowed_proposed_actions`
+
+`npc_skill_projection` 禁止记录 skill 说明正文、safe fragment summary、角色 private 原文、memory content、forbidden fact 文本或玩家原始文本。它只能解释“本轮哪些能力边界被选中”，不能成为新的事实内容通道。
 
 真实 LLM fallback 会写入 trace：
 

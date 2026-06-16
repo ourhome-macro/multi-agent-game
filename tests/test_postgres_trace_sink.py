@@ -149,7 +149,7 @@ def test_postgres_runtime_builder_buffers_trace_for_transactional_flush(
 
 def _trace_record() -> dict[str, object]:
     return {
-        "schema_version": 4,
+        "schema_version": 5,
         "trace_id": "trace.001",
         "timestamp": "2026-06-15T00:00:00+00:00",
         "case_id": "case.trace",
@@ -165,6 +165,7 @@ def _trace_record() -> dict[str, object]:
         "compression_used": False,
         "memory_ids_used": ["memory.001"],
         "memory_projection": {"selected_count": 1},
+        "npc_skill_projection": {},
         "tool_calls": [],
         "security_flags": [],
         "intent_type": "refuse",

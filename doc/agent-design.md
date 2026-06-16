@@ -2,6 +2,8 @@
 
 当前运行时默认仍使用 `MockAgent`。Agent 行为通过稳定接口路由，让确定性 mock、本地 stub 和可选真实 LLM 共享同一套输入/输出合同。
 
+NPC Skill 是游戏运行时领域模型，不是 Codex skill，也不是 prompt 里的自然语言技能标签。它应表示角色在特定剧情、证据、关系和压力条件下可尝试的行为能力，并通过 Narrative Director、Rule Engine 和 WorldEvent 保持可审计。规划见 `doc/agents/npc-skill-system-plan-2026-06-16.md`，当前实现状态见 `doc/agents/npc-skill-implementation-2026-06-16.md`。
+
 ## 统一入口
 
 所有 Agent 实现都使用同一协议：
@@ -116,6 +118,12 @@ LLM Shadow Eval v0 复用 Agent 合同，但不是正式运行链路。它只在
 这层的重点是支持“半真半假但不越权”的蒙太奇话术：LLM 可以负责语言表现，但不能自己决定是否 full reveal、是否直接承认或是否新增事实。
 
 `director_safe_fragments` 是 `AgentLoop` 在构造上下文后由 `NarrativeDirector.safe_fragment_constraints(...)` 注入的生成前事实网关投影。它只包含当前目标 NPC 已有 `FactDisclosureStrategy` 的 `WorldInfo`，并且只包含当前 phase / beat / clue / player knowledge 条件已满足的 `WorldInfo.claim_graph.safe_fragments`。投影字段包括 fragment ref、safe summary、allowed modes 和授权 source refs；locked fragment、forbidden inference、solution claim 和 world truth 原文不得进入该字段。
+
+`npc_skill_projections` 是 NPC Skill v0 的运行时投影。案件包可用 `npc_skills.yaml` 定义角色能力，字段包括 owner、trigger、unlock condition、disclosure、memory policy、proposed action policy 和 cooldown。`NpcSkillSelector` 只按结构化 `PlayerAction`、当前 phase/beat、已发现线索、玩家知识、玩家 world_info、关系阈值和交互压力选择 skill；LLM 不能自由选择、升级或伪造 skill。
+
+`npc_skill_projections` 只包含安全边界数据：`skill_id`、类型、等级、是否 signature、允许 intent、允许 tactic、每个 world_info 的最大披露模式、授权 safe fragment ref、memory plan id 和允许 proposed action 类型。它不包含 skill 说明正文、safe fragment summary、角色 private 原文、hidden truth 或 memory content。`AgentLoop` 会把 `NarrativeDirector.safe_fragment_constraints(...)` 的结果与 skill 的 `safe_fragment_refs` 取交集，并用 skill 的 `max_disclosure_mode_by_world_info` 继续裁剪 fragment `allowed_modes`；因此 skill 不能直接授予事实，只能进一步收窄“这个 NPC 在这个时刻可以围绕哪些已解锁安全碎片、以多大粒度说话”。
+
+运行时 trace schema v5 会额外写 `npc_skill_projection` 安全摘要，用于复盘“为什么本轮 NPC 只能使用这些 intent/tactic/safe fragment”。trace 仍禁止写玩家原文、private 原文、memory content、forbidden fact 文本和 safe fragment summary。
 
 `AgentCharacterView` 只包含安全的公开角色卡字段：
 

@@ -11,7 +11,7 @@ from uuid import uuid4
 
 from app.domain.models import ActionType, AgentIntent, PlayerAction, WorldEvent
 
-TRACE_SCHEMA_VERSION = 4
+TRACE_SCHEMA_VERSION = 5
 
 
 @dataclass
@@ -29,6 +29,7 @@ class RuntimeTraceDraft:
     compression_used: bool = False
     memory_ids_used: list[str] = field(default_factory=list)
     memory_projection: dict[str, object] = field(default_factory=dict)
+    npc_skill_projection: dict[str, object] = field(default_factory=dict)
     tool_calls: list[dict[str, object]] = field(default_factory=list)
     security_flags: list[str] = field(default_factory=list)
     trace_id: str = field(default_factory=lambda: str(uuid4()))
@@ -138,6 +139,7 @@ class RuntimeTracer:
         compression_used: bool = False,
         memory_ids_used: list[str] | None = None,
         memory_projection: dict[str, object] | None = None,
+        npc_skill_projection: dict[str, object] | None = None,
         tool_calls: list[dict[str, object]] | None = None,
         security_flags: list[str] | None = None,
     ) -> RuntimeTraceDraft:
@@ -155,6 +157,9 @@ class RuntimeTracer:
             compression_used=compression_used,
             memory_ids_used=memory_ids_used or [],
             memory_projection=_sanitize_memory_projection(memory_projection or {}),
+            npc_skill_projection=_sanitize_npc_skill_projection(
+                npc_skill_projection or {}
+            ),
             tool_calls=[_sanitize_tool_call(item) for item in (tool_calls or [])],
             security_flags=security_flags or [],
         )
@@ -191,6 +196,7 @@ class RuntimeTracer:
             "compression_used": draft.compression_used,
             "memory_ids_used": draft.memory_ids_used,
             "memory_projection": draft.memory_projection,
+            "npc_skill_projection": draft.npc_skill_projection,
             "tool_calls": draft.tool_calls,
             "security_flags": draft.security_flags,
             "intent_type": intent.intent.value if intent is not None else None,
@@ -272,10 +278,53 @@ def _sanitize_memory_projection_item(item: object) -> dict[str, object]:
     }
 
 
+def _sanitize_npc_skill_projection(projection: dict[str, object]) -> dict[str, object]:
+    raw_items = projection.get("items", [])
+    items = raw_items if isinstance(raw_items, list) else []
+    return {
+        "selected_skill_ids": _string_list(projection.get("selected_skill_ids", [])),
+        "skill_safe_fragment_refs": _string_list(
+            projection.get("skill_safe_fragment_refs", []),
+        ),
+        "items": [_sanitize_npc_skill_projection_item(item) for item in items],
+    }
+
+
+def _sanitize_npc_skill_projection_item(item: object) -> dict[str, object]:
+    if not isinstance(item, dict):
+        item = {}
+    return {
+        "skill_id": str(item.get("skill_id", "")),
+        "type": str(item.get("type", "")),
+        "level": int(item.get("level", 0)),
+        "signature": bool(item.get("signature", False)),
+        "allowed_intents": _string_list(item.get("allowed_intents", [])),
+        "allowed_tactics": _string_list(item.get("allowed_tactics", [])),
+        "max_disclosure_mode_by_world_info": _string_dict(
+            item.get("max_disclosure_mode_by_world_info", {}),
+        ),
+        "safe_fragment_refs": _string_list(item.get("safe_fragment_refs", [])),
+        "memory_plan_id": (
+            str(item["memory_plan_id"])
+            if item.get("memory_plan_id") is not None
+            else None
+        ),
+        "allowed_proposed_actions": _string_list(
+            item.get("allowed_proposed_actions", []),
+        ),
+    }
+
+
 def _string_list(value: object) -> list[str]:
     if not isinstance(value, list):
         return []
     return [str(item) for item in value]
+
+
+def _string_dict(value: object) -> dict[str, str]:
+    if not isinstance(value, dict):
+        return {}
+    return {str(key): str(item) for key, item in value.items()}
 
 
 def _hash_text(text: str | None) -> str | None:

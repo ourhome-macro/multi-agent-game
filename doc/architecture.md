@@ -153,7 +153,7 @@ Memory P2 接入 archival 生命周期。`MemoryArchivalSystem` 会在 agent-bac
 
 AgentLoop 会先调用其注入的 `MemoryRetriever`，再把同一批 `memory_snapshots` 传入 `build_agent_context(...)`。因此普通 turn 的 AgentContext、`memory_ids_used`、trace `memory_projection` 和 `search_memory` tool summary 都来自同一批检索结果。`build_agent_context(...)` 保留内部 retriever 仅作为非 loop 调用路径的兼容 fallback。
 
-Runtime trace schema v4 会记录 `memory_projection` 对象。对象包含 skill 摘要：`skill_id`、`included_memory_types`、`included_scopes`、`included_layers`、`forbidden_scopes`、`forbidden_layers`、`selected_count`，以及 `items` 列表。每个 item 只包含已注入记忆的 `memory_id`、`memory_type`、`memory_scope`、`memory_layer`、`owner_character_id` 和 `visible_to_character_ids`，不记录 memory content。真实 LLM backend 也使用同一投影摘要，便于审计 real turn 是否遵守 scope/layer 边界。
+Runtime trace schema v5 会记录 `memory_projection` 和 `npc_skill_projection` 对象。`memory_projection` 包含检索 skill 摘要：`skill_id`、`included_memory_types`、`included_scopes`、`included_layers`、`forbidden_scopes`、`forbidden_layers`、`selected_count`，以及 `items` 列表。每个 item 只包含已注入记忆的 `memory_id`、`memory_type`、`memory_scope`、`memory_layer`、`owner_character_id` 和 `visible_to_character_ids`，不记录 memory content。`npc_skill_projection` 只记录本轮选中的 NPC skill id、授权 safe fragment refs、允许 intent / tactic / proposed action 类型和 disclosure 上限，不记录 skill 正文、safe summary 或 private 原文。真实 LLM backend 也使用同一投影摘要，便于审计 real turn 是否遵守 scope/layer 和渐进披露边界。
 
 同一个 trace 投影会记录 `director_safe_fragment_refs`，用于审计本轮生成前下发了哪些 Director safe fragment ref。trace 不记录 safe summary、blocked fragment summary 或 forbidden inference summary，避免观测链路反向泄漏事实内容。
 

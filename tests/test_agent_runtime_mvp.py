@@ -143,7 +143,7 @@ def test_runtime_trace_writes_safe_jsonl_and_readable_log(tmp_path: Path) -> Non
 
     assert len(records) == 1
     record = records[0]
-    assert record["schema_version"] == 4
+    assert record["schema_version"] == 5
     assert record["timestamp"]
     assert record["turn_id"] == 1
     assert record["action_type"] == "talk"
@@ -159,7 +159,9 @@ def test_runtime_trace_writes_safe_jsonl_and_readable_log(tmp_path: Path) -> Non
     assert record["memory_projection"]["selected_count"] == len(
         record["memory_projection"]["items"]
     )
+    assert record["npc_skill_projection"]["selected_skill_ids"] == []
     assert "content" not in json.dumps(record["memory_projection"], ensure_ascii=False)
+    assert "content" not in json.dumps(record["npc_skill_projection"], ensure_ascii=False)
     assert set(record["tool_calls"][0]) == {
         "tool_name",
         "status",

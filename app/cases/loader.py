@@ -62,6 +62,7 @@ class CaseLoader:
             "relationships": self._read_yaml(case_dir / "relationships.yaml", default=[]),
             "forbidden_facts": self._read_yaml(case_dir / "forbidden_facts.yaml", default=[]),
             "mock_dialogues": self._read_yaml(case_dir / "mock_dialogues.yaml", default=[]),
+            "npc_skills": self._read_yaml(case_dir / "npc_skills.yaml", default=[]),
             "memory_derivation_rules": MemoryDerivationRuleLoader().load(case_dir),
             "narrative_rules": self._read_yaml(case_dir / "narrative_rules.yaml"),
             "solution_claims": self._read_yaml(
@@ -141,6 +142,11 @@ class CaseLoader:
         self._ensure_unique(
             "mock dialogue character",
             [dialogue.character_id for dialogue in package.mock_dialogues],
+            case_dir,
+        )
+        self._ensure_unique(
+            "npc skill",
+            [skill.id for skill in package.npc_skills],
             case_dir,
         )
         self._ensure_unique(
@@ -232,6 +238,16 @@ class CaseLoader:
                     f"Character '{character.id}' private knowledge "
                     f"'{knowledge.id}' related_world_info_ids",
                 )
+
+        self._validate_npc_skills(
+            package,
+            character_ids=character_ids,
+            clue_ids=clue_ids,
+            phase_ids=phase_ids,
+            beat_ids=beat_ids,
+            world_info_ids=world_info_ids,
+            valid_player_knowledge_ids=valid_player_knowledge_ids,
+        )
 
         for relationship in package.relationships:
             if relationship.source_id not in character_ids and relationship.source_id != "player":
@@ -454,6 +470,107 @@ class CaseLoader:
         unknown_ids = sorted(set(referenced_ids) - world_info_ids)
         if unknown_ids:
             raise CaseLoadError(f"{label} references unknown world_info: {unknown_ids}")
+
+    def _validate_npc_skills(
+        self,
+        package: CasePackage,
+        *,
+        character_ids: set[str],
+        clue_ids: set[str],
+        phase_ids: set[str],
+        beat_ids: set[str],
+        world_info_ids: set[str],
+        valid_player_knowledge_ids: set[str],
+    ) -> None:
+        skill_ids = {skill.id for skill in package.npc_skills}
+        safe_fragment_refs = {
+            f"{world_info.id}.safe_fragment:{fragment.id}"
+            for world_info in package.world_info
+            for fragment in world_info.claim_graph.safe_fragments
+        }
+        for skill in package.npc_skills:
+            unknown_owners = sorted(set(skill.owner_character_ids) - character_ids)
+            if unknown_owners:
+                raise CaseLoadError(
+                    f"NPC skill '{skill.id}' references unknown owners: {unknown_owners}"
+                )
+            unknown_phases = sorted(set(skill.unlock_conditions.phases) - phase_ids)
+            if unknown_phases:
+                raise CaseLoadError(
+                    f"NPC skill '{skill.id}' references unknown phases: {unknown_phases}"
+                )
+            unknown_beats = sorted(set(skill.unlock_conditions.completed_beats) - beat_ids)
+            if unknown_beats:
+                raise CaseLoadError(
+                    f"NPC skill '{skill.id}' references unknown completed beats: "
+                    f"{unknown_beats}"
+                )
+            self._ensure_known_clues(
+                clue_ids,
+                skill.unlock_conditions.required_discovered_clues,
+                f"NPC skill '{skill.id}' required_discovered_clues",
+            )
+            self._ensure_known_clues(
+                clue_ids,
+                skill.triggers.clue_ids,
+                f"NPC skill '{skill.id}' trigger clue_ids",
+            )
+            self._ensure_known_world_info(
+                world_info_ids,
+                skill.unlock_conditions.required_world_info_ids,
+                f"NPC skill '{skill.id}' required_world_info_ids",
+            )
+            self._ensure_known_world_info(
+                world_info_ids,
+                skill.disclosure.world_info_ids,
+                f"NPC skill '{skill.id}' disclosure world_info_ids",
+            )
+            unavailable_player_knowledge = sorted(
+                set(skill.unlock_conditions.required_player_knowledge)
+                - valid_player_knowledge_ids
+            )
+            if unavailable_player_knowledge:
+                raise CaseLoadError(
+                    f"NPC skill '{skill.id}' required_player_knowledge references "
+                    f"unavailable player knowledge: {unavailable_player_knowledge}"
+                )
+            unknown_safe_refs = sorted(
+                set(skill.disclosure.safe_fragment_refs) - safe_fragment_refs
+            )
+            if unknown_safe_refs:
+                raise CaseLoadError(
+                    f"NPC skill '{skill.id}' references unknown safe fragments: "
+                    f"{unknown_safe_refs}"
+                )
+            safe_ref_world_info_ids = {
+                ref.split(".safe_fragment:", 1)[0]
+                for ref in skill.disclosure.safe_fragment_refs
+                if ".safe_fragment:" in ref
+            }
+            unbound_safe_ref_world_info_ids = sorted(
+                safe_ref_world_info_ids - set(skill.disclosure.world_info_ids)
+            )
+            if unbound_safe_ref_world_info_ids:
+                raise CaseLoadError(
+                    f"NPC skill '{skill.id}' safe_fragment_refs are not bound by "
+                    "disclosure world_info_ids: "
+                    f"{unbound_safe_ref_world_info_ids}"
+                )
+            fallback_skill_id = skill.failure.fallback_skill_id
+            if fallback_skill_id is not None and fallback_skill_id not in skill_ids:
+                raise CaseLoadError(
+                    f"NPC skill '{skill.id}' references unknown fallback skill "
+                    f"'{fallback_skill_id}'"
+                )
+            unknown_delta_metrics = (
+                set(skill.proposed_action_policy.max_relationship_delta)
+                - RELATIONSHIP_METRICS
+            )
+            if unknown_delta_metrics:
+                raise CaseLoadError(
+                    f"NPC skill '{skill.id}' references unknown relationship metrics: "
+                    f"{sorted(unknown_delta_metrics)}"
+                )
 
     def _validate_memory_derivation_rules(
         self,

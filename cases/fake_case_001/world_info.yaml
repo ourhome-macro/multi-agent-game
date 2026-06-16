@@ -3,6 +3,23 @@
   description: 书桌抽屉锁孔旁的新鲜划痕表明，抽屉在案发前后被非正常打开过。
   category: physical_fact
   sensitivity: low
+  claim_graph:
+    safe_fragments:
+      - id: drawer_was_forced
+        summary: 书桌抽屉存在新鲜撬动痕迹，只能说明抽屉被非正常打开过。
+        aliases:
+          - 抽屉被撬开
+          - 抽屉被非正常打开
+          - 新鲜撬动痕迹
+        claim_patterns:
+          - "抽屉.*(撬|非正常打开)"
+          - "锁孔.*(划痕|撬动)"
+        allowed_modes:
+          - hint
+          - partial
+        unlock_conditions:
+          player_knowledge_ids:
+            - player_knowledge.desk_forced_open
 
 - id: secret_meeting_note_exists
   title: 存在十点书房会面便签

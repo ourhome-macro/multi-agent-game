@@ -35,3 +35,4 @@ pytest_tmp_*/
 *.sqlite3
 pytest/
 pytest_tmp_agent_matrix/probe.txt
+pytest_clean_root/basetemp_min/test_agent_loop_runs_for_npc_acurrent

@@ -62,6 +62,10 @@ class PromptBuilder:
                 if context.target_profile is not None
                 else None
             ),
+            "npc_skill_projections": [
+                skill.model_dump(mode="json")
+                for skill in context.npc_skill_projections
+            ],
             "portrait_summary": context.portrait_summary,
             "inner_context_summary": self._inner_context_summary(context),
             "player_action": self._action_summary(context),

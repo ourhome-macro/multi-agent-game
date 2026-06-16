@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from app.agents.context import build_agent_context
+from app.agents.disclosure_strategy import DISCLOSURE_MODE_ORDER
 from app.agents.gateway import AgentGateway
 from app.agents.llm_contract import build_llm_agent_input, validate_llm_agent_output
 from app.agents.memory import MemoryRetriever
@@ -15,8 +16,10 @@ from app.domain.models import (
     AgentIntent,
     AgentMemorySnapshot,
     CasePackage,
+    DisclosureMode,
     PlayerAction,
     PromptBundle,
+    SafeFactFragmentProjection,
     SessionState,
 )
 from app.runtime.budget import ContextBudgetManager, ContextBudgetResult
@@ -126,6 +129,7 @@ class AgentLoop:
         security_review = self._injection_guard.review(action)
         memory_ids = [snapshot.memory_id for snapshot in retrieved_memories]
         memory_projection = _memory_projection(plan, retrieved_memories, context)
+        npc_skill_projection = _npc_skill_projection(context)
         prompt_bundle = self._prompt_builder.build(context)
         budget = self._budget_prompt(prompt_bundle, context, memory_ids)
         if budget.compressed_history is not None:
@@ -159,6 +163,7 @@ class AgentLoop:
             compression_used=budget.compression_used,
             memory_ids_used=memory_ids,
             memory_projection=memory_projection,
+            npc_skill_projection=npc_skill_projection,
             tool_calls=tool_calls,
             security_flags=security_review.security_flags,
         )
@@ -198,6 +203,7 @@ class AgentLoop:
             session.narrative,
             context,
         )
+        safe_fragments = tuple(_skill_limited_safe_fragments(context, safe_fragments))
         if not safe_fragments:
             return context
         return context.model_copy(
@@ -272,3 +278,76 @@ def _memory_projection(
             fragment.ref for fragment in context.director_safe_fragments
         ]
     return summary
+
+
+def _npc_skill_projection(context: AgentContext) -> dict[str, object]:
+    return {
+        "selected_skill_ids": [
+            skill.skill_id for skill in context.npc_skill_projections
+        ],
+        "skill_safe_fragment_refs": sorted(
+            {
+                ref
+                for skill in context.npc_skill_projections
+                for ref in skill.safe_fragment_refs
+            }
+        ),
+        "items": [
+            skill.model_dump(mode="json")
+            for skill in context.npc_skill_projections
+        ],
+    }
+
+
+def _skill_limited_safe_fragments(
+    context: AgentContext,
+    safe_fragments: tuple[SafeFactFragmentProjection, ...],
+) -> tuple[SafeFactFragmentProjection, ...]:
+    allowed_refs = {
+        ref
+        for skill in context.npc_skill_projections
+        for ref in skill.safe_fragment_refs
+    }
+    if not allowed_refs:
+        return safe_fragments
+    mode_caps_by_ref = _skill_mode_caps_by_ref(context)
+    return tuple(
+        limited_fragment
+        for fragment in safe_fragments
+        if fragment.ref in allowed_refs
+        for limited_fragment in [_limit_fragment_modes(fragment, mode_caps_by_ref)]
+        if limited_fragment is not None
+    )
+
+
+def _skill_mode_caps_by_ref(context: AgentContext) -> dict[str, DisclosureMode]:
+    caps: dict[str, DisclosureMode] = {}
+    for skill in context.npc_skill_projections:
+        for ref in skill.safe_fragment_refs:
+            world_info_id = ref.split(".safe_fragment:", 1)[0]
+            max_mode = skill.max_disclosure_mode_by_world_info.get(world_info_id)
+            if max_mode is None:
+                continue
+            current = caps.get(ref)
+            if current is None or _mode_index(max_mode) > _mode_index(current):
+                caps[ref] = max_mode
+    return caps
+
+
+def _limit_fragment_modes(
+    fragment: SafeFactFragmentProjection,
+    mode_caps_by_ref: dict[str, DisclosureMode],
+) -> SafeFactFragmentProjection | None:
+    max_mode = mode_caps_by_ref.get(fragment.ref)
+    if max_mode is None:
+        return fragment
+    allowed_modes = [
+        mode for mode in fragment.allowed_modes if _mode_index(mode) <= _mode_index(max_mode)
+    ]
+    if not allowed_modes:
+        return None
+    return fragment.model_copy(update={"allowed_modes": allowed_modes})
+
+
+def _mode_index(mode: DisclosureMode) -> int:
+    return DISCLOSURE_MODE_ORDER.index(mode)

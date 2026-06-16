@@ -343,6 +343,123 @@ class CharacterPrivateConfig(APIModel):
         return normalize_private_items(value, "knowledge")
 
 
+class NpcSkillType(StrEnum):
+    DIALOGUE = "dialogue"
+    SOCIAL = "social"
+    INVESTIGATION = "investigation"
+    MEMORY = "memory"
+    PLOT_GATED = "plot_gated"
+
+
+class NpcSkillPriority(StrEnum):
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+
+
+class NpcSkillTriggerConfig(APIModel):
+    action_types: list[ActionType] = Field(default_factory=list)
+    subject_types: list[SubjectType] = Field(default_factory=list)
+    subject_ids: list[NonEmptyString] = Field(default_factory=list)
+    clue_ids: list[NonEmptyString] = Field(default_factory=list)
+    topic_tags: list[NonEmptyString] = Field(default_factory=list)
+
+
+class NpcSkillUnlockCondition(APIModel):
+    phases: list[NonEmptyString] = Field(default_factory=list)
+    completed_beats: list[NonEmptyString] = Field(default_factory=list)
+    required_discovered_clues: list[NonEmptyString] = Field(default_factory=list)
+    required_player_knowledge: list[NonEmptyString] = Field(default_factory=list)
+    required_world_info_ids: list[NonEmptyString] = Field(default_factory=list)
+    required_pressure_min: float | None = Field(default=None, ge=0.0, le=1.0)
+    suspicion_min: float | None = Field(default=None, ge=-1.0, le=1.0)
+    trust_min: float | None = Field(default=None, ge=-1.0, le=1.0)
+    fear_min: float | None = Field(default=None, ge=-1.0, le=1.0)
+
+
+class NpcSkillDisclosurePolicy(APIModel):
+    world_info_ids: list[NonEmptyString] = Field(default_factory=list)
+    max_mode: DisclosureMode = DisclosureMode.DEFLECT
+    allowed_tactics: list[RhetoricTactic] = Field(default_factory=list)
+    safe_fragment_refs: list[NonEmptyString] = Field(default_factory=list)
+    forbidden_claim_refs: list[NonEmptyString] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def reject_full_mode(self) -> NpcSkillDisclosurePolicy:
+        if self.max_mode == DisclosureMode.FULL:
+            raise ValueError("NPC skill disclosure max_mode must not be full")
+        return self
+
+
+class NpcSkillMemoryPolicy(APIModel):
+    include_types: list[MemoryType] = Field(default_factory=list)
+    include_scopes: list[MemoryScope] = Field(default_factory=list)
+    include_layers: list[MemoryLayer] = Field(default_factory=list)
+    topic_tags: list[NonEmptyString] = Field(default_factory=list)
+    max_items: int | None = Field(default=None, ge=0)
+
+
+class NpcSkillProposedActionPolicy(APIModel):
+    allowed: list[ProposedActionType] = Field(default_factory=list)
+    max_relationship_delta: dict[str, float] = Field(default_factory=dict)
+
+    @field_validator("max_relationship_delta", mode="before")
+    @classmethod
+    def clamp_delta(cls, value: object) -> dict[str, float]:
+        if value is None:
+            return {}
+        return _validate_metric_delta(value, "max_relationship_delta")
+
+
+class NpcSkillCooldownConfig(APIModel):
+    turns: int = Field(default=0, ge=0)
+
+
+class NpcSkillFailureConfig(APIModel):
+    fallback_skill_id: NonEmptyString | None = None
+
+
+class NpcSkillConfig(APIModel):
+    id: NonEmptyString
+    owner_character_ids: list[NonEmptyString]
+    type: NpcSkillType
+    level: int = Field(default=1, ge=0)
+    priority: NpcSkillPriority = NpcSkillPriority.MEDIUM
+    signature: bool = False
+    triggers: NpcSkillTriggerConfig = Field(default_factory=NpcSkillTriggerConfig)
+    unlock_conditions: NpcSkillUnlockCondition = Field(
+        default_factory=NpcSkillUnlockCondition
+    )
+    disclosure: NpcSkillDisclosurePolicy = Field(default_factory=NpcSkillDisclosurePolicy)
+    memory: NpcSkillMemoryPolicy = Field(default_factory=NpcSkillMemoryPolicy)
+    proposed_action_policy: NpcSkillProposedActionPolicy = Field(
+        default_factory=NpcSkillProposedActionPolicy
+    )
+    cooldown: NpcSkillCooldownConfig = Field(default_factory=NpcSkillCooldownConfig)
+    failure: NpcSkillFailureConfig = Field(default_factory=NpcSkillFailureConfig)
+
+    @model_validator(mode="after")
+    def validate_owners(self) -> NpcSkillConfig:
+        if not self.owner_character_ids:
+            raise ValueError("NPC skill must define owner_character_ids")
+        return self
+
+
+class NpcSkillProjection(APIModel):
+    skill_id: NonEmptyString
+    type: NpcSkillType
+    level: int = Field(ge=0)
+    signature: bool = False
+    allowed_intents: list[AgentIntentType] = Field(default_factory=list)
+    allowed_tactics: list[RhetoricTactic] = Field(default_factory=list)
+    max_disclosure_mode_by_world_info: dict[NonEmptyString, DisclosureMode] = Field(
+        default_factory=dict
+    )
+    safe_fragment_refs: list[NonEmptyString] = Field(default_factory=list)
+    memory_plan_id: NonEmptyString | None = None
+    allowed_proposed_actions: list[ProposedActionType] = Field(default_factory=list)
+
+
 class CharacterConfig(APIModel):
     id: NonEmptyString
     display_name: NonEmptyString
@@ -927,6 +1044,7 @@ class CasePackage(APIModel):
     relationships: list[RelationshipConfig] = Field(default_factory=list)
     forbidden_facts: list[ForbiddenFactConfig] = Field(default_factory=list)
     mock_dialogues: list[MockDialogueConfig] = Field(default_factory=list)
+    npc_skills: list[NpcSkillConfig] = Field(default_factory=list)
     memory_derivation_rules: list[MemoryDerivationRuleConfig] = Field(default_factory=list)
     narrative_rules: NarrativeRulesConfig = Field(default_factory=NarrativeRulesConfig)
     solution_claims: SolutionClaimsConfig = Field(default_factory=SolutionClaimsConfig)
@@ -1210,6 +1328,7 @@ class AgentContext(APIModel):
     director_safe_fragments: list[SafeFactFragmentProjection] = Field(
         default_factory=list
     )
+    npc_skill_projections: list[NpcSkillProjection] = Field(default_factory=list)
     portrait_summary: str | None = None
     default_speech: str | None = None
     default_intent: AgentIntentType | None = None

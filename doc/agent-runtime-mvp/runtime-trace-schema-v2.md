@@ -84,13 +84,18 @@ A real API turn should now be identifiable by:
 - `public_speech_source`
 - Director allow/block outcome
 
-## Schema v4 LLM Error Fields
+## Schema v5 LLM Error Fields
 
-Runtime trace schema v4 also records sanitized real LLM fallback metadata:
+Runtime trace schema v5 records sanitized real LLM fallback metadata and the
+safe `npc_skill_projection` summary:
 
 - `llm_fallback_used`
 - `llm_error_type`
 - `llm_error_message_sanitized`
 - `schema_validation_errors`
+- `npc_skill_projection`
 
-These fields must not contain raw provider response text, full prompt content, player free text, forbidden facts, or private NPC card text. They are only operational diagnostics for failed real LLM turns.
+These fields must not contain raw provider response text, full prompt content,
+player free text, forbidden facts, safe fragment summary, skill body, memory
+content, or private NPC card text. They are only operational diagnostics for
+failed real LLM turns and selected NPC skill boundaries.

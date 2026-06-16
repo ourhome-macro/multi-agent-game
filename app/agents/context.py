@@ -9,6 +9,7 @@ from app.agents.memory import (
     memory_allowed_by_plan,
     memory_content_matches_forbidden,
 )
+from app.agents.npc_skills import NpcSkillSelector
 from app.agents.retrieval_planner import MemoryRetrievalPlan, RetrievalPlanner
 from app.domain.models import (
     AgentCharacterView,
@@ -111,6 +112,11 @@ def build_agent_context(
             plan=plan,
         )
     )
+    npc_skill_selection = NpcSkillSelector().select(
+        case=case,
+        session=session,
+        action=action,
+    )
 
     return AgentContext(
         case_id=case.meta.id,
@@ -169,6 +175,7 @@ def build_agent_context(
         player_action=action,
         target_profile=target_profile,
         inner_context=inner_context,
+        npc_skill_projections=npc_skill_selection.projections,
         portrait_summary=portrait_summary,
         default_speech=dialogue.default_speech if dialogue is not None else None,
         default_intent=dialogue.default_intent if dialogue is not None else None,
