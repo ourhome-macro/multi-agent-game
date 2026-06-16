@@ -105,6 +105,44 @@ def test_unlocked_safe_fragment_allows_hint_and_partial(mode: DisclosureMode) ->
     assert decision.allowed is True
 
 
+def test_speech_fragment_touch_requires_matching_claim_ref_or_source_ref() -> None:
+    decision = NarrativeDirector().validate(
+        _case(),
+        _narrative(discovered_clues={"broken_clock"}),
+        AgentIntent(
+            speech="The clock stopped near the critical hour.",
+            intent=AgentIntentType.ANSWER,
+            disclosure_claims=[_claim(DisclosureMode.HINT, [])],
+        ),
+    )
+
+    assert decision.allowed is False
+    assert decision.blocked_fact_id == CLOCK_FRAGMENT_ID
+    assert decision.matched_by == "safe_fragment_pattern"
+    assert decision.reason is not None
+    assert "without matching claim_refs or source_refs" in decision.reason
+
+
+def test_source_ref_can_authorize_unlocked_safe_fragment_touch() -> None:
+    decision = NarrativeDirector().validate(
+        _case(),
+        _narrative(discovered_clues={"broken_clock"}),
+        AgentIntent(
+            speech="The clock stopped near the critical hour.",
+            intent=AgentIntentType.ANSWER,
+            disclosure_claims=[
+                DisclosureClaim(
+                    world_info_id=WORLD_INFO_ID,
+                    mode=DisclosureMode.PARTIAL,
+                    source_refs=["clue:broken_clock"],
+                )
+            ],
+        ),
+    )
+
+    assert decision.allowed is True
+
+
 def test_forbidden_inference_blocks_combined_fragments_without_forbidden_term() -> None:
     decision = NarrativeDirector().validate(
         _case(),
@@ -166,6 +204,7 @@ def _case() -> CasePackage:
                             id=CLOCK_FRAGMENT_ID,
                             summary="The clock time is unreliable.",
                             aliases=["clock stopped around midnight"],
+                            claim_patterns=["clock stopped near the critical hour"],
                             allowed_modes=[
                                 DisclosureMode.HINT,
                                 DisclosureMode.PARTIAL,

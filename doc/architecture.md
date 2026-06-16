@@ -30,6 +30,21 @@ OPENAI_API_KEY=...
 
 ## 行为处理流程
 
+自然语言入口先经过 Action Intake，不能直接调用行为执行：
+
+```text
+raw player text
+  -> ActionRouter classification
+  -> entity resolution
+  -> clarification / rejected
+  -> PlayerAction candidate
+  -> Director precheck summary
+  -> RuleEngine precheck
+  -> ActionService.handle(PlayerAction)
+```
+
+`ActionService.handle_raw_text(...)` 是运行时 raw text 的硬边界。歧义输入只返回 clarification，不写世界事件；未知实体或未知动作返回 rejected，不构造 `PlayerAction`；已构造的候选 `PlayerAction` 还必须经过 Rule Engine 前置校验，非法 target、未发现 clue、不可用 claim 等都会写成 `rule.rejected`，不会进入 Agent / LLM。
+
 ```text
 POST /sessions/{id}/actions
   -> PlayerAction
@@ -47,6 +62,10 @@ POST /sessions/{id}/actions
   -> EventRecorder.append
   -> StateSummary
 ```
+
+这段流程的状态权威点是 Rule Engine 和事件日志，不是 prompt。更精确的 P0 硬链路为：Action Intake 先产出结构化 `PlayerAction`；Director precheck 只作为 Router / Intake 层的可选纯决策面；正式玩家动作由 Rule Engine 写入 `player.*` 或 `rule.rejected`；agent-backed action 再构造 `AgentContext` / `LLMAgentContractInput`；LLM 输出先过 schema 与 `validate_llm_agent_output(...)`；`NarrativeDirector` 在 `npc.replied` 前审计最终 `speech`；只有通过审计后，Rule Engine 才解释白名单 `proposed_actions`；所有真实变化最终写成 `WorldEvent` 并可 replay。完整说明见 `doc/architecture/p0-hard-chain-2026-06-16.md`。
+
+P0 事实网关已经接入 agent-backed 生成链路：`AgentLoop` 构造 `AgentContext` 后，会调用 `NarrativeDirector.safe_fragment_constraints(...)`，只把当前 NPC 可谈且已解锁的 `WorldInfo.claim_graph.safe_fragments` 写入 `AgentContext.director_safe_fragments`。`LLMAgentContractInput` 再把这些 safe fragments 合并到 `world_info` disclosure constraints。blocked fragment、forbidden inference、solution claim、forbidden fact 原文和全局真相原文不进入真实 LLM payload。
 
 `inspect` 不调用 Agent。它只校验热点，并由 Rule Engine 解锁合法线索。
 
@@ -124,6 +143,8 @@ Memory v1.1 hardening 在 `MemoryCandidateState` 和 `AgentMemorySnapshot` 上�
 
 普通 NPC `AgentContext` 的常规 memory 投影只允许 `case/core`、`session/working`、当前目标 NPC 可见的 `npc_private` 和当前目标 NPC 可见的 `scene_shared`，并排除 `director_audit`。`MemoryRetriever` 按 `memory_scope` -> `visible_to_character_ids` / `owner_character_id` -> `memory_layer` 的顺序过滤。Director 审计入口可以检索 `director_audit`，但这不等于把审计记忆注入 NPC。
 
+事实网关不是 memory 通道。`director_safe_fragments` 只允许注入 Director 已放行的 safe summary、fragment ref、allowed modes 和授权 source refs；它不能注入 locked safe fragment、forbidden inference summary、solution claim 或 world truth 原文。
+
 Memory v1.2 在 `AgentLoop` 前置加入 `RetrievalPlanner`。Planner 通过 `SkillLoader` 加载 app-level 和 case-level `MemoryProjectionSkill`，通过 `SkillSelector` 按结构化 `PlayerAction` 选择 skill，再生成 `MemoryRetrievalPlan`。Plan 控制 memory type/scope/layer、禁止项、最大条数、`portrait_summary` 和 `recent_events`，但不能突破代码级硬边界。默认 skill 覆盖 `talk`、`ask_about_clue`、`accuse`；案件级同 id skill 可以覆盖默认 skill。
 
 Memory v1.3 在不改变事件链路的前提下强化检索排序。`MemoryRetriever` 在过滤后使用结构化动作锚点、case clue title 推导、中文/英文 token、recency、reinforcement、salience 和 confidence 排序；`build_agent_context(...)` 的 snapshot 投影复用同一排序。recency 和 reinforcement 都是检索时派生量，不写回 snapshot，不改变 replay 权威。
@@ -133,6 +154,8 @@ Memory P2 接入 archival 生命周期。`MemoryArchivalSystem` 会在 agent-bac
 AgentLoop 会先调用其注入的 `MemoryRetriever`，再把同一批 `memory_snapshots` 传入 `build_agent_context(...)`。因此普通 turn 的 AgentContext、`memory_ids_used`、trace `memory_projection` 和 `search_memory` tool summary 都来自同一批检索结果。`build_agent_context(...)` 保留内部 retriever 仅作为非 loop 调用路径的兼容 fallback。
 
 Runtime trace schema v4 会记录 `memory_projection` 对象。对象包含 skill 摘要：`skill_id`、`included_memory_types`、`included_scopes`、`included_layers`、`forbidden_scopes`、`forbidden_layers`、`selected_count`，以及 `items` 列表。每个 item 只包含已注入记忆的 `memory_id`、`memory_type`、`memory_scope`、`memory_layer`、`owner_character_id` 和 `visible_to_character_ids`，不记录 memory content。真实 LLM backend 也使用同一投影摘要，便于审计 real turn 是否遵守 scope/layer 边界。
+
+同一个 trace 投影会记录 `director_safe_fragment_refs`，用于审计本轮生成前下发了哪些 Director safe fragment ref。trace 不记录 safe summary、blocked fragment summary 或 forbidden inference summary，避免观测链路反向泄漏事实内容。
 
 在 PostgreSQL runtime 下，runtime trace 先写入 `RuntimeTraceBuffer`，再由 `PostgresActionRuntime` 随本轮 `world_events` 同事务 flush 到 `runtime_traces`。这避免 LLM/Director trace 先于事件落库，导致 stale sequence 或 append 失败时留下不可回放的观测记录。
 
@@ -146,7 +169,13 @@ Memory v1.4 将记忆派生收敛到统一 `MemoryDerivationRule`。`CaseLoader`
 
 `LLMAgentContractInput` 用显式披露约束包裹 `AgentContext`，供未来真实 LLM 使用。`validate_llm_agent_output` 要求严格 `AgentIntent` JSON，并在 Rule Engine 前拒绝 LLM 提出的剧情阶段变化。
 
+`world_info` 级 disclosure constraint 现在包含 Director 放行的 `safe_fragments` 与对应 `safe_fact_refs`。真实 LLM 的 `partial` disclosure 必须引用这些 refs；输出引用未授权 safe fragment、或 speech 触碰 safe fragment 但没有匹配 `claim_refs` / `source_refs`，都会被合同校验或 Director 后置审计拒绝。
+
 真实适配器启用时，会发送 `LLMAgentContractInput`，请求严格 JSON，使用 `validate_llm_agent_output` 校验返回值。API 错误、JSON 错误、schema 错误、阶段变更提议或 private 原文回显都会降级为安全拒答。适配器不写事件，也不能绕过 Narrative Director 或 Rule Engine。
+
+真实 LLM 的 provider 级 system instructions 只来自 `app/agents/prompts/system.md`。动态事实、目标 NPC 视图、披露边界和输出合同通过 `LLMAgentContractInput` 作为 user payload 进入，不拼入 system prompt。`PromptBuilder.agent_prompt`、`contract_instruction` 和 `safety_instruction` 当前服务本地 prompt surface 与 context budget，不是 `OpenAILLMAgent` 的 system prompt 拼装源。禁说事实原文、blocked terms、solution claims、线索 truth_status、其他 NPC private、未选中 memory content 和 `director_audit` memory 都不能进入真实 LLM payload；需要表达的边界只能以 ID、allowed/forbidden modes、safe refs、`must_not_claim` 和 schema 约束出现。
+
+因此真实 LLM payload 的事实内容上限是 Director safe fragment summary；这不是案件真相，也不是完整 world_info 描述。模型只能围绕该片段表达，不能把多个 safe fragment 合成为更大的结论，不能访问 locked fragment 或 forbidden inference。
 
 ## 事件回放
 

@@ -13,6 +13,7 @@ from app.domain.models import (
     ForbiddenInferenceConfig,
     NarrativeState,
     SafeFactFragmentConfig,
+    SafeFactFragmentProjection,
     WorldInfoConfig,
 )
 
@@ -132,6 +133,30 @@ class FactGateway:
             forbidden_inferences=tuple(forbidden),
         )
 
+    def safe_fragment_projections(
+        self,
+        *,
+        allowed_world_info_ids: set[str] | None = None,
+    ) -> tuple[SafeFactFragmentProjection, ...]:
+        projections: list[SafeFactFragmentProjection] = []
+        for world_info in self._case.world_info:
+            if allowed_world_info_ids is not None and world_info.id not in allowed_world_info_ids:
+                continue
+            for fragment in world_info.claim_graph.safe_fragments:
+                if not self._fragment_unlocked(fragment):
+                    continue
+                projections.append(
+                    SafeFactFragmentProjection(
+                        world_info_id=world_info.id,
+                        fragment_id=fragment.id,
+                        ref=_canonical_safe_fragment_ref(world_info.id, fragment.id),
+                        summary=fragment.summary,
+                        allowed_modes=fragment.allowed_modes,
+                        source_refs=_fragment_source_refs(fragment),
+                    )
+                )
+        return tuple(projections)
+
     def validate_disclosure_claims(
         self,
         intent: AgentIntent,
@@ -143,8 +168,8 @@ class FactGateway:
 
             fragment_refs = [
                 fragment
-                for ref in claim.claim_refs
-                for fragment in self._matching_fragment_refs(world_info, ref)
+                for fragment in world_info.claim_graph.safe_fragments
+                if self._claim_references_fragment(world_info, fragment, claim)
             ]
             inference_refs = [
                 inference
@@ -182,7 +207,7 @@ class FactGateway:
                 return FactGatewayViolation(
                     reason=(
                         f"Disclosure claim for world_info '{claim.world_info_id}' "
-                        "does not reference a safe fragment"
+                        "does not reference an authorized safe fragment"
                     ),
                     world_info_id=claim.world_info_id,
                     claimed_mode=claim.mode,
@@ -222,6 +247,23 @@ class FactGateway:
             )
             if violation is not None:
                 return violation
+            world_info = self._world_info_by_id.get(mention.world_info_id)
+            if world_info is None:
+                continue
+            if not self._claim_references_fragment(world_info, fragment, claim):
+                return FactGatewayViolation(
+                    reason=(
+                        f"Speech touched safe fragment '{mention.fragment_id}' "
+                        f"for world_info '{mention.world_info_id}' without matching "
+                        "claim_refs or source_refs"
+                    ),
+                    world_info_id=mention.world_info_id,
+                    claimed_mode=claim.mode,
+                    fragment_id=mention.fragment_id,
+                    matched_by=mention.matched_by,
+                    matched_text=mention.matched_text,
+                    pattern_id=mention.pattern_id,
+                )
 
         for inference_mention in self.detect_forbidden_inference_mentions(
             intent.speech,
@@ -419,16 +461,20 @@ class FactGateway:
             if item.world_info_id is not None
         }
 
-    def _matching_fragment_refs(
+    def _claim_references_fragment(
         self,
         world_info: WorldInfoConfig,
-        claim_ref: str,
-    ) -> list[SafeFactFragmentConfig]:
-        return [
-            fragment
-            for fragment in world_info.claim_graph.safe_fragments
-            if _claim_ref_matches(world_info.id, fragment.id, claim_ref, "safe_fragment")
-        ]
+        fragment: SafeFactFragmentConfig,
+        claim: object,
+    ) -> bool:
+        claim_refs = list(getattr(claim, "claim_refs", []))
+        source_refs = list(getattr(claim, "source_refs", []))
+        for ref in [*claim_refs, *source_refs]:
+            if _claim_ref_matches(world_info.id, fragment.id, ref, "safe_fragment"):
+                return True
+            if ref == _canonical_safe_fragment_ref(world_info.id, fragment.id):
+                return True
+        return any(ref in set(_fragment_source_refs(fragment)) for ref in source_refs)
 
     def _matching_inference_refs(
         self,
@@ -533,6 +579,35 @@ def _claim_ref_matches(
         f"{world_info_id}:{item_id}",
         f"{world_info_id}.{prefix}:{item_id}",
     }
+
+
+def _canonical_safe_fragment_ref(world_info_id: str, fragment_id: str) -> str:
+    return f"{world_info_id}.safe_fragment:{fragment_id}"
+
+
+def _fragment_source_refs(fragment: SafeFactFragmentConfig) -> list[str]:
+    refs: list[str] = []
+    conditions = fragment.unlock_conditions
+    refs.extend(f"phase:{phase}" for phase in conditions.phases)
+    refs.extend(f"beat:{beat}" for beat in conditions.completed_beats)
+    refs.extend(conditions.completed_beats)
+    refs.extend(f"clue:{clue_id}" for clue_id in conditions.discovered_clues)
+    refs.extend(conditions.discovered_clues)
+    refs.extend(conditions.player_knowledge_ids)
+    refs.extend(
+        f"world_info:{world_info_id}"
+        for world_info_id in conditions.player_world_info_ids
+    )
+    return _dedupe_strings(refs)
+
+
+def _dedupe_strings(values: list[str]) -> list[str]:
+    deduped: list[str] = []
+    for value in values:
+        if value in deduped:
+            continue
+        deduped.append(value)
+    return deduped
 
 
 def _detect_fragment_alias_mentions(

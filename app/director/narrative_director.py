@@ -20,6 +20,7 @@ from app.domain.models import (
     FactDisclosureStrategy,
     NarrativeState,
     PlayerAction,
+    SafeFactFragmentProjection,
     SessionState,
     SubjectType,
 )
@@ -56,6 +57,34 @@ class NarrativeDirector:
         context: AgentContext | None = None,
     ) -> FactGatewaySummary:
         return FactGateway(case=case, narrative=narrative, context=context).summarize()
+
+    def safe_fragment_constraints(
+        self,
+        case: CasePackage,
+        narrative: NarrativeState,
+        context: AgentContext,
+    ) -> tuple[SafeFactFragmentProjection, ...]:
+        constraints = _world_info_constraints_by_id(context)
+        if not constraints:
+            return ()
+        projections = FactGateway(
+            case=case,
+            narrative=narrative,
+            context=context,
+        ).safe_fragment_projections(
+            allowed_world_info_ids=set(constraints),
+        )
+        return tuple(
+            projection
+            for projection in (
+                _project_fragment_for_strategy(
+                    projection,
+                    constraints[projection.world_info_id],
+                )
+                for projection in projections
+            )
+            if projection is not None
+        )
 
     def precheck_player_action(
         self,
@@ -270,6 +299,22 @@ def _world_info_constraints_by_id(context: AgentContext) -> dict[str, FactDisclo
         strategy.world_info_id: strategy
         for strategy in context.inner_context.fact_disclosure_strategies
     }
+
+
+def _project_fragment_for_strategy(
+    projection: SafeFactFragmentProjection,
+    strategy: FactDisclosureStrategy,
+) -> SafeFactFragmentProjection | None:
+    allowed_modes = [
+        mode
+        for mode in projection.allowed_modes
+        if mode in set(strategy.allowed_modes)
+        and mode not in set(strategy.forbidden_modes)
+        and mode != DisclosureMode.FULL
+    ]
+    if not allowed_modes:
+        return None
+    return projection.model_copy(update={"allowed_modes": allowed_modes})
 
 
 def _blocked_disclosure(

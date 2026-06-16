@@ -637,7 +637,11 @@ def _allowed_disclosure_mode_matrix(contract_input: LLMAgentContractInput) -> st
         ]
         if not allowed_modes:
             allowed_modes = ["none"]
-        lines.append(f"- {constraint.item_id}: {', '.join(allowed_modes)}")
+        safe_refs = ", ".join(constraint.safe_fact_refs) or "none"
+        lines.append(
+            f"- {constraint.item_id}: modes={', '.join(allowed_modes)}; "
+            f"safe_refs={safe_refs}"
+        )
     if not lines:
         return "- no world_info disclosure_claim is allowed; use []"
     return "\n".join(lines)
@@ -875,6 +879,7 @@ def _disclosure_claim_json_schema_for_constraint(
         world_info_id_schema={"type": "string", "enum": [constraint.item_id]},
         mode_values=allowed_modes,
         tactic_values=tactic_values,
+        ref_values=constraint.safe_fact_refs,
     )
 
 
@@ -887,6 +892,7 @@ def _generic_disclosure_claim_json_schema(
         tactic_values=[
             tactic.value for tactic in output_contract.allowed_rhetoric_tactics
         ],
+        ref_values=None,
     )
 
 
@@ -895,7 +901,13 @@ def _disclosure_claim_object_schema(
     world_info_id_schema: dict[str, Any],
     mode_values: list[str],
     tactic_values: list[str],
+    ref_values: list[str] | None,
 ) -> dict[str, Any]:
+    ref_item_schema = (
+        {"type": "string", "enum": ref_values}
+        if ref_values
+        else {"type": "string"}
+    )
     return {
         "type": "object",
         "additionalProperties": False,
@@ -923,11 +935,11 @@ def _disclosure_claim_object_schema(
             },
             "source_refs": {
                 "type": "array",
-                "items": {"type": "string"},
+                "items": ref_item_schema,
             },
             "claim_refs": {
                 "type": "array",
-                "items": {"type": "string"},
+                "items": ref_item_schema,
             },
         },
     }

@@ -35,7 +35,7 @@ class MemorySearchScore:
         return (
             self.total,
             self.structured,
-            self.salience,
+            self.keyword,
             self.reinforcement,
             self.confidence,
             self.updated_at,
@@ -232,8 +232,7 @@ class MemoryRetrievalPipeline:
         reinforcement = self._reinforcement_scorer(snapshot) if has_relevance else 0.0
         confidence = snapshot.confidence * 0.15 if has_relevance else 0.0
         total = (
-            snapshot.salience
-            + structured
+            structured
             + keyword
             + embedding
             + recency

@@ -117,6 +117,7 @@ def _apply_event(session: SessionState, event: WorldEvent) -> None:
             memory_type=str(event.payload.get("memory_type", "episodic")),
             memory_scope=str(event.payload.get("memory_scope", "npc_private")),
             memory_layer=str(event.payload.get("memory_layer", "working")),
+            operation=normalize_memory_operation(event.payload.get("operation")),
             subject_id=str(event.payload["subject_id"]),
             owner_character_id=_optional_str(event.payload.get("owner_character_id")),
             visible_to_character_ids=[
@@ -221,9 +222,9 @@ def _optional_str(value: object) -> str | None:
 
 def _source_event_ids(payload: dict[str, object], fallback_event_id: str) -> list[str]:
     values = payload.get("source_event_ids")
-    if not isinstance(values, list) or not values:
-        return [fallback_event_id]
-    return [str(item) for item in values]
+    if isinstance(values, list):
+        return [str(item) for item in values if str(item)]
+    return [fallback_event_id]
 
 
 def _metadata(value: object) -> dict[str, object]:

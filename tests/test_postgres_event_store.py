@@ -33,7 +33,8 @@ def test_schema_defines_runtime_persistence_tables_and_constraints() -> None:
     assert "UNIQUE (session_id, sequence)" in schema_sql
     assert "PRIMARY KEY (session_id, idempotency_key)" in schema_sql
     assert "REFERENCES world_events(session_id, id)" in schema_sql
-    assert "CHECK (array_length(source_event_ids, 1) IS NOT NULL)" in schema_sql
+    assert "metadata->>'non_authoritative' = 'true'" in schema_sql
+    assert "array_length(source_event_ids, 1) IS NOT NULL" in schema_sql
     assert "operation IN ('create', 'reinforce', 'revise', 'supersede', 'archive')" in schema_sql
 
 

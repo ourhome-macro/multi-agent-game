@@ -238,6 +238,7 @@ def test_plan_max_memory_items_applies_after_quality_sorting() -> None:
     primary = _memory(
         memory_id="memory.quality.max.primary",
         content="空胶囊让江彦回暴露出对药箱的异常防御。",
+        metadata={"clue_id": EMPTY_CAPSULES},
         salience=0.30,
     )
     secondary = _memory(
@@ -265,6 +266,7 @@ def test_build_agent_context_applies_quality_sorting_before_snapshot_truncation(
     primary = _memory(
         memory_id="memory.quality.context.zz_primary",
         content="空胶囊让江彦回暴露出对药箱的异常防御。",
+        metadata={"clue_id": EMPTY_CAPSULES},
         salience=0.30,
     )
     secondary = _memory(

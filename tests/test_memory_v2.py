@@ -106,6 +106,8 @@ def test_memory_metadata_v2_allows_stable_fields_and_rejects_shape_drift() -> No
             "world_info_id": "heart_medicine_replaced",
             "claim_id": "shared_death_chain",
             "scene_id": "study",
+            "phase_id": "opening",
+            "phase_ids": ["opening", "investigation", "opening"],
             "topic_tags": ["medicine", "pressure", "medicine"],
             "privacy_reason": "npc_private_owner_only",
             "decay_policy": {
@@ -118,6 +120,7 @@ def test_memory_metadata_v2_allows_stable_fields_and_rejects_shape_drift() -> No
     )
 
     assert snapshot.metadata["topic_tags"] == ["medicine", "pressure"]
+    assert snapshot.metadata["phase_ids"] == ["opening", "investigation"]
     assert snapshot.metadata["decay_policy"] == {
         "name": "standard",
         "archive_after_days": 7,
@@ -183,9 +186,20 @@ def test_memory_snapshot_system_records_explicit_reinforce_revise_supersede_arch
         snapshot_system,
         recorder,
         memory_id="memory.v2.reducer",
+        operation="supersede",
+        content="Superseding memory narrows the player medicine pressure.",
+        source_event_id="event.source.4",
+        salience=0.5,
+        metadata={"topic_tags": ["medicine", "superseded"]},
+    )
+    _append_memory_candidate(
+        session,
+        snapshot_system,
+        recorder,
+        memory_id="memory.v2.reducer",
         operation="archive",
         content="Archive operation preserves revised content.",
-        source_event_id="event.source.4",
+        source_event_id="event.source.5",
         salience=0.8,
     )
 
@@ -201,6 +215,7 @@ def test_memory_snapshot_system_records_explicit_reinforce_revise_supersede_arch
         "create",
         "reinforce",
         "revise",
+        "supersede",
         "archive",
     ]
     assert snapshot.source_event_ids == [
@@ -208,13 +223,85 @@ def test_memory_snapshot_system_records_explicit_reinforce_revise_supersede_arch
         "event.source.2",
         "event.source.3",
         "event.source.4",
+        "event.source.5",
     ]
-    assert snapshot.content == "Revised player pressure with clearer medicine anchor."
-    assert snapshot.salience == 0.9
+    assert snapshot.content == "Superseding memory narrows the player medicine pressure."
+    assert snapshot.salience == 0.8
     assert snapshot.memory_layer == "archival"
     assert snapshot.last_operation == MemoryOperation.ARCHIVE
-    assert snapshot.metadata["world_info_id"] == "heart_medicine_replaced"
-    assert snapshot.metadata["topic_tags"] == ["medicine", "revision"]
+    assert "world_info_id" not in snapshot.metadata
+    assert snapshot.metadata["topic_tags"] == ["medicine", "superseded"]
+
+
+def test_active_memory_candidate_without_source_is_rejected() -> None:
+    session = _session()
+    recorder = EventRecorder()
+    snapshot_system = MemorySnapshotSystem(recorder)
+    event = recorder.append(
+        session,
+        actor_id="test",
+        event_type=EventType.MEMORY_CANDIDATE_CREATED,
+        payload={
+            "memory_id": "memory.v2.unsourced",
+            "memory_type": "episodic",
+            "memory_scope": "npc_private",
+            "memory_layer": "working",
+            "operation": "create",
+            "subject_id": "player",
+            "owner_character_id": JIANG,
+            "visible_to_character_ids": [JIANG],
+            "content": "Unsourced active memory must not become agent context.",
+            "source_event_ids": [],
+            "source_memory_ids": [],
+            "visibility": ["player"],
+            "salience": 1.0,
+        },
+    )
+
+    with pytest.raises(ValueError, match="must include source_event_ids"):
+        snapshot_system.apply(session=session, event=event)
+
+
+def test_non_authoritative_unsourced_memory_can_be_stored_but_not_retrieved() -> None:
+    session = _session()
+    recorder = EventRecorder()
+    snapshot_system = MemorySnapshotSystem(recorder)
+    event = recorder.append(
+        session,
+        actor_id="test",
+        event_type=EventType.MEMORY_CANDIDATE_CREATED,
+        payload={
+            "memory_id": "memory.v2.unsourced.non_authoritative",
+            "memory_type": "episodic",
+            "memory_scope": "npc_private",
+            "memory_layer": "working",
+            "operation": "create",
+            "subject_id": "player",
+            "owner_character_id": JIANG,
+            "visible_to_character_ids": [JIANG],
+            "content": "empty capsules hearsay without event provenance",
+            "source_event_ids": [],
+            "source_memory_ids": [],
+            "visibility": ["player"],
+            "salience": 1.0,
+            "metadata": {"non_authoritative": True},
+        },
+    )
+
+    snapshot_system.apply(session=session, event=event)
+    memories = MemoryRetriever(max_results=10).retrieve(
+        case=_case(),
+        session=session,
+        action=PlayerAction(type=ActionType.TALK, target_id=JIANG, text="empty capsules"),
+    )
+
+    assert (
+        session.memory_snapshots[
+            "memory.v2.unsourced.non_authoritative"
+        ].source_event_ids
+        == []
+    )
+    assert memories == []
 
 
 def test_memory_retrieval_returns_empty_when_no_relevant_hit_even_with_high_salience() -> None:
@@ -264,6 +351,61 @@ def test_memory_retrieval_hard_filter_blocks_other_npc_private_before_scoring() 
     )
 
     assert [memory.memory_id for memory in memories] == [jiang_memory.memory_id]
+
+
+def test_memory_retrieval_phase_filter_runs_before_scoring() -> None:
+    opening_memory = _memory(
+        memory_id="memory.v2.phase.opening.empty_capsules",
+        content="Jiang remembers empty capsules in the opening.",
+        metadata={"phase_ids": ["opening"]},
+        salience=0.1,
+    )
+    reconstruction_memory = _memory(
+        memory_id="memory.v2.phase.reconstruction.empty_capsules",
+        content="Jiang remembers empty capsules only during reconstruction.",
+        metadata={"phase_id": "reconstruction"},
+        salience=1.0,
+    )
+
+    memories = MemoryRetriever(max_results=10).retrieve(
+        case=_case(),
+        session=_session([reconstruction_memory, opening_memory]),
+        action=PlayerAction(type=ActionType.TALK, target_id=JIANG, text="empty capsules"),
+    )
+
+    assert [memory.memory_id for memory in memories] == [opening_memory.memory_id]
+
+
+def test_memory_retrieval_accepts_topic_and_source_relevance_without_salience_fallback() -> None:
+    topic = _memory(
+        memory_id="memory.v2.topic",
+        content="Jiang remembers the player applying pressure.",
+        metadata={"topic_tags": ["empty_capsules"]},
+        salience=0.1,
+    )
+    source = _memory(
+        memory_id="memory.v2.source",
+        content="Jiang remembers a prior pressure turn.",
+        source_event_ids=["event.empty_capsules.presented"],
+        salience=0.1,
+    )
+    unrelated = _memory(
+        memory_id="memory.v2.unrelated.topic_high_salience",
+        content="Jiang remembers seating chart questions.",
+        salience=1.0,
+    )
+
+    memories = MemoryRetriever(max_results=10).retrieve(
+        case=_case(),
+        session=_session([unrelated, source, topic]),
+        action=PlayerAction(type=ActionType.TALK, target_id=JIANG, text="empty_capsules"),
+    )
+
+    assert {memory.memory_id for memory in memories} == {
+        source.memory_id,
+        topic.memory_id,
+    }
+    assert unrelated.memory_id not in {memory.memory_id for memory in memories}
 
 
 def test_memory_retrieval_can_use_embedding_and_reranker_slots() -> None:
@@ -346,6 +488,7 @@ def _memory(
     visible_to_character_ids: list[str] | None = None,
     memory_scope: str = "npc_private",
     memory_layer: str = "working",
+    source_event_ids: list[str] | None = None,
     metadata: dict[str, object] | None = None,
 ) -> AgentMemorySnapshot:
     return AgentMemorySnapshot(
@@ -357,7 +500,7 @@ def _memory(
         owner_character_id=owner_character_id,
         visible_to_character_ids=visible_to_character_ids or [JIANG],
         content=content,
-        source_event_ids=[f"source.{memory_id}"],
+        source_event_ids=source_event_ids or [f"source.{memory_id}"],
         source_memory_ids=[],
         salience=salience,
         confidence=1.0,

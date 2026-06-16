@@ -10,6 +10,7 @@ from app.domain.models import (
     MemoryDerivationRuleConfig,
     MemoryImpressionEffectConfig,
     MemoryLayer,
+    MemoryOperation,
     MemoryScope,
     MemoryType,
     WorldEvent,
@@ -29,6 +30,7 @@ class MemoryEffect:
     memory_type: MemoryType
     memory_scope: MemoryScope
     memory_layer: MemoryLayer
+    operation: MemoryOperation
     subject_id: str
     owner_character_id: str | None
     visible_to_character_ids: list[str]
@@ -79,6 +81,7 @@ def resolve_memory_derivation_effects(
                         memory_type=produced.memory_type,
                         memory_scope=produced.memory_scope,
                         memory_layer=produced.memory_layer,
+                        operation=produced.operation,
                         subject_id=_render(produced.subject_id, context),
                         owner_character_id=_render_optional(
                             produced.owner_character_id,

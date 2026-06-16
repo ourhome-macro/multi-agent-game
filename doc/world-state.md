@@ -434,12 +434,13 @@ Memory v2 在模型层显式引入 `MemoryOperation`：
 
 兼容规则：历史事件里的 `created`、`updated`、`reinforced`、`revised`、`superseded`、`archived`、`seeded` 会在模型校验时归一到 v2 operation。`MemoryArchivalSystem` 现有事件仍可写 `operation=archived`；模型会把它解释为 `archive`，避免历史 replay 和当前归档事件断裂。
 
-`AgentMemorySnapshot` 记录 `last_operation`，用于审计最后一次快照变化的语义。`MemoryCandidateState` 记录 `operation`，由 `MemorySnapshotSystem` 解释并写入 `agent_memory_snapshot.updated.operation`。当前迁移只改变内存模型和事件 reducer，不改变 Postgres schema。
+`AgentMemorySnapshot` 记录 `last_operation`，用于审计最后一次快照变化的语义。`MemoryCandidateState` 记录 `operation`，由 `MemorySnapshotSystem` 解释并写入 `agent_memory_snapshot.updated.operation`。Postgres `memory_snapshots` 约束要求 active memory 必须有 `source_event_ids`；只有 `archival` 或显式 `metadata.non_authoritative=true` 的记录可以缺少来源。
 
 metadata v2 不允许无约束 dict 漂移：
 
-- ID 型字段必须是非空字符串：`world_info_id`、`claim_id`、`scene_id`、`clue_id`、`belief_subject`、`strategy_id`、`privacy_reason`。
-- `topic_tags` 必须是字符串列表，并去重保序。
+- ID 型字段必须是非空字符串：`world_info_id`、`claim_id`、`scene_id`、`phase_id`、`clue_id`、`belief_subject`、`strategy_id`、`privacy_reason`。
+- `topic_tags` 和 `phase_ids` 必须是字符串列表，并去重保序。
+- `non_authoritative` 必须是布尔值；它只允许存储非权威无来源材料，不允许普通检索把它注入 NPC 上下文。
 - `decay_policy` 只能是 `standard`、`sticky`、`ephemeral`、`never_archive`，或只包含 `name`、`archive_after_days`、`reinforced_event_count` 的对象。
 
 迁移路径：
@@ -633,6 +634,12 @@ Replay 直接应用 `character_impression.updated`，不得重新运行画像派
 - `agent_memory_snapshot.updated` 从事件日志 replay，不重新运行记忆派生。
 - `character_fact_awareness.updated` 从事件日志 replay，不让 LLM 或 Agent 直接写入。
 - `character_impression.updated` 从事件日志 replay，不重新运行画像派生。
+
+P0 硬链路要求：prompt、LLM output contract、`disclosure_claims` 和 repair 都不是状态权威。它们只能影响一次 NPC turn 的候选表达。真实状态只来自 `RuleEngine`、`DerivedEventSystem`、`MemorySnapshotSystem`、`MemoryArchivalSystem`、`RuleTriggerSystem` 和 `EventRecorder` 写出的 `WorldEvent`。
+
+不得把这些内容作为 prompt 事实通道交给 LLM：原始 `CasePackage`、原始 `SessionState`、角色原始 `private`、其他 NPC private、`director_audit` memory、未选中 memory content、线索 `truth_status`、forbidden fact 原文、blocked terms、solution claims 和正式指控真相配置。需要给 LLM 的边界只能以 `blocked_fact_ids`、`revealable_fact_ids`、`LLMDisclosureConstraint`、`FactDisclosureStrategy`、safe refs、`must_not_claim` 和 output schema 的形式出现。
+
+集中说明见 `doc/architecture/p0-hard-chain-2026-06-16.md`。
 
 ## 泄漏边界
 

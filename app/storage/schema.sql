@@ -79,7 +79,11 @@ CREATE TABLE IF NOT EXISTS memory_snapshots (
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
     PRIMARY KEY (session_id, memory_id),
-    CHECK (array_length(source_event_ids, 1) IS NOT NULL),
+    CHECK (
+        memory_layer = 'archival'
+        OR metadata->>'non_authoritative' = 'true'
+        OR array_length(source_event_ids, 1) IS NOT NULL
+    ),
     CHECK (last_operation IN ('create', 'reinforce', 'revise', 'supersede', 'archive')),
     FOREIGN KEY (session_id, last_updated_event_id)
         REFERENCES world_events(session_id, id)

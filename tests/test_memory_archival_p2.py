@@ -105,6 +105,45 @@ def test_archival_system_archives_only_stale_unreinforced_working_memories() -> 
     assert replayed.memory_snapshots[recent.memory_id].memory_layer == "working"
 
 
+def test_archival_system_respects_memory_decay_policy_metadata() -> None:
+    session = _session("case.memory_archival_policy")
+    never_archive = _snapshot(
+        "memory.player.policy.never_archive",
+        content="Sticky working memory should stay active.",
+        updated_at=STALE_TS,
+        source_event_ids=["event.policy.never"],
+        metadata={"decay_policy": "never_archive"},
+    )
+    immediate = _snapshot(
+        "memory.player.policy.immediate",
+        content="Ephemeral working memory should archive immediately.",
+        updated_at=AS_OF_TS,
+        source_event_ids=["event.policy.immediate"],
+        metadata={"decay_policy": {"name": "ephemeral", "archive_after_days": 0}},
+    )
+    reinforced_sticky = _snapshot(
+        "memory.player.policy.sticky_reinforced",
+        content="Sticky policy raises the reinforcement threshold.",
+        updated_at=STALE_TS,
+        source_event_ids=["event.policy.sticky.1", "event.policy.sticky.2"],
+        metadata={"decay_policy": "sticky"},
+    )
+    for snapshot in [never_archive, immediate, reinforced_sticky]:
+        session.memory_snapshots[snapshot.memory_id] = snapshot
+    _append_clock_event(session, AS_OF_TS)
+
+    events = MemoryArchivalSystem(EventRecorder()).apply(
+        session=session,
+        caused_by_event_id="event.clock",
+    )
+
+    assert [event.payload["memory_id"] for event in events] == [
+        immediate.memory_id,
+        reinforced_sticky.memory_id,
+    ]
+    assert session.memory_snapshots[never_archive.memory_id].memory_layer == "working"
+
+
 def test_cold_recall_uses_archival_only_when_working_has_no_relevant_hit() -> None:
     case = CaseLoader().load(CASE_DIR)
     action = _talk_action("empty_capsules")
@@ -282,6 +321,7 @@ def _snapshot(
     visible_to_character_ids: list[str] | None = None,
     salience: float = 0.8,
     source_event_ids: list[str] | None = None,
+    metadata: dict[str, object] | None = None,
     updated_at: str = RECENT_TS,
 ) -> AgentMemorySnapshot:
     return AgentMemorySnapshot(
@@ -299,7 +339,7 @@ def _snapshot(
         salience=salience,
         confidence=1.0,
         visibility="private",
-        metadata={},
+        metadata=metadata or {},
         last_updated_event_id=f"snapshot.{memory_id}",
         created_at=updated_at,
         updated_at=updated_at,

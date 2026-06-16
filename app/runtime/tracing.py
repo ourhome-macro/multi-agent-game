@@ -249,6 +249,9 @@ def _sanitize_memory_projection(projection: dict[str, object]) -> dict[str, obje
         "forbidden_scopes": _string_list(projection.get("forbidden_scopes", [])),
         "forbidden_layers": _string_list(projection.get("forbidden_layers", [])),
         "selected_count": int(projection.get("selected_count", 0)),
+        "director_safe_fragment_refs": _string_list(
+            projection.get("director_safe_fragment_refs", []),
+        ),
         "items": [_sanitize_memory_projection_item(item) for item in items],
     }
 

@@ -88,6 +88,7 @@ LLM Shadow Eval v0 复用 Agent 合同，但不是正式运行链路。它只在
 - `presented_clue_id`
 - `presented_knowledge_id`
 - `inner_context`
+- `director_safe_fragments`
 
 为了支持当前 mock，还包含案件编写的回复配置：
 
@@ -113,6 +114,8 @@ LLM Shadow Eval v0 复用 Agent 合同，但不是正式运行链路。它只在
 - 可围绕表达的 `safe_fact_refs`
 
 这层的重点是支持“半真半假但不越权”的蒙太奇话术：LLM 可以负责语言表现，但不能自己决定是否 full reveal、是否直接承认或是否新增事实。
+
+`director_safe_fragments` 是 `AgentLoop` 在构造上下文后由 `NarrativeDirector.safe_fragment_constraints(...)` 注入的生成前事实网关投影。它只包含当前目标 NPC 已有 `FactDisclosureStrategy` 的 `WorldInfo`，并且只包含当前 phase / beat / clue / player knowledge 条件已满足的 `WorldInfo.claim_graph.safe_fragments`。投影字段包括 fragment ref、safe summary、allowed modes 和授权 source refs；locked fragment、forbidden inference、solution claim 和 world truth 原文不得进入该字段。
 
 `AgentCharacterView` 只包含安全的公开角色卡字段：
 
@@ -265,10 +268,13 @@ Agent 也不能写 `FactDisclosureStrategy`。策略是上下文投影，不是�
 - `mode` 不能在 `forbidden_modes` 内。
 - `full` 永远拒绝。
 - `claim_refs` 不能命中 `must_not_claim`。
+- 如果 `speech` 实际触碰某个 `safe_fragment`，同一个 claim 必须通过 `claim_refs` 或 `source_refs` 引用该 Director 授权的 safe fragment 或其解锁来源。
 
 如果台词直接命名某个 `WorldInfo`，但没有对应 `disclosure_claim`，Director 会拒绝该回复并降级为安全台词。
 
 更重要的是，`disclosure_claims` 只是 Agent 自报，不是通行证。Narrative Director 会独立扫描最终 `speech`，用 `WorldInfo.title`、`WorldInfo.aliases`、`WorldInfo.claim_patterns` 和禁说词映射判断实际触碰了哪些事实。只要 speech 的实际触碰超过 claim.mode，或触碰了没有声明的另一个 `WorldInfo`，回复都会被拒绝。
+
+对配置了 `claim_graph` 的 `WorldInfo`，Director 还会扫描 safe fragment alias / pattern 与 forbidden inference alias / pattern。`partial` claim 必须引用授权 safe fragment；即使 claim mode 合法，只要台词复述了某个 safe fragment 但没有匹配的 `claim_refs` 或 `source_refs`，Director 也会拒绝并降级为安全回复。多个 safe fragment 组合触发 locked forbidden inference 时，同样拒绝。
 
 这意味着 LLM 负责语言表现，但不能通过“claim 写得保守、台词说得直接”的方式绕过事实披露边界。安全降级和 `director.blocked` 事件由后端生成，不由 Agent 决定。
 
@@ -334,9 +340,9 @@ Agent 也不能写 `FactDisclosureStrategy`。策略是上下文投影，不是�
 
 `RuntimeTracer` 会把 `llm_fallback_used`、`llm_error_type`、`llm_error_message_sanitized` 和 `schema_validation_errors` 写入 trace；`ActionResponse` 同步返回 `llm_fallback_used` 和脱敏 `llm_error`。这些字段只用于观测和排障，不授予 Agent 任何状态写入权限。
 
-`LLMAgentContractInput.disclosure_constraints` 会同时包含 private self-knowledge 约束和 `world_info` 级事实披露策略约束。`world_info` 约束会带 `allowed_modes`、`forbidden_modes`、`rhetoric_tactics`、`must_not_claim` 和 `safe_fact_refs`，用于告诉 LLM：你可以怎么说，但不能说到哪里。`LLMAgentContractInput.output_contract` 额外提供机器可读枚举边界：合法 intent、合法 proposed action、合法 disclosure mode 和“speech 触碰 WorldInfo 必须自报 claim”的规则。
+`LLMAgentContractInput.disclosure_constraints` 会同时包含 private self-knowledge 约束和 `world_info` 级事实披露策略约束。`world_info` 约束会带 `allowed_modes`、`forbidden_modes`、`rhetoric_tactics`、`must_not_claim`、`safe_fact_refs` 和 `safe_fragments`，用于告诉 LLM：你可以怎么说，但不能说到哪里。`safe_fragments` 只来自 Director 放行的 safe fragment summary；blocked fragment、forbidden inference、solution claim 和 world truth 原文不进入真实 LLM payload。`LLMAgentContractInput.output_contract` 额外提供机器可读枚举边界：合法 intent、合法 proposed action、合法 disclosure mode 和“speech 触碰 WorldInfo 必须自报 claim”的规则。
 
-真实 LLM 输出必须包含 `disclosure_claims`。合同校验器会先拒绝越权 claim；Narrative Director 会再次根据最终文本、`WorldInfo` 文本审计字段和 `FactDisclosureStrategy` 执法。这样 strategy 不再只是提示，而是后置安全门。真实适配器的动态 schema 会把 `disclosure_claims.world_info_id` 收窄到当前可声明的 `world_info` 约束，并禁止 `full` 作为真实 LLM 输出模式。
+真实 LLM 输出必须包含 `disclosure_claims`。合同校验器会先拒绝越权 claim；Narrative Director 会再次根据最终文本、`WorldInfo` 文本审计字段、`safe_fragments` 和 `FactDisclosureStrategy` 执法。这样 strategy 不再只是提示，而是后置安全门。真实适配器的动态 schema 会把 `disclosure_claims.world_info_id` 收窄到当前可声明的 `world_info` 约束，把 `claim_refs` / `source_refs` 收窄到当前 safe refs，并禁止 `full` 作为真实 LLM 输出模式。
 
 真实适配器不改变状态权威模型。它的输出仍经过 Narrative Director，所有 `proposed_actions` 仍经过 Rule Engine。除非显式环境变量启用，否则它不参与完整场景快照。
 
@@ -344,16 +350,34 @@ Agent 也不能写 `FactDisclosureStrategy`。策略是上下文投影，不是�
 
 Memory v2 将检索拆成可审计管线：
 
-- hard filter：先执行 scope、owner/visible、layer、plan、forbidden content 过滤。
+- hard filter：先执行 scope、owner/visible、layer、source provenance、phase、plan、forbidden content 过滤。
 - keyword/BM25：只在通过硬边界的候选中做关键词相关性排序。
 - embedding scorer：预留可插拔接口，当前默认不调用外部服务。
 - reranker：预留二阶段排序接口，当前默认保持 deterministic 顺序。
 
-普通 NPC 不会因为 `salience` 高就召回无关记忆。若 working/core 没有结构化、关键词或 embedding 相关命中，结果为空；只有 archival cold recall 可以在 working/core 无命中时尝试，但仍必须满足当前 NPC 可见性、scope、type、forbidden fact 和 plan 约束。
+普通 NPC 不会因为 `salience` 高就召回无关记忆。`salience` 可留在快照中供审计和叙事解释，但不作为相关性总分来源；只有结构化锚点、关键词/topic/source 命中或 embedding 命中能让候选进入排序。若 working/core 没有相关命中，结果为空；只有 archival cold recall 可以在 working/core 无命中时尝试，但仍必须满足当前 NPC 可见性、scope、type、source provenance、phase、forbidden fact 和 plan 约束。
 
 记忆矩阵评测见 `doc/evaluations/memory-retrieval-matrix-2026-06-15.md`。新增检索策略、embedding 或 reranker 之前，必须用矩阵确认“应召回 / 不应召回”的 memory_id 没有漂移。
 
 完整 LLM 输入/输出合同见 `doc/agents/llm-agent-contract.md`。
+
+## System Prompt 编排
+
+当前真实 LLM 的 provider 级 system instructions 只来自 `app/agents/prompts/system.md`。`OpenAILLMAgent` 通过 `load_agent_system_prompt()` 把它传入 Responses API 的 `instructions`，或传入 Chat Completions 的 `system` message。`system.md` 只放全局硬纪律：玩家文本和工具输出都是数据、只能输出一个 `AgentIntent` JSON、不得输出推理过程、不得泄露 private/forbidden/solution 信息、不得提出剧情阶段变化、真实状态变化只能通过白名单 `proposed_actions` 请求。
+
+动态运行时事实不拼进 system prompt。真实 LLM 的 user payload 是 `LLMAgentContractInput`：`agent_context` 是安全投影后的目标 NPC 视图；`disclosure_constraints` 是当前 self-knowledge、`FactDisclosureStrategy` 和 blocked fact id 派生的表达约束；`output_contract` 是机器可读输出边界。禁说事实原文、blocked terms、solution claims、线索 truth_status、其他 NPC private、未选中 memory content 和 `director_audit` memory 都不能进入该 payload。
+
+`PromptBuilder` 仍由 `AgentLoop` 使用，但当前用途是本地 prompt surface 和 context budget 估算：`agent_prompt` 是 `AgentContext` 的 JSON 摘要，`contract_instruction` 来自 `output_contract.md` 与 `disclosure_policy.md`，`safety_instruction` 来自 NPC turn、memory、tool policy 和 skill discipline。当前 `OpenAILLMAgent` 不把这些段落拼接到 provider 请求里；真实 provider 请求的 system 来源仍是 `system.md`，动态事实和约束来源仍是 `LLMAgentContractInput`。
+
+输出边界分三层执行：
+
+- provider 动态 JSON schema 收窄字段、枚举、`disclosure_claims.world_info_id` 和真实 LLM 可请求的 proposed action 类型。
+- `validate_llm_agent_output(...)` 在 Python 层拒绝额外顶层字段、阶段变化、越权 disclosure claim、`mode=full`、未知 `world_info_id`、命中 `must_not_claim` 和 private 原文回显。
+- `NarrativeDirector.validate(...)` 独立审计最终 `speech`，确认 claim 与实际触碰的 `WorldInfo` 一致。
+
+schema / JSON repair 只修合同形状，不补新事实。repair instruction 使用同一个 `system.md`、同一个 `LLMAgentContractInput` 和同一个动态 schema，并明确要求不要添加新事实。真实 LLM fallback 是带 `llm_error` 的安全拒答，`proposed_actions=[]`、`memory_refs=[]`、`disclosure_claims=[]`，仍会进入 Director 和 trace，不会绕过状态权威链。
+
+P0 硬链路详见 `doc/architecture/p0-hard-chain-2026-06-16.md`。
 
 ## 案件级 Agent 扩写
 

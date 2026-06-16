@@ -227,9 +227,12 @@ ALLOWED_MEMORY_METADATA_KEYS = frozenset(
         "world_info_id",
         "claim_id",
         "scene_id",
+        "phase_id",
+        "phase_ids",
         "topic_tags",
         "privacy_reason",
         "decay_policy",
+        "non_authoritative",
     }
 )
 
@@ -514,6 +517,15 @@ class CharacterInnerContext(APIModel):
     inner_portraits: list[CharacterImpression] = Field(default_factory=list)
 
 
+class SafeFactFragmentProjection(APIModel):
+    world_info_id: NonEmptyString
+    fragment_id: NonEmptyString
+    ref: NonEmptyString
+    summary: NonEmptyString
+    allowed_modes: list[DisclosureMode] = Field(default_factory=list)
+    source_refs: list[NonEmptyString] = Field(default_factory=list)
+
+
 class LLMDisclosureConstraint(APIModel):
     item_id: NonEmptyString
     item_kind: Literal["goal", "secret", "knowledge", "forbidden_fact", "world_info"]
@@ -526,6 +538,7 @@ class LLMDisclosureConstraint(APIModel):
     rhetoric_tactics: list[RhetoricTactic] = Field(default_factory=list)
     must_not_claim: list[NonEmptyString] = Field(default_factory=list)
     safe_fact_refs: list[NonEmptyString] = Field(default_factory=list)
+    safe_fragments: list[SafeFactFragmentProjection] = Field(default_factory=list)
     blocked: bool = True
 
 
@@ -1194,6 +1207,9 @@ class AgentContext(APIModel):
     player_action: PlayerAction
     target_profile: AgentCharacterView | None = None
     inner_context: CharacterInnerContext | None = None
+    director_safe_fragments: list[SafeFactFragmentProjection] = Field(
+        default_factory=list
+    )
     portrait_summary: str | None = None
     default_speech: str | None = None
     default_intent: AgentIntentType | None = None
@@ -1253,6 +1269,19 @@ class CreateSessionRequest(APIModel):
 class CreateSessionResponse(APIModel):
     session_id: NonEmptyString
     state: StateSummary
+
+
+class RawTextActionRequest(APIModel):
+    raw_text: NonEmptyString
+
+
+class RawTextActionResponse(APIModel):
+    status: NonEmptyString
+    action: PlayerAction | None = None
+    response: ActionResponse | None = None
+    reason: str | None = None
+    missing_slots: list[NonEmptyString] = Field(default_factory=list)
+    route_trace: dict[str, object] = Field(default_factory=dict)
 
 
 class CharacterSummary(APIModel):
@@ -1349,10 +1378,16 @@ def validate_memory_metadata(value: object) -> dict[str, Any]:
         "world_info_id",
         "claim_id",
         "scene_id",
+        "phase_id",
         "privacy_reason",
     ):
         if key in metadata and metadata[key] is not None:
             metadata[key] = _validate_metadata_string(metadata[key], key)
+    if "phase_ids" in metadata:
+        metadata["phase_ids"] = _validate_metadata_string_list(
+            metadata["phase_ids"],
+            "phase_ids",
+        )
     if "topic_tags" in metadata:
         metadata["topic_tags"] = _validate_metadata_string_list(
             metadata["topic_tags"],
@@ -1360,6 +1395,11 @@ def validate_memory_metadata(value: object) -> dict[str, Any]:
         )
     if "decay_policy" in metadata:
         metadata["decay_policy"] = _validate_decay_policy(metadata["decay_policy"])
+    if "non_authoritative" in metadata and not isinstance(
+        metadata["non_authoritative"],
+        bool,
+    ):
+        raise ValueError("non_authoritative must be a boolean")
     return metadata
 
 

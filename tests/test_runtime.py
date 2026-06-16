@@ -1306,7 +1306,7 @@ def test_agent_context_exposes_memory_snapshots_without_internal_leaks() -> None
     context = build_agent_context(
         case,
         session,
-        PlayerAction(type="talk", target_id="butler", text="What do you remember?"),
+        PlayerAction(type="talk", target_id="butler", text="What about scratched_drawer?"),
     )
 
     assert context.memory_snapshots
@@ -1341,11 +1341,19 @@ def test_mock_agent_selects_reply_by_required_memory_snapshot() -> None:
     context = build_agent_context(
         case,
         session,
-        PlayerAction(type="talk", target_id="butler", text="Why are you nervous?"),
+        PlayerAction(
+            type="talk",
+            target_id="butler",
+            text="Why are you nervous about scratched_drawer?",
+        ),
     )
     response = runtime.action_service.handle(
         session=session,
-        action=PlayerAction(type="talk", target_id="butler", text="Why are you nervous?"),
+        action=PlayerAction(
+            type="talk",
+            target_id="butler",
+            text="Why are you nervous about scratched_drawer?",
+        ),
     )
 
     assert {

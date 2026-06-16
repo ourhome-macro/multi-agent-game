@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from app.domain.models import (
+    ActionType,
     AgentIntent,
     CasePackage,
     DiscoverClueAction,
@@ -11,6 +12,7 @@ from app.domain.models import (
     RelationshipChangeAction,
     RelationshipState,
     SceneConfig,
+    SceneHotspotConfig,
     SessionState,
     SubjectType,
     WorldEvent,
@@ -34,6 +36,105 @@ class RuleEngine:
         self._recorder = recorder
         self._deduction_evaluator = DeductionEvaluator()
 
+    def precheck_player_action(
+        self,
+        *,
+        case: CasePackage,
+        session: SessionState,
+        action: PlayerAction,
+    ) -> WorldEvent | None:
+        if action.type == ActionType.INSPECT:
+            if self._hotspot(case, action.target_id) is None:
+                return self.reject_player_action(
+                    session=session,
+                    action=action,
+                    reason="target_id is not a known hotspot",
+                )
+            return None
+
+        if action.type == ActionType.TALK:
+            if not self._is_known_character(case, action.target_id):
+                return self.reject_player_action(
+                    session=session,
+                    action=action,
+                    reason="target_id is not a known character",
+            )
+            return None
+
+        if action.type == ActionType.ASK_ABOUT:
+            return self._copy_precheck_rejection(
+                self.apply_ask_about(
+                    case=case,
+                    session=session.model_copy(deep=True),
+                    action=action,
+                ),
+                session=session,
+            )
+
+        if action.type == ActionType.PRESENT_CLUE:
+            return self._copy_precheck_rejection(
+                self.apply_present_clue(
+                    case=case,
+                    session=session.model_copy(deep=True),
+                    action=action,
+                ),
+                session=session,
+            )
+
+        if action.type == ActionType.ACCUSE:
+            return self._copy_precheck_rejection(
+                self.apply_accuse(
+                    case=case,
+                    session=session.model_copy(deep=True),
+                    action=action,
+                ),
+                session=session,
+            )
+
+        return self.reject_player_action(
+            session=session,
+            action=action,
+            reason=f"unsupported action type: {action.type}",
+        )
+
+    def reject_player_action(
+        self,
+        *,
+        session: SessionState,
+        action: PlayerAction,
+        reason: str,
+    ) -> WorldEvent:
+        return self._reject(
+            session=session,
+            action_type=f"player.{action.type.value}",
+            reason=reason,
+            payload=_player_action_payload(action),
+            caused_by_event_id=None,
+        )
+
+    def _copy_precheck_rejection(
+        self,
+        events: list[WorldEvent],
+        *,
+        session: SessionState,
+    ) -> WorldEvent | None:
+        dry_run_rejection = next(
+            (event for event in events if event.type == EventType.RULE_REJECTED),
+            None,
+        )
+        if dry_run_rejection is None:
+            return None
+        proposed_payload = dry_run_rejection.payload.get("proposed_payload", {})
+        if not isinstance(proposed_payload, dict):
+            proposed_payload = {}
+        return self._reject(
+            session=session,
+            action_type=str(dry_run_rejection.payload.get("action_type", "player.unknown")),
+            reason=str(dry_run_rejection.payload.get("reason", "rule precheck rejected")),
+            payload=proposed_payload,
+            caused_by_event_id=None,
+        )
+
     def apply_inspect(
         self,
         *,
@@ -42,11 +143,7 @@ class RuleEngine:
         action: PlayerAction,
         caused_by_event_id: str,
     ) -> list[WorldEvent]:
-        hotspot = None
-        for scene in case.scenes:
-            hotspot = next((item for item in scene.hotspots if item.id == action.target_id), None)
-            if hotspot is not None:
-                break
+        hotspot = self._hotspot(case, action.target_id)
 
         if hotspot is None:
             return []
@@ -595,6 +692,13 @@ class RuleEngine:
     def _is_known_character(self, case: CasePackage, character_id: str) -> bool:
         return any(character.id == character_id for character in case.characters)
 
+    def _hotspot(self, case: CasePackage, hotspot_id: str) -> SceneHotspotConfig | None:
+        for scene in case.scenes:
+            hotspot = next((item for item in scene.hotspots if item.id == hotspot_id), None)
+            if hotspot is not None:
+                return hotspot
+        return None
+
     def _scene_for_presented_clue(
         self,
         case: CasePackage,
@@ -624,3 +728,7 @@ def relationship_threshold_key(
 
 def player_knowledge_id_for_clue(case: CasePackage, clue_id: str) -> str:
     return _player_knowledge_id_for_clue(case, clue_id)
+
+
+def _player_action_payload(action: PlayerAction) -> dict[str, object]:
+    return action.model_dump(mode="json", exclude_none=True)

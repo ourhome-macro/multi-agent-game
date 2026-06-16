@@ -96,6 +96,7 @@ class MemoryRetriever:
         working_filters = _working_hard_filters(
             enforce_target_visibility=enforce_target_visibility,
             target_id=action.target_id,
+            phase=session.narrative.phase,
             plan=plan,
             forbidden_terms=forbidden_terms,
         )
@@ -111,6 +112,7 @@ class MemoryRetriever:
 
         archival_filters = _archival_hard_filters(
             target_id=action.target_id,
+            phase=session.narrative.phase,
             plan=plan,
             forbidden_terms=forbidden_terms,
         )
@@ -156,6 +158,7 @@ def _working_hard_filters(
     *,
     enforce_target_visibility: bool,
     target_id: str,
+    phase: str,
     plan: MemoryRetrievalPlan | None,
     forbidden_terms: tuple[str, ...],
 ) -> tuple[MemoryHardFilter, ...]:
@@ -179,6 +182,11 @@ def _working_hard_filters(
             ),
         ),
         MemoryHardFilter("layer_allowed", _layer_allowed),
+        MemoryHardFilter("has_source_event_ids", _source_allowed),
+        MemoryHardFilter(
+            "phase_allowed",
+            lambda snapshot: _phase_allowed(snapshot, phase),
+        ),
         MemoryHardFilter(
             "plan_allowed",
             lambda snapshot: memory_allowed_by_plan(snapshot, plan),
@@ -196,6 +204,7 @@ def _working_hard_filters(
 def _archival_hard_filters(
     *,
     target_id: str,
+    phase: str,
     plan: MemoryRetrievalPlan | None,
     forbidden_terms: tuple[str, ...],
 ) -> tuple[MemoryHardFilter, ...]:
@@ -216,6 +225,11 @@ def _archival_hard_filters(
             lambda snapshot: _visible_to_target(snapshot, target_id),
         ),
         MemoryHardFilter("archival_layer", _archival_layer_allowed),
+        MemoryHardFilter("has_source_event_ids", _source_allowed),
+        MemoryHardFilter(
+            "phase_allowed",
+            lambda snapshot: _phase_allowed(snapshot, phase),
+        ),
         MemoryHardFilter(
             "plan_allowed",
             lambda snapshot: memory_allowed_by_plan(
@@ -348,6 +362,21 @@ def _archival_layer_allowed(snapshot: AgentMemorySnapshot) -> bool:
     return snapshot.memory_layer == "archival"
 
 
+def _source_allowed(snapshot: AgentMemorySnapshot) -> bool:
+    return bool(snapshot.source_event_ids)
+
+
+def _phase_allowed(snapshot: AgentMemorySnapshot, phase: str) -> bool:
+    metadata = snapshot.metadata
+    phase_id = metadata.get("phase_id")
+    if phase_id is not None and str(phase_id) != phase:
+        return False
+    phase_ids = metadata.get("phase_ids")
+    if isinstance(phase_ids, list) and phase not in {str(item) for item in phase_ids}:
+        return False
+    return True
+
+
 def _build_query(case: CasePackage, action: PlayerAction) -> MemorySearchQuery:
     raw_anchors = [
         action.clue_id,
@@ -384,11 +413,18 @@ def _structured_score(snapshot: AgentMemorySnapshot, query: MemorySearchQuery) -
         return 0.0
     score = 0.0
     metadata_values = _metadata_string_values(snapshot.metadata)
+    source_event_ids = [_normalize_text(item) for item in snapshot.source_event_ids]
     source_memory_ids = [_normalize_text(item) for item in snapshot.source_memory_ids]
     memory_id = _normalize_text(snapshot.memory_id)
     for anchor in query.anchors:
         if anchor in metadata_values:
             score += 3.0
+            continue
+        if any(
+            _identifier_contains(source_event_id, anchor)
+            for source_event_id in source_event_ids
+        ):
+            score += 2.75
             continue
         if any(
             _identifier_contains(source_memory_id, anchor)
@@ -405,6 +441,7 @@ def _snapshot_haystack(snapshot: AgentMemorySnapshot) -> str:
     values = [
         snapshot.memory_id,
         snapshot.content,
+        *snapshot.source_event_ids,
         *snapshot.source_memory_ids,
         *(_stringify_metadata_value(value) for value in snapshot.metadata.values()),
     ]

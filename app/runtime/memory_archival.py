@@ -59,12 +59,19 @@ class MemoryArchivalSystem:
             return False
         if snapshot.memory_scope not in ARCHIVABLE_SCOPES:
             return False
-        if _reinforcement_count(snapshot) >= self._reinforced_event_count:
+        archive_after = _archive_after(snapshot, self._archive_after)
+        if archive_after is None:
+            return False
+        reinforced_event_count = _reinforced_event_count(
+            snapshot,
+            self._reinforced_event_count,
+        )
+        if _reinforcement_count(snapshot) >= reinforced_event_count:
             return False
         updated_at = _parse_datetime(snapshot.updated_at or snapshot.created_at)
         if updated_at is None:
             return False
-        return as_of - updated_at >= self._archive_after
+        return as_of - updated_at >= archive_after
 
     def _archive_snapshot(
         self,
@@ -141,3 +148,37 @@ def _parse_datetime(value: str | None) -> datetime | None:
 
 def _reinforcement_count(snapshot: AgentMemorySnapshot) -> int:
     return len({event_id for event_id in snapshot.source_event_ids if event_id})
+
+
+def _archive_after(
+    snapshot: AgentMemorySnapshot,
+    default: timedelta,
+) -> timedelta | None:
+    policy = snapshot.metadata.get("decay_policy")
+    if policy == "never_archive":
+        return None
+    if policy == "ephemeral":
+        return timedelta(days=0)
+    if isinstance(policy, dict):
+        if policy.get("name") == "never_archive":
+            return None
+        if policy.get("name") == "ephemeral":
+            return timedelta(days=0)
+        days = policy.get("archive_after_days")
+        if isinstance(days, int):
+            return timedelta(days=days)
+    return default
+
+
+def _reinforced_event_count(
+    snapshot: AgentMemorySnapshot,
+    default: int,
+) -> int:
+    policy = snapshot.metadata.get("decay_policy")
+    if isinstance(policy, dict):
+        count = policy.get("reinforced_event_count")
+        if isinstance(count, int):
+            return count
+    if policy == "sticky":
+        return max(default, 3)
+    return default

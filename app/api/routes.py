@@ -10,6 +10,8 @@ from app.domain.models import (
     CreateSessionRequest,
     CreateSessionResponse,
     PlayerAction,
+    RawTextActionRequest,
+    RawTextActionResponse,
     StateSummary,
     WorldEvent,
 )
@@ -113,6 +115,53 @@ def create_router(runtime_dependency: Callable[[], RuntimeContainer] = get_runti
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=str(exc),
             ) from exc
+
+    @router.post("/sessions/{session_id}/raw-actions", response_model=RawTextActionResponse)
+    def submit_raw_action(
+        session_id: str,
+        request: RawTextActionRequest,
+        idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
+        runtime: RuntimeContainer = runtime_dep,
+    ) -> RawTextActionResponse:
+        try:
+            intake = runtime.handle_raw_text(
+                session_id=session_id,
+                raw_text=request.raw_text,
+                idempotency_key=idempotency_key,
+            )
+        except (KeyError, UnknownSessionError) as exc:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=str(exc),
+            ) from exc
+        except ActionValidationError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=exc.message,
+            ) from exc
+        except StaleSessionSequenceError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=str(exc),
+            ) from exc
+        except (IdempotencyConflictError, IdempotencyInProgressError) as exc:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=str(exc),
+            ) from exc
+        except PostgresPersistenceError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=str(exc),
+            ) from exc
+        return RawTextActionResponse(
+            status=intake.status.value,
+            action=intake.action,
+            response=intake.response,
+            reason=intake.reason,
+            missing_slots=list(intake.missing_slots),
+            route_trace=intake.route.trace.to_safe_dict(),
+        )
 
     @router.get("/sessions/{session_id}/events", response_model=list[WorldEvent])
     def get_events(

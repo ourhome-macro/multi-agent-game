@@ -24,13 +24,13 @@ class MemorySnapshotSystem:
             return []
 
         candidate = self._candidate_from_event(event)
+        if not _candidate_has_required_source(candidate):
+            raise ValueError(
+                f"Active memory '{candidate.memory_id}' must include source_event_ids "
+                "or be explicitly archival/non-authoritative"
+            )
         current = session.memory_snapshots.get(candidate.memory_id)
-        operation = candidate.operation
-        if (
-            operation == MemoryOperation.CREATE
-            and current is not None
-        ):
-            operation = MemoryOperation.REINFORCE
+        operation = _effective_operation(current, candidate.operation)
         snapshot = self._reduce_candidate(current, candidate, event)
         session.memory_snapshots[snapshot.memory_id] = snapshot
 
@@ -86,7 +86,7 @@ class MemorySnapshotSystem:
             ],
             content=str(event.payload["content"]),
             source_event_id=source_event_id,
-            source_event_ids=_source_event_ids(event.payload, source_event_id),
+            source_event_ids=_source_event_ids(event.payload),
             source_memory_ids=[
                 str(item) for item in event.payload.get("source_memory_ids", [])
             ],
@@ -102,14 +102,9 @@ class MemorySnapshotSystem:
         candidate: MemoryCandidateState,
         event: WorldEvent,
     ) -> AgentMemorySnapshot:
-        operation = candidate.operation
-        if (
-            operation == MemoryOperation.CREATE
-            and current is not None
-        ):
-            operation = MemoryOperation.REINFORCE
+        operation = _effective_operation(current, candidate.operation)
         source_event_ids = list(current.source_event_ids) if current is not None else []
-        for event_id in candidate.source_event_ids or [candidate.source_event_id]:
+        for event_id in candidate.source_event_ids:
             if event_id not in source_event_ids:
                 source_event_ids.append(event_id)
         source_memory_ids = (
@@ -118,43 +113,60 @@ class MemorySnapshotSystem:
         for memory_id in candidate.source_memory_ids:
             if memory_id not in source_memory_ids:
                 source_memory_ids.append(memory_id)
-        metadata = dict(current.metadata) if current is not None else {}
-        metadata.update(candidate.metadata)
+        metadata = _reduce_metadata(current, candidate, operation)
         content = current.content if current is not None else candidate.content
-        if operation in {MemoryOperation.REVISE, MemoryOperation.SUPERSEDE}:
+        if operation in {
+            MemoryOperation.CREATE,
+            MemoryOperation.REVISE,
+            MemoryOperation.SUPERSEDE,
+        }:
             content = candidate.content
         memory_layer = (
             current.memory_layer if current is not None else candidate.memory_layer
         )
         if operation == MemoryOperation.ARCHIVE:
             memory_layer = "archival"
+        elif operation == MemoryOperation.SUPERSEDE:
+            memory_layer = candidate.memory_layer
 
         return AgentMemorySnapshot(
             memory_id=candidate.memory_id,
-            rule_id=current.rule_id if current is not None else candidate.rule_id,
+            rule_id=(
+                candidate.rule_id
+                if operation in {MemoryOperation.CREATE, MemoryOperation.SUPERSEDE}
+                else current.rule_id if current is not None else candidate.rule_id
+            ),
             memory_type=(
-                current.memory_type if current is not None else candidate.memory_type
+                candidate.memory_type
+                if operation in {MemoryOperation.CREATE, MemoryOperation.SUPERSEDE}
+                else current.memory_type if current is not None else candidate.memory_type
             ),
             memory_scope=(
-                current.memory_scope if current is not None else candidate.memory_scope
+                candidate.memory_scope
+                if operation in {MemoryOperation.CREATE, MemoryOperation.SUPERSEDE}
+                else current.memory_scope if current is not None else candidate.memory_scope
             ),
             memory_layer=memory_layer,
             last_operation=operation,
             subject_id=candidate.subject_id,
             owner_character_id=(
-                current.owner_character_id
+                candidate.owner_character_id
+                if operation in {MemoryOperation.CREATE, MemoryOperation.SUPERSEDE}
+                else current.owner_character_id
                 if current is not None
                 else candidate.owner_character_id
             ),
             visible_to_character_ids=(
-                list(current.visible_to_character_ids)
+                list(candidate.visible_to_character_ids)
+                if operation in {MemoryOperation.CREATE, MemoryOperation.SUPERSEDE}
+                else list(current.visible_to_character_ids)
                 if current is not None
                 else list(candidate.visible_to_character_ids)
             ),
             content=content,
             source_event_ids=source_event_ids,
             source_memory_ids=source_memory_ids,
-            salience=max(current.salience if current is not None else 0.0, candidate.salience),
+            salience=_reduce_salience(current, candidate, operation),
             confidence=max(
                 current.confidence if current is not None else 0.0,
                 candidate.confidence,
@@ -173,14 +185,56 @@ def _optional_str(value: object) -> str | None:
     return str(value)
 
 
-def _source_event_ids(payload: dict[str, object], fallback_event_id: str) -> list[str]:
+def _source_event_ids(payload: dict[str, object]) -> list[str]:
     values = payload.get("source_event_ids")
-    if not isinstance(values, list) or not values:
-        return [fallback_event_id]
-    return [str(item) for item in values]
+    if isinstance(values, list):
+        return [str(item) for item in values if str(item)]
+    source_event_id = payload.get("source_event_id")
+    if source_event_id is None:
+        return []
+    return [str(source_event_id)]
 
 
 def _metadata(value: object) -> dict[str, object]:
     if not isinstance(value, dict):
         return {}
     return {str(key): item for key, item in value.items()}
+
+
+def _effective_operation(
+    current: AgentMemorySnapshot | None,
+    requested: MemoryOperation,
+) -> MemoryOperation:
+    if requested == MemoryOperation.CREATE and current is not None:
+        return MemoryOperation.REINFORCE
+    return requested
+
+
+def _candidate_has_required_source(candidate: MemoryCandidateState) -> bool:
+    if candidate.source_event_ids:
+        return True
+    if candidate.memory_layer == "archival":
+        return True
+    return candidate.metadata.get("non_authoritative") is True
+
+
+def _reduce_metadata(
+    current: AgentMemorySnapshot | None,
+    candidate: MemoryCandidateState,
+    operation: MemoryOperation,
+) -> dict[str, object]:
+    if operation == MemoryOperation.SUPERSEDE:
+        return dict(candidate.metadata)
+    metadata = dict(current.metadata) if current is not None else {}
+    metadata.update(candidate.metadata)
+    return metadata
+
+
+def _reduce_salience(
+    current: AgentMemorySnapshot | None,
+    candidate: MemoryCandidateState,
+    operation: MemoryOperation,
+) -> float:
+    if operation in {MemoryOperation.CREATE, MemoryOperation.SUPERSEDE}:
+        return candidate.salience
+    return max(current.salience if current is not None else 0.0, candidate.salience)

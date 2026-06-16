@@ -4,7 +4,12 @@ from pathlib import Path
 
 from app.cases.loader import CaseLoader
 from app.domain.models import ActionType, PlayerAction, WorldEvent
-from app.runtime.postgres_runtime import PostgresActionRuntime, request_hash_for_action
+from app.runtime.postgres_runtime import (
+    PostgresActionRuntime,
+    PostgresRuntimeBackend,
+    request_hash_for_action,
+    request_hash_for_raw_text,
+)
 from app.runtime.replay import replay_events
 from app.runtime.service import create_runtime
 from app.storage.postgres import StoredWorldEvent
@@ -75,6 +80,78 @@ def test_postgres_action_runtime_replays_idempotent_response_without_regeneratin
     assert store.appended_events == []
 
 
+def test_postgres_raw_text_runtime_appends_with_idempotency_key() -> None:
+    case = CaseLoader().load(CASE_DIR)
+    runtime = create_runtime([case])
+    seed_session = runtime.session_store.create(case)
+    store = _RecordingEventStore(seed_session.events)
+    backend = PostgresRuntimeBackend(
+        case_store=runtime.case_store,
+        session_store=_StaticSessionStore(case.meta.id),  # type: ignore[arg-type]
+        event_store=store,  # type: ignore[arg-type]
+        action_runtime=PostgresActionRuntime(
+            event_store=store,  # type: ignore[arg-type]
+            action_service=runtime.action_service,
+        ),
+    )
+
+    raw_text = "调查 desk"
+    intake = backend.handle_raw_text(
+        session_id=seed_session.id,
+        raw_text=raw_text,
+        idempotency_key="raw-inspect-desk",
+    )
+
+    assert intake.status == "accepted"
+    assert intake.response is not None
+    assert intake.response.accepted is True
+    assert store.appended_events
+    assert store.expected_current_sequence == 1
+    assert store.idempotency_key == "raw-inspect-desk"
+    assert store.request_hash == request_hash_for_raw_text(raw_text)
+
+
+def test_postgres_raw_text_runtime_replays_idempotent_response_without_rerunning_service() -> None:
+    case = CaseLoader().load(CASE_DIR)
+    runtime = create_runtime([case])
+    seed_session = runtime.session_store.create(case)
+    raw_text = "调查 desk"
+    first_intake = runtime.action_service.handle_raw_text(
+        session=seed_session,
+        raw_text=raw_text,
+    )
+    assert first_intake.response is not None
+    store = _RecordingEventStore(seed_session.events)
+    store.seed_idempotent_response(
+        idempotency_key="raw-inspect-desk",
+        request_hash=request_hash_for_raw_text(raw_text),
+        response_events=first_intake.response.new_events,
+    )
+    backend = PostgresRuntimeBackend(
+        case_store=runtime.case_store,
+        session_store=_StaticSessionStore(case.meta.id),  # type: ignore[arg-type]
+        event_store=store,  # type: ignore[arg-type]
+        action_runtime=PostgresActionRuntime(
+            event_store=store,  # type: ignore[arg-type]
+            action_service=_FailingActionService(),  # type: ignore[arg-type]
+        ),
+    )
+
+    replayed = backend.handle_raw_text(
+        session_id=seed_session.id,
+        raw_text=raw_text,
+        idempotency_key="raw-inspect-desk",
+    )
+
+    assert replayed.status == "accepted"
+    assert replayed.response is not None
+    assert [event.id for event in replayed.response.new_events] == [
+        event.id for event in first_intake.response.new_events
+    ]
+    assert replayed.response.state.event_count == len(seed_session.events)
+    assert store.appended_events == []
+
+
 class _RecordingEventStore:
     def __init__(self, seed_events: list[WorldEvent]) -> None:
         self._events = list(seed_events)
@@ -123,6 +200,7 @@ class _RecordingEventStore:
         idempotency_key: str | None = None,
         request_hash: str | None = None,
         expected_current_sequence: int | None = None,
+        runtime_traces: object = (),
     ) -> list[StoredWorldEvent]:
         self.appended_events = list(events)
         self.expected_current_sequence = expected_current_sequence
@@ -139,3 +217,14 @@ class _RecordingEventStore:
 class _FailingActionService:
     def handle(self, **_: object) -> object:
         raise AssertionError("idempotent replay must not call ActionService.handle")
+
+    def handle_raw_text(self, **_: object) -> object:
+        raise AssertionError("idempotent replay must not call ActionService.handle_raw_text")
+
+
+class _StaticSessionStore:
+    def __init__(self, case_id: str) -> None:
+        self._case_id = case_id
+
+    def get_case_id(self, session_id: str) -> str:
+        return self._case_id

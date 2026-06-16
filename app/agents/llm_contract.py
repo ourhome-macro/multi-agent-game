@@ -12,6 +12,7 @@ from app.domain.models import (
     LLMAgentContractInput,
     LLMDisclosureConstraint,
     ProposedActionType,
+    SafeFactFragmentProjection,
     SelfKnowledgeItem,
     WorldEvent,
 )
@@ -71,7 +72,10 @@ def _build_disclosure_constraints(context: AgentContext) -> list[LLMDisclosureCo
         ]:
             constraints.append(_constraint_from_self_knowledge(item))
         constraints.extend(
-            _constraint_from_fact_disclosure_strategy(strategy)
+            _constraint_from_fact_disclosure_strategy(
+                strategy,
+                safe_fragments=context.director_safe_fragments,
+            )
             for strategy in inner_context.fact_disclosure_strategies
         )
 
@@ -196,7 +200,13 @@ def _constraint_from_self_knowledge(item: SelfKnowledgeItem) -> LLMDisclosureCon
 
 def _constraint_from_fact_disclosure_strategy(
     strategy: FactDisclosureStrategy,
+    safe_fragments: list[SafeFactFragmentProjection] | None = None,
 ) -> LLMDisclosureConstraint:
+    safe_fragments = [
+        fragment
+        for fragment in (safe_fragments or [])
+        if fragment.world_info_id == strategy.world_info_id
+    ]
     return LLMDisclosureConstraint(
         item_id=strategy.world_info_id,
         item_kind="world_info",
@@ -208,9 +218,21 @@ def _constraint_from_fact_disclosure_strategy(
         related_world_info_ids=[strategy.world_info_id],
         rhetoric_tactics=strategy.rhetoric_tactics,
         must_not_claim=strategy.must_not_claim,
-        safe_fact_refs=strategy.safe_fact_refs,
+        safe_fact_refs=_safe_fact_refs(strategy, safe_fragments),
+        safe_fragments=safe_fragments,
         blocked=DisclosureMode.FULL in strategy.forbidden_modes,
     )
+
+
+def _safe_fact_refs(
+    strategy: FactDisclosureStrategy,
+    safe_fragments: list[SafeFactFragmentProjection],
+) -> list[str]:
+    refs = [*strategy.safe_fact_refs]
+    refs.extend(fragment.ref for fragment in safe_fragments)
+    for fragment in safe_fragments:
+        refs.extend(fragment.source_refs)
+    return _dedupe_strings(refs)
 
 
 def _reject_raw_private_echo(
@@ -276,3 +298,59 @@ def _validate_disclosure_claims(
             raise LLMAgentPolicyViolationError(
                 "LLM Agent output violates must_not_claim"
             )
+        authorized_refs = _authorized_safe_fragment_refs(constraint)
+        referenced_refs = _referenced_safe_fragment_refs(
+            constraint,
+            claim_refs=claim.claim_refs,
+            source_refs=claim.source_refs,
+        )
+        if claim.mode == DisclosureMode.PARTIAL and authorized_refs and not referenced_refs:
+            raise LLMAgentPolicyViolationError(
+                "LLM Agent output partial disclosure must reference a safe fragment"
+            )
+        if referenced_refs - authorized_refs:
+            raise LLMAgentPolicyViolationError(
+                "LLM Agent output referenced unauthorized safe fragment"
+            )
+
+
+def _authorized_safe_fragment_refs(
+    constraint: LLMDisclosureConstraint,
+) -> set[str]:
+    refs = set(constraint.safe_fact_refs)
+    for fragment in constraint.safe_fragments:
+        refs.add(fragment.ref)
+        refs.add(fragment.fragment_id)
+        refs.add(f"safe_fragment:{fragment.fragment_id}")
+        refs.add(f"{fragment.world_info_id}.{fragment.fragment_id}")
+        refs.add(f"{fragment.world_info_id}:{fragment.fragment_id}")
+        refs.update(fragment.source_refs)
+    return refs
+
+
+def _referenced_safe_fragment_refs(
+    constraint: LLMDisclosureConstraint,
+    *,
+    claim_refs: list[str],
+    source_refs: list[str],
+) -> set[str]:
+    authorized = _authorized_safe_fragment_refs(constraint)
+    refs = set()
+    for ref in [*claim_refs, *source_refs]:
+        if ref in authorized or _looks_like_safe_fragment_ref(ref):
+            refs.add(ref)
+    return refs
+
+
+def _looks_like_safe_fragment_ref(ref: str) -> bool:
+    normalized = ref.casefold()
+    return "safe_fragment:" in normalized or normalized.startswith("safe_fragment:")
+
+
+def _dedupe_strings(values: list[str]) -> list[str]:
+    deduped: list[str] = []
+    for value in values:
+        if value in deduped:
+            continue
+        deduped.append(value)
+    return deduped

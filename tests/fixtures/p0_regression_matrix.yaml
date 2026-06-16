@@ -1,0 +1,20 @@
+- entry_id: p0.loaded.case
+  case_id: fake_case_001
+  phase: opening
+  input_text: ask about the drawer
+  memory:
+    expected_memory_ids:
+      - memory.butler.drawer
+    forbidden_memory_ids:
+      - memory.niece.private_timeline
+  director:
+    expected_allowed: false
+    forbidden_world_info_ids:
+      - will_swapped
+  action_intake:
+    expected_status: ambiguous
+    expected_missing_slots:
+      - target
+  deduction:
+    expected_accepted: false
+    expected_reject_code: missing_required_evidence

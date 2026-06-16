@@ -17,6 +17,8 @@
 
 这样做的目的是让 Router 集成层可以提前获得安全决策摘要，同时保持事件日志和状态变化只有一个权威来源。
 
+在 P0 硬链路里，precheck 只能位于 Action Intake / Router 之后、正式 Rule Engine 写入之前，作为“这次结构化动作明显不能继续”的提示面。它不能读取或注入 forbidden fact 原文，不能把 solution claim 细节交给 LLM，也不能替代 `RuleEngine.apply_ask_about`、`apply_present_clue` 或 `apply_accuse` 的最终事件化校验。
+
 ## 配置来源
 
 禁说事实写在每个案件包的 `forbidden_facts.yaml`。
@@ -47,6 +49,8 @@
 - `mode` 出现在 `forbidden_modes`。
 - `mode=full`。
 - `claim_refs` 命中 `must_not_claim`。
+- `partial` claim 没有引用当前 Director 授权的 safe fragment。
+- 台词触碰某个 safe fragment，但对应 claim 没有匹配的 `claim_refs` 或 `source_refs`。
 - 台词触碰某个 `WorldInfo`，但没有提交对应 `disclosure_claim`。
 - claim 声明为 `hint`、`deny` 或 `deflect`，但台词实际命中直接事实表达。
 - claim 只声明了事实 A，但台词实际触碰事实 B。
@@ -71,6 +75,16 @@ v0 采用保守策略：命中 title、alias、claim pattern 或 forbidden term 
 
 `director.blocked` 可以包含 blocked fact id、`world_info_id`、`claimed_mode`、`detected_directness`、`matched_by`、`pattern_id` 和 `safe_fallback_used` 用于审计，但不得包含禁说事实原文、blocked terms 或 private 原文。公开 payload 中的 `matched_text` 必须脱敏。
 
+Director 审计发生在 LLM 输出合同校验之后、`npc.replied` 和 `RuleEngine.apply_agent_intent(...)` 之前。`disclosure_claims` 是 Agent/LLM 的自报，不是授权；Director 会独立扫描最终 `speech`。只要 speech 实际触碰的 `WorldInfo` 缺 claim、超出 claim mode、命中 forbidden inference 或触碰另一个未声明事实，就必须 block。block 后不得应用任何 `proposed_actions`。
+
+完整 P0 链路见 `doc/architecture/p0-hard-chain-2026-06-16.md`：
+
+```text
+Action Intake -> optional Director precheck surface -> RuleEngine player action
+  -> LLM output contract -> Director audit -> npc.replied/director.blocked
+  -> RuleEngine proposed_actions -> event store/replay
+```
+
 ## 角色 private 披露边界
 
 角色 `private` 数据是目标 NPC 自己的非公开视角，不是对 NPC 自己隐藏。目标 NPC 永远知道自己的 private goals、secrets 和 knowledge。
@@ -93,6 +107,8 @@ Director 当前已经消费 `CharacterInnerContext.fact_disclosure_strategies`�
 Narrative Director 只判断台词是否安全，不负责让状态变化生效。
 
 Rule Engine 仍负责决定 `AgentIntent.proposed_actions` 是否变成真实 `WorldEvent`。知道 private 信息不代表 NPC 可以直接修改世界状态、线索状态、关系状态、记忆快照或剧情阶段。
+
+不能为了让 LLM“更聪明”把案件真相、blocked terms、solution claims、其他 NPC private 或未解锁 `WorldInfo` 原文放进 prompt。Director 需要这些事实时，应从案件包和 `FactGateway` 读取；LLM 只能收到 ID、allowed/forbidden modes、safe refs、`must_not_claim` 和 tactic 级约束。
 
 ## Shadow Eval 边界
 
@@ -119,7 +135,9 @@ LLM Shadow Eval v0 会调用同一个 `NarrativeDirector.validate(case, narrativ
 - `unlock_conditions`：片段可说之前需要满足的 phase、beat、player knowledge、clue 或 world info 条件。
 - `forbidden_inferences`：即使没有命中旧 `forbidden_facts.blocked_terms`，也必须阻止的组合推断。
 
-`NarrativeDirector.fact_gateway_summary(...)` 可生成前置摘要，列出当前可披露片段、被锁片段和禁推断。当前摘要尚未注入 `AgentContext`，但后置校验已经生效。
+`NarrativeDirector.fact_gateway_summary(...)` 可生成审计摘要，列出当前可披露片段、被锁片段和禁推断。`NarrativeDirector.safe_fragment_constraints(...)` 是生成链路入口：`AgentLoop` 在调用 AgentGateway 前把它写入 `AgentContext.director_safe_fragments`。该投影只包含当前目标 NPC 有 `FactDisclosureStrategy` 的 `WorldInfo`，并且只包含已解锁 safe fragment 的 safe summary、fragment ref、allowed modes 和授权 source refs。
+
+真实 LLM 合同会把这些 safe fragments 合并进 `LLMDisclosureConstraint.safe_fragments` / `safe_fact_refs`。blocked fragments、forbidden inference summary、solution claims、world truth 原文和 forbidden fact 原文不得进入 prompt。生成后，Director 使用同一个 `FactGateway` 校验 `disclosure_claims` 与最终 `speech`：claim 必须引用授权 safe fragment；speech 命中 safe fragment alias / pattern 时必须有匹配 claim；多个 fragment 或 world_info 组合触发 locked forbidden inference 时必须 block。
 
 结构化网关和旧 forbidden terms 并存：旧案件不配置 `claim_graph` 时仍按原逻辑运行；新案件应逐步把核心案件真相拆成 safe fragments 和 forbidden inferences，避免仅靠字符串禁词守门。
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from enum import StrEnum
 from typing import Protocol
 
 from app.agents.gateway import AgentGateway
@@ -18,6 +19,7 @@ from app.domain.models import (
 )
 from app.rules.engine import RuleEngine
 from app.rules.triggers import RuleTriggerSystem
+from app.runtime.action_router import ActionRouter, ActionRouteStatus, RouteResult
 from app.runtime.budget import ContextBudgetManager
 from app.runtime.derivations import DerivedEventSystem
 from app.runtime.errors import ActionValidationError
@@ -26,6 +28,30 @@ from app.runtime.memory_archival import MemoryArchivalSystem
 from app.runtime.memory_snapshots import MemorySnapshotSystem
 from app.runtime.tracing import RuntimeTracer
 from app.storage.memory import InMemoryCaseStore, InMemorySessionStore, build_state_summary
+
+
+class ActionIntakeStatus(StrEnum):
+    ACCEPTED = "accepted"
+    NEEDS_CLARIFICATION = "needs_clarification"
+    REJECTED = "rejected"
+
+
+@dataclass(frozen=True)
+class ActionIntakeResult:
+    status: ActionIntakeStatus
+    route: RouteResult
+    action: PlayerAction | None = None
+    response: ActionResponse | None = None
+    reason: str | None = None
+    missing_slots: list[str] = field(default_factory=list)
+
+    @property
+    def needs_clarification(self) -> bool:
+        return self.status == ActionIntakeStatus.NEEDS_CLARIFICATION
+
+    @property
+    def rejected(self) -> bool:
+        return self.status == ActionIntakeStatus.REJECTED
 
 
 class RuntimeSessionBackend(Protocol):
@@ -42,6 +68,15 @@ class RuntimeSessionBackend(Protocol):
         action: PlayerAction,
         idempotency_key: str | None = None,
     ) -> ActionResponse:
+        ...
+
+    def handle_raw_text(
+        self,
+        *,
+        session_id: str,
+        raw_text: str,
+        idempotency_key: str | None = None,
+    ) -> ActionIntakeResult:
         ...
 
     def get_events(self, session_id: str) -> list[WorldEvent]:
@@ -85,6 +120,22 @@ class RuntimeContainer:
             )
         session = self.session_store.get(session_id)
         return self.action_service.handle(session=session, action=action)
+
+    def handle_raw_text(
+        self,
+        *,
+        session_id: str,
+        raw_text: str,
+        idempotency_key: str | None = None,
+    ) -> ActionIntakeResult:
+        if self.session_backend is not None:
+            return self.session_backend.handle_raw_text(
+                session_id=session_id,
+                raw_text=raw_text,
+                idempotency_key=idempotency_key,
+            )
+        session = self.session_store.get(session_id)
+        return self.action_service.handle_raw_text(session=session, raw_text=raw_text)
 
     def get_events(self, session_id: str) -> list[WorldEvent]:
         if self.session_backend is not None:
@@ -271,6 +322,83 @@ class ActionService:
             )
 
         raise ValueError(f"Unsupported action type: {action.type}")
+
+    def handle_raw_text(
+        self,
+        *,
+        session: SessionState,
+        raw_text: str,
+    ) -> ActionIntakeResult:
+        case = self._case_store.get(session.case_id)
+        routed = ActionRouter(case).route(raw_text)
+
+        if routed.status == ActionRouteStatus.NEEDS_CLARIFICATION:
+            return ActionIntakeResult(
+                status=ActionIntakeStatus.NEEDS_CLARIFICATION,
+                route=routed,
+                reason=routed.reason,
+                missing_slots=list(routed.missing_slots),
+            )
+
+        if routed.action is None:
+            return ActionIntakeResult(
+                status=ActionIntakeStatus.REJECTED,
+                route=routed,
+                reason=routed.reason or "unresolved_player_action",
+            )
+
+        director_decision = self._director.precheck_player_action(case, session, routed.action)
+        routed = routed.with_director_precheck(
+            _precheck_summary(director_decision.allowed, director_decision.reason)
+        )
+        rejection_event = self._rule_engine.precheck_player_action(
+            case=case,
+            session=session,
+            action=routed.action,
+        )
+        if rejection_event is not None:
+            response = ActionResponse(
+                session_id=session.id,
+                accepted=False,
+                new_events=[rejection_event],
+                state=build_state_summary(case, session),
+            )
+            return ActionIntakeResult(
+                status=ActionIntakeStatus.REJECTED,
+                route=routed,
+                action=routed.action,
+                response=response,
+                reason=str(rejection_event.payload.get("reason", "rule_precheck_rejected")),
+            )
+
+        if not director_decision.allowed:
+            rejection_event = self._rule_engine.reject_player_action(
+                session=session,
+                action=routed.action,
+                reason=f"director_precheck:{director_decision.reason or 'blocked'}",
+            )
+            response = ActionResponse(
+                session_id=session.id,
+                accepted=False,
+                new_events=[rejection_event],
+                state=build_state_summary(case, session),
+            )
+            return ActionIntakeResult(
+                status=ActionIntakeStatus.REJECTED,
+                route=routed,
+                action=routed.action,
+                response=response,
+                reason=str(rejection_event.payload.get("reason", "director_precheck_blocked")),
+            )
+
+        response = self.handle(session=session, action=routed.action)
+        return ActionIntakeResult(
+            status=ActionIntakeStatus.ACCEPTED,
+            route=routed,
+            action=routed.action,
+            response=response,
+            reason=None if response.accepted else response.director_reason,
+        )
 
     def _require_hotspot(self, case: CasePackage, target_id: str) -> None:
         for scene in case.scenes:
@@ -469,6 +597,7 @@ def create_runtime(
         case_store.add(package)
     session_store = InMemorySessionStore(recorder)
     rule_engine = RuleEngine(recorder)
+    director = NarrativeDirector()
     agent_loop = AgentLoop(
         agent_gateway=agent_gateway or AgentGateway.from_env(),
         runtime_tracer=runtime_tracer or RuntimeTracer.disabled(),
@@ -476,12 +605,13 @@ def create_runtime(
         context_budget_manager=ContextBudgetManager(
             context_limit_tokens=context_limit_tokens,
         ),
+        narrative_director=director,
     )
     action_service = ActionService(
         case_store=case_store,
         recorder=recorder,
         agent_loop=agent_loop,
-        director=NarrativeDirector(),
+        director=director,
         rule_engine=rule_engine,
         trigger_system=RuleTriggerSystem(recorder),
         derived_event_system=DerivedEventSystem(recorder),
@@ -510,6 +640,12 @@ def _reason_category(reason: str | None) -> str | None:
     if not normalized:
         return None
     return normalized[:80]
+
+
+def _precheck_summary(allowed: bool, reason: str | None) -> str:
+    if allowed:
+        return "allowed"
+    return f"blocked:{_reason_category(reason) or 'unknown'}"
 
 
 def _llm_fallback_used(intent: object) -> bool:

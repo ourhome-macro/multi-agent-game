@@ -4,11 +4,12 @@ from dataclasses import dataclass
 
 from app.agents.context import build_agent_context
 from app.agents.gateway import AgentGateway
-from app.agents.llm_contract import validate_llm_agent_output
+from app.agents.llm_contract import build_llm_agent_input, validate_llm_agent_output
 from app.agents.memory import MemoryRetriever
 from app.agents.prompt_builder import PromptBuilder
 from app.agents.retrieval_planner import MemoryRetrievalPlan, RetrievalPlanner
 from app.agents.tools.runtime import ToolRuntime
+from app.director.narrative_director import NarrativeDirector
 from app.domain.models import (
     AgentContext,
     AgentIntent,
@@ -44,6 +45,7 @@ class AgentLoop:
         retrieval_planner: RetrievalPlanner | None = None,
         context_budget_manager: ContextBudgetManager | None = None,
         tool_runtime: ToolRuntime | None = None,
+        narrative_director: NarrativeDirector | None = None,
     ) -> None:
         self._agent_gateway = agent_gateway
         self._prompt_builder = prompt_builder or PromptBuilder()
@@ -57,6 +59,7 @@ class AgentLoop:
         self._tool_runtime = tool_runtime or ToolRuntime(
             memory_retriever=self._memory_retriever
         )
+        self._narrative_director = narrative_director or NarrativeDirector()
 
     @property
     def backend_name(self) -> str:
@@ -80,12 +83,17 @@ class AgentLoop:
             action=action,
             plan=plan,
         )
-        return build_agent_context(
+        context = build_agent_context(
             case,
             session,
             action,
             retrieval_plan=plan,
             memory_snapshots=retrieved_memories,
+        )
+        return self._attach_director_generation_constraints(
+            case=case,
+            session=session,
+            context=context,
         )
 
     def run_turn(
@@ -110,9 +118,14 @@ class AgentLoop:
             retrieval_plan=plan,
             memory_snapshots=retrieved_memories,
         )
+        context = self._attach_director_generation_constraints(
+            case=case,
+            session=session,
+            context=context,
+        )
         security_review = self._injection_guard.review(action)
         memory_ids = [snapshot.memory_id for snapshot in retrieved_memories]
-        memory_projection = _memory_projection(plan, retrieved_memories)
+        memory_projection = _memory_projection(plan, retrieved_memories, context)
         prompt_bundle = self._prompt_builder.build(context)
         budget = self._budget_prompt(prompt_bundle, context, memory_ids)
         if budget.compressed_history is not None:
@@ -149,14 +162,46 @@ class AgentLoop:
             tool_calls=tool_calls,
             security_flags=security_review.security_flags,
         )
-        intent = self._agent_gateway.generate(context)
-        intent = validate_llm_agent_output(intent.model_dump(mode="json"))
+        intent = self._validate_agent_intent(context, self._agent_gateway.generate(context))
         return AgentTurnResult(
             context=context,
             intent=intent,
             trace=trace,
             security_flags=security_review.security_flags,
             memory_ids_used=memory_ids,
+        )
+
+    def _validate_agent_intent(
+        self,
+        context: AgentContext,
+        intent: AgentIntent,
+    ) -> AgentIntent:
+        contract_input = build_llm_agent_input(context)
+        payload = intent.model_dump(
+            mode="json",
+            exclude={"llm_error"},
+        )
+        validated = validate_llm_agent_output(payload, contract_input)
+        if intent.llm_error is None:
+            return validated
+        return validated.model_copy(update={"llm_error": intent.llm_error})
+
+    def _attach_director_generation_constraints(
+        self,
+        *,
+        case: CasePackage,
+        session: SessionState,
+        context: AgentContext,
+    ) -> AgentContext:
+        safe_fragments = self._narrative_director.safe_fragment_constraints(
+            case,
+            session.narrative,
+            context,
+        )
+        if not safe_fragments:
+            return context
+        return context.model_copy(
+            update={"director_safe_fragments": list(safe_fragments)}
         )
 
     def _budget_prompt(
@@ -208,6 +253,7 @@ class AgentLoop:
 def _memory_projection(
     plan: MemoryRetrievalPlan,
     memories: list[AgentMemorySnapshot],
+    context: AgentContext | None = None,
 ) -> dict[str, object]:
     summary = plan.trace_summary(selected_count=len(memories))
     summary["items"] = [
@@ -221,4 +267,8 @@ def _memory_projection(
         }
         for memory in memories
     ]
+    if context is not None:
+        summary["director_safe_fragment_refs"] = [
+            fragment.ref for fragment in context.director_safe_fragments
+        ]
     return summary

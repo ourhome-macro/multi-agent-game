@@ -8,8 +8,35 @@
 - `GET /cases`
 - `POST /sessions`
 - `POST /sessions/{session_id}/actions`
+- `POST /sessions/{session_id}/raw-actions`
 - `GET /sessions/{session_id}/state`
 - `GET /sessions/{session_id}/events`
+
+## Raw Text Action Intake
+
+自然语言玩家输入不能直接进入 `ActionService.handle(...)`。后端 raw text 入口必须走 `ActionService.handle_raw_text(...)` / `RuntimeContainer.handle_raw_text(...)`：
+
+```text
+raw_text
+  -> ActionRouter.route
+  -> entity resolution
+  -> clarification / rejected
+  -> PlayerAction candidate
+  -> NarrativeDirector.precheck_player_action
+  -> RuleEngine.precheck_player_action
+  -> ActionService.handle(PlayerAction)
+```
+
+生产客户端提交 raw text 时同样应带 `Idempotency-Key` 请求头：
+
+```http
+POST /sessions/{session_id}/raw-actions
+Idempotency-Key: raw-action-001
+```
+
+在 PostgreSQL runtime 下，后端会用原始 `raw_text` 计算 request hash。同一 session 内重复提交相同 `Idempotency-Key` 和相同 `raw_text`，会直接 replay 原响应事件，不再次运行 Agent/LLM，也不会产生第二批 `WorldEvent`。相同 `Idempotency-Key` 携带不同 `raw_text` 必须返回幂等冲突。
+
+歧义目标、歧义线索、歧义场景返回 `needs_clarification` 和 `missing_slots`，不生成 `PlayerAction`，也不写 `WorldEvent`。无法识别或未知实体返回 `rejected`，不允许静默猜测。已经解析成结构化 `PlayerAction` 但不满足规则前置条件时，必须写入 `rule.rejected`，不会进入 Agent / LLM 链路。
 
 ## 创建 Session
 
@@ -163,7 +190,9 @@ Rule Engine 会校验：
 
 `player.presented_clue` payload 必须写出 `presentation_mode`。`scene_id` 和 `present_character_ids` 只在玩家明确当众展示线索时出现。没有 `scene_id` 且没有显式 `presentation_mode` 的旧请求仍按私下展示兼容处理；新客户端必须提交 `presentation_mode`，不能让后端从自然语言或静态场景自动扩散记忆。
 
-之后进入 `AgentGateway -> NarrativeDirector -> RuleEngine` 链路。
+合法 `present_clue` 之后才进入 agent-backed 链路：构造 `AgentContext` / `LLMAgentContractInput`，经 `AgentGateway` 生成 `AgentIntent`，再由输出合同和 `NarrativeDirector` 审计。只有审计通过并写入 `npc.replied` 后，Rule Engine 才会解释白名单 `proposed_actions`。Director 拦截时只写 `director.blocked`，不会应用任何 proposed action。
+
+agent-backed 链路中的 `LLMAgentContractInput.disclosure_constraints` 只会包含 Director 当前放行的 `safe_fragments`。客户端不能通过 API 请求让 LLM 获得 blocked fragment、solution claim 或全局真相原文。LLM 输出的 `disclosure_claims[].claim_refs` / `source_refs` 必须匹配这些 safe refs；否则本轮会被合同校验或 Director 审计降级为安全回复。
 
 ### LLM fallback 观测字段
 
@@ -173,6 +202,8 @@ Rule Engine 会校验：
 - `llm_error`：脱敏错误摘要，包含 `backend`、`error_type`、`error_message_sanitized`、`fallback_used` 和 `schema_validation_errors`。
 
 这些字段不表示 action 被规则层拒绝。它们只说明 Agent 生成阶段发生了可观测错误，后端已使用无 `proposed_actions` 的安全回复继续走 Director / Rule Engine 边界。
+
+如果 Director 因事实网关拦截回复，`ActionResponse.director_blocked=true`，`director_reason` 会说明拒绝类别，例如未授权 safe fragment、locked forbidden inference 或 speech/claim 不一致。对应的 `director.blocked` 事件会记录 `world_info_id`、`blocked_fact_id`、`claimed_mode`、`matched_by`、`pattern_id` 和 `safe_fallback_used` 等审计字段；`matched_text` 必须脱敏，不能把被拦截事实原文回显给客户端。
 
 ### accuse
 
@@ -191,6 +222,8 @@ Rule Engine 会校验：
 ```
 
 `accuse` 是结构化正式指控。它不调用 `AgentGateway`，不使用 LLM，也不让 NPC 判断指控是否正确。Rule Engine 根据 `solution_claims.yaml` 评估。
+
+P0 硬链路的权威顺序是：Action Intake 产出结构化 `PlayerAction`；可选 Director precheck 只给 Router / Intake 层提供越界摘要；正式玩家动作由 Rule Engine 接受或拒绝并写事件；LLM 输出必须先过合同校验和 Director 审计；状态变化最终只能来自 `WorldEvent` 与 replay。集中说明见 `doc/architecture/p0-hard-chain-2026-06-16.md`。
 
 Rule Engine 会校验：
 

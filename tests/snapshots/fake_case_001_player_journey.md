@@ -15,7 +15,7 @@
 - `event_003` `clue.discovered`: Clue `scratched_drawer` discovered.
 - `event_004` `player_knowledge.updated`: Player knowledge `player_knowledge.desk_forced_open` updated.
 - `event_005` `memory_candidate.created`: Memory candidate `memory.player.clue_discovered.scratched_drawer` created.
-- `event_006` `agent_memory_snapshot.updated`: Memory snapshot `memory.player.clue_discovered.scratched_drawer` created from `event_005`.
+- `event_006` `agent_memory_snapshot.updated`: Memory snapshot `memory.player.clue_discovered.scratched_drawer` create from `event_005`.
 - `event_007` `narrative.beat.completed`: Narrative beat `drawer_found` completed.
 - `event_008` `narrative.phase.changed`: Narrative phase changed from `opening` to `investigation`.
 - `event_009` `player.asked_about`: Player asked `butler` about `clue:scratched_drawer`.
@@ -24,7 +24,7 @@
 - `event_012` `character_impression.updated`: Private character impression updated.
 - `event_013` `character_fact_awareness.updated`: Private character fact awareness updated.
 - `event_014` `memory_candidate.created`: Memory candidate `memory.player.asked_about.butler.clue.scratched_drawer` created.
-- `event_015` `agent_memory_snapshot.updated`: Memory snapshot `memory.player.asked_about.butler.clue.scratched_drawer` created from `event_014`.
+- `event_015` `agent_memory_snapshot.updated`: Memory snapshot `memory.player.asked_about.butler.clue.scratched_drawer` create from `event_014`.
 - `event_016` `player.presented_clue`: Player presented clue `scratched_drawer` to `butler`.
 - `event_017` `npc.replied`: NPC replied: "Those scratch marks mean someone forced the drawer, but I did not see who held the tool."
 - `event_018` `relationship.changed`: Relationship `butler->player` changed.
@@ -32,10 +32,10 @@
 - `event_020` `character_impression.updated`: Private character impression updated.
 - `event_021` `character_fact_awareness.updated`: Private character fact awareness updated.
 - `event_022` `memory_candidate.created`: Memory candidate `memory.player.presented_clue.butler.scratched_drawer` created.
-- `event_023` `agent_memory_snapshot.updated`: Memory snapshot `memory.player.presented_clue.butler.scratched_drawer` created from `event_022`.
+- `event_023` `agent_memory_snapshot.updated`: Memory snapshot `memory.player.presented_clue.butler.scratched_drawer` create from `event_022`.
 - `event_024` `character_impression.updated`: Private character impression updated.
 - `event_025` `memory_candidate.created`: Memory candidate `memory.player.relationship_threshold.butler.player.suspicion.guarded` created.
-- `event_026` `agent_memory_snapshot.updated`: Memory snapshot `memory.player.relationship_threshold.butler.player.suspicion.guarded` created from `event_025`.
+- `event_026` `agent_memory_snapshot.updated`: Memory snapshot `memory.player.relationship_threshold.butler.player.suspicion.guarded` create from `event_025`.
 - `event_027` `player.talked`: Player talked to `butler`.
 - `event_028` `npc.replied`: NPC replied: "抽屉确实有响动，但我不能确定是谁动过它。"
 - `event_029` `relationship.changed`: Relationship `butler->player` changed.
@@ -43,7 +43,7 @@
 - `event_031` `clue.discovered`: Clue `dustless_frame` discovered.
 - `event_032` `player_knowledge.updated`: Player knowledge `player_knowledge.portrait_was_moved` updated.
 - `event_033` `memory_candidate.created`: Memory candidate `memory.player.clue_discovered.dustless_frame` created.
-- `event_034` `agent_memory_snapshot.updated`: Memory snapshot `memory.player.clue_discovered.dustless_frame` created from `event_033`.
+- `event_034` `agent_memory_snapshot.updated`: Memory snapshot `memory.player.clue_discovered.dustless_frame` create from `event_033`.
 - `event_035` `player.talked`: Player talked to `butler`.
 - `event_036` `npc.replied`: NPC replied: "抽屉确实有响动，但我不能确定是谁动过它。"
 - `event_037` `relationship.changed`: Relationship `butler->player` changed.
@@ -51,12 +51,12 @@
 - `event_039` `director.blocked`: Director blocked an unsafe reply.
 - `event_040` `character_impression.updated`: Private character impression updated.
 - `event_041` `memory_candidate.created`: Memory candidate `memory.player.director_blocked.butler.redacted_fact` created.
-- `event_042` `agent_memory_snapshot.updated`: Memory snapshot `memory.player.director_blocked.butler.redacted_fact` created from `event_041`.
+- `event_042` `agent_memory_snapshot.updated`: Memory snapshot `memory.player.director_blocked.butler.redacted_fact` create from `event_041`.
 - `event_043` `player.inspected`: Player inspected `carpet`.
 - `event_044` `clue.discovered`: Clue `torn_note` discovered.
 - `event_045` `player_knowledge.updated`: Player knowledge `player_knowledge.secret_meeting_note_exists` updated.
 - `event_046` `memory_candidate.created`: Memory candidate `memory.player.clue_discovered.torn_note` created.
-- `event_047` `agent_memory_snapshot.updated`: Memory snapshot `memory.player.clue_discovered.torn_note` created from `event_046`.
+- `event_047` `agent_memory_snapshot.updated`: Memory snapshot `memory.player.clue_discovered.torn_note` create from `event_046`.
 - `event_048` `narrative.beat.completed`: Narrative beat `hidden_meeting_connected` completed.
 - `event_049` `narrative.phase.changed`: Narrative phase changed from `investigation` to `reveal`.
 - `event_050` `player.accused`: Player accused `butler` with claim `butler_moved_key`.
@@ -66,10 +66,10 @@
 - `event_054` `character_fact_awareness.updated`: Private character fact awareness updated.
 - `event_055` `character_fact_awareness.updated`: Private character fact awareness updated.
 - `event_056` `memory_candidate.created`: Memory candidate `memory.player.accused.butler.butler_moved_key` created.
-- `event_057` `agent_memory_snapshot.updated`: Memory snapshot `memory.player.accused.butler.butler_moved_key` created from `event_056`.
+- `event_057` `agent_memory_snapshot.updated`: Memory snapshot `memory.player.accused.butler.butler_moved_key` create from `event_056`.
 - `event_058` `character_impression.updated`: Private character impression updated.
 - `event_059` `memory_candidate.created`: Memory candidate `memory.player.accusation_evaluated.butler.butler_moved_key.correct` created.
-- `event_060` `agent_memory_snapshot.updated`: Memory snapshot `memory.player.accusation_evaluated.butler.butler_moved_key.correct` created from `event_059`.
+- `event_060` `agent_memory_snapshot.updated`: Memory snapshot `memory.player.accusation_evaluated.butler.butler_moved_key.correct` create from `event_059`.
 - `event_061` `narrative.beat.completed`: Narrative beat `case_solved` completed.
 - `event_062` `narrative.phase.changed`: Narrative phase changed from `reveal` to `resolved`.
 - `event_063` `rule.rejected`: Rejected `narrative.phase.change`: narrative phase changes must be driven by narrative rules.
@@ -96,15 +96,15 @@
 
 ## Memory snapshots
 
-- `memory.player.clue_discovered.scratched_drawer` created; salience `0.8`; sources `event_003`; Player discovered clue '抽屉划痕'.
-- `memory.player.asked_about.butler.clue.scratched_drawer` created; salience `0.6`; sources `event_009`; Player asked 韩管家 about clue 'scratched_drawer' with pressure 0.6.
-- `memory.player.presented_clue.butler.scratched_drawer` created; salience `0.9`; sources `event_016`; Player pressured 韩管家 with clue 'scratched_drawer' at pressure 0.9.
-- `memory.player.relationship_threshold.butler.player.suspicion.guarded` created; salience `0.7`; sources `event_019`; 韩管家 became guarded toward the player (suspicion).
-- `memory.player.clue_discovered.dustless_frame` created; salience `0.8`; sources `event_031`; Player discovered clue '无尘画框印'.
-- `memory.player.director_blocked.butler.redacted_fact` created; salience `0.9`; sources `event_039`; Conversation with 韩管家 was blocked by narrative rules.
-- `memory.player.clue_discovered.torn_note` created; salience `0.8`; sources `event_044`; Player discovered clue '被撕碎的便签'.
-- `memory.player.accused.butler.butler_moved_key` created; salience `1.0`; sources `event_050`; Player formally accused 韩管家 with claim 'butler_moved_key' using evidence ['scratched_drawer', 'dustless_frame', 'torn_note'].
-- `memory.player.accusation_evaluated.butler.butler_moved_key.correct` created; salience `1.0`; sources `event_051`; Rule Engine evaluated the accusation against 韩管家 for claim 'butler_moved_key' as correct.
+- `memory.player.clue_discovered.scratched_drawer` create; salience `0.8`; sources `event_003`; Player discovered clue '抽屉划痕'.
+- `memory.player.asked_about.butler.clue.scratched_drawer` create; salience `0.6`; sources `event_009`; Player asked 韩管家 about clue 'scratched_drawer' with pressure 0.6.
+- `memory.player.presented_clue.butler.scratched_drawer` create; salience `0.9`; sources `event_016`; Player pressured 韩管家 with clue 'scratched_drawer' at pressure 0.9.
+- `memory.player.relationship_threshold.butler.player.suspicion.guarded` create; salience `0.7`; sources `event_019`; 韩管家 became guarded toward the player (suspicion).
+- `memory.player.clue_discovered.dustless_frame` create; salience `0.8`; sources `event_031`; Player discovered clue '无尘画框印'.
+- `memory.player.director_blocked.butler.redacted_fact` create; salience `0.9`; sources `event_039`; Conversation with 韩管家 was blocked by narrative rules.
+- `memory.player.clue_discovered.torn_note` create; salience `0.8`; sources `event_044`; Player discovered clue '被撕碎的便签'.
+- `memory.player.accused.butler.butler_moved_key` create; salience `1.0`; sources `event_050`; Player formally accused 韩管家 with claim 'butler_moved_key' using evidence ['scratched_drawer', 'dustless_frame', 'torn_note'].
+- `memory.player.accusation_evaluated.butler.butler_moved_key.correct` create; salience `1.0`; sources `event_051`; Rule Engine evaluated the accusation against 韩管家 for claim 'butler_moved_key' as correct.
 
 ## Accusation result
 
