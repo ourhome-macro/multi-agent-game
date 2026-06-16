@@ -85,7 +85,7 @@ def test_agent_loop_uses_memory_retriever_and_budget_in_trace(tmp_path: Path) ->
     runtime = create_runtime(
         [case],
         runtime_tracer=RuntimeTracer(jsonl_path=jsonl_path, log_path=tmp_path / "trace.log"),
-        context_limit_tokens=100,
+        context_limit_tokens=1000,
     )
     session = runtime.session_store.create(case)
     runtime.action_service.handle(
@@ -106,6 +106,8 @@ def test_agent_loop_uses_memory_retriever_and_budget_in_trace(tmp_path: Path) ->
     assert record["memory_ids_used"] == ["memory.player.clue_discovered.scratched_drawer"]
     assert record["context_budget_ratio"] > 0.8
     assert record["compression_used"] is True
+    assert record["context_layer_budget"]["compression_scope"] == "soft_context"
+    assert record["context_layer_budget"]["hard_context_over_limit"] is False
 
 
 def test_agent_loop_passes_retrieved_memory_context_to_gateway() -> None:

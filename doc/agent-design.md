@@ -142,7 +142,7 @@ LLM Shadow Eval v0 复用 Agent 合同，但不是正式运行链路。它只在
 
 `AgentLoop.run_turn(...)` 会用同一个 plan 构造 LLM 输入合同和后置 Python 校验。真实 LLM 的动态 JSON schema 也会根据 `output_contract` 收窄 `intent`、`disclosure_claims` 和可请求的 `proposed_actions` 类型；因此模型生成前和生成后都看到同一套硬边界。
 
-运行时 trace schema v5 会额外写 `npc_skill_projection` 安全摘要，用于复盘“为什么本轮 NPC 只能使用这些 intent/tactic/safe fragment”。trace 仍禁止写玩家原文、private 原文、memory content、forbidden fact 文本和 safe fragment summary。
+运行时 trace schema v7 会额外写 `npc_skill_projection`、`context_layer_budget` 和记忆冲突裁决安全摘要，用于复盘“为什么本轮 NPC 只能使用这些 intent/tactic/safe fragment”，以及本轮 hard / soft context 预算是否触发压缩或阻断。trace 仍禁止写玩家原文、private 原文、memory content、forbidden fact 文本和 safe fragment summary。
 
 `AgentCharacterView` 只包含安全的公开角色卡字段：
 
@@ -184,9 +184,23 @@ Memory v1.2 增加 Skill-driven Retrieval Planner。`MemoryProjectionSkill` 使�
 - `ask_about_clue`：线索询问的渐进式披露投影。
 - `accuse`：正式指控时的更宽但仍受边界限制的投影。
 
-`RetrievalPlanner` 从 skill 生成 `MemoryRetrievalPlan`，控制允许的 `memory_type`、`memory_scope`、常规 `memory_layer`、禁止的 scope/layer、`max_memory_items`、是否注入 `portrait_summary`、是否允许 `recent_events`。`recent_events=false` 同时约束 `AgentContext.recent_events` 和 `ToolRuntime.get_recent_events` 的结果计数。硬边界仍在代码里：`director_audit`、其他 NPC private、其他 NPC portrait 和 forbidden fact 文本不能被 skill 放进普通 NPC `AgentContext`。`archival` 即使出现在 skill 的 forbidden layer 中，也可在代码级冷召回路径被选中；该路径只在常规 working/core 没有相关命中时触发，并且不放宽其他边界。
+`RetrievalPlanner` 从 skill 生成 `MemoryRetrievalPlan`，控制允许的 `memory_type`、`memory_scope`、常规 `memory_layer`、禁止的 scope/layer、`max_memory_items`、是否注入 `portrait_summary`、是否允许 `recent_events`。`recent_events=false` 同时约束 `AgentContext.recent_events` 和 `ToolRuntime.get_recent_events` 的结果计数。硬边界仍在代码里：`director_audit`、其他 NPC private、其他 NPC portrait 和 forbidden fact 文本不能被 skill 放进普通 NPC `AgentContext`。在没有 selected NPC skill memory policy 的基础 projection 路径中，`archival` 即使出现在 projection skill 的 forbidden layer 中，也可在代码级冷召回路径被选中；该路径只在常规 working/core 没有相关命中时触发，并且不放宽其他边界。
+
+2026-06-17 后，selected NPC skill 的 `memory` policy 会参与最终 `MemoryRetrievalPlan`，不再只是 `npc_skill_projections.memory_plan_id` 元数据。最终计划由基础 `MemoryProjectionSkill` plan 与 selected NPC skill policy 合成：`include_types`、`include_scopes`、`include_layers` 与基础 plan 取交集，`topic_tags` 变成 `MemoryRetriever` 的硬过滤条件，`max_items` 取更小值。该合成只能收窄，不能把基础 plan 已禁止的 `director_audit`、`archival` 或不可见 NPC 私有记忆放回来；普通 NPC 可见性仍由 `MemoryRetriever` 的 owner / visible 过滤执行。
+
+当 selected NPC skill 声明 memory policy 时，archival cold recall 也不得越过该 skill 的 `include_layers`。没有 selected NPC skill policy 时，保留既有基础 projection plan 与历史 cold recall 行为。runtime trace 的 `memory_projection.final_plan_source` 会记录 `base_memory_skill_id` 和 `npc_skill_policy_ids`，用于复盘本轮最终检索约束来自基础 projection、NPC skill policy，还是两者合成。
 
 Memory v1.3 hardening 改进的是检索质量，不改变记忆权威链路。`MemoryRetriever` 仍先执行 scope、可见性、layer、skill plan 和 forbidden fact 过滤，再对可注入 snapshot 做运行时排序。排序分数只在检索时派生，不能写回 `AgentMemorySnapshot`、`WorldEvent` 或 trace content。当前分数来源包括结构化锚点匹配、中文/英文文本 token、`updated_at` recency、由 `source_event_ids` 派生的 reinforcement、salience 和 confidence。recency / reinforcement 只能在已有结构化或文本相关性命中后加分，不能单独召回无关记忆。
+
+Memory v1.3.1 增加检索后的 authority / conflict 治理层。该层只处理已经通过 hard filter 的候选，不放宽 scope、owner、visible、layer、source provenance、phase、plan 或 forbidden fact 边界。`belief`、`relationship`、`strategy` 属于高影响记忆，会影响披露、关系判断或 NPC 策略；这类记忆必须同时满足有 `source_event_ids`、未标记 `non_authoritative`、`confidence >= 0.5`，否则不能进入普通 NPC 上下文。`episodic` 记忆仍按原有来源和可见性规则检索，不因为 authority 层被额外删除。
+
+同一高影响记忆类型在同一 owner / subject 下，如果共享 `belief_subject`、`strategy_id`、`world_info_id` 或 `clue_id`，会被视为同一裁决面。`MemoryRetriever` 只投影该裁决面的一个确定性 winner，优先级依次考虑：authoritative、confidence、source event 数、是否有 rule_id、更新时间、memory_id；检索相关性分数仅作为最终平局裁决。这样低权威 hearsay 或低置信策略不会和事件锚定的高置信记忆无区分并列进入 LLM 输入。
+
+2026-06-17 后，高影响记忆还支持 `metadata.authority_source`，取值受模型白名单限制。裁决优先级在 confidence 之前考虑 authority source 等级：`system_rule` / `rule_derived` / `player_evidence` / `player_action` / `world_event` 高于 `npc_direct`、`archival`、`llm_summary` 和 `npc_hearsay`。因此低权威但高置信的 hearsay 不能压过中等置信的玩家证据或规则派生记忆。没有显式 `authority_source` 时，带 `rule_id` 的记忆按 `rule_derived`，归档记忆按 `archival`，其他事件锚定记忆按 `world_event` 处理。
+
+同日起，authority / conflict 治理层会产出 trace 级只读审计摘要。`MemoryRetriever.retrieve(...)` 的兼容返回值仍是 `list[AgentMemorySnapshot]`；最近一次裁决摘要通过 `last_authority_trace_summary` 暴露，并由 `AgentLoop` 写入 runtime trace 的 `memory_projection.memory_conflict_resolution`。每条摘要只包含 `conflict_key`、winner memory id、dropped memory ids、`category` 和稳定 `reason`，例如 `lower_authority_profile` 或 `lower_retrieval_score`。该摘要不写 `SessionState`，不生成 `WorldEvent`，不参与 replay，也不能被 Agent 当作状态事实使用。
+
+`memory_conflict_resolution` 是排障证据，不是内容通道。它禁止包含 memory content、private 原文、玩家原文、safe fragment summary、forbidden fact 文本或 blocked term；trace sanitizer 只保留 id、冲突键和 reason/category。生产排查只能据此回答“哪条高影响记忆因为哪个裁决面被丢弃”，不能从 trace 还原被丢弃记忆的正文。
 
 `build_agent_context(...)` 的 `memory_snapshots` 投影必须复用 `MemoryRetriever` 的质量排序并在排序后应用 `max_memory_items`，不能重新按 `memory_id` 截断。AgentLoop 路径中，注入到 loop 的 `MemoryRetriever` 是唯一事实源：loop 先检索出 `memory_snapshots`，再传给 `build_agent_context(...)`、trace `memory_projection` 和 tool `search_memory` 摘要。只有直接调用 `build_agent_context(...)` 且未传入 `memory_snapshots` 时，函数才会使用内部 fallback retriever。
 
@@ -366,6 +380,7 @@ Agent 也不能写 `FactDisclosureStrategy`。策略是上下文投影，不是�
 - `schema_error`
 - `policy_violation`
 - `private_leak_detected`
+- `context_over_limit`
 - `configuration_error`
 - `unknown_error`
 
@@ -418,6 +433,49 @@ Memory v2 将检索拆成可审计管线：
 schema / JSON repair 只修合同形状，不补新事实。repair instruction 使用同一个 `system.md`、同一个 `LLMAgentContractInput` 和同一个动态 schema，并明确要求不要添加新事实。真实 LLM fallback 是带 `llm_error` 的安全拒答，`proposed_actions=[]`、`memory_refs=[]`、`disclosure_claims=[]`，仍会进入 Director 和 trace，不会绕过状态权威链。
 
 P0 硬链路详见 `doc/architecture/p0-hard-chain-2026-06-16.md`。
+
+## Context hard / soft 边界
+
+2026-06-17 起，LLM 输入合同显式携带 `context_layers`，用于把不可压缩的状态权威边界和可预算裁剪的叙事上下文分开。
+
+Hard context 是本轮生成的安全边界，不能被 token budget 压缩、丢弃或摘要改写：
+
+- `current_phase`、`completed_beats`
+- 已发现线索、玩家知识 ID
+- `blocked_fact_ids`、`revealable_fact_ids`
+- Narrative Director 放行的 `safe_fragment` refs
+- 已选 NPC skill ID
+- 已选 memory ID refs
+- prompt injection / security flags
+- `output_contract` 的 allowed intent 和 proposed action 类型
+- `required_output_schema=AgentIntent`
+
+Soft context 是表达辅助材料，可以被预算裁剪或压缩：
+
+- recent event ids
+- `compressed_history`
+- memory 描述性投影
+- portrait summary 是否存在等非权威提示
+
+`ContextBudgetManager` 仍位于 `app/runtime/budget.py`，不会拆出平行预算系统。预算估算可以同时接收 `hard_context_text` 和 `soft_context_text`，并使用当前 `TokenBudgetProfile.available_input_tokens` 做本轮输入预算口径。
+
+`TokenBudgetProfile` 是 provider/model 级预算口径，字段包括 `provider`、`model`、`context_limit_tokens`、`reserved_output_tokens`、`safety_margin_tokens` 和 `conservative_multiplier`。可用输入预算必须从 provider context window 中扣除预留输出和安全余量，不能再把裸 context limit 当成 prompt 输入上限。`ContextBudgetManager` 允许注入真实 tokenizer / estimator；默认 estimator 不依赖网络或下载包，用字符数、UTF-8 字节数和词数做保守估算，再应用 conservative multiplier。运行时入口 `create_runtime(...)` 可接收 `token_budget_profile` 和 `token_estimator`，但它们只影响预算估算和 trace，不授予 Agent 状态写入权。
+
+预算判定顺序必须先 hard 后 soft。只要 `hard_context_tokens_estimated` 超过可用输入预算，运行时不得把本轮请求交给 `AgentGateway.generate(...)` 或真实 LLM 正常生成。该路径返回安全拒答 `AgentIntent`，设置 `llm_error.error_type=context_over_limit`，`fallback_used=true`，并强制 `proposed_actions=[]`、`memory_refs=[]`、`disclosure_claims=[]`，因此 Rule Engine 没有可执行的 Agent 副作用请求。
+
+hard 超限不是 soft 压缩。trace 的 `context_layer_budget` 必须写：
+
+- `hard_context_over_limit=true`
+- `fallback_reason=hard_context_over_limit`
+- `compression_scope=hard_context_over_limit`
+- `compressed_layers=[]`
+- `hard_context_preserved=false`
+
+只有当 hard context 仍在预算内，而总上下文超过压缩阈值时，才允许走 soft-only compression：`compression_scope=soft_context`，`compressed_layers=["soft_context"]`。压缩摘要只代表 soft layer 的折叠，不允许替代 phase、玩家知识、Director constraints、skill projection、security flags、selected memory refs 或输出合同。
+
+`AgentLoop` 在 trace 中写入 `context_layer_budget`，只记录压缩范围、hard/soft token 估算、hard 超限标记、fallback reason、预算 profile 元数据、soft recent event 数和 selected memory 数，不记录玩家原文、memory content、private 原文或 safe fragment summary。该 trace 字段用于证明预算处理是否只影响 soft context；hard context 是否进入 LLM 以 `LLMAgentContractInput.context_layers.hard` 为准。
+
+Provider token budget 的专项说明见 `doc/runtime/provider-token-budget-2026-06-17.md`。
 
 ## 案件级 Agent 扩写
 

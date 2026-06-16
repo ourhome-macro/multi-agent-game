@@ -46,6 +46,7 @@ class LLMErrorType(StrEnum):
     SCHEMA_ERROR = "schema_error"
     POLICY_VIOLATION = "policy_violation"
     PRIVATE_LEAK_DETECTED = "private_leak_detected"
+    CONTEXT_OVER_LIMIT = "context_over_limit"
     CONFIGURATION_ERROR = "configuration_error"
     UNKNOWN_ERROR = "unknown_error"
 
@@ -219,6 +220,19 @@ ALLOWED_MEMORY_DECAY_POLICY_KEYS = frozenset(
         "reinforced_event_count",
     }
 )
+ALLOWED_MEMORY_AUTHORITY_SOURCES = frozenset(
+    {
+        "system_rule",
+        "rule_derived",
+        "player_evidence",
+        "player_action",
+        "world_event",
+        "npc_direct",
+        "npc_hearsay",
+        "llm_summary",
+        "archival",
+    }
+)
 ALLOWED_MEMORY_METADATA_KEYS = frozenset(
     {
         "relationship_delta",
@@ -236,6 +250,7 @@ ALLOWED_MEMORY_METADATA_KEYS = frozenset(
         "privacy_reason",
         "decay_policy",
         "non_authoritative",
+        "authority_source",
     }
 )
 
@@ -1330,6 +1345,39 @@ class CompressedHistoryContext(APIModel):
     risk_notes: list[str] = Field(default_factory=list)
 
 
+class LLMHardContextProjection(APIModel):
+    current_phase: NonEmptyString
+    completed_beats: list[NonEmptyString] = Field(default_factory=list)
+    discovered_clues: list[NonEmptyString] = Field(default_factory=list)
+    player_knowledge_ids: list[NonEmptyString] = Field(default_factory=list)
+    blocked_fact_ids: list[NonEmptyString] = Field(default_factory=list)
+    revealable_fact_ids: list[NonEmptyString] = Field(default_factory=list)
+    director_safe_fragment_refs: list[NonEmptyString] = Field(default_factory=list)
+    selected_npc_skill_ids: list[NonEmptyString] = Field(default_factory=list)
+    selected_memory_ids: list[NonEmptyString] = Field(default_factory=list)
+    security_flags: list[NonEmptyString] = Field(default_factory=list)
+    output_contract_allowed_intents: list[NonEmptyString] = Field(default_factory=list)
+    output_contract_allowed_proposed_actions: list[NonEmptyString] = Field(
+        default_factory=list
+    )
+    required_output_schema: Literal["AgentIntent"] = "AgentIntent"
+
+
+class LLMSoftContextProjection(APIModel):
+    recent_event_ids: list[NonEmptyString] = Field(default_factory=list)
+    compressed_history_present: bool = False
+    compressed_history_event_ids: list[NonEmptyString] = Field(default_factory=list)
+    compressed_history_memory_ids: list[NonEmptyString] = Field(default_factory=list)
+    memory_description_ids: list[NonEmptyString] = Field(default_factory=list)
+    portrait_summary_present: bool = False
+
+
+class LLMContextLayerProjection(APIModel):
+    hard: LLMHardContextProjection
+    soft: LLMSoftContextProjection
+    compression_policy: Literal["soft_only"] = "soft_only"
+
+
 class AgentContext(APIModel):
     case_id: NonEmptyString
     session_id: NonEmptyString
@@ -1372,6 +1420,7 @@ class LLMAgentContractInput(APIModel):
     output_contract: LLMAgentOutputContract = Field(
         default_factory=LLMAgentOutputContract
     )
+    context_layers: LLMContextLayerProjection
     required_output_schema: Literal["AgentIntent"] = "AgentIntent"
     turn_plan_id: str | None = None
 
@@ -1550,6 +1599,10 @@ def validate_memory_metadata(value: object) -> dict[str, Any]:
         bool,
     ):
         raise ValueError("non_authoritative must be a boolean")
+    if "authority_source" in metadata:
+        metadata["authority_source"] = _validate_authority_source(
+            metadata["authority_source"]
+        )
     return metadata
 
 
@@ -1576,6 +1629,13 @@ def _validate_metadata_string_list(value: object, field_name: str) -> list[str]:
         text = _validate_metadata_string(item, field_name)
         if text not in normalized:
             normalized.append(text)
+    return normalized
+
+
+def _validate_authority_source(value: object) -> str:
+    normalized = _validate_metadata_string(value, "authority_source")
+    if normalized not in ALLOWED_MEMORY_AUTHORITY_SOURCES:
+        raise ValueError(f"authority_source is not supported: {normalized}")
     return normalized
 
 

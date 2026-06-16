@@ -4,13 +4,13 @@ from app.agents.disclosure_strategy import (
     DISCLOSURE_MODE_ORDER,
     build_fact_disclosure_strategies,
 )
+from app.agents.final_retrieval_plan import build_final_memory_retrieval_plan
 from app.agents.memory import (
     MemoryRetriever,
     memory_allowed_by_plan,
     memory_content_matches_forbidden,
 )
-from app.agents.npc_skills import NpcSkillSelector
-from app.agents.npc_skills import NpcSkillSelection
+from app.agents.npc_skills import NpcSkillSelection, NpcSkillSelector
 from app.agents.retrieval_planner import MemoryRetrievalPlan, RetrievalPlanner
 from app.domain.models import (
     AgentCharacterView,
@@ -41,10 +41,28 @@ def build_agent_context(
     memory_snapshots: list[AgentMemorySnapshot] | None = None,
     npc_skill_selection: NpcSkillSelection | None = None,
 ) -> AgentContext:
-    plan = retrieval_plan or RetrievalPlanner().plan(
+    base_plan = retrieval_plan or RetrievalPlanner().plan(
         case=case,
         session=session,
         action=action,
+    )
+    selected_npc_skills = (
+        npc_skill_selection
+        if npc_skill_selection is not None
+        else NpcSkillSelector().select(
+            case=case,
+            session=session,
+            action=action,
+        )
+    )
+    plan = (
+        base_plan
+        if retrieval_plan is not None
+        else build_final_memory_retrieval_plan(
+            base_plan=base_plan,
+            case=case,
+            npc_skill_selection=selected_npc_skills,
+        )
     )
     dialogue = next(
         (item for item in case.mock_dialogues if item.character_id == action.target_id),
@@ -114,16 +132,6 @@ def build_agent_context(
             plan=plan,
         )
     )
-    selected_npc_skills = (
-        npc_skill_selection
-        if npc_skill_selection is not None
-        else NpcSkillSelector().select(
-            case=case,
-            session=session,
-            action=action,
-        )
-    )
-
     return AgentContext(
         case_id=case.meta.id,
         session_id=session.id,
@@ -540,7 +548,23 @@ def _memory_event_allowed_by_plan(
         and memory_layer in set(plan.included_layers)
         and memory_scope not in set(plan.forbidden_scopes)
         and memory_layer not in set(plan.forbidden_layers)
+        and _memory_payload_topic_tags_allowed(payload, plan.included_topic_tags)
     )
+
+
+def _memory_payload_topic_tags_allowed(
+    payload: dict[str, object],
+    included_topic_tags: tuple[str, ...],
+) -> bool:
+    if not included_topic_tags:
+        return True
+    metadata = payload.get("metadata", {})
+    if not isinstance(metadata, dict):
+        return False
+    raw_tags = metadata.get("topic_tags", [])
+    if not isinstance(raw_tags, list):
+        return False
+    return bool({str(item) for item in raw_tags} & set(included_topic_tags))
 
 
 def _memory_event_matches_forbidden(

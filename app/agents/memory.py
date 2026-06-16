@@ -5,6 +5,10 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Protocol
 
+from app.agents.memory_authority import (
+    MemoryAuthorityTraceSummary,
+    resolve_authoritative_memory_results_with_trace,
+)
 from app.agents.memory_retrieval import (
     EmbeddingScorer,
     LocalBM25KeywordScorer,
@@ -124,10 +128,15 @@ class MemoryRetriever:
         self._reranker = reranker
         self._memory_store = memory_store or InMemoryMemoryStore()
         self._last_store_trace_summary: MemoryStoreTraceSummary | None = None
+        self._last_authority_trace_summary = MemoryAuthorityTraceSummary()
 
     @property
     def last_store_trace_summary(self) -> MemoryStoreTraceSummary | None:
         return self._last_store_trace_summary
+
+    @property
+    def last_authority_trace_summary(self) -> MemoryAuthorityTraceSummary:
+        return self._last_authority_trace_summary
 
     def retrieve(
         self,
@@ -170,6 +179,7 @@ class MemoryRetriever:
         plan: MemoryRetrievalPlan | None,
     ) -> list[AgentMemorySnapshot]:
         max_results = plan.max_memory_items if plan is not None else self._max_results
+        self._last_authority_trace_summary = MemoryAuthorityTraceSummary()
         if max_results <= 0:
             return []
 
@@ -201,6 +211,9 @@ class MemoryRetriever:
             now=_retrieval_now(session, working_candidates),
             hard_filters=working_filters,
         )
+        authority_result = resolve_authoritative_memory_results_with_trace(scored)
+        scored = authority_result.results
+        self._last_authority_trace_summary = authority_result.trace_summary
         if scored or not enforce_target_visibility:
             return [result.snapshot for result in scored[:max_results]]
 
@@ -229,6 +242,11 @@ class MemoryRetriever:
             now=_retrieval_now(session, archival_candidates),
             hard_filters=archival_filters,
         )
+        archival_authority_result = resolve_authoritative_memory_results_with_trace(
+            archival_scored
+        )
+        archival_scored = archival_authority_result.results
+        self._last_authority_trace_summary = archival_authority_result.trace_summary
         return [result.snapshot for result in archival_scored[:max_results]]
 
     def _fetch_store_candidates(
@@ -437,7 +455,7 @@ def _archival_hard_filters(
             lambda snapshot: memory_allowed_by_plan(
                 snapshot,
                 plan,
-                allow_archival_layer=True,
+                allow_archival_layer=_plan_allows_archival_cold_recall(plan),
             ),
         ),
         MemoryHardFilter(
@@ -448,6 +466,10 @@ def _archival_hard_filters(
             ),
         ),
     )
+
+
+def _plan_allows_archival_cold_recall(plan: MemoryRetrievalPlan | None) -> bool:
+    return plan is None or not plan.npc_skill_policy_ids
 
 
 def _filter_snapshots(
@@ -501,7 +523,23 @@ def memory_allowed_by_plan(
         and layer_included
         and memory_scope not in set(plan.forbidden_scopes)
         and not layer_forbidden
+        and _topic_tags_allowed(snapshot, plan.included_topic_tags)
     )
+
+
+def _topic_tags_allowed(
+    snapshot: object,
+    included_topic_tags: tuple[str, ...],
+) -> bool:
+    if not included_topic_tags:
+        return True
+    metadata = getattr(snapshot, "metadata", {})
+    if not isinstance(metadata, dict):
+        return False
+    raw_tags = metadata.get("topic_tags", [])
+    if not isinstance(raw_tags, list):
+        return False
+    return bool({str(item) for item in raw_tags} & set(included_topic_tags))
 
 
 def memory_content_matches_forbidden(

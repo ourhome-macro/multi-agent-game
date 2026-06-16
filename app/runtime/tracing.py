@@ -11,7 +11,7 @@ from uuid import uuid4
 
 from app.domain.models import ActionType, AgentIntent, PlayerAction, WorldEvent
 
-TRACE_SCHEMA_VERSION = 5
+TRACE_SCHEMA_VERSION = 7
 
 
 @dataclass
@@ -30,6 +30,7 @@ class RuntimeTraceDraft:
     memory_ids_used: list[str] = field(default_factory=list)
     memory_projection: dict[str, object] = field(default_factory=dict)
     npc_skill_projection: dict[str, object] = field(default_factory=dict)
+    context_layer_budget: dict[str, object] = field(default_factory=dict)
     tool_calls: list[dict[str, object]] = field(default_factory=list)
     security_flags: list[str] = field(default_factory=list)
     trace_id: str = field(default_factory=lambda: str(uuid4()))
@@ -140,6 +141,7 @@ class RuntimeTracer:
         memory_ids_used: list[str] | None = None,
         memory_projection: dict[str, object] | None = None,
         npc_skill_projection: dict[str, object] | None = None,
+        context_layer_budget: dict[str, object] | None = None,
         tool_calls: list[dict[str, object]] | None = None,
         security_flags: list[str] | None = None,
     ) -> RuntimeTraceDraft:
@@ -159,6 +161,9 @@ class RuntimeTracer:
             memory_projection=_sanitize_memory_projection(memory_projection or {}),
             npc_skill_projection=_sanitize_npc_skill_projection(
                 npc_skill_projection or {}
+            ),
+            context_layer_budget=_sanitize_context_layer_budget(
+                context_layer_budget or {}
             ),
             tool_calls=[_sanitize_tool_call(item) for item in (tool_calls or [])],
             security_flags=security_flags or [],
@@ -197,6 +202,7 @@ class RuntimeTracer:
             "memory_ids_used": draft.memory_ids_used,
             "memory_projection": draft.memory_projection,
             "npc_skill_projection": draft.npc_skill_projection,
+            "context_layer_budget": draft.context_layer_budget,
             "tool_calls": draft.tool_calls,
             "security_flags": draft.security_flags,
             "intent_type": intent.intent.value if intent is not None else None,
@@ -242,9 +248,45 @@ def _sanitize_tool_call(tool_call: dict[str, object]) -> dict[str, object]:
     }
 
 
+def _sanitize_context_layer_budget(value: dict[str, object]) -> dict[str, object]:
+    return {
+        "compression_scope": str(value.get("compression_scope", "none")),
+        "compressed_layers": _string_list(value.get("compressed_layers", [])),
+        "hard_context_tokens_estimated": int(
+            value.get("hard_context_tokens_estimated", 0)
+        ),
+        "soft_context_tokens_estimated": int(
+            value.get("soft_context_tokens_estimated", 0)
+        ),
+        "hard_context_over_limit": bool(value.get("hard_context_over_limit", False)),
+        "fallback_reason": (
+            str(value["fallback_reason"])
+            if value.get("fallback_reason") is not None
+            else None
+        ),
+        "hard_context_preserved": bool(value.get("hard_context_preserved", True)),
+        "soft_recent_event_count": int(value.get("soft_recent_event_count", 0)),
+        "selected_memory_count": int(value.get("selected_memory_count", 0)),
+        "provider": str(value.get("provider", "")),
+        "model": str(value.get("model", "")),
+        "context_limit_tokens": int(value.get("context_limit_tokens", 0)),
+        "available_input_tokens": int(value.get("available_input_tokens", 0)),
+        "reserved_output_tokens": int(value.get("reserved_output_tokens", 0)),
+        "safety_margin_tokens": int(value.get("safety_margin_tokens", 0)),
+        "conservative_multiplier": float(value.get("conservative_multiplier", 1.0)),
+        "token_estimator_method": str(value.get("token_estimator_method", "")),
+    }
+
+
 def _sanitize_memory_projection(projection: dict[str, object]) -> dict[str, object]:
     raw_items = projection.get("items", [])
     items = raw_items if isinstance(raw_items, list) else []
+    raw_conflict_resolutions = projection.get("memory_conflict_resolution", [])
+    conflict_resolutions = (
+        raw_conflict_resolutions
+        if isinstance(raw_conflict_resolutions, list)
+        else []
+    )
     return {
         "skill_id": str(projection.get("skill_id", "")),
         "included_memory_types": _string_list(
@@ -259,6 +301,10 @@ def _sanitize_memory_projection(projection: dict[str, object]) -> dict[str, obje
             projection.get("director_safe_fragment_refs", []),
         ),
         "store": _sanitize_memory_store_projection(projection.get("store", {})),
+        "memory_conflict_resolution": [
+            _sanitize_memory_conflict_resolution(item)
+            for item in conflict_resolutions
+        ],
         "items": [_sanitize_memory_projection_item(item) for item in items],
     }
 
@@ -301,6 +347,18 @@ def _sanitize_memory_projection_item(item: object) -> dict[str, object]:
         "memory_layer": str(item.get("memory_layer", "")),
         "owner_character_id": item.get("owner_character_id"),
         "visible_to_character_ids": [str(value) for value in visible_to],
+    }
+
+
+def _sanitize_memory_conflict_resolution(item: object) -> dict[str, object]:
+    if not isinstance(item, dict):
+        item = {}
+    return {
+        "category": str(item.get("category", "")),
+        "reason": str(item.get("reason", "")),
+        "conflict_key": _string_list(item.get("conflict_key", [])),
+        "winner_memory_id": str(item.get("winner_memory_id", "")),
+        "dropped_memory_ids": _string_list(item.get("dropped_memory_ids", [])),
     }
 
 

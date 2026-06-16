@@ -22,7 +22,7 @@ from app.domain.models import (
 from app.rules.engine import RuleEngine
 from app.rules.triggers import RuleTriggerSystem
 from app.runtime.action_router import ActionRouter, ActionRouteStatus, RouteResult
-from app.runtime.budget import ContextBudgetManager
+from app.runtime.budget import ContextBudgetManager, TokenBudgetProfile, TokenEstimatorLike
 from app.runtime.derivations import DerivedEventSystem
 from app.runtime.errors import ActionValidationError
 from app.runtime.events import EventRecorder
@@ -642,7 +642,9 @@ def create_runtime(
     runtime_tracer: RuntimeTracer | None = None,
     memory_retriever: MemoryRetriever | None = None,
     retrieval_planner: RetrievalPlanner | None = None,
-    context_limit_tokens: int = 8000,
+    context_limit_tokens: int | None = None,
+    token_budget_profile: TokenBudgetProfile | None = None,
+    token_estimator: TokenEstimatorLike | None = None,
 ) -> RuntimeContainer:
     recorder = EventRecorder()
     case_store = InMemoryCaseStore()
@@ -658,6 +660,8 @@ def create_runtime(
         retrieval_planner=retrieval_planner,
         context_budget_manager=ContextBudgetManager(
             context_limit_tokens=context_limit_tokens,
+            budget_profile=token_budget_profile,
+            token_estimator=token_estimator,
         ),
         narrative_director=director,
     )

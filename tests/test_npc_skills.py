@@ -243,12 +243,16 @@ def test_runtime_trace_records_npc_skill_projection_without_sensitive_content() 
     projection = record["npc_skill_projection"]
     serialized_projection = json.dumps(projection, ensure_ascii=False)
 
-    assert record["schema_version"] == 5
+    assert record["schema_version"] == 7
     assert projection["selected_skill_ids"] == [SKILL_ID]
     assert projection["skill_safe_fragment_refs"] == [SAFE_FRAGMENT_REF]
     assert projection["items"][0]["safe_fragment_refs"] == [SAFE_FRAGMENT_REF]
     assert "书桌抽屉存在新鲜撬动痕迹" not in serialized_projection
     assert "content" not in serialized_projection
+    assert "content" not in json.dumps(
+        record["context_layer_budget"],
+        ensure_ascii=False,
+    )
     for private_value in _private_character_values(case):
         assert private_value not in serialized_projection
 

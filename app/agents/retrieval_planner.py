@@ -52,6 +52,9 @@ class MemoryRetrievalPlan:
     allow_recent_events: bool
     handoff_to_director: bool = False
     disclosure_level: str | None = None
+    included_topic_tags: tuple[str, ...] = ()
+    base_memory_skill_id: str | None = None
+    npc_skill_policy_ids: tuple[str, ...] = ()
 
     def trace_summary(self, *, selected_count: int) -> dict[str, object]:
         return {
@@ -59,8 +62,13 @@ class MemoryRetrievalPlan:
             "included_memory_types": list(self.included_memory_types),
             "included_scopes": list(self.included_scopes),
             "included_layers": list(self.included_layers),
+            "included_topic_tags": list(self.included_topic_tags),
             "forbidden_scopes": list(self.forbidden_scopes),
             "forbidden_layers": list(self.forbidden_layers),
+            "final_plan_source": {
+                "base_memory_skill_id": self.base_memory_skill_id or self.skill_id,
+                "npc_skill_policy_ids": list(self.npc_skill_policy_ids),
+            },
             "selected_count": selected_count,
         }
 

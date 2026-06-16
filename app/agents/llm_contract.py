@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from app.agents.turn_plan import AgentTurnPlan, build_skill_aware_output_contract
 from app.domain.models import (
     AgentContext,
     AgentIntent,
@@ -10,14 +11,16 @@ from app.domain.models import (
     EventType,
     FactDisclosureStrategy,
     LLMAgentContractInput,
-    LLMDisclosureConstraint,
     LLMAgentOutputContract,
+    LLMContextLayerProjection,
+    LLMDisclosureConstraint,
+    LLMHardContextProjection,
+    LLMSoftContextProjection,
     ProposedActionType,
     SafeFactFragmentProjection,
     SelfKnowledgeItem,
     WorldEvent,
 )
-from app.agents.turn_plan import AgentTurnPlan, build_skill_aware_output_contract
 
 
 class LLMAgentPolicyViolationError(ValueError):
@@ -46,6 +49,11 @@ def build_llm_agent_input(
         agent_context=safe_context,
         disclosure_constraints=_build_disclosure_constraints(safe_context),
         output_contract=output_contract,
+        context_layers=_build_context_layers(
+            safe_context,
+            output_contract=output_contract,
+            turn_plan=turn_plan,
+        ),
         turn_plan_id=turn_plan.plan_id if turn_plan is not None else None,
     )
 
@@ -169,6 +177,63 @@ def _project_context_for_llm(context: AgentContext) -> AgentContext:
                 projected_recent_event_ids={event.id for event in recent_events},
             ),
         }
+    )
+
+
+def _build_context_layers(
+    context: AgentContext,
+    *,
+    output_contract: LLMAgentOutputContract,
+    turn_plan: AgentTurnPlan | None,
+) -> LLMContextLayerProjection:
+    security_flags = turn_plan.security_flags if turn_plan is not None else []
+    compressed_history = context.compressed_history
+    return LLMContextLayerProjection(
+        hard=LLMHardContextProjection(
+            current_phase=context.current_phase,
+            completed_beats=list(context.completed_beats),
+            discovered_clues=list(context.discovered_clues),
+            player_knowledge_ids=[
+                item.knowledge_id for item in context.player_knowledge
+            ],
+            blocked_fact_ids=list(context.blocked_fact_ids),
+            revealable_fact_ids=list(context.revealable_fact_ids),
+            director_safe_fragment_refs=[
+                fragment.ref for fragment in context.director_safe_fragments
+            ],
+            selected_npc_skill_ids=[
+                skill.skill_id for skill in context.npc_skill_projections
+            ],
+            selected_memory_ids=[
+                memory.memory_id for memory in context.memory_snapshots
+            ],
+            security_flags=list(security_flags),
+            output_contract_allowed_intents=[
+                intent.value for intent in output_contract.allowed_intents
+            ],
+            output_contract_allowed_proposed_actions=[
+                action_type.value
+                for action_type in output_contract.allowed_proposed_action_types
+            ],
+        ),
+        soft=LLMSoftContextProjection(
+            recent_event_ids=[event.id for event in context.recent_events],
+            compressed_history_present=compressed_history is not None,
+            compressed_history_event_ids=(
+                list(compressed_history.important_event_ids)
+                if compressed_history is not None
+                else []
+            ),
+            compressed_history_memory_ids=(
+                list(compressed_history.important_memory_ids)
+                if compressed_history is not None
+                else []
+            ),
+            memory_description_ids=[
+                memory.memory_id for memory in context.memory_snapshots
+            ],
+            portrait_summary_present=bool(context.portrait_summary),
+        ),
     )
 
 

@@ -144,7 +144,7 @@ def test_runtime_trace_writes_safe_jsonl_and_readable_log(tmp_path: Path) -> Non
 
     assert len(records) == 1
     record = records[0]
-    assert record["schema_version"] == 5
+    assert record["schema_version"] == 7
     assert record["timestamp"]
     assert record["turn_id"] == 1
     assert record["action_type"] == "talk"
@@ -160,9 +160,31 @@ def test_runtime_trace_writes_safe_jsonl_and_readable_log(tmp_path: Path) -> Non
     assert record["memory_projection"]["selected_count"] == len(
         record["memory_projection"]["items"]
     )
+    assert record["memory_projection"]["memory_conflict_resolution"] == []
     assert record["npc_skill_projection"]["selected_skill_ids"] == []
+    assert record["context_layer_budget"]["hard_context_preserved"] is True
+    assert set(record["context_layer_budget"]) == {
+        "compression_scope",
+        "compressed_layers",
+        "hard_context_tokens_estimated",
+        "soft_context_tokens_estimated",
+        "hard_context_over_limit",
+        "fallback_reason",
+        "hard_context_preserved",
+        "soft_recent_event_count",
+        "selected_memory_count",
+        "provider",
+        "model",
+        "context_limit_tokens",
+        "available_input_tokens",
+        "reserved_output_tokens",
+        "safety_margin_tokens",
+        "conservative_multiplier",
+        "token_estimator_method",
+    }
     assert "content" not in json.dumps(record["memory_projection"], ensure_ascii=False)
     assert "content" not in json.dumps(record["npc_skill_projection"], ensure_ascii=False)
+    assert "content" not in json.dumps(record["context_layer_budget"], ensure_ascii=False)
     assert set(record["tool_calls"][0]) == {
         "tool_name",
         "status",

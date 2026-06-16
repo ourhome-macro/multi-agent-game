@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 
 from app.agents.context import build_agent_context
 from app.agents.disclosure_strategy import DISCLOSURE_MODE_ORDER
+from app.agents.final_retrieval_plan import build_final_memory_retrieval_plan
 from app.agents.gateway import AgentGateway
 from app.agents.llm_contract import (
     LLMAgentPolicyViolationError,
@@ -92,8 +94,7 @@ class AgentLoop:
         session: SessionState,
         action: PlayerAction,
     ) -> AgentContext:
-        plan = self._retrieval_planner.plan(case=case, session=session, action=action)
-        npc_skill_selection = NpcSkillSelector().select(
+        plan, npc_skill_selection = self._final_memory_plan(
             case=case,
             session=session,
             action=action,
@@ -148,8 +149,7 @@ class AgentLoop:
         action: PlayerAction,
     ) -> AgentTurnResult:
         phase_before = session.narrative.phase
-        plan = self._retrieval_planner.plan(case=case, session=session, action=action)
-        npc_skill_selection = NpcSkillSelector().select(
+        plan, npc_skill_selection = self._final_memory_plan(
             case=case,
             session=session,
             action=action,
@@ -188,6 +188,9 @@ class AgentLoop:
             retrieved_memories,
             context,
             store_trace_summary=_memory_store_trace_summary(self._memory_retriever),
+            authority_trace_summary=_memory_authority_trace_summary(
+                self._memory_retriever
+            ),
         )
         npc_skill_projection = _npc_skill_projection(context)
         prompt_bundle = self._prompt_builder.build(context)
@@ -224,10 +227,28 @@ class AgentLoop:
             memory_ids_used=memory_ids,
             memory_projection=memory_projection,
             npc_skill_projection=npc_skill_projection,
+            context_layer_budget=_context_layer_budget_projection(
+                budget,
+                context=context,
+                memory_ids=memory_ids,
+            ),
             tool_calls=tool_calls,
             security_flags=security_review.security_flags,
         )
         contract_input = build_llm_agent_input(context, turn_plan=turn_plan)
+        if budget.hard_context_over_limit:
+            return AgentTurnResult(
+                context=context,
+                intent=_hard_context_over_limit_intent(
+                    backend=self._agent_gateway.backend_name,
+                    contract_input=contract_input,
+                    fallback_reason=budget.fallback_reason,
+                ),
+                trace=trace,
+                security_flags=security_review.security_flags,
+                memory_ids_used=memory_ids,
+                npc_skill_selection=npc_skill_selection,
+            )
         intent = self._validate_agent_intent(
             context,
             self._agent_gateway.generate(
@@ -243,6 +264,28 @@ class AgentLoop:
             security_flags=security_review.security_flags,
             memory_ids_used=memory_ids,
             npc_skill_selection=npc_skill_selection,
+        )
+
+    def _final_memory_plan(
+        self,
+        *,
+        case: CasePackage,
+        session: SessionState,
+        action: PlayerAction,
+    ) -> tuple[MemoryRetrievalPlan, NpcSkillSelection]:
+        base_plan = self._retrieval_planner.plan(case=case, session=session, action=action)
+        npc_skill_selection = NpcSkillSelector().select(
+            case=case,
+            session=session,
+            action=action,
+        )
+        return (
+            build_final_memory_retrieval_plan(
+                base_plan=base_plan,
+                case=case,
+                npc_skill_selection=npc_skill_selection,
+            ),
+            npc_skill_selection,
         )
 
     def _validate_agent_intent(
@@ -342,6 +385,8 @@ class AgentLoop:
         )
         return self._context_budget_manager.apply(
             prompt_text=prompt_text,
+            hard_context_text=_hard_context_budget_text(context),
+            soft_context_text=_soft_context_budget_text(context),
             memory_ids=memory_ids,
             recent_event_ids=[event.id for event in context.recent_events],
         )
@@ -380,6 +425,7 @@ def _memory_projection(
     memories: list[AgentMemorySnapshot],
     context: AgentContext | None = None,
     store_trace_summary: object | None = None,
+    authority_trace_summary: object | None = None,
 ) -> dict[str, object]:
     summary = plan.trace_summary(selected_count=len(memories))
     summary["items"] = [
@@ -407,12 +453,21 @@ def _memory_projection(
                 {},
             ),
         }
+    if authority_trace_summary is not None:
+        summary.update(authority_trace_summary.to_projection())
     return summary
 
 
 def _memory_store_trace_summary(memory_retriever: MemoryRetriever) -> object | None:
     try:
         return memory_retriever.last_store_trace_summary
+    except AttributeError:
+        return None
+
+
+def _memory_authority_trace_summary(memory_retriever: MemoryRetriever) -> object | None:
+    try:
+        return memory_retriever.last_authority_trace_summary
     except AttributeError:
         return None
 
@@ -434,6 +489,103 @@ def _npc_skill_projection(context: AgentContext) -> dict[str, object]:
             for skill in context.npc_skill_projections
         ],
     }
+
+
+def _context_layer_budget_projection(
+    budget: ContextBudgetResult,
+    *,
+    context: AgentContext,
+    memory_ids: list[str],
+) -> dict[str, object]:
+    return {
+        "compression_scope": budget.compression_scope,
+        "compressed_layers": budget.compressed_layers or [],
+        "hard_context_tokens_estimated": budget.hard_context_tokens_estimated,
+        "soft_context_tokens_estimated": budget.soft_context_tokens_estimated,
+        "hard_context_over_limit": budget.hard_context_over_limit,
+        "fallback_reason": budget.fallback_reason,
+        "hard_context_preserved": budget.compression_scope != "hard_context_over_limit",
+        "soft_recent_event_count": len(context.recent_events),
+        "selected_memory_count": len(memory_ids),
+        "provider": budget.provider,
+        "model": budget.model,
+        "context_limit_tokens": budget.context_limit_tokens,
+        "available_input_tokens": budget.available_input_tokens,
+        "reserved_output_tokens": budget.reserved_output_tokens,
+        "safety_margin_tokens": budget.safety_margin_tokens,
+        "conservative_multiplier": budget.conservative_multiplier,
+        "token_estimator_method": budget.token_estimator_method,
+    }
+
+
+def _hard_context_over_limit_intent(
+    *,
+    backend: str,
+    contract_input: LLMAgentContractInput,
+    fallback_reason: str | None,
+) -> AgentIntent:
+    reason = fallback_reason or "hard_context_over_limit"
+    return AgentIntent(
+        speech="I cannot answer that safely right now.",
+        intent=contract_input.output_contract.fallback_intent,
+        emotional_shift={},
+        proposed_actions=[],
+        memory_refs=[],
+        disclosure_claims=[],
+        llm_error=LLMErrorSummary(
+            backend=backend,
+            error_type=LLMErrorType.CONTEXT_OVER_LIMIT,
+            error_message_sanitized=reason,
+            fallback_used=True,
+        ),
+    )
+
+
+def _hard_context_budget_text(context: AgentContext) -> str:
+    payload = {
+        "current_phase": context.current_phase,
+        "completed_beats": context.completed_beats,
+        "discovered_clues": context.discovered_clues,
+        "player_knowledge_ids": [
+            item.knowledge_id for item in context.player_knowledge
+        ],
+        "blocked_fact_ids": context.blocked_fact_ids,
+        "revealable_fact_ids": context.revealable_fact_ids,
+        "director_safe_fragment_refs": [
+            fragment.ref for fragment in context.director_safe_fragments
+        ],
+        "selected_npc_skill_ids": [
+            skill.skill_id for skill in context.npc_skill_projections
+        ],
+        "selected_memory_ids": [
+            memory.memory_id for memory in context.memory_snapshots
+        ],
+    }
+    return json.dumps(payload, ensure_ascii=False, sort_keys=True)
+
+
+def _soft_context_budget_text(context: AgentContext) -> str:
+    compressed_history = context.compressed_history
+    payload = {
+        "recent_event_ids": [event.id for event in context.recent_events],
+        "compressed_history": (
+            compressed_history.model_dump(mode="json")
+            if compressed_history is not None
+            else None
+        ),
+        "memory_descriptions": [
+            {
+                "memory_id": memory.memory_id,
+                "memory_type": memory.memory_type,
+                "memory_scope": memory.memory_scope,
+                "memory_layer": memory.memory_layer,
+                "source_event_ids": memory.source_event_ids,
+            }
+            for memory in context.memory_snapshots
+        ],
+        "portrait_summary_present": bool(context.portrait_summary),
+    }
+    return json.dumps(payload, ensure_ascii=False, sort_keys=True)
 
 
 def _skill_limited_safe_fragments(

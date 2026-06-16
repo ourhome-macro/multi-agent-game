@@ -6,7 +6,8 @@ from enum import StrEnum
 from typing import TypeVar
 from uuid import NAMESPACE_URL, uuid5
 
-from app.agents.npc_skills import NpcSkillSelector
+from app.agents.final_retrieval_plan import build_final_memory_retrieval_plan
+from app.agents.npc_skills import NpcSkillSelection, NpcSkillSelector
 from app.agents.retrieval_planner import MemoryRetrievalPlan, RetrievalPlanner
 from app.domain.models import (
     AgentContext,
@@ -58,23 +59,35 @@ def build_agent_turn_plan(
     memory_retrieval_plan: MemoryRetrievalPlan | None = None,
     security_review: PromptInjectionReview | None = None,
 ) -> AgentTurnPlan:
-    memory_plan = (
-        memory_retrieval_plan
-        if memory_retrieval_plan is not None
-        else (retrieval_planner or RetrievalPlanner()).plan(
-            case=case,
-            session=session,
-            action=action,
+    skill_selection = (
+        NpcSkillSelection(
+            projections=list(context.npc_skill_projections),
+            available_skill_ids=[skill.skill_id for skill in context.npc_skill_projections],
         )
-    )
-    skill_projections = (
-        context.npc_skill_projections
         if context is not None
         else NpcSkillSelector().select(
             case=case,
             session=session,
             action=action,
-        ).projections
+        )
+    )
+    memory_plan = (
+        memory_retrieval_plan
+        if memory_retrieval_plan is not None
+        else build_final_memory_retrieval_plan(
+            base_plan=(retrieval_planner or RetrievalPlanner()).plan(
+                case=case,
+                session=session,
+                action=action,
+            ),
+            case=case,
+            npc_skill_selection=skill_selection,
+        )
+    )
+    skill_projections = (
+        context.npc_skill_projections
+        if context is not None
+        else skill_selection.projections
     )
     security_plan = (
         AgentTurnPlan.from_security_review(security_review)
