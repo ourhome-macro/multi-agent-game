@@ -67,7 +67,7 @@ POST /sessions/{id}/actions
 
 P0 事实网关已经接入 agent-backed 生成链路：`AgentLoop` 构造 `AgentContext` 后，会调用 `NarrativeDirector.safe_fragment_constraints(...)`，只把当前 NPC 可谈且已解锁的 `WorldInfo.claim_graph.safe_fragments` 写入 `AgentContext.director_safe_fragments`。`LLMAgentContractInput` 再把这些 safe fragments 合并到 `world_info` disclosure constraints。blocked fragment、forbidden inference、solution claim、forbidden fact 原文和全局真相原文不进入真实 LLM payload。
 
-`inspect` 不调用 Agent。它只校验热点，并由 Rule Engine 解锁合法线索。
+`inspect` 不调用 Agent。它只校验热点，并由 Rule Engine 解锁合法线索。普通热点线索来自 `discover_clues`；条件化返场线索来自同一 hotspot 下的 `backtrack_unlocks`，由 Rule Engine 根据既有 `WorldEvent` 和 `SessionState` 判断是否满足“先检查、后返回”的条件。返场解锁仍写普通 `clue.discovered`，并在 payload 中记录 `source_backtrack_unlock_id` 作为审计来源，后续 `player_knowledge.updated`、memory 和 replay 都沿现有派生链执行。
 
 `talk` 会构造 `AgentContext` 并调用 `AgentGateway`。默认实现是 `MockAgent`；`LLMAgentStub` 只是本地占位，不调用外部模型；`OpenAILLMAgent` 是可选适配器，不参与默认测试和场景快照。
 
@@ -120,6 +120,8 @@ Agent 只能输出 `AgentIntent`。它不能直接修改 `SessionState`、世界
 `DeductionEvaluator` 是 `accuse` 的解释层。它不写事件、不改状态，只返回 matched claim、缺失 evidence、缺失 world info、phase/target 是否通过和最终 result。`RuleEngine.apply_accuse` 只负责把 evaluator 结果映射成 `player.accused`、`accusation.evaluated` 或 `rule.rejected`。
 
 `StateSummary.evidence_assets` 是公开投影，不是新权威状态。它只从已发现 `Clue` 和已存在的 `PlayerKnowledgeState` 派生，用于前端证据栏；未发现线索、未解锁 `WorldInfo`、forbidden facts 和 solution claims 不得进入该字段。
+
+案件包的 `backtrack_unlocks` 也是规则输入，不是状态。`CaseLoader` 必须校验其引用的 clue、phase、beat、hotspot、WorldInfo 和 PlayerKnowledge ID；Rule Engine 才能在玩家返场 inspect 时产生权威 `clue.discovered`。LLM 和 NPC 回复不能直接制造返场线索或玩家已知状态。
 
 ## Agent 输入安全
 

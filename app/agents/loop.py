@@ -5,19 +5,29 @@ from dataclasses import dataclass
 from app.agents.context import build_agent_context
 from app.agents.disclosure_strategy import DISCLOSURE_MODE_ORDER
 from app.agents.gateway import AgentGateway
-from app.agents.llm_contract import build_llm_agent_input, validate_llm_agent_output
+from app.agents.llm_contract import (
+    LLMAgentPolicyViolationError,
+    LLMAgentPrivateLeakError,
+    LLMAgentSchemaError,
+    build_llm_agent_input,
+    validate_llm_agent_output,
+)
 from app.agents.memory import MemoryRetriever
 from app.agents.npc_skills import NpcSkillSelection, NpcSkillSelector
 from app.agents.prompt_builder import PromptBuilder
 from app.agents.retrieval_planner import MemoryRetrievalPlan, RetrievalPlanner
+from app.agents.turn_plan import AgentTurnPlan, build_agent_turn_plan
 from app.agents.tools.runtime import ToolRuntime
 from app.director.narrative_director import NarrativeDirector
 from app.domain.models import (
     AgentContext,
     AgentIntent,
+    AgentIntentType,
     AgentMemorySnapshot,
     CasePackage,
     DisclosureMode,
+    LLMErrorSummary,
+    LLMErrorType,
     PlayerAction,
     PromptBundle,
     SafeFactFragmentProjection,
@@ -107,6 +117,28 @@ class AgentLoop:
             context=context,
         )
 
+    def plan_turn(
+        self,
+        *,
+        case: CasePackage,
+        session: SessionState,
+        action: PlayerAction,
+        context: AgentContext | None = None,
+    ) -> AgentTurnPlan:
+        context = context or self.build_context(
+            case=case,
+            session=session,
+            action=action,
+        )
+        return build_agent_turn_plan(
+            case=case,
+            session=session,
+            action=action,
+            context=context,
+            retrieval_planner=self._retrieval_planner,
+            security_review=self._injection_guard.review(action),
+        )
+
     def run_turn(
         self,
         *,
@@ -141,6 +173,14 @@ class AgentLoop:
             context=context,
         )
         security_review = self._injection_guard.review(action)
+        turn_plan = build_agent_turn_plan(
+            case=case,
+            session=session,
+            action=action,
+            context=context,
+            memory_retrieval_plan=plan,
+            security_review=security_review,
+        )
         memory_ids = [snapshot.memory_id for snapshot in retrieved_memories]
         memory_projection = _memory_projection(
             plan,
@@ -186,7 +226,11 @@ class AgentLoop:
             tool_calls=tool_calls,
             security_flags=security_review.security_flags,
         )
-        intent = self._validate_agent_intent(context, self._agent_gateway.generate(context))
+        intent = self._validate_agent_intent(
+            context,
+            self._agent_gateway.generate(context),
+            turn_plan=turn_plan,
+        )
         return AgentTurnResult(
             context=context,
             intent=intent,
@@ -200,13 +244,58 @@ class AgentLoop:
         self,
         context: AgentContext,
         intent: AgentIntent,
+        *,
+        turn_plan: AgentTurnPlan | None = None,
     ) -> AgentIntent:
-        contract_input = build_llm_agent_input(context)
+        contract_input = build_llm_agent_input(context, turn_plan=turn_plan)
         payload = intent.model_dump(
             mode="json",
             exclude={"llm_error"},
         )
-        validated = validate_llm_agent_output(payload, contract_input)
+        try:
+            validated = validate_llm_agent_output(payload, contract_input)
+        except LLMAgentPolicyViolationError as exc:
+            return AgentIntent(
+                speech=intent.speech,
+                intent=contract_input.output_contract.fallback_intent,
+                emotional_shift={},
+                proposed_actions=[],
+                memory_refs=[],
+                disclosure_claims=[],
+                llm_error=_contract_error_summary(
+                    exc,
+                    error_type=LLMErrorType.POLICY_VIOLATION,
+                    backend=self._agent_gateway.backend_name,
+                ),
+            )
+        except LLMAgentPrivateLeakError as exc:
+            return AgentIntent(
+                speech="I cannot answer that safely.",
+                intent=AgentIntentType.REFUSE,
+                emotional_shift={},
+                proposed_actions=[],
+                memory_refs=[],
+                disclosure_claims=[],
+                llm_error=_contract_error_summary(
+                    exc,
+                    error_type=LLMErrorType.PRIVATE_LEAK_DETECTED,
+                    backend=self._agent_gateway.backend_name,
+                ),
+            )
+        except LLMAgentSchemaError as exc:
+            return AgentIntent(
+                speech="I cannot answer that safely.",
+                intent=AgentIntentType.REFUSE,
+                emotional_shift={},
+                proposed_actions=[],
+                memory_refs=[],
+                disclosure_claims=[],
+                llm_error=_contract_error_summary(
+                    exc,
+                    error_type=LLMErrorType.SCHEMA_ERROR,
+                    backend=self._agent_gateway.backend_name,
+                ),
+            )
         if intent.llm_error is None:
             return validated
         return validated.model_copy(update={"llm_error": intent.llm_error})
@@ -389,3 +478,26 @@ def _limit_fragment_modes(
 
 def _mode_index(mode: DisclosureMode) -> int:
     return DISCLOSURE_MODE_ORDER.index(mode)
+
+
+def _contract_error_summary(
+    exc: Exception,
+    *,
+    error_type: LLMErrorType,
+    backend: str,
+) -> LLMErrorSummary:
+    return LLMErrorSummary(
+        backend=str(backend),
+        error_type=error_type,
+        error_message_sanitized=_trim_contract_error(str(exc)),
+        fallback_used=True,
+    )
+
+
+def _trim_contract_error(message: str, *, limit: int = 180) -> str:
+    normalized = " ".join(message.split())
+    if not normalized:
+        return "LLM output violated the turn contract"
+    if len(normalized) <= limit:
+        return normalized
+    return normalized[:limit] + "...[truncated]"

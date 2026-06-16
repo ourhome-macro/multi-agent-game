@@ -16,6 +16,19 @@
       description: 锁舌边缘有新划痕，缝隙里残留少量润滑油。
       discover_clues:
         - delayed_lock_marks
+      backtrack_unlocks:
+        - id: study_lock_after_tape_review
+          clue_ids:
+            - lock_test_scrap
+          conditions:
+            completed_beats:
+              - mechanism_exposed
+            discovered_clues:
+              - delayed_lock_marks
+              - echo_tape
+            prior_inspected_hotspots:
+              - study_lock
+            min_prior_inspections: 1
     - id: tape_recorder
       name: 录音机
       description: 录音机停在播放位置，磁带标签写着“回声钟终稿”。
@@ -41,7 +54,6 @@
       name: 书桌压痕纸
       description: 书桌暗格里压着几张白纸，纸面留下文件和手写数字的浅痕。
       discover_clues:
-        - lock_test_scrap
         - trust_indent_page
     - id: medicine_drawer_liner
       name: 药盒抽屉衬纸

@@ -10,6 +10,7 @@ from pydantic import ValidationError
 from app.cases.errors import CaseLoadError
 from app.cases.memory_rules import MemoryDerivationRuleLoader
 from app.domain.models import (
+    BacktrackClueUnlockConfig,
     CasePackage,
     DiscoverClueAction,
     EventType,
@@ -181,12 +182,36 @@ class CaseLoader:
 
         hotspot_ids = [hotspot.id for scene in package.scenes for hotspot in scene.hotspots]
         self._ensure_unique("hotspot", hotspot_ids, case_dir)
+        self._ensure_unique(
+            "backtrack unlock",
+            [
+                unlock.id
+                for scene in package.scenes
+                for hotspot in scene.hotspots
+                for unlock in hotspot.backtrack_unlocks
+            ],
+            case_dir,
+        )
         reachable_clue_ids = {
             clue_id
             for scene in package.scenes
             for hotspot in scene.hotspots
             for clue_id in hotspot.discover_clues
         }
+        for scene in package.scenes:
+            for hotspot in scene.hotspots:
+                for unlock in hotspot.backtrack_unlocks:
+                    self._validate_backtrack_unlock(
+                        unlock,
+                        hotspot_id=hotspot.id,
+                        clue_ids=clue_ids,
+                        phase_ids=phase_ids,
+                        beat_ids=beat_ids,
+                        hotspot_ids=set(hotspot_ids),
+                        world_info_ids=world_info_ids,
+                        valid_player_knowledge_ids=valid_player_knowledge_ids,
+                    )
+                    reachable_clue_ids.update(unlock.clue_ids)
 
         for clue in package.clues:
             self._ensure_known_world_info(
@@ -470,6 +495,90 @@ class CaseLoader:
         unknown_ids = sorted(set(referenced_ids) - world_info_ids)
         if unknown_ids:
             raise CaseLoadError(f"{label} references unknown world_info: {unknown_ids}")
+
+    def _ensure_known_phases(
+        self,
+        phase_ids: set[str],
+        referenced_ids: list[str],
+        label: str,
+    ) -> None:
+        unknown_ids = sorted(set(referenced_ids) - phase_ids)
+        if unknown_ids:
+            raise CaseLoadError(f"{label} references unknown phases: {unknown_ids}")
+
+    def _ensure_known_beats(
+        self,
+        beat_ids: set[str],
+        referenced_ids: list[str],
+        label: str,
+    ) -> None:
+        unknown_ids = sorted(set(referenced_ids) - beat_ids)
+        if unknown_ids:
+            raise CaseLoadError(f"{label} references unknown beats: {unknown_ids}")
+
+    def _ensure_known_hotspots(
+        self,
+        hotspot_ids: set[str],
+        referenced_ids: list[str],
+        label: str,
+    ) -> None:
+        unknown_ids = sorted(set(referenced_ids) - hotspot_ids)
+        if unknown_ids:
+            raise CaseLoadError(f"{label} references unknown hotspots: {unknown_ids}")
+
+    def _ensure_known_player_knowledge(
+        self,
+        valid_player_knowledge_ids: set[str],
+        referenced_ids: list[str],
+        label: str,
+    ) -> None:
+        unknown_ids = sorted(set(referenced_ids) - valid_player_knowledge_ids)
+        if unknown_ids:
+            raise CaseLoadError(
+                f"{label} references unavailable player knowledge: {unknown_ids}"
+            )
+
+    def _validate_backtrack_unlock(
+        self,
+        unlock: BacktrackClueUnlockConfig,
+        *,
+        hotspot_id: str,
+        clue_ids: set[str],
+        phase_ids: set[str],
+        beat_ids: set[str],
+        hotspot_ids: set[str],
+        world_info_ids: set[str],
+        valid_player_knowledge_ids: set[str],
+    ) -> None:
+        conditions = unlock.conditions
+        label = f"Backtrack unlock '{unlock.id}' on hotspot '{hotspot_id}'"
+        self._ensure_known_clues(clue_ids, unlock.clue_ids, f"{label} clue_ids")
+        self._ensure_known_clues(
+            clue_ids,
+            conditions.discovered_clues,
+            f"{label} discovered_clues",
+        )
+        self._ensure_known_phases(phase_ids, conditions.phases, f"{label} phases")
+        self._ensure_known_beats(
+            beat_ids,
+            conditions.completed_beats,
+            f"{label} completed_beats",
+        )
+        self._ensure_known_hotspots(
+            hotspot_ids,
+            conditions.prior_inspected_hotspots,
+            f"{label} prior_inspected_hotspots",
+        )
+        self._ensure_known_world_info(
+            world_info_ids,
+            conditions.player_world_info_ids,
+            f"{label} player_world_info_ids",
+        )
+        self._ensure_known_player_knowledge(
+            valid_player_knowledge_ids,
+            conditions.player_knowledge_ids,
+            f"{label} player_knowledge_ids",
+        )
 
     def _validate_npc_skills(
         self,

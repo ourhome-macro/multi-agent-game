@@ -19,8 +19,10 @@ generate(context: AgentContext) -> AgentIntent
 ```text
 PlayerAction(talk | ask_about | present_clue)
   -> build_agent_context(case, session, action)
+  -> AgentTurnPlan(memory plan + selected NPC skill + security limits + output contract)
   -> AgentGateway.generate(context)
   -> AgentIntent
+  -> validate_llm_agent_output(..., turn output contract)
   -> NarrativeDirector.validate
   -> RuleEngine.apply_agent_intent
 ```
@@ -122,6 +124,18 @@ LLM Shadow Eval v0 复用 Agent 合同，但不是正式运行链路。它只在
 `npc_skill_projections` 是 NPC Skill v0 的运行时投影。案件包可用 `npc_skills.yaml` 定义角色能力，字段包括 owner、trigger、unlock condition、disclosure、memory policy、proposed action policy 和 cooldown。`NpcSkillSelector` 只按结构化 `PlayerAction`、当前 phase/beat、已发现线索、玩家知识、玩家 world_info、关系阈值和交互压力选择 skill；LLM 不能自由选择、升级或伪造 skill。
 
 `npc_skill_projections` 只包含安全边界数据：`skill_id`、类型、等级、是否 signature、允许 intent、允许 tactic、每个 world_info 的最大披露模式、授权 safe fragment ref、memory plan id 和允许 proposed action 类型。它不包含 skill 说明正文、safe fragment summary、角色 private 原文、hidden truth 或 memory content。`AgentLoop` 会把 `NarrativeDirector.safe_fragment_constraints(...)` 的结果与 skill 的 `safe_fragment_refs` 取交集，并用 skill 的 `max_disclosure_mode_by_world_info` 继续裁剪 fragment `allowed_modes`；因此 skill 不能直接授予事实，只能进一步收窄“这个 NPC 在这个时刻可以围绕哪些已解锁安全碎片、以多大粒度说话”。
+
+2026-06-16 后，NPC Skill 不再只是 prompt 投影。`AgentTurnPlan` 会把 selected skill 的 `allowed_intents`、`allowed_tactics`、`allowed_proposed_actions` 和 `max_relationship_delta` 合并进本轮 `LLMAgentOutputContract`。`validate_llm_agent_output(...)` 会硬拒绝越权 intent、越权 tactic、未授权 proposed action 和超出 skill policy 的 relationship delta。没有 selected skill 时，本轮默认不允许主动 proposed action；LLM 只能表达台词和意图，不能借普通对话推动关系或线索状态。
+
+`AgentTurnPlan` 是本轮 Agent 调用的运行计划，不是持久状态。它聚合：
+
+- `MemoryRetrievalPlan`
+- selected NPC skill ids
+- skill-aware `LLMAgentOutputContract`
+- prompt injection security flags
+- 高风险注入时的 intent / disclosure 降级建议
+
+`AgentLoop.run_turn(...)` 会用同一个 plan 构造 LLM 输入合同和后置 Python 校验。真实 LLM 的动态 JSON schema 也会根据 `output_contract` 收窄 `intent`、`disclosure_claims` 和可请求的 `proposed_actions` 类型；因此模型生成前和生成后都看到同一套硬边界。
 
 运行时 trace schema v5 会额外写 `npc_skill_projection` 安全摘要，用于复盘“为什么本轮 NPC 只能使用这些 intent/tactic/safe fragment”。trace 仍禁止写玩家原文、private 原文、memory content、forbidden fact 文本和 safe fragment summary。
 
@@ -247,6 +261,10 @@ PromptBuilder 只把 `portrait_summary` 和 inner context 的 id 级摘要写入
 - `revealable_fact_ids`
 
 禁说事实原文仍保留在案件包中，只供 `NarrativeDirector` 做输出校验。
+
+Prompt injection 不再只是 trace 告警。`PromptInjectionGuard` 会输出 `PromptInjectionReview`；高风险输入会在 `AgentTurnPlan` 中形成硬限制：本轮 `allowed_intents` 收窄为 `refuse` / `conceal`，最高 disclosure mode 收窄到 `deflect`。低风险输入只保留 flags 和推荐 response mode，不阻断正常 skill。运行时仍会把安全 flags 写入 trace，便于复盘“玩家输入风险”和“最终 Agent 输出边界”的关系。
+
+如果 Agent backend 返回的 `AgentIntent` 违反本轮合同，`AgentLoop` 不让异常穿透到 API 层，也不把越权 proposed action 交给 Rule Engine。运行时会生成带 `llm_error.error_type=policy_violation` 的安全降级 intent：保留可被 Director 审计的 speech，清空 `proposed_actions`、`memory_refs` 和 `disclosure_claims`。因此合同拒绝不会造成状态副作用，也不会跳过 Director 对最终 speech 的剧透扫描。
 
 ## AgentIntent
 

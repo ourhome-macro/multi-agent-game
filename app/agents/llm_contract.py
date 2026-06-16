@@ -11,11 +11,13 @@ from app.domain.models import (
     FactDisclosureStrategy,
     LLMAgentContractInput,
     LLMDisclosureConstraint,
+    LLMAgentOutputContract,
     ProposedActionType,
     SafeFactFragmentProjection,
     SelfKnowledgeItem,
     WorldEvent,
 )
+from app.agents.turn_plan import AgentTurnPlan, build_skill_aware_output_contract
 
 
 class LLMAgentPolicyViolationError(ValueError):
@@ -30,11 +32,21 @@ class LLMAgentSchemaError(ValueError):
     pass
 
 
-def build_llm_agent_input(context: AgentContext) -> LLMAgentContractInput:
+def build_llm_agent_input(
+    context: AgentContext,
+    turn_plan: AgentTurnPlan | None = None,
+) -> LLMAgentContractInput:
     safe_context = _project_context_for_llm(context)
+    output_contract = (
+        turn_plan.output_contract
+        if turn_plan is not None and turn_plan.output_contract is not None
+        else build_skill_aware_output_contract(context=safe_context)
+    )
     return LLMAgentContractInput(
         agent_context=safe_context,
         disclosure_constraints=_build_disclosure_constraints(safe_context),
+        output_contract=output_contract,
+        turn_plan_id=turn_plan.plan_id if turn_plan is not None else None,
     )
 
 
@@ -56,9 +68,56 @@ def validate_llm_agent_output(
                 "LLM Agent output must not propose narrative phase changes"
             )
     if contract_input is not None:
+        _validate_output_contract(intent, contract_input.output_contract)
         _reject_raw_private_echo(intent, contract_input)
         _validate_disclosure_claims(intent, contract_input)
     return intent
+
+
+def _validate_output_contract(
+    intent: AgentIntent,
+    output_contract: LLMAgentOutputContract,
+) -> None:
+    if intent.intent not in set(output_contract.allowed_intents):
+        raise LLMAgentPolicyViolationError(
+            "LLM Agent output intent is not allowed by the turn contract"
+        )
+    allowed_action_types = set(output_contract.allowed_proposed_action_types)
+    for proposed_action in intent.proposed_actions:
+        if proposed_action.type not in allowed_action_types:
+            raise LLMAgentPolicyViolationError(
+                "LLM Agent output proposed action is not allowed by the turn contract"
+            )
+        if proposed_action.type == ProposedActionType.RELATIONSHIP_CHANGE:
+            _validate_relationship_delta_caps(proposed_action, output_contract)
+    allowed_tactics = set(output_contract.allowed_rhetoric_tactics)
+    allowed_modes = set(output_contract.allowed_disclosure_modes)
+    for claim in intent.disclosure_claims:
+        if claim.mode not in allowed_modes:
+            raise LLMAgentPolicyViolationError(
+                "LLM Agent output disclosure mode is not allowed by the turn contract"
+            )
+        if claim.tactic is not None and claim.tactic not in allowed_tactics:
+            raise LLMAgentPolicyViolationError(
+                "LLM Agent output tactic is not allowed by the turn contract"
+            )
+
+
+def _validate_relationship_delta_caps(
+    proposed_action: object,
+    output_contract: LLMAgentOutputContract,
+) -> None:
+    caps = output_contract.max_relationship_delta
+    deltas = getattr(proposed_action, "deltas", {})
+    for metric, delta in deltas.items():
+        numeric_delta = abs(float(delta))
+        if numeric_delta == 0:
+            continue
+        cap = caps.get(str(metric))
+        if cap is None or numeric_delta > abs(float(cap)):
+            raise LLMAgentPolicyViolationError(
+                "LLM Agent output relationship delta exceeds the turn contract"
+            )
 
 
 def _build_disclosure_constraints(context: AgentContext) -> list[LLMDisclosureConstraint]:

@@ -13,6 +13,7 @@ from app.domain.models import (
     FactDisclosureStrategy,
     MockReplyConfig,
     PrivatePriority,
+    ProposedAction,
     ProposedActionType,
     RelationshipChangeAction,
     RhetoricTactic,
@@ -43,10 +44,9 @@ class MockAgent:
 
         for reply in context.reply_options:
             if self._reply_matches(reply, context):
-                proposed_actions = (
-                    reply.proposed_actions
-                    if reply.proposed_actions
-                    else self._fallback_relationship_actions(context)
+                proposed_actions = self._contract_aware_actions(
+                    context,
+                    reply.proposed_actions,
                 )
                 return AgentIntent(
                     speech=reply.speech,
@@ -127,6 +127,11 @@ class MockAgent:
     ) -> list[RelationshipChangeAction]:
         if not context.fallback_relationship_delta:
             return []
+        if not any(
+            ProposedActionType.RELATIONSHIP_CHANGE in projection.allowed_proposed_actions
+            for projection in context.npc_skill_projections
+        ):
+            return []
         return [
             RelationshipChangeAction(
                 type=ProposedActionType.RELATIONSHIP_CHANGE,
@@ -135,6 +140,66 @@ class MockAgent:
                 deltas=context.fallback_relationship_delta,
             )
         ]
+
+    def _contract_aware_actions(
+        self,
+        context: AgentContext,
+        proposed_actions: list[ProposedAction],
+    ) -> list[ProposedAction]:
+        actions = proposed_actions or self._fallback_relationship_actions(context)
+        filtered_actions: list[ProposedAction] = []
+        for action in actions:
+            filtered = self._contract_compliant_action(context, action)
+            if filtered is not None:
+                filtered_actions.append(filtered)
+        return filtered_actions
+
+    def _contract_compliant_action(
+        self,
+        context: AgentContext,
+        proposed_action: ProposedAction,
+    ) -> ProposedAction | None:
+        allowed_types = {
+            action_type
+            for projection in context.npc_skill_projections
+            for action_type in projection.allowed_proposed_actions
+        }
+        if proposed_action.type not in allowed_types:
+            return None
+        if proposed_action.type != ProposedActionType.RELATIONSHIP_CHANGE:
+            return proposed_action
+        return self._relationship_action_within_skill_caps(context, proposed_action)
+
+    def _relationship_action_within_skill_caps(
+        self,
+        context: AgentContext,
+        action: RelationshipChangeAction,
+    ) -> RelationshipChangeAction | None:
+        caps: dict[str, float] = {}
+        for projection in context.npc_skill_projections:
+            if ProposedActionType.RELATIONSHIP_CHANGE not in projection.allowed_proposed_actions:
+                continue
+            for metric, cap in projection.max_relationship_delta.items():
+                current = caps.get(metric)
+                numeric = abs(float(cap))
+                if current is None or numeric > current:
+                    caps[metric] = numeric
+        clipped_deltas: dict[str, float] = {}
+        for metric, delta in action.deltas.items():
+            numeric_delta = abs(float(delta))
+            if numeric_delta == 0:
+                continue
+            cap = caps.get(metric)
+            if cap is None:
+                continue
+            clipped_deltas[metric] = (
+                float(delta)
+                if numeric_delta <= cap
+                else cap * (1 if float(delta) > 0 else -1)
+            )
+        if not clipped_deltas:
+            return None
+        return action.model_copy(update={"deltas": clipped_deltas})
 
     def _profile_fallback_intent(
         self,

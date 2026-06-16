@@ -20,7 +20,8 @@
 
 书房新增可选 hotspot：
 
-- `desk_embossed_pages`：释放 `lock_test_scrap`、`trust_indent_page`。
+- `desk_embossed_pages`：释放 `trust_indent_page`。
+- `study_lock.backtrack_unlocks.study_lock_after_tape_review`：玩家先检查 `study_lock`，再发现 `echo_tape` 并完成 `mechanism_exposed` 后返场检查 `study_lock`，释放 `lock_test_scrap`。
 - `medicine_drawer_liner`：释放 `capsule_powder_on_liner`、`sedative_bottle_label`。
 - `editing_lamp`：释放 `tape_splice_mark`。
 - `pocket_watch`：释放 `pocket_watch_offset`。
@@ -35,7 +36,7 @@
 - `breaker_sequence_tag` -> `power_cut_was_prepared`
 - `fresh_gear_oil` -> `clock_tower_serviced_before_death`
 - `muted_bell_hammer` -> `real_bell_was_muted`
-- `lock_test_scrap` -> `lock_delay_tested`
+- `lock_test_scrap` -> `lock_delay_tested`（返场线索：`study_lock_after_tape_review`）
 - `trust_indent_page` -> `trust_terms_pressured_guests`
 - `capsule_powder_on_liner` -> `capsule_powder_removed`
 - `sedative_bottle_label` -> `sedative_source_matches_wine`

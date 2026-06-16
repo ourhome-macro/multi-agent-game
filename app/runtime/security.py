@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from app.domain.models import PlayerAction
+from app.domain.models import AgentIntentType, DisclosureMode, PlayerAction
 
 
 @dataclass(frozen=True)
@@ -19,6 +19,22 @@ class PromptInjectionReview:
             f"prompt_injection.{self.risk_level}",
             *[f"prompt_injection.pattern.{pattern}" for pattern in self.matched_patterns],
         ]
+
+    @property
+    def requires_hard_restriction(self) -> bool:
+        return self.risk_level == "high"
+
+    @property
+    def allowed_intents(self) -> list[AgentIntentType] | None:
+        if not self.requires_hard_restriction:
+            return None
+        return [AgentIntentType.REFUSE, AgentIntentType.CONCEAL]
+
+    @property
+    def max_disclosure_mode(self) -> DisclosureMode | None:
+        if not self.requires_hard_restriction:
+            return None
+        return DisclosureMode.DEFLECT
 
 
 class PromptInjectionGuard:

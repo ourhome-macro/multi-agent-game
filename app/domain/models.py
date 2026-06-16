@@ -461,6 +461,7 @@ class NpcSkillProjection(APIModel):
     safe_fragment_refs: list[NonEmptyString] = Field(default_factory=list)
     memory_plan_id: NonEmptyString | None = None
     allowed_proposed_actions: list[ProposedActionType] = Field(default_factory=list)
+    max_relationship_delta: dict[str, float] = Field(default_factory=dict)
 
 
 class CharacterConfig(APIModel):
@@ -689,6 +690,7 @@ class LLMAgentOutputContract(APIModel):
     allowed_rhetoric_tactics: list[RhetoricTactic] = Field(
         default_factory=lambda: list(RhetoricTactic)
     )
+    max_relationship_delta: dict[str, float] = Field(default_factory=dict)
     disclosure_claim_required_for_world_info_touch: bool = True
     unknown_world_info_policy: Literal["avoid_or_refuse"] = "avoid_or_refuse"
 
@@ -765,11 +767,36 @@ class WorldInfoConfig(APIModel):
     claim_graph: ClaimGraphConfig = Field(default_factory=ClaimGraphConfig)
 
 
+class BacktrackUnlockConditionConfig(APIModel):
+    phases: list[NonEmptyString] = Field(default_factory=list)
+    completed_beats: list[NonEmptyString] = Field(default_factory=list)
+    discovered_clues: list[NonEmptyString] = Field(default_factory=list)
+    player_knowledge_ids: list[NonEmptyString] = Field(default_factory=list)
+    player_world_info_ids: list[NonEmptyString] = Field(default_factory=list)
+    prior_inspected_hotspots: list[NonEmptyString] = Field(default_factory=list)
+    min_prior_inspections: int = Field(default=1, ge=1)
+
+
+class BacktrackClueUnlockConfig(APIModel):
+    id: NonEmptyString
+    clue_ids: list[NonEmptyString] = Field(default_factory=list)
+    conditions: BacktrackUnlockConditionConfig = Field(
+        default_factory=BacktrackUnlockConditionConfig
+    )
+
+    @model_validator(mode="after")
+    def require_clue_ids(self) -> BacktrackClueUnlockConfig:
+        if not self.clue_ids:
+            raise ValueError("backtrack unlock must define at least one clue_id")
+        return self
+
+
 class SceneHotspotConfig(APIModel):
     id: NonEmptyString
     name: NonEmptyString
     description: str = ""
     discover_clues: list[str] = Field(default_factory=list)
+    backtrack_unlocks: list[BacktrackClueUnlockConfig] = Field(default_factory=list)
 
 
 class SceneConfig(APIModel):
@@ -1346,6 +1373,7 @@ class LLMAgentContractInput(APIModel):
         default_factory=LLMAgentOutputContract
     )
     required_output_schema: Literal["AgentIntent"] = "AgentIntent"
+    turn_plan_id: str | None = None
 
 
 class NarrativeState(APIModel):

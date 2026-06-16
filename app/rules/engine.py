@@ -3,6 +3,7 @@ from __future__ import annotations
 from app.domain.models import (
     ActionType,
     AgentIntent,
+    BacktrackClueUnlockConfig,
     CasePackage,
     DiscoverClueAction,
     EventType,
@@ -150,19 +151,35 @@ class RuleEngine:
 
         events: list[WorldEvent] = []
         for clue_id in hotspot.discover_clues:
-            if clue_id in session.discovered_clues:
+            event = self._discover_clue(
+                session=session,
+                clue_id=clue_id,
+                payload={"clue_id": clue_id, "source_hotspot_id": hotspot.id},
+                caused_by_event_id=caused_by_event_id,
+            )
+            if event is not None:
+                events.append(event)
+        for unlock in hotspot.backtrack_unlocks:
+            if not self._backtrack_unlock_ready(
+                session,
+                action.target_id,
+                unlock,
+                caused_by_event_id,
+            ):
                 continue
-            session.discovered_clues.add(clue_id)
-            session.narrative.discovered_clues.add(clue_id)
-            events.append(
-                self._recorder.append(
-                    session,
-                    actor_id="system",
-                    event_type=EventType.CLUE_DISCOVERED,
-                    payload={"clue_id": clue_id, "source_hotspot_id": hotspot.id},
+            for clue_id in unlock.clue_ids:
+                event = self._discover_clue(
+                    session=session,
+                    clue_id=clue_id,
+                    payload={
+                        "clue_id": clue_id,
+                        "source_hotspot_id": hotspot.id,
+                        "source_backtrack_unlock_id": unlock.id,
+                    },
                     caused_by_event_id=caused_by_event_id,
                 )
-            )
+                if event is not None:
+                    events.append(event)
         return events
 
     def apply_agent_intent(
@@ -618,13 +635,81 @@ class RuleEngine:
             )
         if action.clue_id in session.discovered_clues:
             return None
-        session.discovered_clues.add(action.clue_id)
-        session.narrative.discovered_clues.add(action.clue_id)
+        return self._discover_clue(
+            session=session,
+            clue_id=action.clue_id,
+            payload={"clue_id": action.clue_id, "source": "agent_intent"},
+            caused_by_event_id=caused_by_event_id,
+        )
+
+    def _backtrack_unlock_ready(
+        self,
+        session: SessionState,
+        hotspot_id: str,
+        unlock: BacktrackClueUnlockConfig,
+        current_inspect_event_id: str,
+    ) -> bool:
+        conditions = unlock.conditions
+        if conditions.phases and session.narrative.phase not in conditions.phases:
+            return False
+        if not set(conditions.completed_beats).issubset(session.narrative.completed_beats):
+            return False
+        if not set(conditions.discovered_clues).issubset(session.discovered_clues):
+            return False
+        if not set(conditions.player_knowledge_ids).issubset(session.player_knowledge):
+            return False
+        player_world_info_ids = {
+            knowledge.world_info_id
+            for knowledge in session.player_knowledge.values()
+            if knowledge.world_info_id is not None
+        }
+        if not set(conditions.player_world_info_ids).issubset(player_world_info_ids):
+            return False
+        required_prior_hotspots = conditions.prior_inspected_hotspots or [hotspot_id]
+        for prior_hotspot_id in required_prior_hotspots:
+            if (
+                self._prior_inspect_count(
+                    session,
+                    prior_hotspot_id,
+                    exclude_event_id=current_inspect_event_id,
+                )
+                < conditions.min_prior_inspections
+            ):
+                return False
+        return True
+
+    def _prior_inspect_count(
+        self,
+        session: SessionState,
+        hotspot_id: str,
+        *,
+        exclude_event_id: str,
+    ) -> int:
+        return sum(
+            1
+            for event in session.events
+            if event.type == EventType.PLAYER_INSPECTED
+            and event.id != exclude_event_id
+            and event.payload.get("target_id") == hotspot_id
+        )
+
+    def _discover_clue(
+        self,
+        *,
+        session: SessionState,
+        clue_id: str,
+        payload: dict[str, object],
+        caused_by_event_id: str,
+    ) -> WorldEvent | None:
+        if clue_id in session.discovered_clues:
+            return None
+        session.discovered_clues.add(clue_id)
+        session.narrative.discovered_clues.add(clue_id)
         return self._recorder.append(
             session,
             actor_id="system",
             event_type=EventType.CLUE_DISCOVERED,
-            payload={"clue_id": action.clue_id, "source": "agent_intent"},
+            payload=payload,
             caused_by_event_id=caused_by_event_id,
         )
 

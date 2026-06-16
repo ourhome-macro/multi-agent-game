@@ -155,6 +155,7 @@ def _project_skill(skill: NpcSkillConfig) -> NpcSkillProjection:
         safe_fragment_refs=list(skill.disclosure.safe_fragment_refs),
         memory_plan_id=skill.id if _skill_has_memory_policy(skill) else None,
         allowed_proposed_actions=list(skill.proposed_action_policy.allowed),
+        max_relationship_delta=dict(skill.proposed_action_policy.max_relationship_delta),
     )
 
 
@@ -190,4 +191,3 @@ def _skill_sort_key(skill: NpcSkillConfig) -> tuple[int, int, str]:
 
 def disclosure_mode_at_most(mode: DisclosureMode, max_mode: DisclosureMode) -> bool:
     return DISCLOSURE_MODE_ORDER.index(mode) <= DISCLOSURE_MODE_ORDER.index(max_mode)
-

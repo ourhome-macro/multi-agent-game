@@ -252,13 +252,8 @@ def test_talk_butler_generates_mock_dialogue(client: TestClient) -> None:
     event_types = [event["type"] for event in payload["new_events"]]
     assert "player.talked" in event_types
     assert "npc.replied" in event_types
-    assert "relationship.changed" in event_types
-    assert "relationship.threshold.crossed" in event_types
-    relationship_event = next(
-        event for event in payload["new_events"] if event["type"] == "relationship.changed"
-    )
-    assert relationship_event["payload"]["source_id"] == "butler"
-    assert relationship_event["payload"]["target_id"] == "player"
+    assert "relationship.changed" not in event_types
+    assert "relationship.threshold.crossed" not in event_types
 
 
 def test_present_clue_rejects_undiscovered_clue_without_state_pollution(
@@ -1975,8 +1970,7 @@ def test_agent_gateway_defaults_to_mock_agent() -> None:
     intent = AgentGateway().generate(context)
 
     assert intent.intent == AgentIntentType.CONCEAL
-    assert intent.proposed_actions
-    assert intent.proposed_actions[0].type == ProposedActionType.RELATIONSHIP_CHANGE
+    assert intent.proposed_actions == []
 
 
 def test_agent_gateway_from_env_enables_real_only_with_api_key(
@@ -3299,11 +3293,6 @@ def test_events_order_is_stable_for_mixed_action_sequence(client: TestClient) ->
         "player.talked",
         "npc_skill.rejected",
         "npc.replied",
-        "relationship.changed",
-        "relationship.threshold.crossed",
-        "character_impression.updated",
-        "memory_candidate.created",
-        "agent_memory_snapshot.updated",
         "player.talked",
         "npc_skill.rejected",
         "director.blocked",
@@ -3498,7 +3487,7 @@ def test_state_summary_snapshots_do_not_leak_internal_fields(client: TestClient)
             "completed_beats": [],
             "discovered": [],
             "player_knowledge": [],
-            "event_count": 8,
+            "event_count": 3,
         },
     }
     serialized = json.dumps([opening, investigation, second_case_talk], ensure_ascii=False)

@@ -779,53 +779,7 @@ def _agent_intent_json_schema(
             },
             "proposed_actions": {
                 "type": "array",
-                "items": {
-                    "anyOf": [
-                        {
-                            "type": "object",
-                            "additionalProperties": False,
-                            "required": ["type", "clue_id"],
-                            "properties": {
-                                "type": {
-                                    "type": "string",
-                                    "enum": ["clue.discover"],
-                                },
-                                "clue_id": {"type": "string"},
-                            },
-                        },
-                        {
-                            "type": "object",
-                            "additionalProperties": False,
-                            "required": ["type", "source_id", "target_id", "deltas"],
-                            "properties": {
-                                "type": {
-                                    "type": "string",
-                                    "enum": ["relationship.change"],
-                                },
-                                "source_id": {"type": "string"},
-                                "target_id": {"type": "string"},
-                                "deltas": {
-                                    "type": "object",
-                                    "additionalProperties": False,
-                                    "required": [
-                                        "trust",
-                                        "suspicion",
-                                        "fear",
-                                        "intimacy",
-                                        "hostility",
-                                    ],
-                                    "properties": {
-                                        "trust": {"type": "number"},
-                                        "suspicion": {"type": "number"},
-                                        "fear": {"type": "number"},
-                                        "intimacy": {"type": "number"},
-                                        "hostility": {"type": "number"},
-                                    },
-                                },
-                            },
-                        },
-                    ]
-                },
+                "items": _proposed_action_json_schema(output_contract),
             },
             "memory_refs": {
                 "type": "array",
@@ -854,6 +808,67 @@ def _disclosure_claim_json_schema(
     if len(claim_schemas) == 1:
         return claim_schemas[0]
     return {"anyOf": claim_schemas}
+
+
+def _proposed_action_json_schema(
+    output_contract: LLMAgentOutputContract,
+) -> dict[str, Any]:
+    schemas: list[dict[str, Any]] = []
+    allowed = set(output_contract.allowed_proposed_action_types)
+    if any(action_type.value == "clue.discover" for action_type in allowed):
+        schemas.append(
+            {
+                "type": "object",
+                "additionalProperties": False,
+                "required": ["type", "clue_id"],
+                "properties": {
+                    "type": {
+                        "type": "string",
+                        "enum": ["clue.discover"],
+                    },
+                    "clue_id": {"type": "string"},
+                },
+            }
+        )
+    if any(action_type.value == "relationship.change" for action_type in allowed):
+        schemas.append(
+            {
+                "type": "object",
+                "additionalProperties": False,
+                "required": ["type", "source_id", "target_id", "deltas"],
+                "properties": {
+                    "type": {
+                        "type": "string",
+                        "enum": ["relationship.change"],
+                    },
+                    "source_id": {"type": "string"},
+                    "target_id": {"type": "string"},
+                    "deltas": {
+                        "type": "object",
+                        "additionalProperties": False,
+                        "required": [
+                            "trust",
+                            "suspicion",
+                            "fear",
+                            "intimacy",
+                            "hostility",
+                        ],
+                        "properties": {
+                            "trust": {"type": "number"},
+                            "suspicion": {"type": "number"},
+                            "fear": {"type": "number"},
+                            "intimacy": {"type": "number"},
+                            "hostility": {"type": "number"},
+                        },
+                    },
+                },
+            }
+        )
+    if not schemas:
+        return {"not": {}}
+    if len(schemas) == 1:
+        return schemas[0]
+    return {"anyOf": schemas}
 
 
 def _disclosure_claim_json_schema_for_constraint(

@@ -48,13 +48,8 @@ steps:
   expected_events:
   - player.asked_about
   - npc.replied
-  - relationship.changed
-  - relationship.threshold.crossed
   - character_impression.updated
   - character_fact_awareness.updated
-  - memory_candidate.created
-  - agent_memory_snapshot.updated
-  - character_impression.updated
   - memory_candidate.created
   - agent_memory_snapshot.updated
   expected_phase: investigation
@@ -76,7 +71,6 @@ steps:
   expected_events:
   - player.presented_clue
   - npc.replied
-  - relationship.changed
   - character_impression.updated
   - character_fact_awareness.updated
   - memory_candidate.created
@@ -175,13 +169,8 @@ steps:
   expected_events:
   - player.presented_clue
   - npc.replied
-  - relationship.changed
-  - relationship.threshold.crossed
   - character_impression.updated
   - character_fact_awareness.updated
-  - memory_candidate.created
-  - agent_memory_snapshot.updated
-  - character_impression.updated
   - memory_candidate.created
   - agent_memory_snapshot.updated
   expected_phase: confrontation

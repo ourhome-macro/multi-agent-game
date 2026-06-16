@@ -1,0 +1,127 @@
+case_id: mist_clock_manor
+expected_final_phase: confrontation
+expected_final_beats:
+- sedative_found
+- mechanism_exposed
+expected_final_player_world_info_ids:
+- sedative_wine
+- timed_lock_modified
+- recording_tape_swapped
+- jiang_ruolan_recording_exists
+- lock_delay_tested
+forbidden_public_terms:
+- Jiang replaced the medicine
+- everyone helped cause Lu's death
+- Shen cut the power
+steps:
+- name: inspect wine table unlocks sedative fact
+  action:
+    type: inspect
+    target_id: wine_table
+  expected_events:
+  - player.inspected
+  - clue.discovered
+  - player_knowledge.updated
+  - memory_candidate.created
+  - agent_memory_snapshot.updated
+  - narrative.beat.completed
+  - narrative.phase.changed
+  expected_phase: investigation
+  expected_player_world_info_ids:
+  - sedative_wine
+  accepted: true
+  director_blocked: false
+  expected_new_awareness: []
+  expected_block: null
+- name: first study lock inspection only unlocks core lock clue
+  action:
+    type: inspect
+    target_id: study_lock
+  expected_events:
+  - player.inspected
+  - clue.discovered
+  - player_knowledge.updated
+  - memory_candidate.created
+  - agent_memory_snapshot.updated
+  expected_phase: investigation
+  expected_player_world_info_ids:
+  - sedative_wine
+  - timed_lock_modified
+  accepted: true
+  director_blocked: false
+  expected_new_awareness: []
+  expected_block: null
+- name: inspect tape recorder exposes mechanism precondition
+  action:
+    type: inspect
+    target_id: tape_recorder
+  expected_events:
+  - player.inspected
+  - clue.discovered
+  - clue.discovered
+  - player_knowledge.updated
+  - memory_candidate.created
+  - agent_memory_snapshot.updated
+  - player_knowledge.updated
+  - memory_candidate.created
+  - agent_memory_snapshot.updated
+  - narrative.beat.completed
+  - narrative.phase.changed
+  expected_phase: confrontation
+  expected_player_world_info_ids:
+  - sedative_wine
+  - timed_lock_modified
+  - recording_tape_swapped
+  - jiang_ruolan_recording_exists
+  accepted: true
+  director_blocked: false
+  expected_new_awareness: []
+  expected_block: null
+- name: backtrack to study lock unlocks lock test scrap
+  action:
+    type: inspect
+    target_id: study_lock
+  expected_events:
+  - player.inspected
+  - clue.discovered
+  - player_knowledge.updated
+  - memory_candidate.created
+  - agent_memory_snapshot.updated
+  expected_phase: confrontation
+  expected_player_world_info_ids:
+  - sedative_wine
+  - timed_lock_modified
+  - recording_tape_swapped
+  - jiang_ruolan_recording_exists
+  - lock_delay_tested
+  accepted: true
+  director_blocked: false
+  expected_new_awareness: []
+  expected_block: null
+- name: ask jiang about backtrack lock scrap updates awareness only
+  action:
+    type: ask_about
+    target_id: jiang_yanhui
+    subject_type: clue
+    subject_id: lock_test_scrap
+    text: What do these lock test times mean?
+  expected_events:
+  - player.asked_about
+  - npc.replied
+  - character_impression.updated
+  - character_fact_awareness.updated
+  - memory_candidate.created
+  - agent_memory_snapshot.updated
+  expected_phase: confrontation
+  expected_player_world_info_ids:
+  - sedative_wine
+  - timed_lock_modified
+  - recording_tape_swapped
+  - jiang_ruolan_recording_exists
+  - lock_delay_tested
+  accepted: true
+  director_blocked: false
+  expected_new_awareness:
+  - character_id: jiang_yanhui
+    world_info_id: lock_delay_tested
+  expected_block: null

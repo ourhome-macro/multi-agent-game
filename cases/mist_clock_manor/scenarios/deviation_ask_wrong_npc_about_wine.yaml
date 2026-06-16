@@ -38,7 +38,6 @@ steps:
   expected_events:
   - player.asked_about
   - npc.replied
-  - relationship.changed
   - character_impression.updated
   - character_fact_awareness.updated
   - memory_candidate.created

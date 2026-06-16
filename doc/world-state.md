@@ -186,6 +186,20 @@ inspect hotspot
   -> replay 恢复同一 PlayerKnowledge
 ```
 
+Hotspot 还可以配置 `backtrack_unlocks`，用于表达“玩家先检查 A，再满足后置条件后回到 A/B 才能发现的新线索”。该配置只声明条件和可解锁 `Clue`，不写状态。运行时语义：
+
+```text
+inspect hotspot
+  -> RuleEngine checks static discover_clues
+  -> RuleEngine checks hotspot.backtrack_unlocks against prior WorldEvent / SessionState
+  -> clue.discovered(source_backtrack_unlock_id=...)
+  -> player_knowledge.updated
+```
+
+`backtrack_unlocks.conditions` 当前支持：`phases`、`completed_beats`、`discovered_clues`、`player_knowledge_ids`、`player_world_info_ids`、`prior_inspected_hotspots` 和 `min_prior_inspections`。`CaseLoader` 会校验这些 ID 必须指向已存在的 phase、beat、clue、hotspot、WorldInfo 或可由线索产生的 PlayerKnowledge。Rule Engine 计算 prior inspection 时排除本次 `player.inspected` 事件，避免第一次检查在后置条件已满足时误触发返场线索。
+
+返场解锁仍然必须发普通 `clue.discovered`，并由现有派生链生成 `PlayerKnowledge`、memory 和 replay 状态。LLM、NPC 回复、mock dialogue 或 `AgentIntent.proposed_actions` 不能绕过 `backtrack_unlocks` 直接修改线索或玩家已知。
+
 `player_knowledge.<clue_id>` 只保留为低层函数对历史事件 replay 的兼容路径。当前 `CaseLoader` 对可到达线索执行 authoring gate：新案件包中每个可到达 `Clue` 都必须显式配置 `reveals_world_info`，并指向已声明的 `WorldInfo`。不能再依赖缺省 `clue_id` 作为事实锚点。
 
 ## 角色私有认知对齐
@@ -638,6 +652,7 @@ Replay 直接应用 `character_impression.updated`，不得重新运行画像派
 ## Rule Engine 原则
 
 - 重复发现同一线索必须幂等，不重复写 `clue.discovered`。
+- 返场线索必须通过 `backtrack_unlocks` 条件和 Rule Engine 解锁，不能只靠 NPC 文案暗示。
 - 关系指标限制在 `-1.0 .. 1.0`。
 - 关系阈值每个 session 每个 threshold 只触发一次。
 - Agent 提出的剧情阶段变化必须被拒绝。
@@ -665,7 +680,7 @@ P0 硬链路要求：prompt、LLM output contract、`disclosure_claims` 和 repa
 
 ## 案件扩写注意事项
 
-`mist_clock_manor` 的 2026-06-14 扩写采用“可选证据厚度层”写法：新增 `Clue` 和 `WorldInfo` 必须挂到新 hotspot 或标准路径不检查的 hotspot，除非同步更新 `scenarios/standard_path.yaml` 的 `expected_events`、`expected_phase` 和 `expected_player_world_info_ids`。
+`mist_clock_manor` 的 2026-06-14 扩写采用“可选证据厚度层”写法：新增 `Clue` 和 `WorldInfo` 必须挂到新 hotspot、标准路径不检查的 hotspot，或受 `backtrack_unlocks` 控制的返场 hotspot，除非同步更新 `scenarios/standard_path.yaml` 的 `expected_events`、`expected_phase` 和 `expected_player_world_info_ids`。
 
 可选线索允许产生新的 `PlayerKnowledge`，但不能无意成为核心 beat 的 `all_discovered` 条件；核心 phase 推进仍由原六条证据控制。新增公开线索标题、描述和 `WorldInfo.description` 必须按公开摘要处理，不能写 private summary、forbidden blocked term 组合或最终责任链结论。
 ## NPC Skill WorldEvent 边界

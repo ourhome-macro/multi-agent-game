@@ -79,8 +79,6 @@ def _assert_full_scenario_state(case: object, session: object, expected_final_ph
         EventType.NARRATIVE_PHASE_CHANGED,
         EventType.PLAYER_TALKED,
         EventType.NPC_REPLIED,
-        EventType.RELATIONSHIP_CHANGED,
-        EventType.RELATIONSHIP_THRESHOLD_CROSSED,
         EventType.PLAYER_KNOWLEDGE_UPDATED,
         EventType.CHARACTER_FACT_AWARENESS_UPDATED,
         EventType.MEMORY_CANDIDATE_CREATED,
@@ -91,6 +89,7 @@ def _assert_full_scenario_state(case: object, session: object, expected_final_ph
     ):
         assert expected_type in event_types
     if getattr(case, "npc_skills", []):
+        assert EventType.RELATIONSHIP_CHANGED in event_types
         assert EventType.NPC_SKILL_SELECTED in event_types
         assert EventType.NPC_SKILL_REJECTED in event_types
 
