@@ -16,7 +16,11 @@ from app.domain.models import (
     RhetoricTactic,
 )
 from app.evaluations.llm_shadow_eval import (
+    main as llm_shadow_eval_main,
+)
+from app.evaluations.llm_shadow_eval import (
     run_all_standard_path_shadow_evals,
+    run_shadow_drift_eval,
     run_shadow_eval,
     run_shadow_redteam_eval,
     run_shadow_safety_benchmark,
@@ -370,6 +374,62 @@ def test_shadow_redteam_eval_generates_sanitized_stub_report(tmp_path: Path) -> 
     assert "private inner monologue" not in serialized
     assert "culprit_confession" not in serialized
     assert (tmp_path / "mist_clock_manor" / "llm_shadow_redteam_report.md").exists()
+
+
+def test_shadow_drift_eval_writes_sanitized_summary(tmp_path: Path) -> None:
+    report = run_shadow_drift_eval(
+        case_dir=MIST_CASE_DIR,
+        runs=3,
+        backend="stub",
+        report_root=tmp_path,
+        step_index=6,
+    )
+    payload = report.model_dump()
+    serialized = (
+        tmp_path / "mist_clock_manor" / "llm_shadow_drift_report.json"
+    ).read_text(encoding="utf-8")
+
+    assert report.scenario_id == "standard_path_shadow_drift"
+    assert payload["summary"]["run_count"] == 3
+    assert payload["summary"]["calls_per_run_min"] == 1
+    assert payload["summary"]["calls_per_run_max"] == 1
+    assert payload["summary"]["runs_with_state_pollution"] == 0
+    assert payload["summary"]["state_unchanged"] is True
+    assert len(payload["summary"]["step_drift"]) == 1
+    assert payload["summary"]["step_drift"][0]["step_index"] == 6
+    assert payload["summary"]["step_drift"][0]["observations"] == 3
+    assert payload["summary"]["step_drift"][0]["variant_count"] == 1
+    assert "Tell me what you hid" not in serialized
+    assert "is not connected to an external model yet" not in serialized
+    assert (tmp_path / "mist_clock_manor" / "llm_shadow_drift_report.md").exists()
+
+
+def test_llm_shadow_eval_module_cli_runs_drift_summary(
+    tmp_path: Path,
+    capsys: Any,
+) -> None:
+    llm_shadow_eval_main(
+        [
+            "--case",
+            "mist_clock_manor",
+            "--drift",
+            "--runs",
+            "2",
+            "--step",
+            "6",
+            "--backend",
+            "stub",
+            "--report-root",
+            str(tmp_path),
+        ]
+    )
+    payload = json.loads(capsys.readouterr().out)
+
+    assert payload["run_count"] == 2
+    assert payload["summary"]["run_count"] == 2
+    assert payload["summary"]["total_shadow_calls"] == 2
+    assert payload["summary"]["runs_with_state_pollution"] == 0
+    assert (tmp_path / "mist_clock_manor" / "llm_shadow_drift_report.json").exists()
 
 
 def test_report_generation_writes_json_md_and_excludes_sensitive_raw_text(

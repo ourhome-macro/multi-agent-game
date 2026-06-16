@@ -1762,3 +1762,100 @@ def _display_path(path: Path) -> str:
         return str(path.resolve().relative_to(PROJECT_ROOT))
     except ValueError:
         return str(path.resolve())
+
+
+def main(argv: list[str] | None = None) -> None:
+    args = _parse_cli_args(argv)
+    if args.all:
+        reports = run_all_standard_path_shadow_evals(
+            cases_root=_resolve_cli_path(args.cases_root),
+            backend=args.backend,
+            report_root=_resolve_cli_path(args.report_root),
+            summary_dir=_resolve_cli_path(args.summary_dir),
+        )
+        print(json.dumps([report.model_dump() for report in reports], ensure_ascii=False, indent=2))
+        return
+
+    case_dir = _resolve_case_dir(case_id=args.case_id, case_dir=args.case_dir)
+    scenario_path = (
+        _resolve_cli_path(args.scenario)
+        if args.scenario is not None
+        else case_dir / "scenarios" / "standard_path.yaml"
+    )
+    if args.benchmark == "safety":
+        report = run_shadow_safety_benchmark(
+            case_dir=case_dir,
+            report_root=_resolve_cli_path(args.report_root),
+        )
+        print(json.dumps(report.model_dump(), ensure_ascii=False, indent=2))
+        return
+    if args.redteam:
+        report = run_shadow_redteam_eval(
+            case_dir=case_dir,
+            backend=args.backend,
+            report_root=_resolve_cli_path(args.report_root),
+        )
+        print(json.dumps(report.model_dump(), ensure_ascii=False, indent=2))
+        return
+    if args.drift:
+        report = run_shadow_drift_eval(
+            case_dir=case_dir,
+            runs=args.runs,
+            scenario_path=scenario_path,
+            backend=args.backend,
+            report_root=_resolve_cli_path(args.report_root),
+            step_index=args.step,
+        )
+        print(json.dumps(report.model_dump(), ensure_ascii=False, indent=2))
+        return
+    report = run_standard_path_shadow_eval(
+        case_dir=case_dir,
+        scenario_path=scenario_path,
+        backend=args.backend,
+        report_root=_resolve_cli_path(args.report_root),
+        step_index=args.step,
+    )
+    print(json.dumps(report.model_dump(), ensure_ascii=False, indent=2))
+
+
+def _parse_cli_args(argv: list[str] | None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Run sanitized LLM shadow evals for standard-path scenarios."
+    )
+    parser.add_argument("--case", dest="case", help="Case id, for example mist_clock_manor.")
+    parser.add_argument("--case-id", default=None)
+    parser.add_argument("--case-dir", type=Path)
+    parser.add_argument("--scenario", type=Path)
+    parser.add_argument("--step", type=int, help="1-based scenario step index to shadow eval.")
+    parser.add_argument("--cases-root", type=Path, default=PROJECT_ROOT / "cases")
+    parser.add_argument("--report-root", type=Path, default=DEFAULT_CASE_REPORT_ROOT)
+    parser.add_argument("--summary-dir", type=Path, default=DEFAULT_SUMMARY_DIR)
+    parser.add_argument("--backend", choices=["stub", "real"])
+    parser.add_argument("--benchmark", choices=["safety"])
+    parser.add_argument("--redteam", action="store_true")
+    parser.add_argument("--drift", action="store_true")
+    parser.add_argument("--runs", type=int, default=DEFAULT_DRIFT_RUNS)
+    parser.add_argument("--all", action="store_true")
+    args = parser.parse_args(argv)
+    if args.redteam and args.benchmark:
+        parser.error("--redteam and --benchmark are mutually exclusive")
+    if args.all and any([args.redteam, args.benchmark, args.drift, args.case_dir, args.scenario]):
+        parser.error("--all cannot be combined with case-specific modes")
+    if args.runs < 1:
+        parser.error("--runs must be at least 1")
+    args.case_id = args.case or args.case_id or "mist_clock_manor"
+    return args
+
+
+def _resolve_case_dir(*, case_id: str, case_dir: Path | None) -> Path:
+    if case_dir is not None:
+        return _resolve_cli_path(case_dir)
+    return PROJECT_ROOT / "cases" / case_id
+
+
+def _resolve_cli_path(path: Path) -> Path:
+    return path if path.is_absolute() else (Path.cwd() / path).resolve()
+
+
+if __name__ == "__main__":
+    main()

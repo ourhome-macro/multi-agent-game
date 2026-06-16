@@ -8,6 +8,7 @@ from typing import Protocol
 from app.agents.memory_retrieval import (
     EmbeddingScorer,
     LocalBM25KeywordScorer,
+    LocalSemanticEmbeddingScorer,
     MemoryHardFilter,
     MemoryReranker,
     MemoryRetrievalPipeline,
@@ -34,6 +35,32 @@ RECENCY_BUCKETS = (
 )
 TEXT_SCORE_CAP = 1.5
 STRUCTURED_SCORE_CAP = 5.0
+LOCAL_SEMANTIC_SCORE_CAP = 1.25
+
+DEFAULT_LOCAL_SEMANTIC_CONCEPT_ALIASES = {
+    "empty_capsules": (
+        "empty capsules",
+        "empty capsule",
+        "capsule shell",
+        "capsule shells",
+        "missing pills",
+        "missing medicine",
+        "medicine box",
+        "medicine bottle",
+        "medical clue",
+        "medicine clue",
+        "空胶囊",
+        "胶囊壳",
+        "胶囊外壳",
+        "药壳",
+        "药壳子",
+        "空药囊",
+        "药箱",
+        "药瓶",
+        "药片缺失",
+        "医药线索",
+    ),
+}
 
 
 @dataclass(frozen=True)
@@ -251,6 +278,17 @@ class MemoryRetriever:
             snapshots=snapshots,
             hard_filters=hard_filters,
         )
+
+
+def build_local_semantic_embedding_scorer(
+    concept_aliases: dict[str, tuple[str, ...]] | None = None,
+) -> LocalSemanticEmbeddingScorer:
+    return LocalSemanticEmbeddingScorer(
+        concept_aliases or DEFAULT_LOCAL_SEMANTIC_CONCEPT_ALIASES,
+        tokenizer=_tokens,
+        haystack_builder=_snapshot_haystack,
+        cap=LOCAL_SEMANTIC_SCORE_CAP,
+    )
 
 
 def _working_hard_filters(

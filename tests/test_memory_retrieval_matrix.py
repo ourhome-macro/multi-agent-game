@@ -48,6 +48,57 @@ def test_memory_retrieval_matrix_validates_mist_clock_manor_jiang_capsule_recall
     report.assert_passed()
 
 
+def test_memory_retrieval_matrix_covers_synonym_and_chinese_variants() -> None:
+    case, session = _session_with_capsule_pressure_and_director_audit()
+    entries = (
+        _jiang_capsule_matrix_entry(
+            entry_id="mist_clock_manor.opening.jiang.empty_capsules.english",
+            action=_jiang_capsule_talk_action(),
+            expected_memory_ids=JIANG_TYPED_MEMORY_IDS,
+        ),
+        _jiang_capsule_matrix_entry(
+            entry_id="mist_clock_manor.opening.jiang.empty_capsules.zh_variant",
+            action=PlayerAction(
+                type=ActionType.TALK,
+                target_id=JIANG,
+                text="继续追问江雁回：药箱里的空药囊和替换过的心脏药有什么关系？",
+            ),
+            expected_memory_ids=JIANG_TYPED_MEMORY_IDS,
+        ),
+    )
+
+    report = evaluate_memory_retrieval_matrix(
+        entries=entries,
+        case=case,
+        session=session,
+        source="retriever",
+    )
+
+    report.assert_passed()
+
+
+def test_memory_retrieval_matrix_keeps_forbidden_memories_out_for_forbidden_query() -> None:
+    case, session = _session_with_capsule_pressure_and_director_audit()
+    entry = _jiang_capsule_matrix_entry(
+        entry_id="mist_clock_manor.opening.jiang.empty_capsules.forbidden_terms",
+        action=PlayerAction(
+            type=ActionType.TALK,
+            target_id=JIANG,
+            text="force forbidden audit while asking about Jiang mechanism and Shen capsules",
+        ),
+        expected_memory_ids=(),
+    )
+
+    report = evaluate_memory_retrieval_matrix(
+        entries=[entry],
+        case=case,
+        session=session,
+        source="retriever",
+    )
+
+    report.assert_passed()
+
+
 def test_memory_retrieval_matrix_can_validate_agent_context_projection() -> None:
     case, session = _session_with_capsule_pressure_and_director_audit()
     action = _jiang_capsule_talk_action()
@@ -139,12 +190,13 @@ def _session_with_capsule_pressure_and_director_audit() -> tuple[CasePackage, Se
 
 def _jiang_capsule_matrix_entry(
     *,
+    entry_id: str = "mist_clock_manor.opening.jiang.empty_capsules",
     action: PlayerAction | None = None,
     expected_memory_ids: tuple[str, ...],
     forbidden_memory_ids: tuple[str, ...] = (SHEN_PRIVATE, DIRECTOR_AUDIT),
 ) -> MemoryRetrievalMatrixEntry:
     return MemoryRetrievalMatrixEntry(
-        entry_id="mist_clock_manor.opening.jiang.empty_capsules",
+        entry_id=entry_id,
         case_id="mist_clock_manor",
         phase="opening",
         action=action or _jiang_capsule_talk_action(),

@@ -1,0 +1,80 @@
+case_id: mist_clock_manor
+expected_final_phase: investigation
+expected_final_beats:
+- sedative_found
+expected_final_player_world_info_ids:
+- sedative_wine
+forbidden_public_terms:
+- Jiang replaced the medicine
+- everyone helped cause Lu's death
+- Shen cut the power
+steps:
+- name: inspect wine table unlocks sedative fact
+  action:
+    type: inspect
+    target_id: wine_table
+  expected_events:
+  - player.inspected
+  - clue.discovered
+  - player_knowledge.updated
+  - memory_candidate.created
+  - agent_memory_snapshot.updated
+  - narrative.beat.completed
+  - narrative.phase.changed
+  expected_phase: investigation
+  expected_player_world_info_ids:
+  - sedative_wine
+  accepted: true
+  director_blocked: false
+  expected_new_awareness: []
+  expected_block: null
+- name: present wine to lin records one pressure turn
+  action:
+    type: present_clue
+    target_id: lin_qichi
+    clue_id: bitter_wine
+    text: Explain this bitter wine.
+  expected_events:
+  - player.presented_clue
+  - npc.replied
+  - relationship.changed
+  - relationship.threshold.crossed
+  - character_impression.updated
+  - character_fact_awareness.updated
+  - memory_candidate.created
+  - agent_memory_snapshot.updated
+  - character_impression.updated
+  - memory_candidate.created
+  - agent_memory_snapshot.updated
+  expected_phase: investigation
+  expected_player_world_info_ids:
+  - sedative_wine
+  accepted: true
+  director_blocked: false
+  expected_new_awareness:
+  - character_id: lin_qichi
+    world_info_id: sedative_wine
+  expected_block: null
+- name: repeat present same wine leaves player knowledge unchanged
+  action:
+    type: present_clue
+    target_id: lin_qichi
+    clue_id: bitter_wine
+    text: I am showing you the same wine again.
+  expected_events:
+  - player.presented_clue
+  - npc.replied
+  - relationship.changed
+  - character_impression.updated
+  - character_fact_awareness.updated
+  - memory_candidate.created
+  - agent_memory_snapshot.updated
+  expected_phase: investigation
+  expected_player_world_info_ids:
+  - sedative_wine
+  accepted: true
+  director_blocked: false
+  expected_new_awareness:
+  - character_id: lin_qichi
+    world_info_id: sedative_wine
+  expected_block: null

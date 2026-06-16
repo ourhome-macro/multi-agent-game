@@ -1,0 +1,108 @@
+case_id: mist_clock_manor
+expected_final_phase: confrontation
+expected_final_beats:
+- sedative_found
+- mechanism_exposed
+expected_final_player_world_info_ids:
+- sedative_wine
+- timed_lock_modified
+- recording_tape_swapped
+- jiang_ruolan_recording_exists
+forbidden_public_terms:
+- Jiang replaced the medicine
+- everyone helped cause Lu's death
+- Shen cut the power
+steps:
+- name: inspect wine table unlocks sedative fact
+  action:
+    type: inspect
+    target_id: wine_table
+  expected_events:
+  - player.inspected
+  - clue.discovered
+  - player_knowledge.updated
+  - memory_candidate.created
+  - agent_memory_snapshot.updated
+  - narrative.beat.completed
+  - narrative.phase.changed
+  expected_phase: investigation
+  expected_player_world_info_ids:
+  - sedative_wine
+  accepted: true
+  director_blocked: false
+  expected_new_awareness: []
+  expected_block: null
+- name: inspect study lock keeps investigation until tape is found
+  action:
+    type: inspect
+    target_id: study_lock
+  expected_events:
+  - player.inspected
+  - clue.discovered
+  - player_knowledge.updated
+  - memory_candidate.created
+  - agent_memory_snapshot.updated
+  expected_phase: investigation
+  expected_player_world_info_ids:
+  - sedative_wine
+  - timed_lock_modified
+  accepted: true
+  director_blocked: false
+  expected_new_awareness: []
+  expected_block: null
+- name: inspect tape recorder enters confrontation
+  action:
+    type: inspect
+    target_id: tape_recorder
+  expected_events:
+  - player.inspected
+  - clue.discovered
+  - clue.discovered
+  - player_knowledge.updated
+  - memory_candidate.created
+  - agent_memory_snapshot.updated
+  - player_knowledge.updated
+  - memory_candidate.created
+  - agent_memory_snapshot.updated
+  - narrative.beat.completed
+  - narrative.phase.changed
+  expected_phase: confrontation
+  expected_player_world_info_ids:
+  - sedative_wine
+  - timed_lock_modified
+  - recording_tape_swapped
+  - jiang_ruolan_recording_exists
+  accepted: true
+  director_blocked: false
+  expected_new_awareness: []
+  expected_block: null
+- name: wrong lin-only accusation does not resolve or reconstruct
+  action:
+    type: accuse
+    target_id: lin_qichi
+    claim_id: lin_poisoned_lu
+    evidence_clue_ids:
+    - bitter_wine
+    text: Lin alone poisoned Lu with the wine.
+  expected_events:
+  - player.accused
+  - accusation.evaluated
+  - character_impression.updated
+  - character_fact_awareness.updated
+  - memory_candidate.created
+  - agent_memory_snapshot.updated
+  - character_impression.updated
+  - memory_candidate.created
+  - agent_memory_snapshot.updated
+  expected_phase: confrontation
+  expected_player_world_info_ids:
+  - sedative_wine
+  - timed_lock_modified
+  - recording_tape_swapped
+  - jiang_ruolan_recording_exists
+  accepted: true
+  director_blocked: false
+  expected_new_awareness:
+  - character_id: lin_qichi
+    world_info_id: sedative_wine
+  expected_block: null

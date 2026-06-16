@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import math
 from collections import Counter
-from collections.abc import Callable, Iterable, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Protocol
 
@@ -95,6 +95,68 @@ class NoopMemoryReranker:
     ) -> Sequence[MemorySearchResult]:
         _ = query
         return results
+
+
+class LocalSemanticEmbeddingScorer:
+    """Deterministic first-stage semantic scorer for already-filtered candidates.
+
+    This is intentionally not a vector store. It never fetches candidates and must
+    only run inside the retrieval pipeline after scope/layer/visibility/phase and
+    forbidden-fact hard filters have already accepted a snapshot.
+    """
+
+    def __init__(
+        self,
+        concept_aliases: Mapping[str, Iterable[str]],
+        *,
+        tokenizer: Callable[[str], set[str]],
+        haystack_builder: Callable[[AgentMemorySnapshot], str],
+        cap: float = 1.25,
+        concept_weight: float = 1.0,
+        overlap_weight: float = 0.08,
+    ) -> None:
+        self._tokenizer = tokenizer
+        self._haystack_builder = haystack_builder
+        self._cap = cap
+        self._concept_weight = concept_weight
+        self._overlap_weight = overlap_weight
+        self._concept_tokens = _compile_concept_tokens(
+            concept_aliases,
+            tokenizer=tokenizer,
+        )
+
+    def score(
+        self,
+        *,
+        query: MemorySearchQuery,
+        snapshot: AgentMemorySnapshot,
+    ) -> float:
+        if not self._concept_tokens:
+            return 0.0
+        query_tokens = self._query_tokens(query)
+        if not query_tokens:
+            return 0.0
+        snapshot_tokens = self._tokenizer(self._haystack_builder(snapshot))
+        if not snapshot_tokens:
+            return 0.0
+
+        score = 0.0
+        for alias_tokens in self._concept_tokens.values():
+            query_overlap = query_tokens & alias_tokens
+            if not query_overlap:
+                continue
+            snapshot_overlap = snapshot_tokens & alias_tokens
+            if not snapshot_overlap:
+                continue
+            score += self._concept_weight
+            score += min(len(query_overlap | snapshot_overlap), 4) * self._overlap_weight
+        return min(score, self._cap)
+
+    def _query_tokens(self, query: MemorySearchQuery) -> set[str]:
+        tokens = set(query.text_tokens)
+        for anchor in query.anchors:
+            tokens.update(self._tokenizer(anchor))
+        return tokens
 
 
 class LocalBM25KeywordScorer:
@@ -254,3 +316,18 @@ class MemoryRetrievalPipeline:
             has_relevance=has_relevance,
         )
         return MemorySearchResult(snapshot=snapshot, score=score)
+
+
+def _compile_concept_tokens(
+    concept_aliases: Mapping[str, Iterable[str]],
+    *,
+    tokenizer: Callable[[str], set[str]],
+) -> dict[str, frozenset[str]]:
+    compiled: dict[str, frozenset[str]] = {}
+    for concept, aliases in concept_aliases.items():
+        tokens = set(tokenizer(str(concept)))
+        for alias in aliases:
+            tokens.update(tokenizer(str(alias)))
+        if tokens:
+            compiled[str(concept)] = frozenset(tokens)
+    return compiled

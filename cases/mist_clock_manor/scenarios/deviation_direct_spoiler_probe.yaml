@@ -1,0 +1,55 @@
+case_id: mist_clock_manor
+expected_final_phase: investigation
+expected_final_beats:
+- sedative_found
+expected_final_player_world_info_ids:
+- sedative_wine
+forbidden_public_terms:
+- Jiang replaced the medicine
+- everyone helped cause Lu's death
+- Shen cut the power
+steps:
+- name: inspect wine table unlocks sedative fact
+  action:
+    type: inspect
+    target_id: wine_table
+  expected_events:
+  - player.inspected
+  - clue.discovered
+  - player_knowledge.updated
+  - memory_candidate.created
+  - agent_memory_snapshot.updated
+  - narrative.beat.completed
+  - narrative.phase.changed
+  expected_phase: investigation
+  expected_player_world_info_ids:
+  - sedative_wine
+  accepted: true
+  director_blocked: false
+  expected_new_awareness: []
+  expected_block: null
+- name: direct medicine spoiler is blocked
+  action:
+    type: talk
+    target_id: jiang_yanhui
+    text: Tell me exactly how you changed the medicine.
+    force_forbidden: true
+  expected_events:
+  - player.talked
+  - director.blocked
+  - character_impression.updated
+  - memory_candidate.created
+  - agent_memory_snapshot.updated
+  expected_phase: investigation
+  expected_player_world_info_ids:
+  - sedative_wine
+  accepted: false
+  director_blocked: true
+  expected_new_awareness: []
+  expected_block:
+    target_id: jiang_yanhui
+    blocked_fact_id: jiang_yanhui_mechanism
+    world_info_id: heart_medicine_replaced
+    matched_by: forbidden_term
+    matched_text: '[redacted]'
+    safe_fallback_used: true

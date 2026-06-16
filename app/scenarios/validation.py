@@ -68,12 +68,32 @@ _RECONSTRUCTION_FIELDS = frozenset({"overview", "runtime_note", "director_note",
 
 
 def discover_standard_scenarios(cases_root: Path) -> list[Path]:
+    return discover_scenarios(cases_root, pattern="standard_path.yaml")
+
+
+def discover_scenarios(cases_root: Path, *, pattern: str = "*.yaml") -> list[Path]:
     if cases_root.is_dir() and (cases_root / "case.yaml").exists():
-        scenario_path = cases_root / "scenarios" / "standard_path.yaml"
-        return [scenario_path] if scenario_path.exists() else []
+        scenario_dir = cases_root / "scenarios"
+        return sorted(scenario_dir.glob(pattern)) if scenario_dir.exists() else []
     if not cases_root.exists():
         raise ScenarioValidationError(f"Cases root does not exist: {cases_root}")
-    return sorted(cases_root.glob("*/scenarios/standard_path.yaml"))
+    return sorted(cases_root.glob(f"*/scenarios/{pattern}"))
+
+
+def discover_deviation_scenarios(cases_root: Path) -> list[Path]:
+    if cases_root.is_dir() and (cases_root / "case.yaml").exists():
+        scenario_dir = cases_root / "scenarios"
+        return sorted(scenario_dir.glob("deviation_*.yaml"))
+    if not cases_root.exists():
+        raise ScenarioValidationError(f"Cases root does not exist: {cases_root}")
+    return sorted(cases_root.glob("*/scenarios/deviation_*.yaml"))
+
+
+def discover_regression_scenarios(cases_root: Path) -> list[Path]:
+    return [
+        *discover_standard_scenarios(cases_root),
+        *discover_deviation_scenarios(cases_root),
+    ]
 
 
 def load_scenario_package(scenario_path: Path) -> ScenarioPackage:

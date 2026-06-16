@@ -265,6 +265,11 @@ def resolve_benchmark_database_url(
             f"{ALLOW_DB_ENV}=1 is required before any PostgreSQL benchmark connects."
         )
     if explicit_url:
+        if explicit_url == environment.get(PRODUCTION_DATABASE_ENV):
+            raise BenchmarkSafetyError(
+                f"Explicit --database-url matches {PRODUCTION_DATABASE_ENV}; refusing "
+                "to benchmark the production runtime database."
+            )
         return explicit_url
     test_url = environment.get(TEST_DATABASE_ENV)
     if test_url:
@@ -651,6 +656,16 @@ class PostgresBenchmarkBackend:
             for trace_index in range(traces_per_action)
         ]
         try:
+            replayed = self._event_store.load_idempotent_response(
+                session_id=session.id,
+                idempotency_key=idempotency_key,
+                request_hash=request_hash,
+            )
+        except IdempotencyConflictError as exc:
+            raise BenchmarkIdempotencyConflict(str(exc)) from exc
+        if replayed is not None:
+            return AppendResult(event_count=len(replayed), trace_count=0, replayed=True)
+        try:
             stored = self._event_store.append(
                 session.to_session_state(),
                 events,
@@ -665,8 +680,7 @@ class PostgresBenchmarkBackend:
             raise BenchmarkSequenceConflict(str(exc)) from exc
         return AppendResult(
             event_count=len(stored),
-            trace_count=0 if _is_replay(stored, events) else traces_per_action,
-            replayed=_is_replay(stored, events),
+            trace_count=traces_per_action,
         )
 
     def query_memory_candidates(self, session: BenchmarkSession, query_index: int) -> int:
@@ -922,12 +936,6 @@ def _runtime_trace_record(
         "security_flags": [],
         "status": "ok",
     }
-
-
-def _is_replay(stored: Sequence[object], requested_events: Sequence[WorldEvent]) -> bool:
-    stored_ids = [str(getattr(item, "event").id) for item in stored]
-    requested_ids = [event.id for event in requested_events]
-    return bool(stored_ids and stored_ids != requested_ids)
 
 
 def _count_rows(

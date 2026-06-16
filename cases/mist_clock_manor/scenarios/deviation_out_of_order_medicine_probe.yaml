@@ -1,0 +1,57 @@
+case_id: mist_clock_manor
+expected_final_phase: opening
+expected_final_beats: []
+expected_final_player_world_info_ids:
+- heart_medicine_replaced
+forbidden_public_terms:
+- Jiang replaced the medicine
+- everyone helped cause Lu's death
+- Shen cut the power
+steps:
+- name: inspect medicine before opening beat
+  action:
+    type: inspect
+    target_id: medicine_box
+  expected_events:
+  - player.inspected
+  - clue.discovered
+  - player_knowledge.updated
+  - memory_candidate.created
+  - agent_memory_snapshot.updated
+  expected_phase: opening
+  expected_player_world_info_ids:
+  - heart_medicine_replaced
+  accepted: true
+  director_blocked: false
+  expected_new_awareness: []
+  expected_block: null
+- name: ask jiang about capsules before sedative path
+  action:
+    type: ask_about
+    target_id: jiang_yanhui
+    subject_type: clue
+    subject_id: empty_capsules
+    text: What about these capsules?
+  expected_events:
+  - player.asked_about
+  - npc.replied
+  - relationship.changed
+  - character_impression.updated
+  - character_fact_awareness.updated
+  - memory_candidate.created
+  - agent_memory_snapshot.updated
+  - memory_candidate.created
+  - agent_memory_snapshot.updated
+  - memory_candidate.created
+  - agent_memory_snapshot.updated
+  - memory_candidate.created
+  - agent_memory_snapshot.updated
+  expected_phase: opening
+  expected_player_world_info_ids:
+  - heart_medicine_replaced
+  accepted: true
+  director_blocked: false
+  expected_new_awareness:
+  - character_id: jiang_yanhui
+    world_info_id: heart_medicine_replaced
+  expected_block: null

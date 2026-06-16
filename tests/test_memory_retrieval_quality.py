@@ -9,7 +9,8 @@ from app.agents.context import build_agent_context
 from app.agents.gateway import AgentGateway
 from app.agents.llm_contract import build_llm_agent_input
 from app.agents.loop import AgentLoop
-from app.agents.memory import MemoryRetriever
+from app.agents.memory import MemoryRetriever, build_local_semantic_embedding_scorer
+from app.agents.memory_retrieval import EmbeddingScorer
 from app.agents.real_llm_agent import OpenAILLMAgent
 from app.agents.retrieval_planner import MemoryRetrievalPlan
 from app.domain.models import (
@@ -341,6 +342,123 @@ def test_build_agent_context_fallback_retrieval_still_works_without_supplied_sna
     assert _memory_ids(context.memory_snapshots) == [relevant.memory_id]
 
 
+def test_local_semantic_scorer_recalls_synonym_without_default_drift() -> None:
+    relevant = _memory(
+        memory_id="memory.quality.semantic.empty_capsules",
+        content="Jiang believes the player is closing in on the medicine clue.",
+        metadata={"topic_tags": ["medicine_replaced"]},
+        salience=0.2,
+    )
+    unrelated = _memory(
+        memory_id="memory.quality.semantic.unrelated",
+        content="The player studied the seating chart and corridor route.",
+        salience=1.0,
+    )
+    action = PlayerAction(
+        type=ActionType.TALK,
+        target_id=JIANG,
+        text="继续追问药壳子是不是药箱里的东西",
+    )
+
+    default_memories = _retrieve([unrelated, relevant], action)
+    semantic_memories = _retrieve(
+        [unrelated, relevant],
+        action,
+        embedding_scorer=build_local_semantic_embedding_scorer(),
+    )
+
+    assert relevant.memory_id not in _memory_ids(default_memories)
+    assert _memory_ids(semantic_memories) == [relevant.memory_id]
+
+
+def test_local_semantic_scorer_still_respects_hard_filters_before_scoring() -> None:
+    visible = _memory(
+        memory_id="memory.quality.semantic.visible",
+        content="Jiang believes the player is closing in on the medicine clue.",
+        metadata={"topic_tags": ["medicine_replaced"]},
+        salience=0.2,
+    )
+    hidden_scope = _memory(
+        memory_id="memory.quality.semantic.director_audit",
+        content="Director audit mentions the medicine clue.",
+        memory_scope="director_audit",
+        owner_character_id=None,
+        visible_to_character_ids=[],
+        salience=1.0,
+    )
+    hidden_visibility = _memory(
+        memory_id="memory.quality.semantic.shen_private",
+        content="Shen remembers pressure around the medicine clue.",
+        owner_character_id=SHEN,
+        visible_to_character_ids=[SHEN],
+        salience=1.0,
+    )
+    hidden_phase = _memory(
+        memory_id="memory.quality.semantic.future_phase",
+        content="Jiang links the medicine clue to a later reconstruction.",
+        metadata={"phase_id": "reconstruction", "topic_tags": ["medicine_replaced"]},
+        salience=1.0,
+    )
+    hidden_archival = _memory(
+        memory_id="memory.quality.semantic.archival",
+        content="Archived medicine clue summary.",
+        memory_layer="archival",
+        salience=1.0,
+    )
+    action = PlayerAction(
+        type=ActionType.TALK,
+        target_id=JIANG,
+        text="药壳子和药箱这条线",
+    )
+
+    memories = _retrieve(
+        [
+            hidden_scope,
+            hidden_visibility,
+            hidden_phase,
+            hidden_archival,
+            visible,
+        ],
+        action,
+        embedding_scorer=build_local_semantic_embedding_scorer(),
+    )
+
+    assert _memory_ids(memories) == [visible.memory_id]
+
+
+def test_local_semantic_scorer_cannot_admit_forbidden_memory_to_context() -> None:
+    forbidden = _memory(
+        memory_id="memory.quality.semantic.forbidden_fact",
+        content="玩家把药瓶线索直接连到未解锁真相：真凶是管家。",
+        metadata={"topic_tags": ["medicine_replaced"]},
+        salience=1.0,
+    )
+    visible = _memory(
+        memory_id="memory.quality.semantic.safe",
+        content="Jiang believes the player is closing in on the medicine clue.",
+        metadata={"topic_tags": ["medicine_replaced"]},
+        salience=0.2,
+    )
+    case = _case(
+        forbidden_facts=[
+            ForbiddenFactConfig(
+                id="fact.killer_identity",
+                text="真凶是管家",
+                blocked_terms=["真凶是管家", "管家下毒"],
+            ),
+        ],
+    )
+
+    memories = _retrieve(
+        [forbidden, visible],
+        PlayerAction(type=ActionType.TALK, target_id=JIANG, text="药壳子和药箱"),
+        case=case,
+        embedding_scorer=build_local_semantic_embedding_scorer(),
+    )
+
+    assert _memory_ids(memories) == [visible.memory_id]
+
+
 def test_agent_loop_uses_injected_retriever_as_single_context_and_trace_source(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -548,8 +666,9 @@ def _retrieve(
     *,
     case: CasePackage | None = None,
     plan: MemoryRetrievalPlan | None = None,
+    embedding_scorer: EmbeddingScorer | None = None,
 ) -> list[AgentMemorySnapshot]:
-    return MemoryRetriever(max_results=20).retrieve(
+    return MemoryRetriever(max_results=20, embedding_scorer=embedding_scorer).retrieve(
         case=case or _case(),
         session=_session(snapshots),
         action=action,
