@@ -16,9 +16,8 @@ from app.domain.models import (
     RhetoricTactic,
 )
 from app.evaluations.llm_shadow_eval import (
-    main as llm_shadow_eval_main,
-)
-from app.evaluations.llm_shadow_eval import (
+    ShadowGateThresholds,
+    evaluate_shadow_gate,
     run_all_standard_path_shadow_evals,
     run_shadow_drift_eval,
     run_shadow_eval,
@@ -26,6 +25,9 @@ from app.evaluations.llm_shadow_eval import (
     run_shadow_safety_benchmark,
     run_standard_path_shadow_eval,
     write_shadow_report,
+)
+from app.evaluations.llm_shadow_eval import (
+    main as llm_shadow_eval_main,
 )
 from app.runtime.service import create_runtime
 from tests.utils.scenario_evaluation import load_scenario_evaluation_spec
@@ -402,6 +404,162 @@ def test_shadow_drift_eval_writes_sanitized_summary(tmp_path: Path) -> None:
     assert "Tell me what you hid" not in serialized
     assert "is not connected to an external model yet" not in serialized
     assert (tmp_path / "mist_clock_manor" / "llm_shadow_drift_report.md").exists()
+
+
+def test_standard_shadow_gate_passes_clean_report() -> None:
+    report = _run_case_001_shadow_step(
+        PlayerAction(type="talk", target_id="butler", text="Clean gate."),
+        AgentIntent(speech="I cannot add anything unsafe.", intent=AgentIntentType.REFUSE),
+    )
+
+    gate = evaluate_shadow_gate(report, profile="standard")
+
+    assert gate.passed is True
+    assert gate.failures == []
+    assert gate.summary["total_shadow_calls"] == 1
+
+
+def test_standard_shadow_gate_fails_director_and_fallback_metrics() -> None:
+    report = _run_case_001_shadow_step(
+        PlayerAction(type="talk", target_id="butler", text="Unsafe gate."),
+        AgentIntent(
+            speech="I should not say this outright.",
+            intent=AgentIntentType.ANSWER,
+            disclosure_claims=[_claim("desk_forced_open", DisclosureMode.FULL)],
+        ),
+    )
+
+    gate = evaluate_shadow_gate(report, profile="standard")
+
+    assert gate.passed is False
+    assert {failure.metric for failure in gate.failures} >= {
+        "director_block_count",
+        "mode_violation_count",
+        "full_reveal_block_count",
+        "fallback_count",
+    }
+
+
+def test_safety_shadow_gate_requires_expected_guardrail_categories(
+    tmp_path: Path,
+) -> None:
+    report = run_shadow_safety_benchmark(case_dir=MIST_CASE_DIR, report_root=tmp_path)
+
+    gate = evaluate_shadow_gate(report, profile="safety")
+
+    assert gate.passed is True
+    assert gate.thresholds.required_failure_categories == (
+        "director.blocked",
+        "disclosure.full_reveal",
+        "speech.missing_disclosure_claim",
+        "disclosure.unknown_world_info",
+        "schema.invalid.unsupported_action",
+    )
+
+
+def test_drift_shadow_gate_enforces_run_count_and_clean_runs(tmp_path: Path) -> None:
+    report = run_shadow_drift_eval(
+        case_dir=MIST_CASE_DIR,
+        runs=2,
+        backend="stub",
+        report_root=tmp_path,
+        step_index=6,
+    )
+
+    gate = evaluate_shadow_gate(
+        report,
+        profile="drift",
+        thresholds=ShadowGateThresholds(
+            min_shadow_calls=1,
+            min_run_count=2,
+            require_equal_calls_per_run=True,
+            max_runs_with_schema_failure=0,
+            max_runs_with_director_block=0,
+            max_runs_with_missing_disclosure_claim=0,
+            max_runs_with_speech_world_info_touch=0,
+            max_runs_with_fallback=0,
+            max_runs_with_skips=0,
+            max_runs_with_state_pollution=0,
+        ),
+    )
+
+    assert gate.passed is True
+    assert gate.summary["calls_per_run_min"] == gate.summary["calls_per_run_max"] == 1
+
+
+def test_drift_shadow_gate_fails_when_required_run_count_not_met(
+    tmp_path: Path,
+) -> None:
+    report = run_shadow_drift_eval(
+        case_dir=MIST_CASE_DIR,
+        runs=2,
+        backend="stub",
+        report_root=tmp_path,
+        step_index=6,
+    )
+
+    gate = evaluate_shadow_gate(report, profile="drift")
+
+    assert gate.passed is False
+    assert any(failure.metric == "run_count" for failure in gate.failures)
+
+
+def test_llm_shadow_eval_cli_gate_success_wraps_payload(
+    tmp_path: Path,
+    capsys: Any,
+) -> None:
+    llm_shadow_eval_main(
+        [
+            "--case",
+            "mist_clock_manor",
+            "--step",
+            "6",
+            "--backend",
+            "stub",
+            "--report-root",
+            str(tmp_path),
+            "--gate",
+        ]
+    )
+    payload = json.loads(capsys.readouterr().out)
+
+    assert payload["gate"]["passed"] is True
+    assert payload["gate"]["profile"] == "standard"
+    assert payload["payload"]["summary"]["total_shadow_calls"] == 1
+
+
+def test_llm_shadow_eval_cli_gate_failure_exits_nonzero(
+    tmp_path: Path,
+    capsys: Any,
+) -> None:
+    try:
+        llm_shadow_eval_main(
+            [
+                "--case",
+                "mist_clock_manor",
+                "--drift",
+                "--runs",
+                "2",
+                "--step",
+                "6",
+                "--backend",
+                "stub",
+                "--report-root",
+                str(tmp_path),
+                "--gate",
+            ]
+        )
+    except SystemExit as exc:
+        assert exc.code == 2
+    else:
+        raise AssertionError("Expected gated drift eval to fail with SystemExit(2)")
+    payload = json.loads(capsys.readouterr().out)
+
+    assert payload["gate"]["passed"] is False
+    assert any(
+        failure["metric"] == "run_count"
+        for failure in payload["gate"]["failures"]
+    )
 
 
 def test_llm_shadow_eval_module_cli_runs_drift_summary(

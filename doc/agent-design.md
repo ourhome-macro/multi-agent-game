@@ -9,10 +9,14 @@ NPC Skill 是游戏运行时领域模型，不是 Codex skill，也不是 prompt
 所有 Agent 实现都使用同一协议：
 
 ```python
-generate(context: AgentContext) -> AgentIntent
+generate(
+    context: AgentContext,
+    *,
+    contract_input: LLMAgentContractInput | None = None,
+) -> AgentIntent
 ```
 
-`AgentGateway` 是运行时唯一的 Agent 生成入口。默认后端是 `MockAgent`。`LLMAgentStub` 只是 schema 安全的本地占位，不调用外部服务。`OpenAILLMAgent` 是默认禁用的真实 LLM 适配器。
+`AgentGateway` 是运行时唯一的 Agent 生成入口。默认后端是 `MockAgent`。`LLMAgentStub` 只是 schema 安全的本地占位，不调用外部服务。`OpenAILLMAgent` 是默认禁用的真实 LLM 适配器。生产 `AgentLoop.run_turn(...)` 必须先构造本轮唯一的 `LLMAgentContractInput`，再把同一个对象传入 gateway、真实 LLM 请求 schema、输出校验和 LLM fallback。直接只传 `context` 的调用只允许作为 mock、测试或 shadow eval 的兼容路径，由 agent 自行从 context 推导合同。
 
 当前 Agent 支持的玩家动作链路：
 
@@ -20,9 +24,10 @@ generate(context: AgentContext) -> AgentIntent
 PlayerAction(talk | ask_about | present_clue)
   -> build_agent_context(case, session, action)
   -> AgentTurnPlan(memory plan + selected NPC skill + security limits + output contract)
-  -> AgentGateway.generate(context)
+  -> build_llm_agent_input(context, turn_plan)
+  -> AgentGateway.generate(context, contract_input)
   -> AgentIntent
-  -> validate_llm_agent_output(..., turn output contract)
+  -> validate_llm_agent_output(..., same contract_input)
   -> NarrativeDirector.validate
   -> RuleEngine.apply_agent_intent
 ```
@@ -351,7 +356,7 @@ Agent 也不能写 `FactDisclosureStrategy`。策略是上下文投影，不是�
 
 `LLMAgentStub` 返回合法 `AgentIntent`，不调用外部模型，也不修改 `SessionState`。它用于在接入真实模型前锁定 LLM 合同。
 
-`OpenAILLMAgent` 是最小真实后端适配器。它构造 `LLMAgentContractInput`，请求符合 `AgentIntent` 的严格 JSON，运行 `validate_llm_agent_output`，返回校验后的 intent。任何失败都会返回无 `proposed_actions` 的安全拒答。失败包括缺少 API key、HTTP 错误、JSON 错误、schema 错误、private 原文回显、直接提议剧情阶段变化。
+`OpenAILLMAgent` 是最小真实后端适配器。生产链路中它接收 `AgentLoop` 已构造好的 `LLMAgentContractInput`，并用同一份合同生成 provider 动态 JSON schema、请求 user payload、schema / JSON repair 输入和 Python 层 `validate_llm_agent_output` 校验。只有直接调试或 shadow eval 这类兼容路径可以只传 `context`，此时适配器才从 context 推导合同。任何失败都会返回无 `proposed_actions` 的安全拒答。失败包括缺少 API key、HTTP 错误、JSON 错误、schema 错误、private 原文回显、直接提议剧情阶段变化。
 
 真实 LLM fallback 不是静默兜底。`OpenAILLMAgent.generate(...)` 会在安全拒答的 `AgentIntent.llm_error` 中记录机器可读错误摘要：
 

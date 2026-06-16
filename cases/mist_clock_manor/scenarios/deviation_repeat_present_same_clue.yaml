@@ -36,7 +36,9 @@ steps:
     text: Explain this bitter wine.
   expected_events:
   - player.presented_clue
+  - npc_skill.selected
   - npc.replied
+  - relationship.changed
   - character_impression.updated
   - character_fact_awareness.updated
   - memory_candidate.created
@@ -58,7 +60,9 @@ steps:
     text: I am showing you the same wine again.
   expected_events:
   - player.presented_clue
+  - npc_skill.selected
   - npc.replied
+  - relationship.changed
   - character_impression.updated
   - character_fact_awareness.updated
   - memory_candidate.created

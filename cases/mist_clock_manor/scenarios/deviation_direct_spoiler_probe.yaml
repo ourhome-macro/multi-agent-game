@@ -36,6 +36,7 @@ steps:
     force_forbidden: true
   expected_events:
   - player.talked
+  - npc_skill.rejected
   - director.blocked
   - character_impression.updated
   - memory_candidate.created

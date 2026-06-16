@@ -11,6 +11,23 @@
     - "红酒.*(药|镇静剂|安眠药)"
     - "酒.*(下药|有药)"
 
+  claim_graph:
+    safe_fragments:
+      - id: wine_residue_indicates_sedative
+        summary: Player has evidence that the bitter red wine residue supports a sedative trace.
+        aliases:
+          - bitter wine residue
+          - sedative trace in wine
+        claim_patterns:
+          - "bitter wine residue"
+          - "sedative trace"
+        allowed_modes:
+          - hint
+          - partial
+        unlock_conditions:
+          player_knowledge_ids:
+            - player_knowledge.sedative_wine
+
 - id: timed_lock_modified
   title: 书房门锁被改成延时落锁
   description: 门锁内侧的新划痕和润滑油说明，有人提前做了延时卡榫，制造密室假象。
@@ -24,6 +41,23 @@
     - "门锁.*(改|动过|延时)"
     - "密室.*假"
 
+  claim_graph:
+    safe_fragments:
+      - id: lock_has_delay_marks
+        summary: Player has evidence that the study lock carries fresh marks consistent with delayed locking.
+        aliases:
+          - study lock delay marks
+          - delayed lock marks
+        claim_patterns:
+          - "study lock.*delay"
+          - "delayed lock marks"
+        allowed_modes:
+          - hint
+          - partial
+        unlock_conditions:
+          player_knowledge_ids:
+            - player_knowledge.timed_lock_modified
+
 - id: recording_tape_swapped
   title: 书房录音带被替换
   description: 十一点十七分响起的钟声来自书房录音机，而不是山庄钟楼。
@@ -36,6 +70,23 @@
   claim_patterns:
     - "录音带.*(换|替换)"
     - "钟声.*录音"
+
+  claim_graph:
+    safe_fragments:
+      - id: tape_label_and_chime_are_evidence
+        summary: Player has evidence that the Echo Clock tape and its chime timing are relevant.
+        aliases:
+          - Echo Clock tape
+          - tape chime timing
+        claim_patterns:
+          - "Echo Clock tape"
+          - "tape.*chime"
+        allowed_modes:
+          - hint
+          - partial
+        unlock_conditions:
+          player_knowledge_ids:
+            - player_knowledge.recording_tape_swapped
 
 - id: fake_confession_plan
   title: 陆澜生准备伪造忏悔信洗白旧案
@@ -63,6 +114,23 @@
     - "江若岚.*录音"
     - "若岚.*声音"
 
+  claim_graph:
+    safe_fragments:
+      - id: old_voice_fragment_exists
+        summary: Player has evidence that an old Ruolan voice fragment exists on the tape.
+        aliases:
+          - Ruolan voice fragment
+          - old voice fragment
+        claim_patterns:
+          - "Ruolan voice fragment"
+          - "old voice fragment"
+        allowed_modes:
+          - hint
+          - partial
+        unlock_conditions:
+          player_knowledge_ids:
+            - player_knowledge.jiang_ruolan_recording_exists
+
 - id: heart_medicine_replaced
   title: 陆澜生的心脏病药被换成空胶囊
   description: 书房药盒中有外观相同的空胶囊，导致陆澜生发病时没有得到有效药物。
@@ -76,6 +144,23 @@
     - "心脏.*药.*(换|空)"
     - "空胶囊"
 
+  claim_graph:
+    safe_fragments:
+      - id: capsules_are_empty
+        summary: Player has evidence that some heart medicine capsules are empty.
+        aliases:
+          - empty capsules
+          - capsules are empty
+        claim_patterns:
+          - "empty capsules"
+          - "capsules.*empty"
+        allowed_modes:
+          - hint
+          - partial
+        unlock_conditions:
+          player_knowledge_ids:
+            - player_knowledge.heart_medicine_replaced
+
 - id: power_cut_by_shen
   title: 沈照夜切断主电源
   description: 沈照夜在案发前切断主电源，想迫使陆澜生无法按原计划播放公开视频。
@@ -88,6 +173,23 @@
   claim_patterns:
     - "沈照夜.*(拉闸|切断电源)"
     - "停电.*人为"
+
+  claim_graph:
+    safe_fragments:
+      - id: breaker_was_cut
+        summary: Player has evidence that the main breaker was manually cut.
+        aliases:
+          - main breaker was cut
+          - manual power cut
+        claim_patterns:
+          - "main breaker.*cut"
+          - "manual power cut"
+        allowed_modes:
+          - hint
+          - partial
+        unlock_conditions:
+          player_knowledge_ids:
+            - player_knowledge.power_cut_by_shen
 
 - id: death_chain_shared
   title: 四人的小动作共同促成死亡
@@ -129,6 +231,23 @@
     - "备用线路.*(供电|定时器)"
     - "定时器.*(仍在|还在).*走"
 
+  claim_graph:
+    safe_fragments:
+      - id: backup_line_kept_timer_possible
+        summary: Player has evidence that a backup line could keep a small timer running after the outage.
+        aliases:
+          - backup line timer
+          - timer kept running
+        claim_patterns:
+          - "backup line.*timer"
+          - "timer.*running"
+        allowed_modes:
+          - hint
+          - partial
+        unlock_conditions:
+          player_knowledge_ids:
+            - player_knowledge.backup_timer_kept_recorder_power
+
 - id: power_cut_was_prepared
   title: 断电顺序被预先熟悉
   description: 主闸旁的纸牌和工具位置显示，案发前有人熟悉过配电顺序。
@@ -140,6 +259,23 @@
   claim_patterns:
     - "主闸.*(顺序|标记)"
     - "配电.*预先"
+
+  claim_graph:
+    safe_fragments:
+      - id: breaker_sequence_was_marked
+        summary: Player has evidence that the breaker sequence had been marked or rehearsed.
+        aliases:
+          - breaker sequence marked
+          - breaker sequence prepared
+        claim_patterns:
+          - "breaker sequence.*marked"
+          - "breaker sequence.*prepared"
+        allowed_modes:
+          - hint
+          - partial
+        unlock_conditions:
+          player_knowledge_ids:
+            - player_knowledge.power_cut_was_prepared
 
 - id: clock_tower_serviced_before_death
   title: 钟楼齿轮在案发前被维护
@@ -177,6 +313,23 @@
     - "门锁.*(试验|测试)"
     - "卡榫.*(回弹|延迟)"
 
+  claim_graph:
+    safe_fragments:
+      - id: lock_test_times_exist
+        summary: Player has evidence that the lock delay was tested with repeated timing notes.
+        aliases:
+          - lock test times
+          - repeated lock timing notes
+        claim_patterns:
+          - "lock test times"
+          - "lock.*timing notes"
+        allowed_modes:
+          - hint
+          - partial
+        unlock_conditions:
+          player_knowledge_ids:
+            - player_knowledge.lock_delay_tested
+
 - id: trust_terms_pressured_guests
   title: 信托条款压迫在场者表态
   description: 信托条款把继承利益与旧案表态绑定，陆澜生用文件迫使众人接受同一套说法。
@@ -201,6 +354,23 @@
     - "胶囊.*(拆开|处理)"
     - "抽屉.*药粉"
 
+  claim_graph:
+    safe_fragments:
+      - id: liner_has_capsule_powder
+        summary: Player has evidence that powder and pressure marks on the liner are tied to capsule handling.
+        aliases:
+          - capsule powder on liner
+          - liner pressure marks
+        claim_patterns:
+          - "capsule powder"
+          - "liner pressure marks"
+        allowed_modes:
+          - hint
+          - partial
+        unlock_conditions:
+          player_knowledge_ids:
+            - player_knowledge.capsule_powder_removed
+
 - id: sedative_source_matches_wine
   title: 镇静剂来源与红酒苦味吻合
   description: 助眠药瓶标签与红酒残液的苦味相互印证，支持红酒含有镇静剂的判断。
@@ -213,6 +383,23 @@
     - "助眠药.*(苦味|红酒)"
     - "药瓶标签.*红酒"
 
+  claim_graph:
+    safe_fragments:
+      - id: bottle_label_matches_bitter_wine
+        summary: Player has evidence that a sedative bottle label matches the bitter wine trace.
+        aliases:
+          - sedative bottle label
+          - bottle label matches wine
+        claim_patterns:
+          - "sedative bottle label"
+          - "bottle label.*wine"
+        allowed_modes:
+          - hint
+          - partial
+        unlock_conditions:
+          player_knowledge_ids:
+            - player_knowledge.sedative_source_matches_wine
+
 - id: tape_was_edited_twice
   title: 磁带至少经历两次剪接
   description: 磁带接口有新旧两层胶带，说明录音内容并非单次替换完成。
@@ -224,6 +411,23 @@
   claim_patterns:
     - "磁带.*(两次|多次).*剪接"
     - "录音.*多次处理"
+
+  claim_graph:
+    safe_fragments:
+      - id: splice_marks_show_multiple_edits
+        summary: Player has evidence that the tape splice marks indicate more than one edit.
+        aliases:
+          - tape splice marks
+          - multiple tape edits
+        claim_patterns:
+          - "tape splice marks"
+          - "multiple tape edits"
+        allowed_modes:
+          - hint
+          - partial
+        unlock_conditions:
+          player_knowledge_ids:
+            - player_knowledge.tape_was_edited_twice
 
 - id: fake_chime_confused_death_time
   title: 假钟声干扰死亡时间判断
@@ -273,6 +477,23 @@
     - "坠湖.*(报道|剪报).*(不一致|矛盾)"
     - "旧案记录.*裂缝"
 
+  claim_graph:
+    safe_fragments:
+      - id: old_report_has_inconsistencies
+        summary: Player has evidence that old lake-death reports contain inconsistencies.
+        aliases:
+          - old lake report inconsistency
+          - old case report inconsistency
+        claim_patterns:
+          - "old lake report.*inconsisten"
+          - "old case report.*inconsisten"
+        allowed_modes:
+          - hint
+          - partial
+        unlock_conditions:
+          player_knowledge_ids:
+            - player_knowledge.old_lake_report_inconsistent
+
 - id: old_case_file_incomplete
   title: 旧案证物登记不完整
   description: 旧证物盒编号跳页，说明当年的调查材料没有形成完整闭环。
@@ -284,6 +505,23 @@
   claim_patterns:
     - "证物.*(缺页|不完整)"
     - "旧案材料.*不完整"
+
+  claim_graph:
+    safe_fragments:
+      - id: evidence_box_registration_incomplete
+        summary: Player has evidence that the old evidence-box registration is incomplete.
+        aliases:
+          - incomplete evidence box
+          - old evidence registration gap
+        claim_patterns:
+          - "incomplete evidence box"
+          - "evidence registration gap"
+        allowed_modes:
+          - hint
+          - partial
+        unlock_conditions:
+          player_knowledge_ids:
+            - player_knowledge.old_case_file_incomplete
 
 - id: lake_mud_trace_recent
   title: 湖岸方向近期有人经过
@@ -298,6 +536,22 @@
     - "近期.*湖边"
 
 - id: manor_log_page_removed
+  claim_graph:
+    safe_fragments:
+      - id: visitor_log_page_missing
+        summary: Player has evidence that an old visitor-log page is missing from the manor record.
+        aliases:
+          - missing visitor log page
+          - visitor log page missing
+        claim_patterns:
+          - "missing visitor log page"
+          - "visitor log page.*missing"
+        allowed_modes:
+          - hint
+          - partial
+        unlock_conditions:
+          player_knowledge_ids:
+            - player_knowledge.manor_log_page_removed
   title: 山庄访客登记缺页
   description: 访客登记册旧页被整齐撕走，山庄在旧案前后的来访记录不完整。
   category: physical_fact

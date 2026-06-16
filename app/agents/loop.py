@@ -16,8 +16,8 @@ from app.agents.memory import MemoryRetriever
 from app.agents.npc_skills import NpcSkillSelection, NpcSkillSelector
 from app.agents.prompt_builder import PromptBuilder
 from app.agents.retrieval_planner import MemoryRetrievalPlan, RetrievalPlanner
-from app.agents.turn_plan import AgentTurnPlan, build_agent_turn_plan
 from app.agents.tools.runtime import ToolRuntime
+from app.agents.turn_plan import AgentTurnPlan, build_agent_turn_plan
 from app.director.narrative_director import NarrativeDirector
 from app.domain.models import (
     AgentContext,
@@ -26,6 +26,7 @@ from app.domain.models import (
     AgentMemorySnapshot,
     CasePackage,
     DisclosureMode,
+    LLMAgentContractInput,
     LLMErrorSummary,
     LLMErrorType,
     PlayerAction,
@@ -226,10 +227,14 @@ class AgentLoop:
             tool_calls=tool_calls,
             security_flags=security_review.security_flags,
         )
+        contract_input = build_llm_agent_input(context, turn_plan=turn_plan)
         intent = self._validate_agent_intent(
             context,
-            self._agent_gateway.generate(context),
-            turn_plan=turn_plan,
+            self._agent_gateway.generate(
+                context,
+                contract_input=contract_input,
+            ),
+            contract_input=contract_input,
         )
         return AgentTurnResult(
             context=context,
@@ -246,8 +251,13 @@ class AgentLoop:
         intent: AgentIntent,
         *,
         turn_plan: AgentTurnPlan | None = None,
+        contract_input: LLMAgentContractInput | None = None,
     ) -> AgentIntent:
-        contract_input = build_llm_agent_input(context, turn_plan=turn_plan)
+        contract_input = (
+            contract_input
+            if contract_input is not None
+            else build_llm_agent_input(context, turn_plan=turn_plan)
+        )
         payload = intent.model_dump(
             mode="json",
             exclude={"llm_error"},

@@ -73,10 +73,16 @@ class OpenAILLMAgent:
     def model_name(self) -> str:
         return self._model
 
-    def generate(self, context: AgentContext) -> AgentIntent:
+    def generate(
+        self,
+        context: AgentContext,
+        *,
+        contract_input: LLMAgentContractInput | None = None,
+    ) -> AgentIntent:
         if not self._api_key:
             return self._safe_fallback(
                 context,
+                contract_input=contract_input,
                 error_summary=LLMErrorSummary(
                     backend=OPENAI_BACKEND_NAME,
                     error_type=LLMErrorType.CONFIGURATION_ERROR,
@@ -88,17 +94,23 @@ class OpenAILLMAgent:
             )
 
         try:
-            return self.generate_strict(context)
+            return self.generate_strict(context, contract_input=contract_input)
         except Exception as exc:
             return self._safe_fallback(
                 context,
+                contract_input=contract_input,
                 error_summary=_llm_error_summary(exc, backend=OPENAI_BACKEND_NAME),
             )
 
-    def generate_strict(self, context: AgentContext) -> AgentIntent:
+    def generate_strict(
+        self,
+        context: AgentContext,
+        *,
+        contract_input: LLMAgentContractInput | None = None,
+    ) -> AgentIntent:
         if not self._api_key:
             raise RuntimeError("OPENAI_API_KEY is required for strict LLM generation")
-        contract_input = build_llm_agent_input(context)
+        contract_input = contract_input or build_llm_agent_input(context)
         response_payload = self._create_response(contract_input)
         for attempt in range(self._schema_repair_attempts + 1):
             output_payload: dict[str, Any] = {}
@@ -437,11 +449,13 @@ class OpenAILLMAgent:
         self,
         context: AgentContext,
         *,
+        contract_input: LLMAgentContractInput | None = None,
         error_summary: LLMErrorSummary,
     ) -> AgentIntent:
+        context = contract_input.agent_context if contract_input is not None else context
         return AgentIntent(
             speech=f"{context.target_agent_id} cannot answer through the LLM backend.",
-            intent=AgentIntentType.REFUSE,
+            intent=_safe_fallback_intent(contract_input),
             emotional_shift={},
             proposed_actions=[],
             memory_refs=[],
@@ -459,6 +473,14 @@ def _llm_error_summary(exc: Exception, *, backend: str) -> LLMErrorSummary:
         fallback_used=True,
         schema_validation_errors=_schema_validation_error_details(exc),
     )
+
+
+def _safe_fallback_intent(
+    contract_input: LLMAgentContractInput | None,
+) -> AgentIntentType:
+    if contract_input is None:
+        return AgentIntentType.REFUSE
+    return contract_input.output_contract.fallback_intent
 
 
 def _classify_llm_error(exc: Exception) -> LLMErrorType:

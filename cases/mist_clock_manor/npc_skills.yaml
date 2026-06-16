@@ -1,0 +1,517 @@
+- id: jiang_lock_boundary
+  owner_character_ids:
+    - jiang_yanhui
+  type: dialogue
+  level: 2
+  priority: high
+  signature: true
+  triggers:
+    action_types:
+      - ask_about
+      - present_clue
+    subject_types:
+      - clue
+    clue_ids:
+      - delayed_lock_marks
+      - lock_test_scrap
+    topic_tags:
+      - lock
+      - delay
+  unlock_conditions:
+    phases:
+      - opening
+      - investigation
+      - confrontation
+      - reconstruction
+      - resolved
+    required_discovered_clues:
+      - delayed_lock_marks
+    required_player_knowledge:
+      - player_knowledge.timed_lock_modified
+    required_world_info_ids:
+      - timed_lock_modified
+    required_pressure_min: 0.4
+  disclosure:
+    world_info_ids:
+      - timed_lock_modified
+      - lock_delay_tested
+    max_mode: hint
+    allowed_tactics:
+      - answer_adjacent_truth
+      - shift_focus
+      - qualify_certainty
+    safe_fragment_refs:
+      - timed_lock_modified.safe_fragment:lock_has_delay_marks
+      - lock_delay_tested.safe_fragment:lock_test_times_exist
+  memory:
+    include_types:
+      - episodic
+      - belief
+      - relationship
+      - strategy
+    include_scopes:
+      - npc_private
+      - scene_shared
+    include_layers:
+      - working
+    topic_tags:
+      - jiang_yanhui
+      - delayed_lock_marks
+      - lock_test_scrap
+      - lock_modified
+    max_items: 4
+  proposed_action_policy:
+    allowed:
+      - relationship.change
+    max_relationship_delta:
+      suspicion: 0.2
+      trust: 0.08
+      fear: 0.08
+  cooldown:
+    turns: 0
+
+- id: jiang_capsule_boundary
+  owner_character_ids:
+    - jiang_yanhui
+  type: dialogue
+  level: 2
+  priority: high
+  signature: true
+  triggers:
+    action_types:
+      - ask_about
+      - present_clue
+    subject_types:
+      - clue
+    clue_ids:
+      - empty_capsules
+      - capsule_powder_on_liner
+    topic_tags:
+      - capsule
+      - medicine
+  unlock_conditions:
+    phases:
+      - opening
+      - investigation
+      - confrontation
+      - reconstruction
+      - resolved
+    required_discovered_clues:
+      - empty_capsules
+    required_player_knowledge:
+      - player_knowledge.heart_medicine_replaced
+    required_world_info_ids:
+      - heart_medicine_replaced
+    required_pressure_min: 0.4
+  disclosure:
+    world_info_ids:
+      - heart_medicine_replaced
+      - capsule_powder_removed
+    max_mode: hint
+    allowed_tactics:
+      - answer_adjacent_truth
+      - shift_focus
+      - qualify_certainty
+    safe_fragment_refs:
+      - heart_medicine_replaced.safe_fragment:capsules_are_empty
+      - capsule_powder_removed.safe_fragment:liner_has_capsule_powder
+  memory:
+    include_types:
+      - episodic
+      - belief
+      - relationship
+      - strategy
+    include_scopes:
+      - npc_private
+      - scene_shared
+    include_layers:
+      - working
+    topic_tags:
+      - jiang_yanhui
+      - empty_capsules
+      - capsule_powder_on_liner
+      - medicine_replaced
+    max_items: 4
+  proposed_action_policy:
+    allowed:
+      - relationship.change
+    max_relationship_delta:
+      suspicion: 0.2
+      trust: 0.08
+      fear: 0.08
+  cooldown:
+    turns: 0
+
+- id: qi_tape_boundary
+  owner_character_ids:
+    - qi_yan
+  type: dialogue
+  level: 2
+  priority: high
+  signature: true
+  triggers:
+    action_types:
+      - ask_about
+      - present_clue
+    subject_types:
+      - clue
+    clue_ids:
+      - echo_tape
+      - ruolan_voice_tape
+      - tape_splice_mark
+    topic_tags:
+      - tape
+      - audio
+      - splice
+  unlock_conditions:
+    phases:
+      - opening
+      - investigation
+      - confrontation
+      - reconstruction
+      - resolved
+    required_discovered_clues:
+      - echo_tape
+    required_player_knowledge:
+      - player_knowledge.recording_tape_swapped
+    required_world_info_ids:
+      - recording_tape_swapped
+    required_pressure_min: 0.4
+  disclosure:
+    world_info_ids:
+      - recording_tape_swapped
+      - jiang_ruolan_recording_exists
+      - tape_was_edited_twice
+    max_mode: hint
+    allowed_tactics:
+      - counter_question
+      - qualify_certainty
+      - shift_focus
+    safe_fragment_refs:
+      - recording_tape_swapped.safe_fragment:tape_label_and_chime_are_evidence
+      - jiang_ruolan_recording_exists.safe_fragment:old_voice_fragment_exists
+      - tape_was_edited_twice.safe_fragment:splice_marks_show_multiple_edits
+  memory:
+    include_types:
+      - episodic
+      - belief
+      - relationship
+      - strategy
+    include_scopes:
+      - npc_private
+      - scene_shared
+    include_layers:
+      - working
+    topic_tags:
+      - qi_yan
+      - echo_tape
+      - ruolan_voice_tape
+      - tape_splice_mark
+      - tape_swapped
+      - old_case_echo
+    max_items: 4
+  proposed_action_policy:
+    allowed:
+      - relationship.change
+    max_relationship_delta:
+      suspicion: 0.18
+      trust: 0.06
+      hostility: 0.12
+  cooldown:
+    turns: 0
+
+- id: lin_wine_boundary
+  owner_character_ids:
+    - lin_qichi
+  type: dialogue
+  level: 2
+  priority: high
+  signature: true
+  triggers:
+    action_types:
+      - ask_about
+      - present_clue
+    subject_types:
+      - clue
+    clue_ids:
+      - bitter_wine
+      - sedative_bottle_label
+    topic_tags:
+      - wine
+      - sedative
+  unlock_conditions:
+    phases:
+      - opening
+      - investigation
+      - confrontation
+      - reconstruction
+      - resolved
+    required_discovered_clues:
+      - bitter_wine
+    required_player_knowledge:
+      - player_knowledge.sedative_wine
+    required_world_info_ids:
+      - sedative_wine
+    required_pressure_min: 0.4
+  disclosure:
+    world_info_ids:
+      - sedative_wine
+      - sedative_source_matches_wine
+    max_mode: hint
+    allowed_tactics:
+      - answer_adjacent_truth
+      - shift_focus
+      - qualify_certainty
+    safe_fragment_refs:
+      - sedative_wine.safe_fragment:wine_residue_indicates_sedative
+      - sedative_source_matches_wine.safe_fragment:bottle_label_matches_bitter_wine
+  memory:
+    include_types:
+      - episodic
+      - belief
+      - relationship
+      - strategy
+    include_scopes:
+      - npc_private
+      - scene_shared
+    include_layers:
+      - working
+    topic_tags:
+      - lin_qichi
+      - bitter_wine
+      - sedative_bottle_label
+      - lin_delivered_wine
+    max_items: 4
+  proposed_action_policy:
+    allowed:
+      - relationship.change
+    max_relationship_delta:
+      suspicion: 0.16
+      trust: 0.1
+      fear: 0.1
+  cooldown:
+    turns: 0
+
+- id: shen_power_boundary
+  owner_character_ids:
+    - shen_zhaoye
+  type: dialogue
+  level: 2
+  priority: high
+  signature: true
+  triggers:
+    action_types:
+      - ask_about
+      - present_clue
+    subject_types:
+      - clue
+    clue_ids:
+      - cut_power_trace
+      - backup_timer
+      - breaker_sequence_tag
+    topic_tags:
+      - power
+      - outage
+  unlock_conditions:
+    phases:
+      - opening
+      - investigation
+      - confrontation
+      - reconstruction
+      - resolved
+    required_discovered_clues:
+      - cut_power_trace
+    required_player_knowledge:
+      - player_knowledge.power_cut_by_shen
+    required_world_info_ids:
+      - power_cut_by_shen
+    required_pressure_min: 0.4
+  disclosure:
+    world_info_ids:
+      - power_cut_by_shen
+      - backup_timer_kept_recorder_power
+      - power_cut_was_prepared
+    max_mode: hint
+    allowed_tactics:
+      - answer_adjacent_truth
+      - qualify_certainty
+      - counter_question
+    safe_fragment_refs:
+      - power_cut_by_shen.safe_fragment:breaker_was_cut
+      - backup_timer_kept_recorder_power.safe_fragment:backup_line_kept_timer_possible
+      - power_cut_was_prepared.safe_fragment:breaker_sequence_was_marked
+  memory:
+    include_types:
+      - episodic
+      - belief
+      - relationship
+      - strategy
+    include_scopes:
+      - npc_private
+      - scene_shared
+    include_layers:
+      - working
+    topic_tags:
+      - shen_zhaoye
+      - cut_power_trace
+      - backup_timer
+      - breaker_sequence_tag
+      - power_cut
+    max_items: 5
+  proposed_action_policy:
+    allowed:
+      - relationship.change
+    max_relationship_delta:
+      suspicion: 0.12
+      trust: 0.12
+      fear: 0.08
+  cooldown:
+    turns: 0
+
+- id: shen_study_lock_boundary
+  owner_character_ids:
+    - shen_zhaoye
+  type: dialogue
+  level: 1
+  priority: high
+  signature: false
+  triggers:
+    action_types:
+      - ask_about
+      - present_clue
+    subject_types:
+      - clue
+    clue_ids:
+      - delayed_lock_marks
+      - lock_test_scrap
+    topic_tags:
+      - study_lock
+      - lock
+  unlock_conditions:
+    phases:
+      - opening
+      - investigation
+      - confrontation
+      - reconstruction
+      - resolved
+    required_discovered_clues:
+      - delayed_lock_marks
+    required_player_knowledge:
+      - player_knowledge.timed_lock_modified
+    required_world_info_ids:
+      - timed_lock_modified
+    required_pressure_min: 0.4
+  disclosure:
+    world_info_ids:
+      - timed_lock_modified
+      - lock_delay_tested
+    max_mode: hint
+    allowed_tactics:
+      - answer_adjacent_truth
+      - qualify_certainty
+      - counter_question
+    safe_fragment_refs:
+      - timed_lock_modified.safe_fragment:lock_has_delay_marks
+      - lock_delay_tested.safe_fragment:lock_test_times_exist
+  memory:
+    include_types:
+      - episodic
+      - belief
+      - relationship
+      - strategy
+    include_scopes:
+      - npc_private
+      - scene_shared
+    include_layers:
+      - working
+    topic_tags:
+      - shen_zhaoye
+      - delayed_lock_marks
+      - lock_test_scrap
+      - lock_modified
+    max_items: 4
+  proposed_action_policy:
+    allowed:
+      - relationship.change
+    max_relationship_delta:
+      suspicion: 0.12
+      trust: 0.1
+      fear: 0.06
+  cooldown:
+    turns: 0
+
+- id: shen_old_case_boundary
+  owner_character_ids:
+    - shen_zhaoye
+  type: dialogue
+  level: 1
+  priority: high
+  signature: false
+  triggers:
+    action_types:
+      - ask_about
+      - present_clue
+    subject_types:
+      - clue
+    clue_ids:
+      - lake_death_clipping
+      - incomplete_evidence_box
+      - missing_visitor_log_page
+    topic_tags:
+      - old_case
+      - archive
+  unlock_conditions:
+    phases:
+      - opening
+      - investigation
+      - confrontation
+      - reconstruction
+      - resolved
+    required_discovered_clues:
+      - lake_death_clipping
+    required_player_knowledge:
+      - player_knowledge.old_lake_report_inconsistent
+    required_world_info_ids:
+      - old_lake_report_inconsistent
+    required_pressure_min: 0.4
+  disclosure:
+    world_info_ids:
+      - old_lake_report_inconsistent
+      - old_case_file_incomplete
+      - manor_log_page_removed
+    max_mode: hint
+    allowed_tactics:
+      - answer_adjacent_truth
+      - qualify_certainty
+      - counter_question
+    safe_fragment_refs:
+      - old_lake_report_inconsistent.safe_fragment:old_report_has_inconsistencies
+      - old_case_file_incomplete.safe_fragment:evidence_box_registration_incomplete
+      - manor_log_page_removed.safe_fragment:visitor_log_page_missing
+  memory:
+    include_types:
+      - episodic
+      - belief
+      - relationship
+      - strategy
+    include_scopes:
+      - npc_private
+      - scene_shared
+    include_layers:
+      - working
+    topic_tags:
+      - shen_zhaoye
+      - lake_death_clipping
+      - incomplete_evidence_box
+      - missing_visitor_log_page
+      - old_case_echo
+    max_items: 5
+  proposed_action_policy:
+    allowed:
+      - relationship.change
+    max_relationship_delta:
+      suspicion: 0.1
+      trust: 0.12
+      fear: 0.06
+  cooldown:
+    turns: 0

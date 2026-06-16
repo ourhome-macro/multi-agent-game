@@ -34,6 +34,7 @@ steps:
     text: What about these capsules?
   expected_events:
   - player.asked_about
+  - npc_skill.selected
   - npc.replied
   - character_impression.updated
   - character_fact_awareness.updated

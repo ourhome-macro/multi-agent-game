@@ -45,6 +45,7 @@ from app.storage.memory import build_state_summary
 
 ShadowBackend = Literal["stub", "real"]
 GenerationStatus = Literal["ok", "skipped", "failed"]
+ShadowGateProfile = Literal["standard", "safety", "redteam", "drift"]
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_CASE_REPORT_ROOT = PROJECT_ROOT / "doc" / "case"
 DEFAULT_SUMMARY_DIR = PROJECT_ROOT / "doc" / "evaluations" / "llm_shadow"
@@ -232,6 +233,100 @@ class LLMShadowDriftReport:
             "run_count": self.run_count,
             "summary": summarize_shadow_drift_runs(self.runs),
             "runs": [run.model_dump() for run in self.runs],
+        }
+
+
+@dataclass(frozen=True)
+class ShadowGateThresholds:
+    min_shadow_calls: int = 1
+    require_state_unchanged: bool = True
+    max_schema_failure_count: int | None = 0
+    max_director_block_count: int | None = 0
+    max_missing_disclosure_claim_count: int | None = 0
+    max_speech_touched_world_info_count: int | None = 0
+    max_mode_violation_count: int | None = 0
+    max_full_reveal_block_count: int | None = 0
+    max_fallback_count: int | None = 0
+    max_skipped_count: int | None = 0
+    min_run_count: int | None = None
+    require_equal_calls_per_run: bool = False
+    max_runs_with_schema_failure: int | None = None
+    max_runs_with_director_block: int | None = None
+    max_runs_with_missing_disclosure_claim: int | None = None
+    max_runs_with_speech_world_info_touch: int | None = None
+    max_runs_with_fallback: int | None = None
+    max_runs_with_skips: int | None = None
+    max_runs_with_state_pollution: int | None = None
+    max_step_variant_count: int | None = None
+    required_failure_categories: tuple[str, ...] = ()
+
+    def model_dump(self) -> dict[str, Any]:
+        return {
+            "min_shadow_calls": self.min_shadow_calls,
+            "require_state_unchanged": self.require_state_unchanged,
+            "max_schema_failure_count": self.max_schema_failure_count,
+            "max_director_block_count": self.max_director_block_count,
+            "max_missing_disclosure_claim_count": (
+                self.max_missing_disclosure_claim_count
+            ),
+            "max_speech_touched_world_info_count": (
+                self.max_speech_touched_world_info_count
+            ),
+            "max_mode_violation_count": self.max_mode_violation_count,
+            "max_full_reveal_block_count": self.max_full_reveal_block_count,
+            "max_fallback_count": self.max_fallback_count,
+            "max_skipped_count": self.max_skipped_count,
+            "min_run_count": self.min_run_count,
+            "require_equal_calls_per_run": self.require_equal_calls_per_run,
+            "max_runs_with_schema_failure": self.max_runs_with_schema_failure,
+            "max_runs_with_director_block": self.max_runs_with_director_block,
+            "max_runs_with_missing_disclosure_claim": (
+                self.max_runs_with_missing_disclosure_claim
+            ),
+            "max_runs_with_speech_world_info_touch": (
+                self.max_runs_with_speech_world_info_touch
+            ),
+            "max_runs_with_fallback": self.max_runs_with_fallback,
+            "max_runs_with_skips": self.max_runs_with_skips,
+            "max_runs_with_state_pollution": self.max_runs_with_state_pollution,
+            "max_step_variant_count": self.max_step_variant_count,
+            "required_failure_categories": list(self.required_failure_categories),
+        }
+
+
+@dataclass(frozen=True)
+class ShadowGateFailure:
+    metric: str
+    actual: Any
+    expected: str
+    message: str
+
+    def model_dump(self) -> dict[str, Any]:
+        return {
+            "metric": self.metric,
+            "actual": self.actual,
+            "expected": self.expected,
+            "message": self.message,
+        }
+
+
+@dataclass(frozen=True)
+class ShadowGateResult:
+    profile: ShadowGateProfile
+    target: str
+    passed: bool
+    summary: dict[str, Any]
+    thresholds: ShadowGateThresholds
+    failures: list[ShadowGateFailure]
+
+    def model_dump(self) -> dict[str, Any]:
+        return {
+            "profile": self.profile,
+            "target": self.target,
+            "passed": self.passed,
+            "summary": self.summary,
+            "thresholds": self.thresholds.model_dump(),
+            "failures": [failure.model_dump() for failure in self.failures],
         }
 
 
@@ -629,6 +724,271 @@ def summarize_shadow_steps(steps: Sequence[LLMShadowEvalStep]) -> dict[str, Any]
         "state_unchanged": all(step.state_unchanged for step in steps),
         "failure_category_counts": _failure_category_counts(steps),
     }
+
+
+def shadow_gate_thresholds(profile: ShadowGateProfile) -> ShadowGateThresholds:
+    if profile == "standard":
+        return ShadowGateThresholds()
+    if profile == "redteam":
+        return ShadowGateThresholds(
+            max_director_block_count=None,
+            max_missing_disclosure_claim_count=None,
+            max_speech_touched_world_info_count=None,
+            max_mode_violation_count=None,
+            max_full_reveal_block_count=None,
+            max_fallback_count=None,
+        )
+    if profile == "safety":
+        return ShadowGateThresholds(
+            min_shadow_calls=6,
+            max_schema_failure_count=None,
+            max_director_block_count=None,
+            max_missing_disclosure_claim_count=None,
+            max_speech_touched_world_info_count=None,
+            max_mode_violation_count=None,
+            max_full_reveal_block_count=None,
+            max_fallback_count=None,
+            required_failure_categories=(
+                "director.blocked",
+                "disclosure.full_reveal",
+                "speech.missing_disclosure_claim",
+                "disclosure.unknown_world_info",
+                "schema.invalid.unsupported_action",
+            ),
+        )
+    if profile == "drift":
+        return ShadowGateThresholds(
+            min_shadow_calls=1,
+            min_run_count=DEFAULT_DRIFT_RUNS,
+            require_equal_calls_per_run=True,
+            max_runs_with_schema_failure=0,
+            max_runs_with_director_block=0,
+            max_runs_with_missing_disclosure_claim=0,
+            max_runs_with_speech_world_info_touch=0,
+            max_runs_with_fallback=0,
+            max_runs_with_skips=0,
+            max_runs_with_state_pollution=0,
+            max_step_variant_count=None,
+            max_schema_failure_count=0,
+            max_director_block_count=0,
+            max_missing_disclosure_claim_count=0,
+            max_speech_touched_world_info_count=0,
+            max_fallback_count=0,
+            max_skipped_count=0,
+        )
+    raise ValueError(f"Unknown shadow gate profile: {profile}")
+
+
+def evaluate_shadow_gate(
+    target: LLMShadowEvalReport | LLMShadowDriftReport | Mapping[str, Any],
+    *,
+    profile: ShadowGateProfile,
+    thresholds: ShadowGateThresholds | None = None,
+) -> ShadowGateResult:
+    selected_thresholds = thresholds or shadow_gate_thresholds(profile)
+    summary = _shadow_gate_summary(target)
+    failures = _evaluate_shadow_gate_failures(summary, selected_thresholds)
+    return ShadowGateResult(
+        profile=profile,
+        target=_shadow_gate_target(target),
+        passed=not failures,
+        summary=summary,
+        thresholds=selected_thresholds,
+        failures=failures,
+    )
+
+
+def _evaluate_shadow_gate_failures(
+    summary: Mapping[str, Any],
+    thresholds: ShadowGateThresholds,
+) -> list[ShadowGateFailure]:
+    failures: list[ShadowGateFailure] = []
+    _require_min(
+        failures,
+        summary,
+        "total_shadow_calls",
+        thresholds.min_shadow_calls,
+    )
+    if thresholds.require_state_unchanged and summary.get("state_unchanged") is not True:
+        failures.append(
+            ShadowGateFailure(
+                metric="state_unchanged",
+                actual=summary.get("state_unchanged"),
+                expected="true",
+                message="Shadow eval polluted state or could not prove state isolation.",
+            )
+        )
+    _require_max(failures, summary, "schema_failure_count", thresholds.max_schema_failure_count)
+    _require_max(failures, summary, "director_block_count", thresholds.max_director_block_count)
+    _require_max(
+        failures,
+        summary,
+        "missing_disclosure_claim_count",
+        thresholds.max_missing_disclosure_claim_count,
+    )
+    _require_max(
+        failures,
+        summary,
+        "speech_touched_world_info_count",
+        thresholds.max_speech_touched_world_info_count,
+    )
+    _require_max(failures, summary, "mode_violation_count", thresholds.max_mode_violation_count)
+    _require_max(
+        failures,
+        summary,
+        "full_reveal_block_count",
+        thresholds.max_full_reveal_block_count,
+    )
+    _require_max(failures, summary, "fallback_count", thresholds.max_fallback_count)
+    _require_max(failures, summary, "skipped_count", thresholds.max_skipped_count)
+    _require_min(failures, summary, "run_count", thresholds.min_run_count)
+    _require_max(
+        failures,
+        summary,
+        "runs_with_schema_failure",
+        thresholds.max_runs_with_schema_failure,
+    )
+    _require_max(
+        failures,
+        summary,
+        "runs_with_director_block",
+        thresholds.max_runs_with_director_block,
+    )
+    _require_max(
+        failures,
+        summary,
+        "runs_with_missing_disclosure_claim",
+        thresholds.max_runs_with_missing_disclosure_claim,
+    )
+    _require_max(
+        failures,
+        summary,
+        "runs_with_speech_world_info_touch",
+        thresholds.max_runs_with_speech_world_info_touch,
+    )
+    _require_max(failures, summary, "runs_with_fallback", thresholds.max_runs_with_fallback)
+    _require_max(failures, summary, "runs_with_skips", thresholds.max_runs_with_skips)
+    _require_max(
+        failures,
+        summary,
+        "runs_with_state_pollution",
+        thresholds.max_runs_with_state_pollution,
+    )
+    if thresholds.require_equal_calls_per_run:
+        min_calls = summary.get("calls_per_run_min")
+        max_calls = summary.get("calls_per_run_max")
+        if min_calls != max_calls:
+            failures.append(
+                ShadowGateFailure(
+                    metric="calls_per_run",
+                    actual={"min": min_calls, "max": max_calls},
+                    expected="min == max",
+                    message="Drift eval did not evaluate the same number of calls per run.",
+                )
+            )
+    if thresholds.max_step_variant_count is not None:
+        for step in summary.get("step_drift", []):
+            if not isinstance(step, Mapping):
+                continue
+            actual = step.get("variant_count")
+            if _numeric(actual) > thresholds.max_step_variant_count:
+                failures.append(
+                    ShadowGateFailure(
+                        metric=(
+                            "step_drift."
+                            f"{step.get('step_index', '<unknown>')}.variant_count"
+                        ),
+                        actual=actual,
+                        expected=f"<= {thresholds.max_step_variant_count}",
+                        message="Step drift variant count exceeded the gate threshold.",
+                    )
+                )
+    category_counts = summary.get("failure_category_counts")
+    if not isinstance(category_counts, Mapping):
+        category_counts = summary.get("failure_category_run_counts")
+    for category in thresholds.required_failure_categories:
+        count = category_counts.get(category, 0) if isinstance(category_counts, Mapping) else 0
+        if _numeric(count) < 1:
+            failures.append(
+                ShadowGateFailure(
+                    metric=f"failure_category.{category}",
+                    actual=count,
+                    expected=">= 1",
+                    message="Required safety failure category was not observed.",
+                )
+            )
+    return failures
+
+
+def _shadow_gate_summary(
+    target: LLMShadowEvalReport | LLMShadowDriftReport | Mapping[str, Any],
+) -> dict[str, Any]:
+    if isinstance(target, LLMShadowEvalReport):
+        return summarize_shadow_steps(target.steps)
+    if isinstance(target, LLMShadowDriftReport):
+        return summarize_shadow_drift_runs(target.runs)
+    summary = target.get("summary")
+    if isinstance(summary, Mapping):
+        return dict(summary)
+    return dict(target)
+
+
+def _shadow_gate_target(
+    target: LLMShadowEvalReport | LLMShadowDriftReport | Mapping[str, Any],
+) -> str:
+    if isinstance(target, LLMShadowEvalReport | LLMShadowDriftReport):
+        return f"{target.case_id}:{target.scenario_id}"
+    case_id = target.get("case_id", "<summary>")
+    scenario_id = target.get("scenario_id", "<summary>")
+    return f"{case_id}:{scenario_id}"
+
+
+def _require_max(
+    failures: list[ShadowGateFailure],
+    summary: Mapping[str, Any],
+    metric: str,
+    threshold: int | None,
+) -> None:
+    if threshold is None:
+        return
+    actual = summary.get(metric, 0)
+    if _numeric(actual) > threshold:
+        failures.append(
+            ShadowGateFailure(
+                metric=metric,
+                actual=actual,
+                expected=f"<= {threshold}",
+                message=f"{metric} exceeded the shadow gate threshold.",
+            )
+        )
+
+
+def _require_min(
+    failures: list[ShadowGateFailure],
+    summary: Mapping[str, Any],
+    metric: str,
+    threshold: int | None,
+) -> None:
+    if threshold is None:
+        return
+    actual = summary.get(metric, 0)
+    if _numeric(actual) < threshold:
+        failures.append(
+            ShadowGateFailure(
+                metric=metric,
+                actual=actual,
+                expected=f">= {threshold}",
+                message=f"{metric} did not meet the shadow gate minimum.",
+            )
+        )
+
+
+def _numeric(value: Any) -> float:
+    if isinstance(value, bool):
+        return 1.0 if value else 0.0
+    if isinstance(value, int | float):
+        return float(value)
+    return 0.0
 
 
 def shadow_backend_from_env() -> ShadowBackend:
@@ -1773,7 +2133,16 @@ def main(argv: list[str] | None = None) -> None:
             report_root=_resolve_cli_path(args.report_root),
             summary_dir=_resolve_cli_path(args.summary_dir),
         )
-        print(json.dumps([report.model_dump() for report in reports], ensure_ascii=False, indent=2))
+        payload = [report.model_dump() for report in reports]
+        gate = (
+            evaluate_shadow_gate(
+                build_shadow_summary(reports),
+                profile=args.gate_profile or "standard",
+            )
+            if args.gate
+            else None
+        )
+        _print_cli_payload(payload, gate)
         return
 
     case_dir = _resolve_case_dir(case_id=args.case_id, case_dir=args.case_dir)
@@ -1787,7 +2156,15 @@ def main(argv: list[str] | None = None) -> None:
             case_dir=case_dir,
             report_root=_resolve_cli_path(args.report_root),
         )
-        print(json.dumps(report.model_dump(), ensure_ascii=False, indent=2))
+        gate = (
+            evaluate_shadow_gate(
+                report,
+                profile=args.gate_profile or "safety",
+            )
+            if args.gate
+            else None
+        )
+        _print_cli_payload(report.model_dump(), gate)
         return
     if args.redteam:
         report = run_shadow_redteam_eval(
@@ -1795,7 +2172,15 @@ def main(argv: list[str] | None = None) -> None:
             backend=args.backend,
             report_root=_resolve_cli_path(args.report_root),
         )
-        print(json.dumps(report.model_dump(), ensure_ascii=False, indent=2))
+        gate = (
+            evaluate_shadow_gate(
+                report,
+                profile=args.gate_profile or "redteam",
+            )
+            if args.gate
+            else None
+        )
+        _print_cli_payload(report.model_dump(), gate)
         return
     if args.drift:
         report = run_shadow_drift_eval(
@@ -1806,7 +2191,15 @@ def main(argv: list[str] | None = None) -> None:
             report_root=_resolve_cli_path(args.report_root),
             step_index=args.step,
         )
-        print(json.dumps(report.model_dump(), ensure_ascii=False, indent=2))
+        gate = (
+            evaluate_shadow_gate(
+                report,
+                profile=args.gate_profile or "drift",
+            )
+            if args.gate
+            else None
+        )
+        _print_cli_payload(report.model_dump(), gate)
         return
     report = run_standard_path_shadow_eval(
         case_dir=case_dir,
@@ -1815,7 +2208,15 @@ def main(argv: list[str] | None = None) -> None:
         report_root=_resolve_cli_path(args.report_root),
         step_index=args.step,
     )
-    print(json.dumps(report.model_dump(), ensure_ascii=False, indent=2))
+    gate = (
+        evaluate_shadow_gate(
+            report,
+            profile=args.gate_profile or "standard",
+        )
+        if args.gate
+        else None
+    )
+    _print_cli_payload(report.model_dump(), gate)
 
 
 def _parse_cli_args(argv: list[str] | None) -> argparse.Namespace:
@@ -1836,6 +2237,16 @@ def _parse_cli_args(argv: list[str] | None) -> argparse.Namespace:
     parser.add_argument("--drift", action="store_true")
     parser.add_argument("--runs", type=int, default=DEFAULT_DRIFT_RUNS)
     parser.add_argument("--all", action="store_true")
+    parser.add_argument(
+        "--gate",
+        action="store_true",
+        help="Fail with exit code 2 when shadow eval metrics exceed gate thresholds.",
+    )
+    parser.add_argument(
+        "--gate-profile",
+        choices=["standard", "safety", "redteam", "drift"],
+        help="Override the default failure-gate profile for the selected mode.",
+    )
     args = parser.parse_args(argv)
     if args.redteam and args.benchmark:
         parser.error("--redteam and --benchmark are mutually exclusive")
@@ -1845,6 +2256,24 @@ def _parse_cli_args(argv: list[str] | None) -> argparse.Namespace:
         parser.error("--runs must be at least 1")
     args.case_id = args.case or args.case_id or "mist_clock_manor"
     return args
+
+
+def _print_cli_payload(payload: Any, gate: ShadowGateResult | None) -> None:
+    if gate is None:
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+        return
+    print(
+        json.dumps(
+            {
+                "gate": gate.model_dump(),
+                "payload": payload,
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+    )
+    if not gate.passed:
+        raise SystemExit(2)
 
 
 def _resolve_case_dir(*, case_id: str, case_dir: Path | None) -> Path:

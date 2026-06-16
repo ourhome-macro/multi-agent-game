@@ -37,6 +37,7 @@ steps:
     text: What do you know about the bitter wine?
   expected_events:
   - player.asked_about
+  - npc_skill.rejected
   - npc.replied
   - character_impression.updated
   - character_fact_awareness.updated

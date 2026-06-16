@@ -3,7 +3,8 @@ from __future__ import annotations
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from enum import StrEnum
-from uuid import uuid5, NAMESPACE_URL
+from typing import TypeVar
+from uuid import NAMESPACE_URL, uuid5
 
 from app.agents.npc_skills import NpcSkillSelector
 from app.agents.retrieval_planner import MemoryRetrievalPlan, RetrievalPlanner
@@ -20,6 +21,8 @@ from app.domain.models import (
     SessionState,
 )
 from app.runtime.security import PromptInjectionReview
+
+TStrEnum = TypeVar("TStrEnum", bound=StrEnum)
 
 
 @dataclass(frozen=True)
@@ -183,10 +186,10 @@ def build_skill_aware_output_contract(
     return contract
 
 
-def _ordered_enum_values[T: StrEnum](
-    enum_type: type[T],
-    values: set[T],
-) -> list[T]:
+def _ordered_enum_values(
+    enum_type: type[TStrEnum],
+    values: set[TStrEnum],
+) -> list[TStrEnum]:
     return [item for item in enum_type if item in values]
 
 

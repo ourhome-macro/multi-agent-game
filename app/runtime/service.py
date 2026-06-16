@@ -568,11 +568,14 @@ class ActionService:
                     caused_by_event_id=caused_by_event_id,
                 )
             )
+        if selected:
+            return events
         rejected = [
             {"skill_id": skill_id, "reason": reason}
             for skill_id, reason in sorted(
                 turn.npc_skill_selection.rejected_reasons.items()
             )
+            if reason != "owner_mismatch"
         ]
         if rejected:
             events.append(

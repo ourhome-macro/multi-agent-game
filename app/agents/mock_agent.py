@@ -11,6 +11,7 @@ from app.domain.models import (
     DisclosureClaim,
     DisclosureMode,
     FactDisclosureStrategy,
+    LLMAgentContractInput,
     MockReplyConfig,
     PrivatePriority,
     ProposedAction,
@@ -22,7 +23,13 @@ from app.domain.models import (
 
 
 class MockAgent:
-    def generate(self, context: AgentContext) -> AgentIntent:
+    def generate(
+        self,
+        context: AgentContext,
+        *,
+        contract_input: LLMAgentContractInput | None = None,
+    ) -> AgentIntent:
+        _ = contract_input
         if context.default_speech is None:
             if context.target_profile is not None:
                 return self._profile_fallback_intent(

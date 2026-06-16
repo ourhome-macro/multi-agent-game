@@ -107,7 +107,9 @@ steps:
     text: What do these lock test times mean?
   expected_events:
   - player.asked_about
+  - npc_skill.selected
   - npc.replied
+  - relationship.changed
   - character_impression.updated
   - character_fact_awareness.updated
   - memory_candidate.created

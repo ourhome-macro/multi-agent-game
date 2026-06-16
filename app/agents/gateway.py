@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import os
+from inspect import Parameter, signature
 from typing import Literal
 
 from app.agents.llm_stub import LLMAgentStub
 from app.agents.mock_agent import MockAgent
 from app.agents.protocol import AgentProtocol
 from app.agents.real_llm_agent import OpenAILLMAgent
-from app.domain.models import AgentContext, AgentIntent
+from app.domain.models import AgentContext, AgentIntent, LLMAgentContractInput
 
 AgentBackend = Literal["mock", "llm_stub", "real"]
 
@@ -51,8 +52,16 @@ class AgentGateway:
             return None
         return str(model_name)
 
-    def generate(self, context: AgentContext) -> AgentIntent:
-        return self._agents[self._backend].generate(context)
+    def generate(
+        self,
+        context: AgentContext,
+        *,
+        contract_input: LLMAgentContractInput | None = None,
+    ) -> AgentIntent:
+        agent = self._agents[self._backend]
+        if contract_input is not None and _accepts_contract_input(agent.generate):
+            return agent.generate(context, contract_input=contract_input)
+        return agent.generate(context)
 
 
 def load_dotenv(path: str = ".env") -> None:
@@ -76,3 +85,15 @@ def _clean_env_value(value: str) -> str:
     if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
         return value[1:-1]
     return value
+
+
+def _accepts_contract_input(generate: object) -> bool:
+    try:
+        parameters = signature(generate).parameters.values()
+    except (TypeError, ValueError):
+        return False
+    return any(
+        parameter.kind == Parameter.VAR_KEYWORD
+        or parameter.name == "contract_input"
+        for parameter in parameters
+    )
