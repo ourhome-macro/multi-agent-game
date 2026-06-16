@@ -19,6 +19,7 @@ from app.domain.models import (
     RelationshipChangeAction,
     SubjectType,
     WorldInfoConfig,
+    WorldInfoSensitivity,
 )
 
 RELATIONSHIP_METRICS = {"trust", "suspicion", "fear", "intimacy", "hostility"}
@@ -102,6 +103,7 @@ class CaseLoader:
         dialogue_character_ids = {dialogue.character_id for dialogue in package.mock_dialogues}
         phase_ids = {phase.id for phase in package.narrative_rules.phases}
         beat_ids = {beat.id for beat in package.narrative_rules.beats}
+        valid_player_knowledge_ids = self._player_knowledge_ids_produced_by_clues(package)
 
         self._ensure_unique(
             "character",
@@ -122,6 +124,7 @@ class CaseLoader:
                 clue_ids=clue_ids,
                 phase_ids=phase_ids,
                 beat_ids=beat_ids,
+                valid_player_knowledge_ids=valid_player_knowledge_ids,
             )
         self._ensure_unique("clue", [clue.id for clue in package.clues], case_dir)
         self._ensure_unique("scene", [scene.id for scene in package.scenes], case_dir)
@@ -331,6 +334,34 @@ class CaseLoader:
                 claim.required_world_info,
                 f"Solution claim '{claim.id}' required_world_info",
             )
+            if not claim.required_evidence:
+                raise CaseLoadError(
+                    f"Solution claim '{claim.id}' required_evidence must not be empty"
+                )
+            if not claim.required_world_info:
+                raise CaseLoadError(
+                    f"Solution claim '{claim.id}' required_world_info must not be empty"
+                )
+            unreachable_required_evidence = sorted(
+                set(claim.required_evidence) - reachable_clue_ids
+            )
+            if unreachable_required_evidence:
+                raise CaseLoadError(
+                    f"Solution claim '{claim.id}' required_evidence contains unreachable "
+                    f"clues: {unreachable_required_evidence}"
+                )
+            claim_evidence_world_info_ids = self._player_world_info_ids_for_clues(
+                package,
+                set(claim.required_evidence),
+            )
+            uncovered_required_world_info = sorted(
+                set(claim.required_world_info) - claim_evidence_world_info_ids
+            )
+            if uncovered_required_world_info:
+                raise CaseLoadError(
+                    f"Solution claim '{claim.id}' required_world_info not produced by "
+                    f"required_evidence: {uncovered_required_world_info}"
+                )
             unknown_phases = sorted(set(claim.allowed_phases) - phase_ids)
             if unknown_phases:
                 raise CaseLoadError(
@@ -382,12 +413,20 @@ class CaseLoader:
             scene_ids=scene_ids,
         )
 
+        self._validate_world_info_authoring_links(package, world_info_ids)
+
         unreachable_clue_ids = clue_ids - reachable_clue_ids
         if unreachable_clue_ids:
             raise CaseLoadError(
                 f"Clues are not reachable by any hotspot or mock proposed action: "
                 f"{sorted(unreachable_clue_ids)}"
             )
+        for clue in package.clues:
+            if not clue.reveals_world_info:
+                raise CaseLoadError(
+                    f"Clue '{clue.id}' reveals_world_info must reference at least one "
+                    "world_info"
+                )
 
     def _ensure_unique(self, label: str, ids: list[str], case_dir: Path | str) -> None:
         duplicates = sorted({item_id for item_id in ids if ids.count(item_id) > 1})
@@ -535,6 +574,7 @@ class CaseLoader:
         clue_ids: set[str],
         phase_ids: set[str],
         beat_ids: set[str],
+        valid_player_knowledge_ids: set[str],
     ) -> None:
         graph = world_info.claim_graph
 
@@ -557,7 +597,16 @@ class CaseLoader:
                 phase_ids=phase_ids,
                 beat_ids=beat_ids,
                 world_info_ids=world_info_ids,
+                valid_player_knowledge_ids=valid_player_knowledge_ids,
             )
+            if (
+                world_info.sensitivity == WorldInfoSensitivity.HIGH
+                and not self._has_unlock_conditions(fragment.unlock_conditions)
+            ):
+                raise CaseLoadError(
+                    f"WorldInfo '{world_info.id}' safe fragment '{fragment.id}' "
+                    "unlock_conditions must not be empty for high-sensitivity world_info"
+                )
 
         inference_ids = [inference.id for inference in graph.forbidden_inferences]
         self._ensure_unique(
@@ -565,11 +614,28 @@ class CaseLoader:
             inference_ids,
             case_dir,
         )
+        ambiguous_graph_ids = sorted(fragment_id_set & set(inference_ids))
+        if ambiguous_graph_ids:
+            raise CaseLoadError(
+                f"WorldInfo '{world_info.id}' claim_graph has ambiguous ids used by both "
+                f"safe_fragments and forbidden_inferences: {ambiguous_graph_ids}"
+            )
         for inference in graph.forbidden_inferences:
             self._validate_world_info_claim_patterns(
                 f"{world_info.id}.forbidden_inference.{inference.id}",
                 inference.claim_patterns,
             )
+            if not (
+                inference.trigger_fragment_ids
+                or inference.trigger_world_info_ids
+                or inference.aliases
+                or inference.claim_patterns
+            ):
+                raise CaseLoadError(
+                    f"WorldInfo '{world_info.id}' forbidden inference '{inference.id}' "
+                    "must define trigger_fragment_ids, trigger_world_info_ids, aliases, "
+                    "or claim_patterns"
+                )
             unknown_fragments = sorted(set(inference.trigger_fragment_ids) - fragment_id_set)
             if unknown_fragments:
                 raise CaseLoadError(
@@ -590,6 +656,7 @@ class CaseLoader:
                     phase_ids=phase_ids,
                     beat_ids=beat_ids,
                     world_info_ids=world_info_ids,
+                    valid_player_knowledge_ids=valid_player_knowledge_ids,
                 )
 
     def _validate_unlock_conditions(
@@ -601,6 +668,7 @@ class CaseLoader:
         phase_ids: set[str],
         beat_ids: set[str],
         world_info_ids: set[str],
+        valid_player_knowledge_ids: set[str],
     ) -> None:
         unknown_phases = sorted(set(conditions.phases) - phase_ids)
         if unknown_phases:
@@ -618,6 +686,136 @@ class CaseLoader:
             conditions.player_world_info_ids,
             f"{label} player_world_info_ids",
         )
+        unavailable_player_knowledge = sorted(
+            set(conditions.player_knowledge_ids) - valid_player_knowledge_ids
+        )
+        if unavailable_player_knowledge:
+            raise CaseLoadError(
+                f"{label} player_knowledge_ids references unavailable player knowledge: "
+                f"{unavailable_player_knowledge}"
+            )
+
+    def _has_unlock_conditions(self, conditions: FactUnlockConditionConfig) -> bool:
+        return bool(
+            conditions.phases
+            or conditions.completed_beats
+            or conditions.discovered_clues
+            or conditions.player_knowledge_ids
+            or conditions.player_world_info_ids
+        )
+
+    def _player_knowledge_ids_produced_by_clues(self, package: CasePackage) -> set[str]:
+        world_info_ids = {world_info.id for world_info in package.world_info}
+        knowledge_ids: set[str] = set()
+        for clue in package.clues:
+            world_info_id = self._first_known_world_info_id(
+                clue.reveals_world_info,
+                world_info_ids,
+            )
+            if world_info_id is None:
+                knowledge_ids.add(f"player_knowledge.{clue.id}")
+            else:
+                knowledge_ids.add(f"player_knowledge.{world_info_id}")
+        return knowledge_ids
+
+    def _player_world_info_ids_for_clues(
+        self,
+        package: CasePackage,
+        clue_ids: set[str],
+    ) -> set[str]:
+        world_info_ids = {world_info.id for world_info in package.world_info}
+        clue_by_id = {clue.id: clue for clue in package.clues}
+        produced_world_info_ids: set[str] = set()
+        for clue_id in clue_ids:
+            clue = clue_by_id.get(clue_id)
+            if clue is None:
+                continue
+            world_info_id = self._first_known_world_info_id(
+                clue.reveals_world_info,
+                world_info_ids,
+            )
+            if world_info_id is not None:
+                produced_world_info_ids.add(world_info_id)
+        return produced_world_info_ids
+
+    def _first_known_world_info_id(
+        self,
+        referenced_ids: list[str],
+        world_info_ids: set[str],
+    ) -> str | None:
+        return next((item_id for item_id in referenced_ids if item_id in world_info_ids), None)
+
+    def _validate_world_info_authoring_links(
+        self,
+        package: CasePackage,
+        world_info_ids: set[str],
+    ) -> None:
+        referenced_world_info_ids: set[str] = set()
+        for clue in package.clues:
+            referenced_world_info_ids.update(clue.reveals_world_info)
+
+        for character in package.characters:
+            referenced_world_info_ids.update(
+                character.private.disclosure_style.max_mode_by_world_info
+            )
+            for goal in character.private.goals:
+                referenced_world_info_ids.update(goal.related_world_info_ids)
+            for secret in character.private.secrets:
+                referenced_world_info_ids.update(secret.related_world_info_ids)
+            for knowledge in character.private.knowledge:
+                referenced_world_info_ids.update(knowledge.related_world_info_ids)
+
+        for fact in package.forbidden_facts:
+            if fact.world_info_id is not None:
+                referenced_world_info_ids.add(fact.world_info_id)
+
+        for claim in package.solution_claims.claims:
+            referenced_world_info_ids.update(claim.required_world_info)
+
+        for world_info in package.world_info:
+            for fragment in world_info.claim_graph.safe_fragments:
+                referenced_world_info_ids.update(
+                    fragment.unlock_conditions.player_world_info_ids
+                )
+                referenced_world_info_ids.update(
+                    self._world_info_ids_from_player_knowledge_ids(
+                        fragment.unlock_conditions.player_knowledge_ids,
+                        world_info_ids,
+                    )
+                )
+            for inference in world_info.claim_graph.forbidden_inferences:
+                referenced_world_info_ids.update(inference.trigger_world_info_ids)
+                if inference.unlock_conditions is None:
+                    continue
+                referenced_world_info_ids.update(
+                    inference.unlock_conditions.player_world_info_ids
+                )
+                referenced_world_info_ids.update(
+                    self._world_info_ids_from_player_knowledge_ids(
+                        inference.unlock_conditions.player_knowledge_ids,
+                        world_info_ids,
+                    )
+                )
+
+        isolated_world_info_ids = sorted(world_info_ids - referenced_world_info_ids)
+        if isolated_world_info_ids:
+            raise CaseLoadError(
+                "WorldInfo ids are not referenced by any clue, character private state, "
+                "forbidden fact, solution claim, or claim_graph condition: "
+                f"{isolated_world_info_ids}"
+            )
+
+    def _world_info_ids_from_player_knowledge_ids(
+        self,
+        player_knowledge_ids: list[str],
+        world_info_ids: set[str],
+    ) -> set[str]:
+        return {
+            knowledge_id.removeprefix("player_knowledge.")
+            for knowledge_id in player_knowledge_ids
+            if knowledge_id.startswith("player_knowledge.")
+            and knowledge_id.removeprefix("player_knowledge.") in world_info_ids
+        }
 
     def _validate_proposed_action(
         self,

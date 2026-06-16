@@ -3640,6 +3640,21 @@ def test_case_loader_keeps_world_info_audit_fields_optional(tmp_path: Path) -> N
         "  title: Fact\n",
         encoding="utf-8",
     )
+    (case_dir / "scenes.yaml").write_text(
+        "- id: room\n  name: Room\n  characters:\n"
+        "    - npc\n  hotspots:\n"
+        "    - id: desk\n      name: Desk\n      discover_clues:\n"
+        "        - clue\n",
+        encoding="utf-8",
+    )
+    (case_dir / "clues.yaml").write_text(
+        "- id: clue\n"
+        "  title: Clue\n"
+        "  description: clue\n"
+        "  reveals_world_info:\n"
+        "    - fact\n",
+        encoding="utf-8",
+    )
 
     case = CaseLoader().load(case_dir)
 

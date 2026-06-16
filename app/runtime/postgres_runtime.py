@@ -14,6 +14,7 @@ from app.domain.models import (
     WorldEvent,
 )
 from app.runtime.service import ActionService
+from app.runtime.tracing import RuntimeTraceBuffer
 from app.storage.memory import InMemoryCaseStore, build_state_summary
 from app.storage.postgres import (
     ConnectionLike,
@@ -35,6 +36,7 @@ class PostgresActionRuntime:
 
     event_store: PostgresEventStore
     action_service: ActionService
+    trace_buffer: RuntimeTraceBuffer | None = None
 
     def handle(
         self,
@@ -67,7 +69,15 @@ class PostgresActionRuntime:
         session = replay_events(case, [item.event for item in stored_before])
         expected_sequence = stored_before[-1].sequence
 
-        response = self.action_service.handle(session=session, action=action)
+        if self.trace_buffer is not None:
+            self.trace_buffer.clear()
+        try:
+            response = self.action_service.handle(session=session, action=action)
+        except Exception:
+            if self.trace_buffer is not None:
+                self.trace_buffer.clear()
+            raise
+        runtime_traces = self.trace_buffer.drain() if self.trace_buffer is not None else []
         if response.new_events:
             stored = self.event_store.append(
                 session,
@@ -75,6 +85,7 @@ class PostgresActionRuntime:
                 idempotency_key=idempotency_key,
                 request_hash=request_hash,
                 expected_current_sequence=expected_sequence,
+                runtime_traces=runtime_traces,
             )
             stored_event_ids = [item.event.id for item in stored]
             response_event_ids = [event.id for event in response.new_events]
@@ -85,6 +96,8 @@ class PostgresActionRuntime:
                     response_events=stored,
                     all_events=self.event_store.load_stored(session_id),
                 )
+        elif self.trace_buffer is not None:
+            self.trace_buffer.clear()
         return response.model_copy(
             update={
                 "state": build_state_summary(case, session),

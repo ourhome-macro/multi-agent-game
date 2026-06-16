@@ -327,6 +327,19 @@ Memory v1.4 后，payload 结构不变，但 `rule_id` 可能来自 app 默认 `
 
 `StateSummary` 是公开状态视图。它可以包含已发现线索、完成的 beats、公开关系指标和玩家已知摘要。v0 不暴露记忆快照或私有角色画像，也不暴露 `solution_claims` 或指控真相配置。
 
+`StateSummary.evidence_assets` 是面向前端证据栏的公开投影。每条记录来自已发现线索和对应玩家已知账本：
+
+- `id`
+- `title`
+- `summary`
+- `source`
+- `clue_id`
+- `world_info_id`
+- `source_knowledge_id`
+- `unlocked_at_event_id`
+
+它不暴露未发现线索、未解锁 `WorldInfo`、forbidden facts、角色 private 原文或 solution claim。客户端不能把该字段回传当作权威证据状态；`present_clue` 和 `accuse` 仍必须由后端按 `session.discovered_clues` 与 `session.player_knowledge` 校验。
+
 角色 `private` 数据是 NPC 自己的非公开视角，不是对 NPC 自己隐藏。API 边界是：原始 private 数据不能返回给玩家、其他 NPC、公开 summary 或 journey artifacts。`AgentContext.inner_context` 不属于公开 API 响应。
 
 角色摘要只暴露公开角色卡字段：
@@ -370,6 +383,8 @@ Memory v1.4 后，payload 结构不变，但 `rule_id` 可能来自 app 默认 `
 - `llm_error_type`
 - `llm_error_message_sanitized`
 - `schema_validation_errors`
+
+PostgreSQL runtime 下，action 产生的 trace 会随同本轮 `world_events` 在同一事务写入 `runtime_traces`。trace payload 会包含 `action_event_id`，用于关联触发它的玩家 action 事件。若事件追加因 stale sequence 或幂等冲突失败，本轮 trace 不会提前落库。
 
 ## 错误
 

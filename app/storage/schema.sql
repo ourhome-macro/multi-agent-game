@@ -1,6 +1,22 @@
 -- PostgreSQL runtime persistence schema for the multi-agent narrative system.
 -- World events are the authority. Projection tables exist only for hot reads.
 
+CREATE TABLE IF NOT EXISTS schema_migrations (
+    name text PRIMARY KEY,
+    version integer NOT NULL CHECK (version > 0),
+    description text NOT NULL,
+    applied_at timestamptz NOT NULL DEFAULT now()
+);
+
+INSERT INTO schema_migrations (name, version, description)
+VALUES ('postgres_runtime_schema', 1, 'Initial PostgreSQL runtime schema')
+ON CONFLICT (name) DO UPDATE
+SET version = GREATEST(schema_migrations.version, EXCLUDED.version),
+    description = EXCLUDED.description,
+    applied_at = now()
+WHERE schema_migrations.version IS DISTINCT FROM EXCLUDED.version
+   OR schema_migrations.description IS DISTINCT FROM EXCLUDED.description;
+
 CREATE TABLE IF NOT EXISTS app_sessions (
     id text PRIMARY KEY,
     case_id text NOT NULL,

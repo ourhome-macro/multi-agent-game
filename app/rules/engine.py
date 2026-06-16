@@ -16,6 +16,8 @@ from app.domain.models import (
     WorldEvent,
     clamp_relationship_metric,
 )
+from app.rules.deduction import DeductionEvaluator, DeductionResult
+from app.rules.deduction import player_knowledge_id_for_clue as _player_knowledge_id_for_clue
 from app.runtime.events import EventRecorder
 from app.runtime.pressure import calculate_interaction_pressure
 
@@ -30,6 +32,7 @@ RELATIONSHIP_THRESHOLDS = {
 class RuleEngine:
     def __init__(self, recorder: EventRecorder) -> None:
         self._recorder = recorder
+        self._deduction_evaluator = DeductionEvaluator()
 
     def apply_inspect(
         self,
@@ -320,140 +323,25 @@ class RuleEngine:
         session: SessionState,
         action: PlayerAction,
     ) -> list[WorldEvent]:
-        payload = {
+        payload: dict[str, object] = {
             "target_id": action.target_id,
             "claim_id": action.claim_id,
             "evidence_clue_ids": list(action.evidence_clue_ids),
             "text": action.text,
         }
-        if not self._is_known_character(case, action.target_id):
-            return [
-                self._reject(
-                    session=session,
-                    action_type="player.accuse",
-                    reason="target_id is not a known character",
-                    payload=payload,
-                    caused_by_event_id=None,
-                )
-            ]
-
-        claim = next(
-            (item for item in case.solution_claims.claims if item.id == action.claim_id),
-            None,
+        result = self._deduction_evaluator.evaluate(
+            case=case,
+            session=session,
+            action=action,
         )
-        if claim is None:
+        if not result.accepted:
             return [
-                self._reject(
+                self._accuse_rejection(
                     session=session,
-                    action_type="player.accuse",
-                    reason="claim_id is not defined by the case package",
                     payload=payload,
-                    caused_by_event_id=None,
+                    result=result,
                 )
             ]
-        if claim.target_id != action.target_id:
-            return [
-                self._reject(
-                    session=session,
-                    action_type="player.accuse",
-                    reason="claim target_id does not match action target_id",
-                    payload=payload,
-                    caused_by_event_id=None,
-                )
-            ]
-        if session.narrative.phase not in claim.allowed_phases:
-            return [
-                self._reject(
-                    session=session,
-                    action_type="player.accuse",
-                    reason="claim is not allowed in current narrative phase",
-                    payload={**payload, "current_phase": session.narrative.phase},
-                    caused_by_event_id=None,
-                )
-            ]
-
-        evidence_ids = list(dict.fromkeys(action.evidence_clue_ids))
-        if not evidence_ids:
-            return [
-                self._reject(
-                    session=session,
-                    action_type="player.accuse",
-                    reason="evidence_clue_ids cannot be empty",
-                    payload=payload,
-                    caused_by_event_id=None,
-                )
-            ]
-
-        clue_ids = {clue.id for clue in case.clues}
-        unknown_evidence = sorted(set(evidence_ids) - clue_ids)
-        if unknown_evidence:
-            return [
-                self._reject(
-                    session=session,
-                    action_type="player.accuse",
-                    reason="evidence_clue_ids contain unknown clues",
-                    payload={**payload, "unknown_evidence": unknown_evidence},
-                    caused_by_event_id=None,
-                )
-            ]
-
-        undiscovered = sorted(set(evidence_ids) - session.discovered_clues)
-        if undiscovered:
-            return [
-                self._reject(
-                    session=session,
-                    action_type="player.accuse",
-                    reason="evidence clues have not all been discovered",
-                    payload={**payload, "undiscovered_evidence": undiscovered},
-                    caused_by_event_id=None,
-                )
-            ]
-
-        missing_knowledge = sorted(
-            clue_id
-            for clue_id in evidence_ids
-            if player_knowledge_id_for_clue(case, clue_id) not in session.player_knowledge
-        )
-        if missing_knowledge:
-            return [
-                self._reject(
-                    session=session,
-                    action_type="player.accuse",
-                    reason="evidence clues are not all available in player knowledge",
-                    payload={**payload, "missing_player_knowledge": missing_knowledge},
-                    caused_by_event_id=None,
-                )
-            ]
-
-        missing_required = sorted(set(claim.required_evidence) - set(evidence_ids))
-        if missing_required:
-            return [
-                self._reject(
-                    session=session,
-                    action_type="player.accuse",
-                    reason="evidence does not cover required claim evidence",
-                    payload={**payload, "missing_required_evidence": missing_required},
-                    caused_by_event_id=None,
-                )
-            ]
-
-        if claim.required_world_info:
-            known_world_info_ids = {
-                item.world_info_id
-                for item in session.player_knowledge.values()
-                if item.world_info_id is not None
-            }
-            missing_world_info = sorted(set(claim.required_world_info) - known_world_info_ids)
-            if missing_world_info:
-                return [
-                    self._reject(
-                        session=session,
-                        action_type="player.accuse",
-                        reason="player knowledge does not cover required world info",
-                        payload={**payload, "missing_required_world_info": missing_world_info},
-                        caused_by_event_id=None,
-                    )
-                ]
 
         accused_event = self._recorder.append(
             session,
@@ -462,7 +350,7 @@ class RuleEngine:
             payload={
                 "target_id": action.target_id,
                 "claim_id": str(action.claim_id),
-                "evidence_clue_ids": evidence_ids,
+                "evidence_clue_ids": result.evidence_clue_ids or [],
                 "text": action.text,
             },
         )
@@ -473,13 +361,70 @@ class RuleEngine:
             payload={
                 "target_id": action.target_id,
                 "claim_id": str(action.claim_id),
-                "result": claim.result,
-                "matched_required_evidence": sorted(claim.required_evidence),
-                "missing_required_evidence": [],
+                "result": result.result,
+                "matched_required_evidence": result.matched_required_evidence,
+                "missing_required_evidence": result.missing_evidence,
             },
             caused_by_event_id=accused_event.id,
         )
         return [accused_event, evaluated_event]
+
+    def _accuse_rejection(
+        self,
+        *,
+        session: SessionState,
+        payload: dict[str, object],
+        result: DeductionResult,
+    ) -> WorldEvent:
+        match result.reject_code:
+            case "unknown_target":
+                reason = "target_id is not a known character"
+                reject_payload = payload
+            case "unknown_claim":
+                reason = "claim_id is not defined by the case package"
+                reject_payload = payload
+            case "target_mismatch":
+                reason = "claim target_id does not match action target_id"
+                reject_payload = payload
+            case "phase_not_allowed":
+                reason = "claim is not allowed in current narrative phase"
+                reject_payload = {**payload, "current_phase": session.narrative.phase}
+            case "empty_evidence":
+                reason = "evidence_clue_ids cannot be empty"
+                reject_payload = payload
+            case "unknown_evidence":
+                reason = "evidence_clue_ids contain unknown clues"
+                reject_payload = {**payload, "unknown_evidence": result.unknown_evidence or []}
+            case "undiscovered_evidence":
+                reason = "evidence clues have not all been discovered"
+                reject_payload = {
+                    **payload,
+                    "undiscovered_evidence": result.undiscovered_evidence or [],
+                }
+            case "missing_player_knowledge":
+                reason = "evidence clues are not all available in player knowledge"
+                reject_payload = {
+                    **payload,
+                    "missing_player_knowledge": result.missing_player_knowledge or [],
+                }
+            case "missing_required_evidence":
+                reason = "evidence does not cover required claim evidence"
+                reject_payload = {**payload, "missing_required_evidence": result.missing_evidence}
+            case "missing_required_world_info":
+                reason = "player knowledge does not cover required world info"
+                reject_payload = {
+                    **payload,
+                    "missing_required_world_info": result.missing_world_info,
+                }
+            case _:
+                raise ValueError("deduction rejection is missing a reject_code")
+        return self._reject(
+            session=session,
+            action_type="player.accuse",
+            reason=reason,
+            payload=reject_payload,
+            caused_by_event_id=None,
+        )
 
     def _apply_relationship_change(
         self,
@@ -678,14 +623,4 @@ def relationship_threshold_key(
 
 
 def player_knowledge_id_for_clue(case: CasePackage, clue_id: str) -> str:
-    clue = next((item for item in case.clues if item.id == clue_id), None)
-    if clue is None:
-        return f"player_knowledge.{clue_id}"
-    world_info_ids = {item.id for item in case.world_info}
-    world_info_id = next(
-        (item_id for item_id in clue.reveals_world_info if item_id in world_info_ids),
-        None,
-    )
-    if world_info_id is None:
-        return f"player_knowledge.{clue_id}"
-    return f"player_knowledge.{world_info_id}"
+    return _player_knowledge_id_for_clue(case, clue_id)

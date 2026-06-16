@@ -1,6 +1,6 @@
 ﻿# 运行时架构
 
-本项目是一个“案件无关”的后端叙事运行时。它负责加载案件包、创建内存会话、处理玩家行为、生成可审计事件日志，并返回公开状态摘要。默认不调用真实 LLM，不使用数据库持久化，不使用向量记忆，也不包含前端。
+本项目是一个“案件无关”的后端叙事运行时。它负责加载案件包、创建会话、处理玩家行为、生成可审计事件日志，并返回公开状态摘要。默认不调用真实 LLM，默认使用内存 runtime；生产或本地联调可以通过 `AGENT_RUNTIME=postgres` 切换到 PostgreSQL event stream runtime。
 
 ## 启动流程
 
@@ -60,6 +60,8 @@ POST /sessions/{id}/actions
 
 `accuse` 是正式指控动作，不调用 `AgentGateway`。Rule Engine 根据 `solution_claims.yaml` 校验 `claim_id`、当前剧情阶段和玩家已掌握证据，写入 `player.accused`，再写入 `accusation.evaluated`。它不直接修改剧情阶段；阶段变化仍由 `RuleTriggerSystem` 根据事件触发。
 
+PostgreSQL runtime 下，行为处理会先从数据库 `world_events` replay 最新 `SessionState`，再调用同一套 `ActionService`。生成的 `new_events`、投影更新和 deferred runtime trace 在同一个短事务中提交；如果 `expected_current_sequence` 已过期，本轮事件和 trace 都不会落库。
+
 ## 核心模块
 
 - `app/domain/models.py`：Pydantic v2 领域模型和 API DTO。
@@ -81,6 +83,10 @@ POST /sessions/{id}/actions
 - `app/runtime/memory_archival.py`：把陈旧且未强化的 working memory 事件化降级为 archival。
 - `app/runtime/replay.py`：从 `WorldEvent` 重建 `SessionState`。
 - `app/storage/memory.py`：内存案件/会话存储与 `StateSummary` 构造。
+- `app/storage/postgres.py`：PostgreSQL `WorldEvent` 追加存储、投影表、幂等键和 runtime trace 持久化。
+- `app/runtime/postgres_runtime.py`：数据库事件流 runtime adapter，负责 replay -> handle -> append。
+- `app/runtime/schema_admin.py`：PostgreSQL schema apply/check/projection rebuild 运维入口。
+- `app/rules/deduction.py`：正式指控的只读结构化判定器。
 
 ## 状态权威
 
@@ -91,6 +97,10 @@ Agent 只能输出 `AgentIntent`。它不能直接修改 `SessionState`、世界
 剧情阶段变化由 `narrative_rules.yaml` 和 `RuleTriggerSystem` 驱动，不由 Agent 输出决定。
 
 正式指控的正确性由 `solution_claims.yaml` 编写，并由 Rule Engine 评估。Agent 和 LLM 不决定指控是否成立。Rule Engine 也不直接把案件设为 resolved；它只写入 `accusation.evaluated`，后续由 `RuleTriggerSystem` 消费该事件。
+
+`DeductionEvaluator` 是 `accuse` 的解释层。它不写事件、不改状态，只返回 matched claim、缺失 evidence、缺失 world info、phase/target 是否通过和最终 result。`RuleEngine.apply_accuse` 只负责把 evaluator 结果映射成 `player.accused`、`accusation.evaluated` 或 `rule.rejected`。
+
+`StateSummary.evidence_assets` 是公开投影，不是新权威状态。它只从已发现 `Clue` 和已存在的 `PlayerKnowledgeState` 派生，用于前端证据栏；未发现线索、未解锁 `WorldInfo`、forbidden facts 和 solution claims 不得进入该字段。
 
 ## Agent 输入安全
 
@@ -123,6 +133,8 @@ Memory P2 接入 archival 生命周期。`MemoryArchivalSystem` 会在 agent-bac
 AgentLoop 会先调用其注入的 `MemoryRetriever`，再把同一批 `memory_snapshots` 传入 `build_agent_context(...)`。因此普通 turn 的 AgentContext、`memory_ids_used`、trace `memory_projection` 和 `search_memory` tool summary 都来自同一批检索结果。`build_agent_context(...)` 保留内部 retriever 仅作为非 loop 调用路径的兼容 fallback。
 
 Runtime trace schema v4 会记录 `memory_projection` 对象。对象包含 skill 摘要：`skill_id`、`included_memory_types`、`included_scopes`、`included_layers`、`forbidden_scopes`、`forbidden_layers`、`selected_count`，以及 `items` 列表。每个 item 只包含已注入记忆的 `memory_id`、`memory_type`、`memory_scope`、`memory_layer`、`owner_character_id` 和 `visible_to_character_ids`，不记录 memory content。真实 LLM backend 也使用同一投影摘要，便于审计 real turn 是否遵守 scope/layer 边界。
+
+在 PostgreSQL runtime 下，runtime trace 先写入 `RuntimeTraceBuffer`，再由 `PostgresActionRuntime` 随本轮 `world_events` 同事务 flush 到 `runtime_traces`。这避免 LLM/Director trace 先于事件落库，导致 stale sequence 或 append 失败时留下不可回放的观测记录。
 
 Memory v1.4 将记忆派生收敛到统一 `MemoryDerivationRule`。`CaseLoader` 通过 `MemoryDerivationRuleLoader` 先加载 `app/runtime/memory_derivation_rules.yaml`，再加载案件包 `memory_derivation_rules.yaml`；`DerivedEventSystem` 对已支持事件优先执行配置化规则，只有目标 memory 未由配置规则产生时才调用旧 Python fallback。当前已迁移 app 默认 `player.presented_clue` episodic 规则，以及 `mist_clock_manor` 中江雁回 + 空胶囊的 belief / relationship / strategy typed memory 规则；其他 core 规则仍保留 Python fallback，避免一次性迁移扩大风险。
 

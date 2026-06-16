@@ -23,6 +23,19 @@
 
 `StateSummary` 是对该状态的公开投影，不是权威状态。运行时记忆快照、角色事实认知账本和私有角色画像刻意不通过 `StateSummary` 暴露。
 
+`StateSummary.evidence_assets` 是从已发现 `Clue` 和 `PlayerKnowledgeState` 派生出的证据原件公开摘要。它不新增权威状态、不写事件，也不直接读取案件包中尚未被玩家掌握的 `WorldInfo`。每条公开证据摘要包含：
+
+- `id`：证据资产 ID，当前与来源 `clue_id` 对齐。
+- `title`：来源线索标题。
+- `summary`：来源线索公开描述，不使用 `WorldInfo.description` 作为原件摘要。
+- `source`：来源类型，当前主要为 `clue`。
+- `clue_id`：产生该证据资产的线索。
+- `world_info_id`：玩家已通过该线索掌握的事实锚点，可为空。
+- `source_knowledge_id`：来源玩家已知账本条目。
+- `unlocked_at_event_id`：解锁该玩家已知的来源事件。
+
+生成条件必须同时满足：`PlayerKnowledgeState` 存在、其 `clue_id` 已在 `session.discovered_clues` 中、且线索仍存在于案件包。仅存在于案件静态配置里的未发现线索、未解锁 `WorldInfo`、高敏案件真相锚点、禁说事实和 solution claim 都不能进入 `evidence_assets`。
+
 ## 角色卡
 
 静态角色数据分为公开角色卡和私有角色视角：
@@ -169,10 +182,11 @@ inspect hotspot
   -> clue.reveals_world_info
   -> player_knowledge.updated(world_info_id)
   -> StateSummary.player_knowledge
+  -> StateSummary.evidence_assets
   -> replay 恢复同一 PlayerKnowledge
 ```
 
-如果旧线索没有配置 `reveals_world_info`，运行时会回退到 `player_knowledge.<clue_id>`，用于兼容历史案件包。新案件应显式配置 `reveals_world_info`。
+`player_knowledge.<clue_id>` 只保留为低层函数对历史事件 replay 的兼容路径。当前 `CaseLoader` 对可到达线索执行 authoring gate：新案件包中每个可到达 `Clue` 都必须显式配置 `reveals_world_info`，并指向已声明的 `WorldInfo`。不能再依赖缺省 `clue_id` 作为事实锚点。
 
 ## 角色私有认知对齐
 
@@ -214,6 +228,8 @@ CharacterPrivateConfig
 
 事件日志中的 `player_knowledge.updated` 必须包含这些字段。Replay 直接恢复该状态，不重新推导不确定内容。
 
+`EvidenceAsset` 是面向前端线索板/证据栏的领域投影，用于把“玩家掌握了某个事实”还原成“玩家手上有哪件证据原件”。它不能替代 `PlayerKnowledgeState`：正式 `present_clue` 和 `accuse` 仍由 Rule Engine 检查 `session.discovered_clues` 与 `session.player_knowledge`，而不是信任前端传回的 evidence summary。
+
 ## ask_about 与 present_clue
 
 `ask_about` 在 Rule Engine 校验 subject 后写入 `player.asked_about`：
@@ -247,6 +263,17 @@ CharacterPrivateConfig
 ## accuse
 
 `accuse` 是正式结构化指控，包含 `claim_id`、目标角色、提交的 evidence clue ids 和可选玩家文本。它只由 Rule Engine 根据案件编写的 `solution_claims.yaml` 评估。
+
+`DeductionEvaluator` 是当前指控判定的只读解释层。它输入 `case`、`session` 和结构化 `PlayerAction(type=accuse)`，不写事件、不改状态，只返回结构化判定结果：
+
+- `matched_claim`：命中的 `SolutionClaim` id；未知 claim 时为空。
+- `missing_evidence`：未覆盖的 `required_evidence`。
+- `missing_world_info`：玩家已知账本未覆盖的 `required_world_info`。
+- `phase_allowed`：当前 `session.narrative.phase` 是否允许该 claim。
+- `target_matches`：action target 是否与 claim target 一致。
+- `accepted` / `result`：是否通过规则判定，以及通过后对应的 `correct` / `incorrect` 配置结果。
+
+`RuleEngine.apply_accuse` 复用该 evaluator，并把拒绝码映射回既有 `rule.rejected` 原因，保持旧的 accuse 事件语义。未来 Evidence Graph 可以接到 evaluator 内部，但仍不能绕过 `PlayerKnowledge`、`WorldEvent` 和 Rule Engine 的状态边界。
 
 合法 accuse 写入：
 

@@ -105,10 +105,12 @@ class PostgresEventStore:
         idempotency_key: str | None = None,
         request_hash: str | None = None,
         expected_current_sequence: int | None = None,
+        runtime_traces: Sequence[dict[str, object]] = (),
     ) -> list[StoredWorldEvent]:
-        if not events:
+        if not events and not runtime_traces:
             return []
-        _validate_event_batch(session, events)
+        if events:
+            _validate_event_batch(session, events)
         effective_hash = request_hash or request_hash_for_events(events)
 
         with _transaction(self._connection):
@@ -139,12 +141,19 @@ class PostgresEventStore:
                     starting_sequence=current_sequence + 1,
                     idempotency_key=idempotency_key,
                 )
-                self._update_session_projection(
-                    cursor,
-                    session,
-                    stored[-1].sequence,
-                    narrative_phase=_narrative_phase_after_events(session, events),
-                )
+                if stored:
+                    self._update_session_projection(
+                        cursor,
+                        session,
+                        stored[-1].sequence,
+                        narrative_phase=_narrative_phase_after_events(session, events),
+                    )
+                    self._append_runtime_traces_locked(
+                        cursor,
+                        session_id=session.id,
+                        records=runtime_traces,
+                        action_event_id=_first_action_event_id(events),
+                    )
                 if idempotency_key is not None:
                     self._commit_idempotency_key(
                         cursor,
@@ -221,27 +230,55 @@ class PostgresEventStore:
         trace_id = str(record.get("trace_id") or uuid4())
         with _transaction(self._connection):
             with _cursor(self._connection) as cursor:
-                cursor.execute(
-                    """
-                    INSERT INTO runtime_traces (
-                        id, session_id, action_event_id, target_character_id, backend,
-                        memory_projection, director_decision, llm_error_type, payload
-                    )
-                    VALUES (%s, %s, %s, %s, %s, %s::jsonb, %s::jsonb, %s, %s::jsonb)
-                    """,
-                    (
-                        trace_id,
-                        str(record["session_id"]),
-                        _optional_text(record.get("action_event_id")),
-                        _optional_text(record.get("target_agent_id")),
-                        str(record.get("agent_backend") or record.get("backend") or "unknown"),
-                        _json_dumps(record.get("memory_projection") or {}),
-                        _json_dumps(_director_decision_from_trace(record)),
-                        _optional_text(record.get("error_category")),
-                        _json_dumps(record),
-                    ),
-                )
+                self._insert_runtime_trace(cursor, record, trace_id=trace_id)
         return trace_id
+
+    def _append_runtime_traces_locked(
+        self,
+        cursor: CursorLike,
+        *,
+        session_id: str,
+        records: Sequence[dict[str, object]],
+        action_event_id: str | None,
+    ) -> None:
+        for record in records:
+            trace_id = str(record.get("trace_id") or uuid4())
+            enriched = {
+                **record,
+                "session_id": record.get("session_id") or session_id,
+                "action_event_id": record.get("action_event_id") or action_event_id,
+            }
+            if enriched["action_event_id"] is None:
+                enriched.pop("action_event_id")
+            self._insert_runtime_trace(cursor, enriched, trace_id=trace_id)
+
+    def _insert_runtime_trace(
+        self,
+        cursor: CursorLike,
+        record: dict[str, object],
+        *,
+        trace_id: str,
+    ) -> None:
+        cursor.execute(
+            """
+            INSERT INTO runtime_traces (
+                id, session_id, action_event_id, target_character_id, backend,
+                memory_projection, director_decision, llm_error_type, payload
+            )
+            VALUES (%s, %s, %s, %s, %s, %s::jsonb, %s::jsonb, %s, %s::jsonb)
+            """,
+            (
+                trace_id,
+                str(record["session_id"]),
+                _optional_text(record.get("action_event_id")),
+                _optional_text(record.get("target_agent_id")),
+                str(record.get("agent_backend") or record.get("backend") or "unknown"),
+                _json_dumps(record.get("memory_projection") or {}),
+                _json_dumps(_director_decision_from_trace(record)),
+                _optional_text(record.get("error_category")),
+                _json_dumps(record),
+            ),
+        )
 
     def _lock_session(self, cursor: CursorLike, session: SessionState) -> int:
         cursor.execute(
@@ -854,6 +891,13 @@ def _narrative_phase_after_events(
         if event.type == EventType.NARRATIVE_PHASE_CHANGED:
             phase = str(event.payload.get("phase") or event.payload.get("to_phase") or phase)
     return phase
+
+
+def _first_action_event_id(events: Sequence[WorldEvent]) -> str | None:
+    for event in events:
+        if event.actor_id == "player":
+            return event.id
+    return events[0].id if events else None
 
 
 def _memory_operation_from_event(event: WorldEvent) -> MemoryOperation:

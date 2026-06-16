@@ -1073,6 +1073,16 @@ class PlayerKnowledgeState(APIModel):
     source_event_id: NonEmptyString
 
 
+class EvidenceAsset(APIModel):
+    id: NonEmptyString
+    title: NonEmptyString
+    summary: str
+    source: PlayerKnowledgeSourceType = PlayerKnowledgeSourceType.CLUE
+    clue_id: NonEmptyString | None = None
+    world_info_id: NonEmptyString | None = None
+    source_knowledge_id: NonEmptyString
+
+
 class MemoryCandidateState(APIModel):
     memory_id: NonEmptyString
     rule_id: NonEmptyString | None = None
@@ -1270,6 +1280,10 @@ class PlayerKnowledgeSummary(APIModel):
     summary: str
 
 
+class EvidenceSummary(EvidenceAsset):
+    unlocked_at_event_id: NonEmptyString
+
+
 class StateSummary(APIModel):
     session_id: NonEmptyString
     case_id: NonEmptyString
@@ -1279,6 +1293,7 @@ class StateSummary(APIModel):
     characters: list[CharacterSummary]
     discovered_clues: list[ClueSummary]
     player_knowledge: list[PlayerKnowledgeSummary]
+    evidence_assets: list[EvidenceSummary] = Field(default_factory=list)
     relationships: list[RelationshipState]
     event_count: int
 

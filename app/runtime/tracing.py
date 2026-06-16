@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 from time import perf_counter
+from typing import Protocol
 from uuid import uuid4
 
 from app.domain.models import ActionType, AgentIntent, PlayerAction, WorldEvent
@@ -34,6 +35,61 @@ class RuntimeTraceDraft:
     started_at: float = field(default_factory=perf_counter)
 
 
+class RuntimeTraceSink(Protocol):
+    def write(self, record: dict[str, object]) -> None:
+        ...
+
+
+class JsonlRuntimeTraceSink:
+    def __init__(
+        self,
+        *,
+        jsonl_path: Path | str = Path("logs") / "runtime_trace.jsonl",
+        log_path: Path | str = Path("logs") / "runtime_trace.log",
+    ) -> None:
+        self._jsonl_path = Path(jsonl_path)
+        self._log_path = Path(log_path)
+
+    def write(self, record: dict[str, object]) -> None:
+        self._jsonl_path.parent.mkdir(parents=True, exist_ok=True)
+        self._log_path.parent.mkdir(parents=True, exist_ok=True)
+        with self._jsonl_path.open("a", encoding="utf-8") as jsonl_file:
+            jsonl_file.write(json.dumps(record, ensure_ascii=False, sort_keys=True) + "\n")
+        with self._log_path.open("a", encoding="utf-8") as log_file:
+            log_file.write(_render_log_record(record) + "\n")
+
+
+class PostgresRuntimeTraceStore(Protocol):
+    def append_runtime_trace(self, record: dict[str, object]) -> str:
+        ...
+
+
+class PostgresTraceSink:
+    def __init__(self, event_store: PostgresRuntimeTraceStore) -> None:
+        self._event_store = event_store
+
+    def write(self, record: dict[str, object]) -> None:
+        self._event_store.append_runtime_trace(record)
+
+
+class RuntimeTraceBuffer:
+    """Collect trace records until the persistence boundary can flush them."""
+
+    def __init__(self) -> None:
+        self._records: list[dict[str, object]] = []
+
+    def write(self, record: dict[str, object]) -> None:
+        self._records.append(dict(record))
+
+    def drain(self) -> list[dict[str, object]]:
+        records = self._records
+        self._records = []
+        return records
+
+    def clear(self) -> None:
+        self._records = []
+
+
 class RuntimeTracer:
     def __init__(
         self,
@@ -41,15 +97,22 @@ class RuntimeTracer:
         jsonl_path: Path | str = Path("logs") / "runtime_trace.jsonl",
         log_path: Path | str = Path("logs") / "runtime_trace.log",
         enabled: bool = True,
+        sink: RuntimeTraceSink | None = None,
     ) -> None:
-        self._jsonl_path = Path(jsonl_path)
-        self._log_path = Path(log_path)
         self._enabled = enabled
+        self._sink = sink or JsonlRuntimeTraceSink(
+            jsonl_path=jsonl_path,
+            log_path=log_path,
+        )
         self._turn_ids_by_session: dict[str, int] = {}
 
     @classmethod
     def disabled(cls) -> RuntimeTracer:
         return cls(enabled=False)
+
+    @classmethod
+    def postgres(cls, event_store: PostgresRuntimeTraceStore) -> RuntimeTracer:
+        return cls(sink=PostgresTraceSink(event_store))
 
     @property
     def enabled(self) -> bool:
@@ -160,12 +223,7 @@ class RuntimeTracer:
     def write(self, record: dict[str, object]) -> None:
         if not self._enabled:
             return
-        self._jsonl_path.parent.mkdir(parents=True, exist_ok=True)
-        self._log_path.parent.mkdir(parents=True, exist_ok=True)
-        with self._jsonl_path.open("a", encoding="utf-8") as jsonl_file:
-            jsonl_file.write(json.dumps(record, ensure_ascii=False, sort_keys=True) + "\n")
-        with self._log_path.open("a", encoding="utf-8") as log_file:
-            log_file.write(_render_log_record(record) + "\n")
+        self._sink.write(record)
 
 
 def _sanitize_tool_call(tool_call: dict[str, object]) -> dict[str, object]:

@@ -5,9 +5,12 @@ from uuid import uuid4
 from app.domain.models import (
     CasePackage,
     CharacterSummary,
+    ClueConfig,
     ClueSummary,
     EventType,
+    EvidenceSummary,
     NarrativeState,
+    PlayerKnowledgeState,
     PlayerKnowledgeSummary,
     RelationshipState,
     SessionState,
@@ -86,6 +89,14 @@ def build_state_summary(package: CasePackage, session: SessionState) -> StateSum
         for clue_id in sorted(session.discovered_clues)
         if (clue := clue_by_id.get(clue_id)) is not None
     ]
+    evidence_assets = [
+        summary
+        for item in sorted(
+            session.player_knowledge.values(),
+            key=lambda value: value.knowledge_id,
+        )
+        if (summary := _build_evidence_summary(item, clue_by_id, session)) is not None
+    ]
 
     return StateSummary(
         session_id=session.id,
@@ -119,6 +130,29 @@ def build_state_summary(package: CasePackage, session: SessionState) -> StateSum
                 key=lambda value: value.knowledge_id,
             )
         ],
+        evidence_assets=evidence_assets,
         relationships=list(session.relationships.values()),
         event_count=len(session.events),
+    )
+
+
+def _build_evidence_summary(
+    item: PlayerKnowledgeState,
+    clue_by_id: dict[str, ClueConfig],
+    session: SessionState,
+) -> EvidenceSummary | None:
+    if item.clue_id is None or item.clue_id not in session.discovered_clues:
+        return None
+    clue = clue_by_id.get(item.clue_id)
+    if clue is None:
+        return None
+    return EvidenceSummary(
+        id=clue.id,
+        title=clue.title,
+        summary=clue.description,
+        source=item.source_type,
+        clue_id=item.clue_id,
+        world_info_id=item.world_info_id,
+        source_knowledge_id=item.knowledge_id,
+        unlocked_at_event_id=item.source_event_id,
     )
