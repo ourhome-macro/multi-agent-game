@@ -151,6 +151,8 @@ class FactGateway:
                         fragment_id=fragment.id,
                         ref=_canonical_safe_fragment_ref(world_info.id, fragment.id),
                         summary=fragment.summary,
+                        aliases=fragment.aliases,
+                        claim_patterns=fragment.claim_patterns,
                         allowed_modes=fragment.allowed_modes,
                         source_refs=_fragment_source_refs(fragment),
                     )

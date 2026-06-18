@@ -4,7 +4,7 @@ import argparse
 import json
 import os
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from pathlib import Path
 from time import perf_counter
@@ -14,10 +14,11 @@ from pydantic import ValidationError
 
 from app.agents.context import build_agent_context
 from app.agents.gateway import AgentGateway, load_dotenv
-from app.agents.llm_contract import build_llm_agent_input, validate_llm_agent_output
+from app.agents.llm_contract import build_llm_agent_input
 from app.agents.llm_stub import LLMAgentStub
 from app.agents.protocol import AgentProtocol
 from app.agents.real_llm_agent import OpenAILLMAgent
+from app.agents.turn_plan import build_agent_turn_plan
 from app.cases.loader import CaseLoader
 from app.director.narrative_director import (
     DetectedWorldInfoMention,
@@ -39,6 +40,7 @@ from app.domain.models import (
 )
 from app.rules.engine import RuleEngine
 from app.runtime.events import EventRecorder
+from app.runtime.security import PromptInjectionGuard
 from app.runtime.service import create_runtime
 from app.scenarios.validation import discover_standard_scenarios, read_scenario_yaml
 from app.storage.memory import build_state_summary
@@ -51,6 +53,7 @@ DEFAULT_CASE_REPORT_ROOT = PROJECT_ROOT / "doc" / "case"
 DEFAULT_SUMMARY_DIR = PROJECT_ROOT / "doc" / "evaluations" / "llm_shadow"
 DEFAULT_DRIFT_RUNS = 20
 SHADOW_EVAL_ENV = "LLM_SHADOW_EVAL"
+LEGACY_REAL_SHADOW_EVAL_ENV = "LLM_SHADOW_EVAL_ENABLE_REAL"
 RAW_TRANSCRIPT_ENV = "LLM_SHADOW_WRITE_RAW"
 RAW_TRANSCRIPT_DIR_ENV = "LLM_SHADOW_RAW_DIR"
 RAW_TRANSCRIPT_DIR = PROJECT_ROOT / ".shadow_eval" / "private_transcripts"
@@ -330,6 +333,66 @@ class ShadowGateResult:
         }
 
 
+@dataclass(frozen=True)
+class ShadowGateSuiteEntry:
+    name: str
+    profile: ShadowGateProfile
+    production_gate: bool
+    passed: bool
+    exit_code: int
+    failure_metrics: list[str]
+    gate: ShadowGateResult
+    report_json_path: str | None
+    report_md_path: str | None
+    llm_backend: ShadowBackend | None
+    real_shadow_enabled: bool | None
+
+    def model_dump(self) -> dict[str, Any]:
+        return {
+            "name": self.name,
+            "profile": self.profile,
+            "production_gate": self.production_gate,
+            "passed": self.passed,
+            "exit_code": self.exit_code,
+            "failure_metrics": self.failure_metrics,
+            "summary": _suite_gate_summary(self.profile, self.gate.summary),
+            "thresholds": self.gate.thresholds.model_dump(),
+            "failures": [failure.model_dump() for failure in self.gate.failures],
+            "report_json_path": self.report_json_path,
+            "report_md_path": self.report_md_path,
+            "llm_backend": self.llm_backend,
+            "real_shadow_enabled": self.real_shadow_enabled,
+        }
+
+
+@dataclass(frozen=True)
+class ShadowGateSuiteReport:
+    case_id: str
+    generated_at: str
+    requested_backend: ShadowBackend
+    real_shadow_enabled: bool
+    drift_runs: int
+    production_default_drift_runs: int
+    production_mode: bool
+    passed: bool
+    exit_code: int
+    gates: list[ShadowGateSuiteEntry]
+
+    def model_dump(self) -> dict[str, Any]:
+        return {
+            "case_id": self.case_id,
+            "generated_at": self.generated_at,
+            "requested_backend": self.requested_backend,
+            "real_shadow_enabled": self.real_shadow_enabled,
+            "drift_runs": self.drift_runs,
+            "production_default_drift_runs": self.production_default_drift_runs,
+            "production_mode": self.production_mode,
+            "passed": self.passed,
+            "exit_code": self.exit_code,
+            "gates": [gate.model_dump() for gate in self.gates],
+        }
+
+
 def run_standard_path_shadow_eval(
     *,
     case_dir: Path,
@@ -345,12 +408,14 @@ def run_standard_path_shadow_eval(
     selected_scenario_path = scenario_path or case_dir / "scenarios" / "standard_path.yaml"
     scenario = read_scenario_yaml(selected_scenario_path)
     selected_backend = backend or shadow_backend_from_env()
+    selected_real_shadow_enabled = real_shadow_eval_enabled()
+    _ensure_requested_real_shadow_enabled(selected_backend, selected_real_shadow_enabled)
     report = run_shadow_eval(
         case=case,
         scenario=scenario,
         scenario_path=selected_scenario_path,
         backend=selected_backend,
-        real_shadow_enabled=real_shadow_eval_enabled(),
+        real_shadow_enabled=selected_real_shadow_enabled,
         agent=agent,
         step_index=step_index,
     )
@@ -397,6 +462,8 @@ def run_shadow_drift_eval(
     selected_scenario_path = scenario_path or case_dir / "scenarios" / "standard_path.yaml"
     scenario = read_scenario_yaml(selected_scenario_path)
     selected_backend = backend or shadow_backend_from_env()
+    selected_real_shadow_enabled = real_shadow_eval_enabled()
+    _ensure_requested_real_shadow_enabled(selected_backend, selected_real_shadow_enabled)
     drift_runs = [
         LLMShadowDriftRun(
             run_index=index,
@@ -405,7 +472,7 @@ def run_shadow_drift_eval(
                 scenario=scenario,
                 scenario_path=selected_scenario_path,
                 backend=selected_backend,
-                real_shadow_enabled=real_shadow_eval_enabled(),
+                real_shadow_enabled=selected_real_shadow_enabled,
                 step_index=step_index,
             ),
         )
@@ -417,7 +484,7 @@ def run_shadow_drift_eval(
         scenario_id=f"{selected_scenario_path.stem}_shadow_drift",
         generated_at=datetime.now(UTC).isoformat(),
         llm_backend=selected_backend,
-        real_shadow_enabled=real_shadow_eval_enabled(),
+        real_shadow_enabled=selected_real_shadow_enabled,
         run_count=runs,
         runs=drift_runs,
     )
@@ -557,12 +624,15 @@ def run_shadow_redteam_eval(
     scenario_path = case_dir / "scenarios" / "standard_path.yaml"
     _ = read_scenario_yaml(scenario_path)
     scenario = _shadow_redteam_scenario(case.meta.id)
+    selected_backend = backend or shadow_backend_from_env()
+    selected_real_shadow_enabled = real_shadow_eval_enabled()
+    _ensure_requested_real_shadow_enabled(selected_backend, selected_real_shadow_enabled)
     report = run_shadow_eval(
         case=case,
         scenario=scenario,
         scenario_path=scenario_path,
-        backend=backend or shadow_backend_from_env(),
-        real_shadow_enabled=real_shadow_eval_enabled(),
+        backend=selected_backend,
+        real_shadow_enabled=selected_real_shadow_enabled,
     )
     redteam_report = LLMShadowEvalReport(
         case_id=report.case_id,
@@ -583,6 +653,93 @@ def run_shadow_redteam_eval(
     )
     write_shadow_redteam_report(redteam_report, report_root=report_root)
     return redteam_report
+
+
+def run_shadow_gate_suite(
+    *,
+    case_dir: Path,
+    backend: ShadowBackend | None = None,
+    report_root: Path = DEFAULT_CASE_REPORT_ROOT,
+    summary_dir: Path = DEFAULT_SUMMARY_DIR,
+    drift_runs: int = DEFAULT_DRIFT_RUNS,
+    scenario_path: Path | None = None,
+) -> ShadowGateSuiteReport:
+    if drift_runs < 1:
+        raise ValueError("Drift run count must be at least 1")
+    load_dotenv()
+    case = CaseLoader().load(case_dir)
+    selected_backend = backend or shadow_backend_from_env()
+    selected_real_shadow_enabled = real_shadow_eval_enabled()
+    _ensure_requested_real_shadow_enabled(selected_backend, selected_real_shadow_enabled)
+    selected_scenario_path = scenario_path or case_dir / "scenarios" / "standard_path.yaml"
+
+    standard_report = run_standard_path_shadow_eval(
+        case_dir=case_dir,
+        scenario_path=selected_scenario_path,
+        backend=selected_backend,
+        report_root=report_root,
+    )
+    redteam_report = run_shadow_redteam_eval(
+        case_dir=case_dir,
+        backend=selected_backend,
+        report_root=report_root,
+    )
+    safety_report = run_shadow_safety_benchmark(
+        case_dir=case_dir,
+        report_root=report_root,
+    )
+    drift_report = run_shadow_drift_eval(
+        case_dir=case_dir,
+        runs=drift_runs,
+        scenario_path=selected_scenario_path,
+        backend=selected_backend,
+        report_root=report_root,
+    )
+
+    entries = [
+        _build_suite_entry(
+            name="standard_path",
+            profile="standard",
+            report=standard_report,
+            report_root=report_root,
+        ),
+        _build_suite_entry(
+            name="redteam",
+            profile="redteam",
+            report=redteam_report,
+            report_root=report_root,
+        ),
+        _build_suite_entry(
+            name="safety_benchmark",
+            profile="safety",
+            report=safety_report,
+            report_root=report_root,
+        ),
+        _build_suite_entry(
+            name="drift",
+            profile="drift",
+            report=drift_report,
+            report_root=report_root,
+            thresholds=_suite_drift_thresholds(drift_runs),
+        ),
+    ]
+    failed_production_gates = [
+        entry for entry in entries if entry.production_gate and not entry.passed
+    ]
+    suite = ShadowGateSuiteReport(
+        case_id=case.meta.id,
+        generated_at=datetime.now(UTC).isoformat(),
+        requested_backend=selected_backend,
+        real_shadow_enabled=selected_real_shadow_enabled,
+        drift_runs=drift_runs,
+        production_default_drift_runs=DEFAULT_DRIFT_RUNS,
+        production_mode=drift_runs >= DEFAULT_DRIFT_RUNS,
+        passed=not failed_production_gates,
+        exit_code=0 if not failed_production_gates else 2,
+        gates=entries,
+    )
+    write_shadow_gate_suite_report(suite, summary_dir=summary_dir)
+    return suite
 
 
 def write_shadow_benchmark_report(
@@ -633,6 +790,22 @@ def write_shadow_drift_report(
         encoding="utf-8",
     )
     md_path.write_text(render_shadow_drift_markdown(report), encoding="utf-8")
+    return json_path, md_path
+
+
+def write_shadow_gate_suite_report(
+    report: ShadowGateSuiteReport,
+    *,
+    summary_dir: Path = DEFAULT_SUMMARY_DIR,
+) -> tuple[Path, Path]:
+    summary_dir.mkdir(parents=True, exist_ok=True)
+    json_path = summary_dir / "gate_suite.json"
+    md_path = summary_dir / "gate_suite.md"
+    json_path.write_text(
+        json.dumps(report.model_dump(), ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    md_path.write_text(render_shadow_gate_suite_markdown(report), encoding="utf-8")
     return json_path, md_path
 
 
@@ -796,6 +969,91 @@ def evaluate_shadow_gate(
         thresholds=selected_thresholds,
         failures=failures,
     )
+
+
+def _build_suite_entry(
+    *,
+    name: str,
+    profile: ShadowGateProfile,
+    report: LLMShadowEvalReport | LLMShadowDriftReport,
+    report_root: Path,
+    thresholds: ShadowGateThresholds | None = None,
+) -> ShadowGateSuiteEntry:
+    gate = evaluate_shadow_gate(report, profile=profile, thresholds=thresholds)
+    json_path, md_path = _suite_report_paths(report, report_root=report_root)
+    return ShadowGateSuiteEntry(
+        name=name,
+        profile=profile,
+        production_gate=True,
+        passed=gate.passed,
+        exit_code=0 if gate.passed else 2,
+        failure_metrics=[failure.metric for failure in gate.failures],
+        gate=gate,
+        report_json_path=_display_path(json_path),
+        report_md_path=_display_path(md_path),
+        llm_backend=getattr(report, "llm_backend", None),
+        real_shadow_enabled=getattr(report, "real_shadow_enabled", None),
+    )
+
+
+def _suite_report_paths(
+    report: LLMShadowEvalReport | LLMShadowDriftReport,
+    *,
+    report_root: Path,
+) -> tuple[Path, Path]:
+    output_dir = report_root / report.case_id
+    if isinstance(report, LLMShadowDriftReport):
+        return output_dir / "llm_shadow_drift_report.json", output_dir / (
+            "llm_shadow_drift_report.md"
+        )
+    if report.scenario_id.endswith("_shadow_redteam"):
+        return output_dir / "llm_shadow_redteam_report.json", output_dir / (
+            "llm_shadow_redteam_report.md"
+        )
+    if report.scenario_id.endswith("_shadow_safety"):
+        return output_dir / "llm_shadow_safety_benchmark.json", output_dir / (
+            "llm_shadow_safety_benchmark.md"
+        )
+    return output_dir / "llm_shadow_report.json", output_dir / "llm_shadow_report.md"
+
+
+def _suite_drift_thresholds(drift_runs: int) -> ShadowGateThresholds:
+    thresholds = shadow_gate_thresholds("drift")
+    if drift_runs >= DEFAULT_DRIFT_RUNS:
+        return thresholds
+    return replace(thresholds, min_run_count=drift_runs)
+
+
+def _suite_gate_summary(
+    profile: ShadowGateProfile,
+    summary: Mapping[str, Any],
+) -> dict[str, Any]:
+    keys = (
+        (
+            "run_count",
+            "total_shadow_calls",
+            "calls_per_run_min",
+            "calls_per_run_max",
+            "runs_with_schema_failure",
+            "runs_with_director_block",
+            "runs_with_fallback",
+            "runs_with_skips",
+            "runs_with_state_pollution",
+            "state_unchanged",
+        )
+        if profile == "drift"
+        else (
+            "total_shadow_calls",
+            "schema_failure_count",
+            "director_block_count",
+            "missing_disclosure_claim_count",
+            "speech_touched_world_info_count",
+            "fallback_count",
+            "skipped_count",
+            "state_unchanged",
+        )
+    )
+    return {key: summary[key] for key in keys if key in summary}
 
 
 def _evaluate_shadow_gate_failures(
@@ -1001,7 +1259,26 @@ def shadow_backend_from_env() -> ShadowBackend:
 
 
 def real_shadow_eval_enabled() -> bool:
-    return os.getenv(SHADOW_EVAL_ENV, "").strip().lower() in {"1", "true", "yes", "on"}
+    explicit = os.getenv(SHADOW_EVAL_ENV)
+    if explicit is not None:
+        return _truthy_env_value(explicit)
+    return _truthy_env_value(os.getenv(LEGACY_REAL_SHADOW_EVAL_ENV, ""))
+
+
+def _ensure_requested_real_shadow_enabled(
+    backend: ShadowBackend,
+    real_shadow_enabled: bool,
+) -> None:
+    if backend != "real" or real_shadow_enabled:
+        return
+    raise ValueError(
+        "Real shadow eval was requested but is disabled. Set LLM_SHADOW_EVAL=1 "
+        f"or {LEGACY_REAL_SHADOW_EVAL_ENV}=1 before running --backend real."
+    )
+
+
+def _truthy_env_value(value: str) -> bool:
+    return value.strip().lower() in {"1", "true", "yes", "on"}
 
 
 def _evaluate_shadow_step(
@@ -1023,11 +1300,20 @@ def _evaluate_shadow_step(
     shadow_session = session.model_copy(deep=True)
     _prepare_shadow_context_session(case, shadow_session, action)
     context = build_agent_context(case, shadow_session, action).model_copy(deep=True)
+    turn_plan = build_agent_turn_plan(
+        case=case,
+        session=shadow_session,
+        action=action,
+        context=context,
+        security_review=PromptInjectionGuard().review(action),
+    )
+    contract_input = build_llm_agent_input(context, turn_plan=turn_plan)
     generation = _generate_shadow_intent(
         context=context,
         backend=backend,
         real_shadow_enabled=real_shadow_enabled,
         agent=agent,
+        contract_input=contract_input,
     )
     decision = director.validate(case, shadow_session.narrative, generation.intent, context)
     detected_mentions = detect_world_info_mentions(generation.intent.speech, case)
@@ -1116,6 +1402,7 @@ def _generate_shadow_intent(
     backend: ShadowBackend,
     real_shadow_enabled: bool,
     agent: AgentProtocol | None,
+    contract_input: Any | None = None,
 ) -> ShadowGenerationResult:
     start = perf_counter()
     if agent is not None:
@@ -1126,7 +1413,11 @@ def _generate_shadow_intent(
         return _skipped_generation(context, start, "shadow_eval_disabled")
     if not os.getenv("OPENAI_API_KEY"):
         return _skipped_generation(context, start, "missing_api_key")
-    return _generate_from_real_llm(context=context, start=start)
+    return _generate_from_real_llm(
+        context=context,
+        start=start,
+        contract_input=contract_input,
+    )
 
 
 def _generate_from_agent(
@@ -1160,17 +1451,21 @@ def _generate_from_agent(
     )
 
 
-def _generate_from_real_llm(*, context: Any, start: float) -> ShadowGenerationResult:
+def _generate_from_real_llm(
+    *,
+    context: Any,
+    start: float,
+    contract_input: Any | None = None,
+) -> ShadowGenerationResult:
     agent = OpenAILLMAgent()
     contract_payload: dict[str, Any] | None = None
     response_payload: dict[str, Any] | None = None
     output_payload: dict[str, Any] | None = None
     try:
-        contract_input = build_llm_agent_input(context)
+        contract_input = contract_input or build_llm_agent_input(context)
         contract_payload = contract_input.model_dump(mode="json")
-        response_payload = agent._create_response(contract_input)
-        output_payload = agent._extract_json_payload(response_payload)
-        intent = validate_llm_agent_output(output_payload, contract_input)
+        intent = agent.generate_strict(context, contract_input=contract_input)
+        output_payload = intent.model_dump(mode="json")
     except Exception as exc:
         return _failed_generation(
             context,
@@ -1776,6 +2071,43 @@ def render_shadow_drift_markdown(report: LLMShadowDriftReport) -> str:
     return "\n".join(lines).rstrip() + "\n"
 
 
+def render_shadow_gate_suite_markdown(report: ShadowGateSuiteReport) -> str:
+    lines = [
+        f"# LLM Shadow Gate Suite: {report.case_id}",
+        "",
+        f"- Requested backend: `{report.requested_backend}`",
+        f"- Real shadow enabled: `{str(report.real_shadow_enabled).lower()}`",
+        f"- Drift runs: `{report.drift_runs}`",
+        f"- Production mode: `{str(report.production_mode).lower()}`",
+        f"- Passed: `{str(report.passed).lower()}`",
+        f"- Exit code: `{report.exit_code}`",
+        "",
+        "## Gates",
+        "",
+    ]
+    for entry in report.gates:
+        lines.extend(
+            [
+                f"### {entry.name}",
+                "",
+                f"- Profile: `{entry.profile}`",
+                f"- Production gate: `{str(entry.production_gate).lower()}`",
+                f"- Passed: `{str(entry.passed).lower()}`",
+                f"- Failure metrics: `{', '.join(entry.failure_metrics) or 'none'}`",
+                f"- Report JSON: `{entry.report_json_path or 'none'}`",
+                f"- Report MD: `{entry.report_md_path or 'none'}`",
+                "",
+            ]
+        )
+        summary_lines = (
+            _drift_summary_lines(entry.gate.summary)
+            if entry.profile == "drift"
+            else _summary_lines(entry.gate.summary)
+        )
+        lines.extend([*summary_lines, ""])
+    return "\n".join(lines).rstrip() + "\n"
+
+
 def _summary_lines(summary: Mapping[str, Any]) -> list[str]:
     keys = [
         "total_shadow_calls",
@@ -1989,7 +2321,10 @@ def _prepare_shadow_context_session(
 
 
 def _is_agent_action(action: PlayerAction) -> bool:
-    return action.type in {ActionType.TALK, ActionType.ASK_ABOUT, ActionType.PRESENT_CLUE}
+    return (
+        action.type in {ActionType.TALK, ActionType.ASK_ABOUT, ActionType.PRESENT_CLUE}
+        and not action.force_forbidden
+    )
 
 
 def _state_fingerprint(case: CasePackage, session: SessionState) -> dict[str, Any]:
@@ -2151,6 +2486,19 @@ def main(argv: list[str] | None = None) -> None:
         if args.scenario is not None
         else case_dir / "scenarios" / "standard_path.yaml"
     )
+    if args.suite:
+        suite = run_shadow_gate_suite(
+            case_dir=case_dir,
+            backend=args.backend,
+            report_root=_resolve_cli_path(args.report_root),
+            summary_dir=_resolve_cli_path(args.summary_dir),
+            drift_runs=args.runs,
+            scenario_path=scenario_path,
+        )
+        print(json.dumps(suite.model_dump(), ensure_ascii=False, indent=2))
+        if suite.exit_code:
+            raise SystemExit(suite.exit_code)
+        return
     if args.benchmark == "safety":
         report = run_shadow_safety_benchmark(
             case_dir=case_dir,
@@ -2195,6 +2543,11 @@ def main(argv: list[str] | None = None) -> None:
             evaluate_shadow_gate(
                 report,
                 profile=args.gate_profile or "drift",
+                thresholds=(
+                    _suite_drift_thresholds(args.runs)
+                    if args.gate_profile is None
+                    else None
+                ),
             )
             if args.gate
             else None
@@ -2235,6 +2588,11 @@ def _parse_cli_args(argv: list[str] | None) -> argparse.Namespace:
     parser.add_argument("--benchmark", choices=["safety"])
     parser.add_argument("--redteam", action="store_true")
     parser.add_argument("--drift", action="store_true")
+    parser.add_argument(
+        "--suite",
+        action="store_true",
+        help="Run standard, redteam, safety, and drift gates as one release suite.",
+    )
     parser.add_argument("--runs", type=int, default=DEFAULT_DRIFT_RUNS)
     parser.add_argument("--all", action="store_true")
     parser.add_argument(
@@ -2252,6 +2610,8 @@ def _parse_cli_args(argv: list[str] | None) -> argparse.Namespace:
         parser.error("--redteam and --benchmark are mutually exclusive")
     if args.all and any([args.redteam, args.benchmark, args.drift, args.case_dir, args.scenario]):
         parser.error("--all cannot be combined with case-specific modes")
+    if args.suite and any([args.redteam, args.benchmark, args.drift, args.all]):
+        parser.error("--suite cannot be combined with --all, --redteam, --benchmark, or --drift")
     if args.runs < 1:
         parser.error("--runs must be at least 1")
     args.case_id = args.case or args.case_id or "mist_clock_manor"

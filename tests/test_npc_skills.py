@@ -189,6 +189,55 @@ def test_npc_skill_caps_director_safe_fragment_modes() -> None:
     assert DisclosureMode.PARTIAL not in constraint.safe_fragments[0].allowed_modes
 
 
+def test_npc_skill_safe_fragment_survives_stricter_fact_strategy() -> None:
+    case = CaseLoader().load(CASE_DIR)
+    character_index = next(
+        index for index, character in enumerate(case.characters) if character.id == "butler"
+    )
+    butler = case.characters[character_index]
+    case.characters[character_index] = butler.model_copy(
+        update={
+            "private": butler.private.model_copy(
+                update={
+                    "disclosure_style": butler.private.disclosure_style.model_copy(
+                        update={
+                            "max_mode_by_world_info": {
+                                **butler.private.disclosure_style.max_mode_by_world_info,
+                                "desk_forced_open": DisclosureMode.DEFLECT,
+                            }
+                        }
+                    )
+                }
+            )
+        }
+    )
+    runtime = create_runtime([case], runtime_tracer=RuntimeTracer.disabled())
+    session = runtime.session_store.create(case)
+    runtime.action_service.handle(
+        session=session,
+        action=PlayerAction(type=ActionType.INSPECT, target_id="desk"),
+    )
+
+    context = runtime.agent_loop.build_context(
+        case=case,
+        session=session,
+        action=_ask_about_drawer(),
+    )
+    contract_input = build_llm_agent_input(context)
+    constraint = next(
+        item
+        for item in contract_input.disclosure_constraints
+        if item.item_kind == "world_info" and item.item_id == "desk_forced_open"
+    )
+
+    assert [fragment.ref for fragment in context.director_safe_fragments] == [
+        SAFE_FRAGMENT_REF
+    ]
+    assert constraint.safe_fragments[0].ref == SAFE_FRAGMENT_REF
+    assert DisclosureMode.PARTIAL in constraint.allowed_modes
+    assert DisclosureMode.PARTIAL not in constraint.forbidden_modes
+
+
 def test_llm_contract_includes_skill_projection_without_unlocking_more_facts() -> None:
     case = CaseLoader().load(CASE_DIR)
     runtime = create_runtime([case], runtime_tracer=RuntimeTracer.disabled())
@@ -243,7 +292,7 @@ def test_runtime_trace_records_npc_skill_projection_without_sensitive_content() 
     projection = record["npc_skill_projection"]
     serialized_projection = json.dumps(projection, ensure_ascii=False)
 
-    assert record["schema_version"] == 7
+    assert record["schema_version"] == 8
     assert projection["selected_skill_ids"] == [SKILL_ID]
     assert projection["skill_safe_fragment_refs"] == [SAFE_FRAGMENT_REF]
     assert projection["items"][0]["safe_fragment_refs"] == [SAFE_FRAGMENT_REF]

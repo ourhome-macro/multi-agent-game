@@ -12,7 +12,7 @@
 - director_block_count: `4`
 - missing_disclosure_claim_count: `1`
 - speech_touched_world_info_count: `2`
-- mode_violation_count: `2`
+- mode_violation_count: `1`
 - full_reveal_block_count: `1`
 - fallback_count: `5`
 - skipped_count: `0`
@@ -24,7 +24,6 @@
 - failure_category.schema.invalid: `1`
 - failure_category.schema.invalid.unsupported_action: `1`
 - failure_category.schema.invalid.validationerror: `1`
-- failure_category.speech.directness_exceeds_mode: `1`
 - failure_category.speech.missing_disclosure_claim: `1`
 - failure_category.speech.world_info_touch_blocked: `1`
 
@@ -67,7 +66,7 @@
 - LLM success: `true`
 - Schema valid: `true`
 - Director blocked: `true`
-- Block reason: `Speech directness 'direct_claim' exceeds disclosure mode 'hint'`
+- Block reason: `Safe fragment 'wine_residue_indicates_sedative' for world_info 'sedative_wine' is not unlocked`
 - Disclosure claims: `1`
 - Speech touched WorldInfo: `true`
 - Missing disclosure claim: `false`
@@ -82,7 +81,7 @@
 - LLM success: `true`
 - Schema valid: `true`
 - Director blocked: `true`
-- Block reason: `Speech touched world_info 'timed_lock_modified' without a disclosure claim`
+- Block reason: `Speech touched safe fragment 'lock_has_delay_marks' for world_info 'timed_lock_modified' without a disclosure claim`
 - Disclosure claims: `0`
 - Speech touched WorldInfo: `true`
 - Missing disclosure claim: `true`

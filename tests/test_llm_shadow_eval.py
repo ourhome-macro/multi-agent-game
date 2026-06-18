@@ -18,12 +18,15 @@ from app.domain.models import (
 from app.evaluations.llm_shadow_eval import (
     ShadowGateThresholds,
     evaluate_shadow_gate,
+    real_shadow_eval_enabled,
     run_all_standard_path_shadow_evals,
+    run_shadow_gate_suite,
     run_shadow_drift_eval,
     run_shadow_eval,
     run_shadow_redteam_eval,
     run_shadow_safety_benchmark,
     run_standard_path_shadow_eval,
+    shadow_backend_from_env,
     write_shadow_report,
 )
 from app.evaluations.llm_shadow_eval import (
@@ -222,6 +225,45 @@ def test_real_shadow_eval_without_api_key_is_safely_skipped(monkeypatch: Any) ->
     }
 
 
+def test_legacy_real_shadow_eval_enable_env_is_supported(monkeypatch: Any) -> None:
+    monkeypatch.delenv("LLM_SHADOW_EVAL", raising=False)
+    monkeypatch.setenv("LLM_SHADOW_EVAL_ENABLE_REAL", "1")
+    monkeypatch.setenv("LLM_BACKEND", "real")
+
+    assert real_shadow_eval_enabled() is True
+    assert shadow_backend_from_env() == "real"
+
+
+def test_explicit_shadow_eval_env_overrides_legacy_enable(monkeypatch: Any) -> None:
+    monkeypatch.setenv("LLM_SHADOW_EVAL", "0")
+    monkeypatch.setenv("LLM_SHADOW_EVAL_ENABLE_REAL", "1")
+    monkeypatch.setenv("LLM_BACKEND", "real")
+
+    assert real_shadow_eval_enabled() is False
+    assert shadow_backend_from_env() == "stub"
+
+
+def test_explicit_real_backend_requires_enabled_shadow_eval(
+    tmp_path: Path,
+    monkeypatch: Any,
+) -> None:
+    monkeypatch.setenv("LLM_LOAD_DOTENV", "0")
+    monkeypatch.delenv("LLM_SHADOW_EVAL", raising=False)
+    monkeypatch.setenv("LLM_SHADOW_EVAL_ENABLE_REAL", "0")
+
+    try:
+        run_standard_path_shadow_eval(
+            case_dir=MIST_CASE_DIR,
+            backend="real",
+            report_root=tmp_path,
+            step_index=6,
+        )
+    except ValueError as exc:
+        assert "Real shadow eval was requested but is disabled" in str(exc)
+    else:
+        raise AssertionError("Expected real shadow eval to fail when disabled")
+
+
 def test_raw_transcript_is_private_opt_in_and_not_public_report(
     tmp_path: Path,
     monkeypatch: Any,
@@ -266,11 +308,11 @@ def test_step_filter_runs_only_selected_dialogue_step(tmp_path: Path) -> None:
     report = run_standard_path_shadow_eval(
         case_dir=MIST_CASE_DIR,
         report_root=tmp_path,
-        step_index=6,
+        step_index=7,
     )
 
-    assert [step.step_index for step in report.steps] == [6]
-    assert report.steps[0].action_type == "talk"
+    assert [step.step_index for step in report.steps] == [7]
+    assert report.steps[0].action_type == "present_clue"
 
 
 def test_all_mode_discovers_standard_paths_and_writes_summary(tmp_path: Path) -> None:
@@ -308,7 +350,7 @@ def test_shadow_safety_benchmark_generates_expected_guardrail_report(
     assert summary["director_block_count"] == 4
     assert summary["missing_disclosure_claim_count"] == 1
     assert summary["speech_touched_world_info_count"] == 2
-    assert summary["mode_violation_count"] == 2
+    assert summary["mode_violation_count"] == 1
     assert summary["full_reveal_block_count"] == 1
     assert summary["state_unchanged"] is True
     assert summary["failure_category_counts"] == {
@@ -319,7 +361,6 @@ def test_shadow_safety_benchmark_generates_expected_guardrail_report(
         "schema.invalid": 1,
         "schema.invalid.unsupported_action": 1,
         "schema.invalid.validationerror": 1,
-        "speech.directness_exceeds_mode": 1,
         "speech.missing_disclosure_claim": 1,
         "speech.world_info_touch_blocked": 1,
     }
@@ -384,7 +425,7 @@ def test_shadow_drift_eval_writes_sanitized_summary(tmp_path: Path) -> None:
         runs=3,
         backend="stub",
         report_root=tmp_path,
-        step_index=6,
+        step_index=7,
     )
     payload = report.model_dump()
     serialized = (
@@ -398,12 +439,39 @@ def test_shadow_drift_eval_writes_sanitized_summary(tmp_path: Path) -> None:
     assert payload["summary"]["runs_with_state_pollution"] == 0
     assert payload["summary"]["state_unchanged"] is True
     assert len(payload["summary"]["step_drift"]) == 1
-    assert payload["summary"]["step_drift"][0]["step_index"] == 6
+    assert payload["summary"]["step_drift"][0]["step_index"] == 7
     assert payload["summary"]["step_drift"][0]["observations"] == 3
     assert payload["summary"]["step_drift"][0]["variant_count"] == 1
     assert "Tell me what you hid" not in serialized
     assert "is not connected to an external model yet" not in serialized
     assert (tmp_path / "mist_clock_manor" / "llm_shadow_drift_report.md").exists()
+
+
+def test_shadow_gate_suite_runs_all_release_gates_with_stub(
+    tmp_path: Path,
+    monkeypatch: Any,
+) -> None:
+    monkeypatch.setenv("LLM_LOAD_DOTENV", "0")
+    suite = run_shadow_gate_suite(
+        case_dir=MIST_CASE_DIR,
+        backend="stub",
+        report_root=tmp_path / "case",
+        summary_dir=tmp_path / "summary",
+        drift_runs=2,
+    )
+    payload = json.loads((tmp_path / "summary" / "gate_suite.json").read_text("utf-8"))
+
+    assert suite.passed is True
+    assert suite.exit_code == 0
+    assert {entry.name for entry in suite.gates} == {
+        "standard_path",
+        "redteam",
+        "safety_benchmark",
+        "drift",
+    }
+    assert payload["passed"] is True
+    assert payload["drift_runs"] == 2
+    assert (tmp_path / "summary" / "gate_suite.md").exists()
 
 
 def test_standard_shadow_gate_passes_clean_report() -> None:
@@ -463,7 +531,7 @@ def test_drift_shadow_gate_enforces_run_count_and_clean_runs(tmp_path: Path) -> 
         runs=2,
         backend="stub",
         report_root=tmp_path,
-        step_index=6,
+        step_index=7,
     )
 
     gate = evaluate_shadow_gate(
@@ -495,7 +563,7 @@ def test_drift_shadow_gate_fails_when_required_run_count_not_met(
         runs=2,
         backend="stub",
         report_root=tmp_path,
-        step_index=6,
+        step_index=7,
     )
 
     gate = evaluate_shadow_gate(report, profile="drift")
@@ -512,8 +580,8 @@ def test_llm_shadow_eval_cli_gate_success_wraps_payload(
         [
             "--case",
             "mist_clock_manor",
-            "--step",
-            "6",
+                "--step",
+                "7",
             "--backend",
             "stub",
             "--report-root",
@@ -528,38 +596,31 @@ def test_llm_shadow_eval_cli_gate_success_wraps_payload(
     assert payload["payload"]["summary"]["total_shadow_calls"] == 1
 
 
-def test_llm_shadow_eval_cli_gate_failure_exits_nonzero(
+def test_llm_shadow_eval_cli_drift_gate_uses_requested_run_count(
     tmp_path: Path,
     capsys: Any,
 ) -> None:
-    try:
-        llm_shadow_eval_main(
-            [
-                "--case",
-                "mist_clock_manor",
-                "--drift",
-                "--runs",
-                "2",
+    llm_shadow_eval_main(
+        [
+            "--case",
+            "mist_clock_manor",
+            "--drift",
+            "--runs",
+            "2",
                 "--step",
-                "6",
-                "--backend",
-                "stub",
-                "--report-root",
-                str(tmp_path),
-                "--gate",
-            ]
-        )
-    except SystemExit as exc:
-        assert exc.code == 2
-    else:
-        raise AssertionError("Expected gated drift eval to fail with SystemExit(2)")
+                "7",
+            "--backend",
+            "stub",
+            "--report-root",
+            str(tmp_path),
+            "--gate",
+        ]
+    )
     payload = json.loads(capsys.readouterr().out)
 
-    assert payload["gate"]["passed"] is False
-    assert any(
-        failure["metric"] == "run_count"
-        for failure in payload["gate"]["failures"]
-    )
+    assert payload["gate"]["passed"] is True
+    assert payload["gate"]["thresholds"]["min_run_count"] == 2
+    assert payload["payload"]["summary"]["run_count"] == 2
 
 
 def test_llm_shadow_eval_module_cli_runs_drift_summary(
@@ -573,8 +634,8 @@ def test_llm_shadow_eval_module_cli_runs_drift_summary(
             "--drift",
             "--runs",
             "2",
-            "--step",
-            "6",
+                "--step",
+                "7",
             "--backend",
             "stub",
             "--report-root",
@@ -629,7 +690,9 @@ def test_mist_clock_manor_standard_path_can_run_shadow_eval(tmp_path: Path) -> N
     )
     spec = load_scenario_evaluation_spec(MIST_CASE_DIR / "scenarios" / "standard_path.yaml")
     expected_agent_step_count = sum(
-        step.action.type in {"talk", "ask_about", "present_clue"} for step in spec.steps
+        step.action.type in {"talk", "ask_about", "present_clue"}
+        and not step.action.force_forbidden
+        for step in spec.steps
     )
 
     assert report.case_id == "mist_clock_manor"

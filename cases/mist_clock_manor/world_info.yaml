@@ -18,9 +18,14 @@
         aliases:
           - bitter wine residue
           - sedative trace in wine
+          - 苦味红酒残液
+          - 红酒镇静剂痕迹
+          - 红酒安眠药痕迹
         claim_patterns:
           - "bitter wine residue"
           - "sedative trace"
+          - "红酒.*(镇静剂|安眠药|药)"
+          - "酒.*(下药|有药)"
         allowed_modes:
           - hint
           - partial
@@ -48,9 +53,17 @@
         aliases:
           - study lock delay marks
           - delayed lock marks
+          - 门锁延时痕迹
+          - 延时落锁痕迹
+          - 延迟落锁痕迹
+          - 延迟落锁
         claim_patterns:
           - "study lock.*delay"
           - "delayed lock marks"
+          - "门锁.*(延时|改|动过)"
+          - "锁.*延时"
+          - "(延时|延迟).*落锁"
+          - "(延时|延迟).*痕迹"
         allowed_modes:
           - hint
           - partial
@@ -100,6 +113,23 @@
   claim_patterns:
     - "忏悔信.*(伪造|洗白)"
     - "旧案.*包装.*意外"
+
+  claim_graph:
+    safe_fragments:
+      - id: burned_confession_points_to_old_case_coverup
+        summary: Player has evidence that the burned confession appendix points to an old-case coverup plan.
+        aliases:
+          - burned confession appendix
+          - old-case coverup plan
+        claim_patterns:
+          - "burned confession"
+          - "old-case coverup"
+        allowed_modes:
+          - hint
+          - partial
+        unlock_conditions:
+          player_knowledge_ids:
+            - player_knowledge.fake_confession_plan
 
 - id: jiang_ruolan_recording_exists
   title: 江若岚旧录音存在

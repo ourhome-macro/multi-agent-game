@@ -144,7 +144,7 @@ def test_runtime_trace_writes_safe_jsonl_and_readable_log(tmp_path: Path) -> Non
 
     assert len(records) == 1
     record = records[0]
-    assert record["schema_version"] == 7
+    assert record["schema_version"] == 8
     assert record["timestamp"]
     assert record["turn_id"] == 1
     assert record["action_type"] == "talk"
@@ -162,6 +162,8 @@ def test_runtime_trace_writes_safe_jsonl_and_readable_log(tmp_path: Path) -> Non
     )
     assert record["memory_projection"]["memory_conflict_resolution"] == []
     assert record["npc_skill_projection"]["selected_skill_ids"] == []
+    assert record["turn_plan_id"].startswith("agent_turn_plan.")
+    assert record["output_contract_summary"]["allowed_proposed_action_types"] == []
     assert record["context_layer_budget"]["hard_context_preserved"] is True
     assert set(record["context_layer_budget"]) == {
         "compression_scope",

@@ -65,26 +65,33 @@ class NarrativeDirector:
         context: AgentContext,
     ) -> tuple[SafeFactFragmentProjection, ...]:
         constraints = _world_info_constraints_by_id(context)
-        if not constraints:
+        skill_safe_fragment_refs = _skill_safe_fragment_refs(context)
+        if not constraints and not skill_safe_fragment_refs:
             return ()
+        allowed_world_info_ids = set(constraints) | _world_info_ids_from_fragment_refs(
+            skill_safe_fragment_refs
+        )
         projections = FactGateway(
             case=case,
             narrative=narrative,
             context=context,
         ).safe_fragment_projections(
-            allowed_world_info_ids=set(constraints),
+            allowed_world_info_ids=allowed_world_info_ids,
         )
-        return tuple(
-            projection
-            for projection in (
-                _project_fragment_for_strategy(
-                    projection,
-                    constraints[projection.world_info_id],
-                )
-                for projection in projections
+        safe_fragments: dict[str, SafeFactFragmentProjection] = {}
+        for projection in projections:
+            strategy = constraints.get(projection.world_info_id)
+            strategy_projection = (
+                _project_fragment_for_strategy(projection, strategy)
+                if strategy is not None
+                else None
             )
-            if projection is not None
-        )
+            if strategy_projection is not None:
+                safe_fragments[strategy_projection.ref] = strategy_projection
+                continue
+            if projection.ref in skill_safe_fragment_refs:
+                safe_fragments[projection.ref] = projection
+        return tuple(safe_fragments.values())
 
     def precheck_player_action(
         self,
@@ -183,6 +190,10 @@ class NarrativeDirector:
                 )
             allowed_modes = set(constraint.allowed_modes)
             forbidden_modes = set(constraint.forbidden_modes)
+            fragment_modes = _referenced_safe_fragment_modes(context, claim)
+            if fragment_modes:
+                allowed_modes.update(fragment_modes)
+                forbidden_modes.difference_update(fragment_modes)
             if claim.mode == DisclosureMode.FULL:
                 return _blocked_disclosure(
                     claim,
@@ -299,6 +310,54 @@ def _world_info_constraints_by_id(context: AgentContext) -> dict[str, FactDisclo
         strategy.world_info_id: strategy
         for strategy in context.inner_context.fact_disclosure_strategies
     }
+
+
+def _skill_safe_fragment_refs(context: AgentContext) -> set[str]:
+    return {
+        ref
+        for skill in context.npc_skill_projections
+        for ref in skill.safe_fragment_refs
+    }
+
+
+def _world_info_ids_from_fragment_refs(refs: set[str]) -> set[str]:
+    return {
+        ref.split(".safe_fragment:", 1)[0]
+        for ref in refs
+        if ".safe_fragment:" in ref
+    }
+
+
+def _referenced_safe_fragment_modes(
+    context: AgentContext,
+    claim: DisclosureClaim,
+) -> set[DisclosureMode]:
+    refs = set(claim.claim_refs) | set(claim.source_refs)
+    modes: set[DisclosureMode] = set()
+    for fragment in context.director_safe_fragments:
+        if fragment.world_info_id != claim.world_info_id:
+            continue
+        if not _claim_refs_match_projection(fragment, refs):
+            continue
+        modes.update(mode for mode in fragment.allowed_modes if mode != DisclosureMode.FULL)
+    return modes
+
+
+def _claim_refs_match_projection(
+    fragment: SafeFactFragmentProjection,
+    refs: set[str],
+) -> bool:
+    return bool(
+        refs
+        & {
+            fragment.ref,
+            fragment.fragment_id,
+            f"safe_fragment:{fragment.fragment_id}",
+            f"{fragment.world_info_id}.{fragment.fragment_id}",
+            f"{fragment.world_info_id}:{fragment.fragment_id}",
+            *fragment.source_refs,
+        }
+    )
 
 
 def _project_fragment_for_strategy(

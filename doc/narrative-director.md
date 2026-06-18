@@ -95,6 +95,15 @@ Action Intake -> optional Director precheck surface -> RuleEngine player action
 
 Director 当前已经消费 `CharacterInnerContext.fact_disclosure_strategies`，把生成前的策略约束变成生成后的执法规则。Agent 或 LLM 可以选择话术，但不能自己决定事实披露边界。
 
+2026-06-18 起，`NarrativeDirector.safe_fragment_constraints(...)` 会合并两类生成前安全片段：
+
+- 角色当前 `FactDisclosureStrategy` 允许的 unlocked safe fragment。
+- 当前已选中 NPC Skill 显式白名单授权的 unlocked safe fragment。
+
+第二类只开放 skill 的 `safe_fragment_refs`，不会把同一 `WorldInfo` 的其他片段或完整事实放进合同。进入 `AgentContext.director_safe_fragments` 后，还会按 NPC Skill 的 `max_mode` 截断 allowed modes。这样可以表达“角色不能承认完整机制，但可以围绕玩家已展示证据作有限提示”的边界。
+
+Director 的 claim 前置校验也会识别已授权 safe fragment claim：如果 `disclosure_claim` 引用了当前上下文里的 safe fragment，且 `mode` 在该 fragment 的 allowed modes 内，则允许它通过角色 fact strategy 的更保守整体上限，后续仍交给 `FactGateway` 校验 fragment 是否已解锁、claim refs 是否匹配、speech 是否触碰 forbidden inference。普通证据 ref 可以作为审计来源保留，但不能单独证明 safe fragment 披露；claim 必须指向 fragment ref、fragment id 变体或该 fragment 的 source refs，才能通过 safe fragment 匹配。`full` 永远不允许。
+
 后续 Director 仍应进一步检查生成台词是否：
 
 - 透露锁定的禁说事实
@@ -137,7 +146,7 @@ LLM Shadow Eval v0 会调用同一个 `NarrativeDirector.validate(case, narrativ
 
 `NarrativeDirector.fact_gateway_summary(...)` 可生成审计摘要，列出当前可披露片段、被锁片段和禁推断。`NarrativeDirector.safe_fragment_constraints(...)` 是生成链路入口：`AgentLoop` 在调用 AgentGateway 前把它写入 `AgentContext.director_safe_fragments`。该投影只包含当前目标 NPC 有 `FactDisclosureStrategy` 的 `WorldInfo`，并且只包含已解锁 safe fragment 的 safe summary、fragment ref、allowed modes 和授权 source refs。
 
-真实 LLM 合同会把这些 safe fragments 合并进 `LLMDisclosureConstraint.safe_fragments` / `safe_fact_refs`。blocked fragments、forbidden inference summary、solution claims、world truth 原文和 forbidden fact 原文不得进入 prompt。生成后，Director 使用同一个 `FactGateway` 校验 `disclosure_claims` 与最终 `speech`：claim 必须引用授权 safe fragment；speech 命中 safe fragment alias / pattern 时必须有匹配 claim；多个 fragment 或 world_info 组合触发 locked forbidden inference 时必须 block。
+真实 LLM 合同会把这些 safe fragments 合并进 `LLMDisclosureConstraint.safe_fragments` / `safe_fact_refs`。`safe_fact_refs` 可包含普通证据 ref 供模型说明依据，但本地 LLM contract 和 Director 都只把 fragment ref、fragment id 变体或 fragment source refs 视为 safe fragment 引用。blocked fragments、forbidden inference summary、solution claims、world truth 原文和 forbidden fact 原文不得进入 prompt。生成后，Director 使用同一个 `FactGateway` 校验 `disclosure_claims` 与最终 `speech`：claim 必须引用授权 safe fragment；speech 命中 safe fragment alias / pattern 时必须有匹配 claim；多个 fragment 或 world_info 组合触发 locked forbidden inference 时必须 block。
 
 结构化网关和旧 forbidden terms 并存：旧案件不配置 `claim_graph` 时仍按原逻辑运行；新案件应逐步把核心案件真相拆成 safe fragments 和 forbidden inferences，避免仅靠字符串禁词守门。
 

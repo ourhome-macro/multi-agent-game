@@ -19,6 +19,7 @@
       source_memory_ids:
         - memory.player.presented_clue.{target_id}.{clue_id}
       metadata:
+        authority_source: player_evidence
         belief_subject: player_approaching_medicine_truth
         belief_polarity: believes
         clue_id: empty_capsules
@@ -38,6 +39,7 @@
       source_memory_ids:
         - memory.player.presented_clue.{target_id}.{clue_id}
       metadata:
+        authority_source: player_evidence
         relationship_delta:
           suspicion: 0.2
           trust: -0.1
@@ -58,6 +60,7 @@
       source_memory_ids:
         - memory.player.presented_clue.{target_id}.{clue_id}
       metadata:
+        authority_source: player_evidence
         strategy_id: avoid_medicine_topic
         clue_id: empty_capsules
   impression:
@@ -89,6 +92,7 @@
       source_memory_ids:
         - memory.player.asked_about.{target_id}.{subject_type}.{subject_id}
       metadata:
+        authority_source: player_evidence
         belief_subject: player_approaching_medicine_truth
         belief_polarity: believes
         clue_id: empty_capsules
@@ -108,6 +112,7 @@
       source_memory_ids:
         - memory.player.asked_about.{target_id}.{subject_type}.{subject_id}
       metadata:
+        authority_source: player_evidence
         relationship_delta:
           suspicion: 0.2
           trust: -0.1
@@ -128,6 +133,7 @@
       source_memory_ids:
         - memory.player.asked_about.{target_id}.{subject_type}.{subject_id}
       metadata:
+        authority_source: player_evidence
         strategy_id: avoid_medicine_topic
         clue_id: empty_capsules
   impression:
@@ -159,6 +165,7 @@
       source_memory_ids:
         - memory.player.asked_about.{target_id}.{subject_type}.{subject_id}
       metadata:
+        authority_source: player_evidence
         belief_subject: player_noticed_tape_splice_sequence
         belief_polarity: believes
         clue_id: tape_splice_mark
@@ -178,6 +185,7 @@
       source_memory_ids:
         - memory.player.asked_about.{target_id}.{subject_type}.{subject_id}
       metadata:
+        authority_source: player_evidence
         strategy_id: admit_partial_tape_contact
         clue_id: tape_splice_mark
   impression:
@@ -209,6 +217,7 @@
       source_memory_ids:
         - memory.player.presented_clue.{target_id}.{clue_id}
       metadata:
+        authority_source: player_evidence
         belief_subject: player_connecting_lock_delay_to_timing
         belief_polarity: believes
         clue_id: lock_test_scrap
@@ -228,6 +237,7 @@
       source_memory_ids:
         - memory.player.presented_clue.{target_id}.{clue_id}
       metadata:
+        authority_source: player_evidence
         strategy_id: concede_timing_not_causality
         clue_id: lock_test_scrap
   impression:

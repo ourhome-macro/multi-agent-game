@@ -331,11 +331,14 @@ def _constraint_from_fact_disclosure_strategy(
         for fragment in (safe_fragments or [])
         if fragment.world_info_id == strategy.world_info_id
     ]
+    allowed_modes = _constraint_allowed_modes(strategy, safe_fragments)
     return LLMDisclosureConstraint(
         item_id=strategy.world_info_id,
         item_kind="world_info",
-        allowed_modes=strategy.allowed_modes,
-        forbidden_modes=strategy.forbidden_modes,
+        allowed_modes=allowed_modes,
+        forbidden_modes=[
+            mode for mode in strategy.forbidden_modes if mode not in set(allowed_modes)
+        ],
         direct_reveal_allowed=False,
         direct_quote_allowed=False,
         related_clue_ids=strategy.evidence_clue_ids,
@@ -346,6 +349,21 @@ def _constraint_from_fact_disclosure_strategy(
         safe_fragments=safe_fragments,
         blocked=DisclosureMode.FULL in strategy.forbidden_modes,
     )
+
+
+def _constraint_allowed_modes(
+    strategy: FactDisclosureStrategy,
+    safe_fragments: list[SafeFactFragmentProjection],
+) -> list[DisclosureMode]:
+    modes = [mode for mode in strategy.allowed_modes if mode != DisclosureMode.FULL]
+    seen = set(modes)
+    for fragment in safe_fragments:
+        for mode in fragment.allowed_modes:
+            if mode == DisclosureMode.FULL or mode in seen:
+                continue
+            modes.append(mode)
+            seen.add(mode)
+    return [mode for mode in DisclosureMode if mode in seen and mode != DisclosureMode.FULL]
 
 
 def _safe_fact_refs(
@@ -441,7 +459,7 @@ def _validate_disclosure_claims(
 def _authorized_safe_fragment_refs(
     constraint: LLMDisclosureConstraint,
 ) -> set[str]:
-    refs = set(constraint.safe_fact_refs)
+    refs: set[str] = set()
     for fragment in constraint.safe_fragments:
         refs.add(fragment.ref)
         refs.add(fragment.fragment_id)

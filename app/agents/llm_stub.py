@@ -23,10 +23,21 @@ class LLMAgentStub:
                     f"{contract_input.agent_context.target_agent_id} is not connected "
                     "to an external model yet."
                 ),
-                "intent": AgentIntentType.REFUSE,
+                "intent": _stub_intent(contract_input),
                 "emotional_shift": {},
                 "proposed_actions": [],
                 "memory_refs": [],
                 "disclosure_claims": [],
-            }
+            },
+            contract_input,
         )
+
+
+def _stub_intent(contract_input: LLMAgentContractInput) -> AgentIntentType:
+    allowed = contract_input.output_contract.allowed_intents
+    fallback = contract_input.output_contract.fallback_intent
+    if fallback in allowed:
+        return fallback
+    if AgentIntentType.CONCEAL in allowed:
+        return AgentIntentType.CONCEAL
+    return allowed[0] if allowed else fallback

@@ -1,13 +1,13 @@
 # LLM Shadow Eval Report: mist_clock_manor
 
 - Scenario: `cases\mist_clock_manor\scenarios\standard_path.yaml`
-- Backend: `real`
-- Real shadow enabled: `true`
+- Backend: `stub`
+- Real shadow enabled: `false`
 - State unchanged: `true`
 
 ## Summary
 
-- total_shadow_calls: `4`
+- total_shadow_calls: `3`
 - schema_failure_count: `0`
 - director_block_count: `0`
 - missing_disclosure_claim_count: `0`
@@ -28,9 +28,10 @@
 - Schema valid: `true`
 - Director blocked: `false`
 - Block reason: `none`
-- Disclosure claims: `1`
+- Disclosure claims: `0`
 - Speech touched WorldInfo: `false`
 - Missing disclosure claim: `false`
+- Missing disclosure claim ids: `none`
 - Fallback used: `false`
 - State unchanged: `true`
 
@@ -42,23 +43,10 @@
 - Schema valid: `true`
 - Director blocked: `false`
 - Block reason: `none`
-- Disclosure claims: `1`
-- Speech touched WorldInfo: `false`
-- Missing disclosure claim: `false`
-- Fallback used: `false`
-- State unchanged: `true`
-
-### Step 6: director blocks jiang medicine reveal before reconstruction
-
-- Action: `talk` -> `jiang_yanhui`
-- Phase: `confrontation`
-- LLM success: `true`
-- Schema valid: `true`
-- Director blocked: `false`
-- Block reason: `none`
 - Disclosure claims: `0`
 - Speech touched WorldInfo: `false`
 - Missing disclosure claim: `false`
+- Missing disclosure claim ids: `none`
 - Fallback used: `false`
 - State unchanged: `true`
 
@@ -73,5 +61,6 @@
 - Disclosure claims: `0`
 - Speech touched WorldInfo: `false`
 - Missing disclosure claim: `false`
+- Missing disclosure claim ids: `none`
 - Fallback used: `false`
 - State unchanged: `true`

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -209,6 +210,41 @@ def test_no_selected_skill_blocks_active_proposed_actions_by_default() -> None:
         )
 
 
+def test_no_selected_skill_rejects_full_disclosure_claim_by_default() -> None:
+    case = CaseLoader().load(CASE_DIR)
+    runtime = create_runtime([case], runtime_tracer=RuntimeTracer.disabled())
+    session = runtime.session_store.create(case)
+    action = PlayerAction(
+        type=ActionType.TALK,
+        target_id="butler",
+        text="Just chatting.",
+    )
+    context = runtime.agent_loop.build_context(case=case, session=session, action=action)
+    contract = build_llm_agent_input(context)
+
+    assert context.npc_skill_projections == []
+    with pytest.raises(LLMAgentPolicyViolationError, match="disclosure mode"):
+        validate_llm_agent_output(
+            {
+                "speech": "The drawer was forced open and that is the full truth.",
+                "intent": "answer",
+                "emotional_shift": {},
+                "proposed_actions": [],
+                "memory_refs": [],
+                "disclosure_claims": [
+                    {
+                        "world_info_id": "desk_forced_open",
+                        "mode": DisclosureMode.FULL.value,
+                        "tactic": "answer_adjacent_truth",
+                        "source_refs": [],
+                        "claim_refs": [],
+                    }
+                ],
+            },
+            contract,
+        )
+
+
 def test_explicit_turn_plan_can_be_passed_to_llm_contract() -> None:
     case, runtime, session = _runtime_with_drawer_unlocked()
     action = _ask_about_drawer()
@@ -244,6 +280,29 @@ def test_real_llm_json_schema_uses_skill_allowed_proposed_actions() -> None:
     assert "clue.discover" not in serialized
 
 
+def test_real_llm_json_schema_uses_skill_relationship_delta_caps() -> None:
+    case, runtime, session = _runtime_with_drawer_unlocked()
+    contract = build_llm_agent_input(
+        runtime.agent_loop.build_context(
+            case=case,
+            session=session,
+            action=_ask_about_drawer(),
+        )
+    )
+
+    schema = _agent_intent_json_schema(contract)
+    deltas_schema = schema["properties"]["proposed_actions"]["items"]["properties"][
+        "deltas"
+    ]["properties"]
+
+    assert deltas_schema["trust"]["minimum"] == -0.1
+    assert deltas_schema["trust"]["maximum"] == 0.1
+    assert deltas_schema["suspicion"]["minimum"] == -0.2
+    assert deltas_schema["suspicion"]["maximum"] == 0.2
+    assert deltas_schema["fear"]["minimum"] == 0
+    assert deltas_schema["fear"]["maximum"] == 0
+
+
 def test_runtime_degrades_skill_contract_violation_without_applying_side_effects() -> None:
     case = CaseLoader().load(CASE_DIR)
     runtime = create_runtime(
@@ -272,6 +331,70 @@ def test_runtime_degrades_skill_contract_violation_without_applying_side_effects
     )
 
 
+def test_runtime_degrades_schema_contract_violation_without_applying_side_effects() -> None:
+    case = CaseLoader().load(CASE_DIR)
+    runtime = create_runtime(
+        [case],
+        agent_gateway=AgentGateway(mock_agent=_MalformedSchemaAgent()),
+        runtime_tracer=RuntimeTracer.disabled(),
+    )
+    session = runtime.session_store.create(case)
+    runtime.action_service.handle(
+        session=session,
+        action=PlayerAction(type=ActionType.INSPECT, target_id="desk"),
+    )
+
+    response = runtime.action_service.handle(
+        session=session,
+        action=_ask_about_drawer(),
+    )
+
+    assert response.accepted is True
+    assert response.llm_fallback_used is True
+    assert response.llm_error is not None
+    assert response.llm_error.error_type == "schema_error"
+    assert not any(
+        event.type == "relationship.changed"
+        for event in response.new_events
+    )
+
+
+def test_runtime_trace_records_turn_plan_and_output_contract_summary(
+    tmp_path: Path,
+) -> None:
+    case = CaseLoader().load(CASE_DIR)
+    runtime = create_runtime(
+        [case],
+        runtime_tracer=RuntimeTracer(
+            jsonl_path=tmp_path / "trace.jsonl",
+            log_path=tmp_path / "trace.log",
+        ),
+    )
+    session = runtime.session_store.create(case)
+    runtime.action_service.handle(
+        session=session,
+        action=PlayerAction(type=ActionType.INSPECT, target_id="desk"),
+    )
+
+    runtime.action_service.handle(session=session, action=_ask_about_drawer())
+
+    record = json.loads((tmp_path / "trace.jsonl").read_text(encoding="utf-8"))
+    summary = record["output_contract_summary"]
+
+    assert record["turn_plan_id"].startswith("agent_turn_plan.")
+    assert summary["allowed_intents"] == ["answer", "conceal", "probe"]
+    assert summary["allowed_proposed_action_types"] == ["relationship.change"]
+    assert set(summary["allowed_rhetoric_tactics"]) == {
+        "answer_adjacent_truth",
+        "shift_focus",
+        "qualify_certainty",
+    }
+    assert summary["max_relationship_delta"] == {
+        "suspicion": 0.2,
+        "trust": 0.1,
+    }
+
+
 class _OverCapSkillAgent:
     def generate(self, context: AgentContext) -> AgentIntent:
         return AgentIntent(
@@ -286,6 +409,39 @@ class _OverCapSkillAgent:
                 )
             ],
         )
+
+
+class _MalformedSchemaAgent:
+    def generate(self, context: AgentContext) -> object:
+        _ = context
+        return _MalformedSchemaIntent()
+
+
+class _MalformedSchemaIntent:
+    speech = "Malformed payload should not reach rules."
+    llm_error = None
+
+    def model_dump(self, **_: object) -> dict[str, object]:
+        return {
+            "intent": "answer",
+            "emotional_shift": {},
+            "proposed_actions": [
+                {
+                    "type": "relationship.change",
+                    "source_id": "butler",
+                    "target_id": "player",
+                    "deltas": {
+                        "trust": 0.1,
+                        "suspicion": 0.0,
+                        "fear": 0.0,
+                        "intimacy": 0.0,
+                        "hostility": 0.0,
+                    },
+                }
+            ],
+            "memory_refs": [],
+            "disclosure_claims": [],
+        }
 
 
 def _runtime_with_drawer_unlocked() -> tuple[object, object, object]:

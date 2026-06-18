@@ -69,7 +69,7 @@ def load_dotenv(path: str = ".env") -> None:
         return
     if not os.path.exists(path):
         return
-    with open(path, encoding="utf-8") as env_file:
+    with open(path, encoding="utf-8-sig") as env_file:
         for raw_line in env_file:
             line = raw_line.strip()
             if not line or line.startswith("#") or "=" not in line:

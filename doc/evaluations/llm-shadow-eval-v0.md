@@ -1,5 +1,14 @@
 # LLM Shadow Eval v0
 
+## 2026-06-18 更新
+
+- 真实 shadow 显式 `--backend real` 时必须启用真实 shadow；否则直接失败，不再生成全 skipped 的假 real 报告。
+- 启用变量优先级：`LLM_SHADOW_EVAL` 优先，未设置时兼容旧变量 `LLM_SHADOW_EVAL_ENABLE_REAL`。
+- `--suite` 会一次性运行 standard、redteam、safety benchmark 和 drift gate，并写 `gate_suite.json/md`。
+- 标准路径 shadow/drift 只评估生产正常路径 Agent turn；`force_forbidden=true` 的对抗动作不计入 normal drift，必须由 `--redteam` 和 `--benchmark safety` 覆盖。
+- 快速 drift gate 使用当前 `--runs` 作为 `min_run_count`；生产默认仍应跑 `--runs 20 --gate`。
+- 真实 raw transcript 只能写入 ignored 私有目录或 `LLM_SHADOW_RAW_DIR`，不得落入 `doc`。
+
 LLM Shadow Eval 是真实 LLM 接入生产 runtime 前的影子质量入口。它只生成候选 `AgentIntent` 并交给 `NarrativeDirector` 审计，不执行 `RuleEngine.apply_agent_intent`，不写正式 `WorldEvent`，不把候选台词返回给玩家，也不污染 `SessionState`。
 
 ## Runtime Boundary
@@ -129,10 +138,13 @@ $env:LLM_BACKEND="real"
 $env:OPENAI_API_KEY="..."
 $env:OPENAI_BASE_URL="https://api.example.com/v1"
 $env:OPENAI_MODEL="model-name"
+$env:LLM_TIMEOUT_SECONDS="45"
 py -3.12 -m app.evaluations.llm_shadow_eval --case mist_clock_manor --drift --runs 20 --backend real
 ```
 
 CI 默认不设置 `LLM_SHADOW_EVAL=1`，因此即使传入 `--backend real`，真实调用也会被记录为 `skipped=true`、`skip_reason=shadow_eval_disabled`。缺少 API key 时记录 `skip_reason=missing_api_key`。这两种情况都必须保持状态零污染。
+
+真实 provider 长跑必须把 transport 配置显式化：`LLM_HTTP_RETRY_ATTEMPTS` 控制 408/429/5xx、timeout 和 transport error 的有限重试次数，默认 2；`LLM_TIMEOUT_SECONDS` 控制单次 HTTP 请求超时，默认 20 秒。provider 慢响应导致 fallback 仍会让 production drift gate 失败，因此 DeepSeek 等 OpenAI-compatible provider 的 20-run 建议显式设置 45 秒后再判断模型合同质量。
 
 ## Public Reports
 

@@ -11,7 +11,7 @@ from uuid import uuid4
 
 from app.domain.models import ActionType, AgentIntent, PlayerAction, WorldEvent
 
-TRACE_SCHEMA_VERSION = 7
+TRACE_SCHEMA_VERSION = 8
 
 
 @dataclass
@@ -33,6 +33,8 @@ class RuntimeTraceDraft:
     context_layer_budget: dict[str, object] = field(default_factory=dict)
     tool_calls: list[dict[str, object]] = field(default_factory=list)
     security_flags: list[str] = field(default_factory=list)
+    turn_plan_id: str | None = None
+    output_contract_summary: dict[str, object] = field(default_factory=dict)
     trace_id: str = field(default_factory=lambda: str(uuid4()))
     started_at: float = field(default_factory=perf_counter)
 
@@ -144,6 +146,8 @@ class RuntimeTracer:
         context_layer_budget: dict[str, object] | None = None,
         tool_calls: list[dict[str, object]] | None = None,
         security_flags: list[str] | None = None,
+        turn_plan_id: str | None = None,
+        output_contract_summary: dict[str, object] | None = None,
     ) -> RuntimeTraceDraft:
         return RuntimeTraceDraft(
             case_id=case_id,
@@ -167,6 +171,10 @@ class RuntimeTracer:
             ),
             tool_calls=[_sanitize_tool_call(item) for item in (tool_calls or [])],
             security_flags=security_flags or [],
+            turn_plan_id=turn_plan_id,
+            output_contract_summary=_sanitize_output_contract_summary(
+                output_contract_summary or {}
+            ),
         )
 
     def finish_turn(
@@ -205,6 +213,8 @@ class RuntimeTracer:
             "context_layer_budget": draft.context_layer_budget,
             "tool_calls": draft.tool_calls,
             "security_flags": draft.security_flags,
+            "turn_plan_id": draft.turn_plan_id,
+            "output_contract_summary": draft.output_contract_summary,
             "intent_type": intent.intent.value if intent is not None else None,
             "public_speech": public_speech,
             "public_speech_source": public_speech_source,
@@ -245,6 +255,25 @@ def _sanitize_tool_call(tool_call: dict[str, object]) -> dict[str, object]:
         "duration_ms": int(tool_call.get("duration_ms", 0)),
         "error_category": tool_call.get("error_category"),
         "result_count": int(tool_call.get("result_count", 0)),
+    }
+
+
+def _sanitize_output_contract_summary(value: dict[str, object]) -> dict[str, object]:
+    return {
+        "allowed_intents": _string_list(value.get("allowed_intents", [])),
+        "allowed_rhetoric_tactics": _string_list(
+            value.get("allowed_rhetoric_tactics", []),
+        ),
+        "allowed_proposed_action_types": _string_list(
+            value.get("allowed_proposed_action_types", []),
+        ),
+        "allowed_disclosure_modes": _string_list(
+            value.get("allowed_disclosure_modes", []),
+        ),
+        "max_relationship_delta": _float_dict(
+            value.get("max_relationship_delta", {}),
+        ),
+        "fallback_intent": str(value.get("fallback_intent", "")),
     }
 
 
@@ -409,6 +438,18 @@ def _string_dict(value: object) -> dict[str, str]:
     if not isinstance(value, dict):
         return {}
     return {str(key): str(item) for key, item in value.items()}
+
+
+def _float_dict(value: object) -> dict[str, float]:
+    if not isinstance(value, dict):
+        return {}
+    result: dict[str, float] = {}
+    for key, item in value.items():
+        try:
+            result[str(key)] = float(item)
+        except (TypeError, ValueError):
+            continue
+    return result
 
 
 def _hash_text(text: str | None) -> str | None:

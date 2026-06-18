@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 
+from pydantic import ValidationError
+
 from app.agents.context import build_agent_context
 from app.agents.disclosure_strategy import DISCLOSURE_MODE_ORDER
 from app.agents.final_retrieval_plan import build_final_memory_retrieval_plan
@@ -29,6 +31,7 @@ from app.domain.models import (
     CasePackage,
     DisclosureMode,
     LLMAgentContractInput,
+    LLMAgentOutputContract,
     LLMErrorSummary,
     LLMErrorType,
     PlayerAction,
@@ -234,6 +237,10 @@ class AgentLoop:
             ),
             tool_calls=tool_calls,
             security_flags=security_review.security_flags,
+            turn_plan_id=turn_plan.plan_id,
+            output_contract_summary=_output_contract_trace_summary(
+                turn_plan.output_contract
+            ),
         )
         contract_input = build_llm_agent_input(context, turn_plan=turn_plan)
         if budget.hard_context_over_limit:
@@ -336,6 +343,20 @@ class AgentLoop:
                 ),
             )
         except LLMAgentSchemaError as exc:
+            return AgentIntent(
+                speech="I cannot answer that safely.",
+                intent=AgentIntentType.REFUSE,
+                emotional_shift={},
+                proposed_actions=[],
+                memory_refs=[],
+                disclosure_claims=[],
+                llm_error=_contract_error_summary(
+                    exc,
+                    error_type=LLMErrorType.SCHEMA_ERROR,
+                    backend=self._agent_gateway.backend_name,
+                ),
+            )
+        except ValidationError as exc:
             return AgentIntent(
                 speech="I cannot answer that safely.",
                 intent=AgentIntentType.REFUSE,
@@ -488,6 +509,33 @@ def _npc_skill_projection(context: AgentContext) -> dict[str, object]:
             skill.model_dump(mode="json")
             for skill in context.npc_skill_projections
         ],
+    }
+
+
+def _output_contract_trace_summary(
+    contract: LLMAgentOutputContract | None,
+) -> dict[str, object]:
+    if contract is None:
+        return {}
+    return {
+        "allowed_intents": [
+            intent.value for intent in contract.allowed_intents
+        ],
+        "allowed_rhetoric_tactics": [
+            tactic.value for tactic in contract.allowed_rhetoric_tactics
+        ],
+        "allowed_proposed_action_types": [
+            action_type.value
+            for action_type in contract.allowed_proposed_action_types
+        ],
+        "allowed_disclosure_modes": [
+            mode.value for mode in contract.allowed_disclosure_modes
+        ],
+        "max_relationship_delta": {
+            str(metric): float(value)
+            for metric, value in contract.max_relationship_delta.items()
+        },
+        "fallback_intent": contract.fallback_intent.value,
     }
 
 

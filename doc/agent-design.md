@@ -46,13 +46,13 @@ LLM_BACKEND=real + OPENAI_API_KEY=... -> OpenAILLMAgent
 
 如果 `LLM_BACKEND=real` 但没有 API key，网关创建时会回退到 `mock`，避免 CI 和默认本地场景意外进入真实 LLM 或安全拒答快照。
 
-`AgentGateway.from_env()` 会读取本地 `.env`，但可用 `LLM_LOAD_DOTENV=0` 显式关闭，方便测试隔离。真实 LLM 适配器支持 OpenAI-compatible base URL：
+`AgentGateway.from_env()` 会读取本地 `.env`，但可用 `LLM_LOAD_DOTENV=0` 显式关闭，方便测试隔离。`.env` 按 `utf-8-sig` 读取，因此 Windows 编辑器写入的 UTF-8 BOM 不会污染第一行 key；真实 LLM 网关必须能正确识别 `OPENAI_API_KEY`。真实 LLM 适配器支持 OpenAI-compatible base URL：
 
 ```text
 OPENAI_BASE_URL=https://api.xiaomimimo.com/v1
 ```
 
-适配器会优先把 base URL 拼接到 `/responses`。如果 OpenAI-compatible 服务明确不支持 Responses API，会降级到 `/chat/completions`。例如小米 API 使用 `https://api.xiaomimimo.com/v1`，本轮真实 Shadow Eval 使用 `OPENAI_MODEL=mimo-v2.5` 验证通过。可用 `LLM_API_STYLE=chat_completions` 显式跳过 `/responses` 探测，直接请求 `/chat/completions`。Chat Completions 默认仍要求 `json_schema`；如果兼容服务不支持 schema，默认安全 fallback。只有显式设置 `LLM_ALLOW_JSON_OBJECT_FALLBACK=1` 时才允许降级到 `json_object`，且输出仍要经过 Python 合同校验和 Director。即使配置了 API key 和 base URL，常规运行仍只有在 `LLM_BACKEND=real` 时才使用真实后端。
+适配器会优先把 base URL 拼接到 `/responses`。如果 OpenAI-compatible 服务明确不支持 Responses API，会降级到 `/chat/completions`。例如小米 API 使用 `https://api.xiaomimimo.com/v1`，真实 Shadow Eval 应设置 `OPENAI_MODEL=mimo-v2.5` 并可用 `LLM_API_STYLE=chat_completions` 显式跳过 `/responses` 探测，直接请求 `/chat/completions`。Chat Completions 默认仍要求 `json_schema`；如果兼容服务不支持 schema，默认安全 fallback。只有显式设置 `LLM_ALLOW_JSON_OBJECT_FALLBACK=1` 时才允许降级到 `json_object`，且输出仍要经过 Python 合同校验和 Director。即使配置了 API key 和 base URL，常规运行仍只有在 `LLM_BACKEND=real` 时才使用真实后端。
 
 ## LLM Shadow Eval
 
@@ -70,6 +70,12 @@ LLM Shadow Eval v0 复用 Agent 合同，但不是正式运行链路。它只在
 影子报告位于 `doc/case/<case_id>/llm_shadow_report.json` 和 `doc/case/<case_id>/llm_shadow_report.md`。`--all` 会额外写 `doc/evaluations/llm_shadow/summary.json` 和 `summary.md`。报告只记录 intent 摘要、Director 审计结果、`disclosure_claims` 摘要和 `failure_categories`，不公开原始 speech 或玩家自由文本，避免把 private 原文、forbidden facts、blocked terms 或 solution claims 写入公开文档产物。
 
 真实对话调试可显式设置 `LLM_SHADOW_WRITE_RAW=1`，私有 transcript 只写入 ignored 的 `.shadow_eval/private_transcripts/` 或 `LLM_SHADOW_RAW_DIR` 指定目录，不进入 `doc`。安全基准可通过 `scripts/run_llm_shadow_eval.py --case mist_clock_manor --benchmark safety` 运行；它不调用真实 LLM，只用确定性候选 intent 检查 Director 和 schema guardrail。Red-team 探针可通过 `--redteam` 运行；它构造 adversarial 玩家行动来评估真实 LLM 是否会越权、剧透、伪造事实或试图改状态，但仍只产生 shadow candidate。
+
+2026-06-18 起，真实 shadow 显式 `--backend real` 时必须确认真实 shadow 已启用；如果 `LLM_SHADOW_EVAL` 未设置，会兼容读取旧变量 `LLM_SHADOW_EVAL_ENABLE_REAL`，但显式 `LLM_SHADOW_EVAL=0` 优先级更高。`--suite` 会把 standard、redteam、safety benchmark 和 drift gate 串成一个总门槛，避免只看单份报告误判。标准 drift 不再把 `force_forbidden=true` 的对抗动作算入正常路径；这类动作归 redteam/safety 覆盖。
+
+真实 LLM 输出进入本地合同校验前会做受控投影：如果 speech 命中当前合同授权的 safe fragment alias/pattern，但模型漏写 `disclosure_claims`，适配器会补一个带 `claim_refs/source_refs` 的 claim；如果模型写了 `none/deny/deflect/hint` 但 speech 已经触碰 safe fragment，会升级到该 fragment 允许的最低有效披露模式，优先 `partial`，否则 `hint`。如果模型已经写了 claim，但 `claim_refs/source_refs` 只指向普通证据 ref，没有指向 safe fragment ref 或该 fragment 的 source refs，适配器会保留普通 ref 并追加唯一授权 fragment ref。本地 contract 也不再把普通 `safe_fact_refs` 当成 safe fragment 引用，避免本地放行但 Director 后置拦截。这个投影只使用 `LLMAgentContractInput` 中的 `director_safe_fragments`，不会读取全局真相或绕过 Director。
+
+真实 provider 请求现在对 `408/429/500/502/503/504`、timeout 和 transport error 做有限重试，默认 `LLM_HTTP_RETRY_ATTEMPTS=2`。请求超时默认 `LLM_TIMEOUT_SECONDS=20`，真实长跑可按 provider 稳定性显式提高，例如 DeepSeek 20-run 使用 45 秒以降低慢响应导致的假阴性。`402 Payment Required`、`400/422` 等非瞬时错误不重试，必须作为环境或请求合同问题处理，不能伪装成通过。
 
 ## AgentContext
 
@@ -130,7 +136,7 @@ LLM Shadow Eval v0 复用 Agent 合同，但不是正式运行链路。它只在
 
 `npc_skill_projections` 只包含安全边界数据：`skill_id`、类型、等级、是否 signature、允许 intent、允许 tactic、每个 world_info 的最大披露模式、授权 safe fragment ref、memory plan id 和允许 proposed action 类型。它不包含 skill 说明正文、safe fragment summary、角色 private 原文、hidden truth 或 memory content。`AgentLoop` 会把 `NarrativeDirector.safe_fragment_constraints(...)` 的结果与 skill 的 `safe_fragment_refs` 取交集，并用 skill 的 `max_disclosure_mode_by_world_info` 继续裁剪 fragment `allowed_modes`；因此 skill 不能直接授予事实，只能进一步收窄“这个 NPC 在这个时刻可以围绕哪些已解锁安全碎片、以多大粒度说话”。
 
-2026-06-16 后，NPC Skill 不再只是 prompt 投影。`AgentTurnPlan` 会把 selected skill 的 `allowed_intents`、`allowed_tactics`、`allowed_proposed_actions` 和 `max_relationship_delta` 合并进本轮 `LLMAgentOutputContract`。`validate_llm_agent_output(...)` 会硬拒绝越权 intent、越权 tactic、未授权 proposed action 和超出 skill policy 的 relationship delta。没有 selected skill 时，本轮默认不允许主动 proposed action；LLM 只能表达台词和意图，不能借普通对话推动关系或线索状态。
+2026-06-16 后，NPC Skill 不再只是 prompt 投影。`AgentTurnPlan` 会把 selected skill 的 `allowed_intents`、`allowed_tactics`、`allowed_proposed_actions` 和 `max_relationship_delta` 合并进本轮 `LLMAgentOutputContract`。`validate_llm_agent_output(...)` 会硬拒绝越权 intent、越权 tactic、未授权 proposed action 和超出 skill policy 的 relationship delta。没有 selected skill 时，本轮默认不允许主动 proposed action；`full` disclosure claim 仍被合同层拒绝。LLM 只能表达台词和意图，不能借普通对话推动关系、线索状态或强披露事实。
 
 `AgentTurnPlan` 是本轮 Agent 调用的运行计划，不是持久状态。它聚合：
 
@@ -140,9 +146,9 @@ LLM Shadow Eval v0 复用 Agent 合同，但不是正式运行链路。它只在
 - prompt injection security flags
 - 高风险注入时的 intent / disclosure 降级建议
 
-`AgentLoop.run_turn(...)` 会用同一个 plan 构造 LLM 输入合同和后置 Python 校验。真实 LLM 的动态 JSON schema 也会根据 `output_contract` 收窄 `intent`、`disclosure_claims` 和可请求的 `proposed_actions` 类型；因此模型生成前和生成后都看到同一套硬边界。
+`AgentLoop.run_turn(...)` 会用同一个 plan 构造 LLM 输入合同和后置 Python 校验。真实 LLM 的动态 JSON schema 也会根据 `output_contract` 收窄 `intent`、`disclosure_claims`、可请求的 `proposed_actions` 类型和 `relationship.change.deltas` 数值上下限；因此模型生成前和生成后都看到同一套硬边界。`LLMAgentStub` 也必须选择本轮合同允许的安全 intent，不能用固定 `refuse` 绕过或误撞 skill-aware 合同。
 
-运行时 trace schema v7 会额外写 `npc_skill_projection`、`context_layer_budget` 和记忆冲突裁决安全摘要，用于复盘“为什么本轮 NPC 只能使用这些 intent/tactic/safe fragment”，以及本轮 hard / soft context 预算是否触发压缩或阻断。trace 仍禁止写玩家原文、private 原文、memory content、forbidden fact 文本和 safe fragment summary。
+运行时 trace schema v8 会额外写 `turn_plan_id` 和 `output_contract_summary`，摘要只包含 allowed intents、allowed tactics、allowed proposed action types、allowed disclosure modes、relationship delta cap 和 fallback intent。它与 `npc_skill_projection`、`context_layer_budget` 和记忆冲突裁决安全摘要共同用于复盘“为什么本轮 NPC 只能使用这些 intent/tactic/safe fragment/action”，以及本轮 hard / soft context 预算是否触发压缩或阻断。trace 仍禁止写玩家原文、private 原文、memory content、forbidden fact 文本和 safe fragment summary。
 
 `AgentCharacterView` 只包含安全的公开角色卡字段：
 
@@ -196,7 +202,7 @@ Memory v1.3.1 增加检索后的 authority / conflict 治理层。该层只处�
 
 同一高影响记忆类型在同一 owner / subject 下，如果共享 `belief_subject`、`strategy_id`、`world_info_id` 或 `clue_id`，会被视为同一裁决面。`MemoryRetriever` 只投影该裁决面的一个确定性 winner，优先级依次考虑：authoritative、confidence、source event 数、是否有 rule_id、更新时间、memory_id；检索相关性分数仅作为最终平局裁决。这样低权威 hearsay 或低置信策略不会和事件锚定的高置信记忆无区分并列进入 LLM 输入。
 
-2026-06-17 后，高影响记忆还支持 `metadata.authority_source`，取值受模型白名单限制。裁决优先级在 confidence 之前考虑 authority source 等级：`system_rule` / `rule_derived` / `player_evidence` / `player_action` / `world_event` 高于 `npc_direct`、`archival`、`llm_summary` 和 `npc_hearsay`。因此低权威但高置信的 hearsay 不能压过中等置信的玩家证据或规则派生记忆。没有显式 `authority_source` 时，带 `rule_id` 的记忆按 `rule_derived`，归档记忆按 `archival`，其他事件锚定记忆按 `world_event` 处理。
+2026-06-17 后，高影响记忆还支持 `metadata.authority_source`，取值受模型白名单限制。裁决优先级在 confidence 之前考虑 authority source 等级：`system_rule` / `rule_derived` / `player_evidence` / `player_action` / `world_event` 高于 `npc_direct`、`archival`、`llm_summary` 和 `npc_hearsay`。因此低权威但高置信的 hearsay 不能压过中等置信的玩家证据或规则派生记忆。没有显式 `authority_source` 时，带 `rule_id` 的记忆按 `rule_derived`，归档记忆按 `archival`，其他事件锚定记忆按 `world_event` 处理。模型层缺省 `metadata.authority` 也按 `event_observed` 归一，只有显式 `non_authoritative=true` 或低权威来源才会降为非权威；这避免有 `source_event_ids` 的事件锚定记忆因为作者未重复写 authority_source 而被错误踢出上下文。
 
 同日起，authority / conflict 治理层会产出 trace 级只读审计摘要。`MemoryRetriever.retrieve(...)` 的兼容返回值仍是 `list[AgentMemorySnapshot]`；最近一次裁决摘要通过 `last_authority_trace_summary` 暴露，并由 `AgentLoop` 写入 runtime trace 的 `memory_projection.memory_conflict_resolution`。每条摘要只包含 `conflict_key`、winner memory id、dropped memory ids、`category` 和稳定 `reason`，例如 `lower_authority_profile` 或 `lower_retrieval_score`。该摘要不写 `SessionState`，不生成 `WorldEvent`，不参与 replay，也不能被 Agent 当作状态事实使用。
 
@@ -283,7 +289,7 @@ PromptBuilder 只把 `portrait_summary` 和 inner context 的 id 级摘要写入
 
 Prompt injection 不再只是 trace 告警。`PromptInjectionGuard` 会输出 `PromptInjectionReview`；高风险输入会在 `AgentTurnPlan` 中形成硬限制：本轮 `allowed_intents` 收窄为 `refuse` / `conceal`，最高 disclosure mode 收窄到 `deflect`。低风险输入只保留 flags 和推荐 response mode，不阻断正常 skill。运行时仍会把安全 flags 写入 trace，便于复盘“玩家输入风险”和“最终 Agent 输出边界”的关系。
 
-如果 Agent backend 返回的 `AgentIntent` 违反本轮合同，`AgentLoop` 不让异常穿透到 API 层，也不把越权 proposed action 交给 Rule Engine。运行时会生成带 `llm_error.error_type=policy_violation` 的安全降级 intent：保留可被 Director 审计的 speech，清空 `proposed_actions`、`memory_refs` 和 `disclosure_claims`。因此合同拒绝不会造成状态副作用，也不会跳过 Director 对最终 speech 的剧透扫描。
+如果 Agent backend 返回的 `AgentIntent` 违反本轮合同，`AgentLoop` 不让异常穿透到 API 层，也不把越权 proposed action 交给 Rule Engine。policy 违约会生成带 `llm_error.error_type=policy_violation` 的安全降级 intent；schema / Pydantic 违约会生成 `llm_error.error_type=schema_error` 的安全拒答。两类 fallback 都会清空 `proposed_actions`、`memory_refs` 和 `disclosure_claims`。因此合同拒绝不会造成状态副作用，也不会跳过 Director 对最终 speech 的剧透扫描。
 
 ## AgentIntent
 
@@ -372,6 +378,10 @@ Agent 也不能写 `FactDisclosureStrategy`。策略是上下文投影，不是�
 
 `OpenAILLMAgent` 是最小真实后端适配器。生产链路中它接收 `AgentLoop` 已构造好的 `LLMAgentContractInput`，并用同一份合同生成 provider 动态 JSON schema、请求 user payload、schema / JSON repair 输入和 Python 层 `validate_llm_agent_output` 校验。只有直接调试或 shadow eval 这类兼容路径可以只传 `context`，此时适配器才从 context 推导合同。任何失败都会返回无 `proposed_actions` 的安全拒答。失败包括缺少 API key、HTTP 错误、JSON 错误、schema 错误、private 原文回显、直接提议剧情阶段变化。
 
+真实适配器默认会对 JSON / schema / policy 合同违约做 1 次受控 repair，可用 `LLM_SCHEMA_REPAIR_ATTEMPTS=0` 关闭或设置更高次数。repair 只允许把同一候选输出修回合同形状，不允许补新事实；private 原文回显不进入 repair，直接 fallback。policy repair 会把本轮 relationship delta cap 写入指令，要求超过 cap 的 `relationship.change` 修正或删除。provider JSON schema 同时把未授权关系指标限制为 `0`，把授权指标限制到 selected skill 声明的 `max_relationship_delta`。
+
+2026-06-17 后，真实适配器在进入二次 LLM repair 前会先做本地合同投影。可确定的结构违约不再交给模型重写：额外顶层字段会被删除，未授权 `disclosure_claims` 会被删除，越过 cap 或未授权的 `proposed_actions` 会被删除，非法顶层 intent 会降级为合同内最安全的 intent。降级选择顺序是：合同声明的 `fallback_intent`、`refuse`、`conceal`、`answer`、合同允许列表中的第一个 intent；如果某个 skill 合同没有允许 `refuse`，适配器不能投影到合同外的 `refuse`。缺少 `speech`、JSON 破损等无法本地保真修复的问题才进入一次 schema / JSON repair。叙事阶段变更和 private 原文回显仍是硬拒绝，不做本地投影。
+
 真实 LLM fallback 不是静默兜底。`OpenAILLMAgent.generate(...)` 会在安全拒答的 `AgentIntent.llm_error` 中记录机器可读错误摘要：
 
 - `network_error`
@@ -388,7 +398,7 @@ Agent 也不能写 `FactDisclosureStrategy`。策略是上下文投影，不是�
 
 `LLMAgentContractInput.disclosure_constraints` 会同时包含 private self-knowledge 约束和 `world_info` 级事实披露策略约束。`world_info` 约束会带 `allowed_modes`、`forbidden_modes`、`rhetoric_tactics`、`must_not_claim`、`safe_fact_refs` 和 `safe_fragments`，用于告诉 LLM：你可以怎么说，但不能说到哪里。`safe_fragments` 只来自 Director 放行的 safe fragment summary；blocked fragment、forbidden inference、solution claim 和 world truth 原文不进入真实 LLM payload。`LLMAgentContractInput.output_contract` 额外提供机器可读枚举边界：合法 intent、合法 proposed action、合法 disclosure mode 和“speech 触碰 WorldInfo 必须自报 claim”的规则。
 
-真实 LLM 输出必须包含 `disclosure_claims`。合同校验器会先拒绝越权 claim；Narrative Director 会再次根据最终文本、`WorldInfo` 文本审计字段、`safe_fragments` 和 `FactDisclosureStrategy` 执法。这样 strategy 不再只是提示，而是后置安全门。真实适配器的动态 schema 会把 `disclosure_claims.world_info_id` 收窄到当前可声明的 `world_info` 约束，把 `claim_refs` / `source_refs` 收窄到当前 safe refs，并禁止 `full` 作为真实 LLM 输出模式。
+真实 LLM 输出必须包含 `disclosure_claims`。合同校验器会先拒绝越权 claim；Narrative Director 会再次根据最终文本、`WorldInfo` 文本审计字段、`safe_fragments` 和 `FactDisclosureStrategy` 执法。这样 strategy 不再只是提示，而是后置安全门。真实适配器的动态 schema 会把 `disclosure_claims.world_info_id` 收窄到当前可声明的 `world_info` 约束，把 `claim_refs` / `source_refs` 收窄到当前 safe refs，并禁止 `full` 作为真实 LLM 输出模式；缺少 `disclosure_claims[].mode` 这类 provider 真实输出错误会先尝试本地删除不完整 claim，若输出仍无法形成合法 `AgentIntent`，再进入一次 schema repair，repair 后仍不合法则 fallback 并计入 Shadow Eval gate。
 
 真实适配器不改变状态权威模型。它的输出仍经过 Narrative Director，所有 `proposed_actions` 仍经过 Rule Engine。除非显式环境变量启用，否则它不参与完整场景快照。
 
@@ -426,11 +436,12 @@ Memory v2 将检索拆成可审计管线：
 
 输出边界分三层执行：
 
-- provider 动态 JSON schema 收窄字段、枚举、`disclosure_claims.world_info_id` 和真实 LLM 可请求的 proposed action 类型。
+- provider 动态 JSON schema 收窄字段、枚举、`disclosure_claims.world_info_id`、真实 LLM 可请求的 proposed action 类型和关系变化数值上限。
+- 真实适配器本地合同投影只删除或降级可机械证明的越权字段，不创造事实、不补台词、不放宽 skill / Director 边界。
 - `validate_llm_agent_output(...)` 在 Python 层拒绝额外顶层字段、阶段变化、越权 disclosure claim、`mode=full`、未知 `world_info_id`、命中 `must_not_claim` 和 private 原文回显。
 - `NarrativeDirector.validate(...)` 独立审计最终 `speech`，确认 claim 与实际触碰的 `WorldInfo` 一致。
 
-schema / JSON repair 只修合同形状，不补新事实。repair instruction 使用同一个 `system.md`、同一个 `LLMAgentContractInput` 和同一个动态 schema，并明确要求不要添加新事实。真实 LLM fallback 是带 `llm_error` 的安全拒答，`proposed_actions=[]`、`memory_refs=[]`、`disclosure_claims=[]`，仍会进入 Director 和 trace，不会绕过状态权威链。
+schema / JSON repair 只修合同形状，不补新事实。repair instruction 使用同一个 `system.md`、同一个 `LLMAgentContractInput` 和同一个动态 schema，并明确要求不要添加新事实。本地投影优先于 repair，用来吸收真实 provider 常见的可裁剪漂移；repair 只处理缺关键字段、JSON 破损或需要重写表达才能合法的输出。真实 LLM fallback 是带 `llm_error` 的安全拒答，`proposed_actions=[]`、`memory_refs=[]`、`disclosure_claims=[]`，仍会进入 Director 和 trace，不会绕过状态权威链。
 
 P0 硬链路详见 `doc/architecture/p0-hard-chain-2026-06-16.md`。
 

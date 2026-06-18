@@ -58,7 +58,7 @@
     - qi_yan
   related_events:
     - old_case_echo
-  key: false
+  key: true
 
 - id: empty_capsules
   title: 重量异常的心脏病胶囊

@@ -53,6 +53,23 @@
 
 Private 数据是角色认知，不是自动公开事实，也不是直接修改状态的通道。
 
+## Safe Fragment 投影
+
+`WorldInfo.claim_graph.safe_fragments` 是可审计的部分事实释放单元。运行时只会把已解锁且当前上下文授权的 safe fragment 投影给 Agent，不会把完整 `WorldInfo.description` 或案件真相锚点直接交给 LLM。
+
+`SafeFactFragmentProjection` 当前包含：
+
+- `world_info_id`
+- `fragment_id`
+- `ref`
+- `summary`
+- `aliases`
+- `claim_patterns`
+- `allowed_modes`
+- `source_refs`
+
+`aliases` 和 `claim_patterns` 是合同级检测词表，用于让真实 LLM 输出投影和 Narrative Director 使用同一套可审计匹配边界。新增中文表达时应写入案件包的 safe fragment，而不是硬编码到 Agent 适配器。`source_refs` 只引用玩家已知、阶段或 beat 等解锁来源，不应包含 private 原文。
+
 ## 角色事实认知账本
 
 `CharacterFactAwarenessState` 是 NPC 视角下的事实认知账本。它解决的问题不是“角色卡里写了什么”，而是“运行时当前这个 NPC 对某个 `WorldInfo` 处于什么认知姿态”。
@@ -455,6 +472,7 @@ metadata v2 不允许无约束 dict 漂移：
 - ID 型字段必须是非空字符串：`world_info_id`、`claim_id`、`scene_id`、`phase_id`、`clue_id`、`belief_subject`、`strategy_id`、`privacy_reason`。
 - `topic_tags` 和 `phase_ids` 必须是字符串列表，并去重保序。
 - `non_authoritative` 必须是布尔值；它只允许存储非权威无来源材料，不允许普通检索把它注入 NPC 上下文。
+- `authority_source` 必须来自白名单；缺省 `authority` 归一为 `event_observed`，显式 `non_authoritative=true`、`npc_hearsay`、`llm_summary` 或 `archival` 才会降权。事件锚定 memory 的权威性以 `source_event_ids` 和检索期 authority gate 共同判断，不能因为 metadata 省略 `authority_source` 就默认视为脏记忆。
 - `decay_policy` 只能是 `standard`、`sticky`、`ephemeral`、`never_archive`，或只包含 `name`、`archive_after_days`、`reinforced_event_count` 的对象。
 
 2026-06-16 起，运行时派生的 clue 相关 memory 必须自动补齐结构化 metadata，不能只依赖自然语言 `content` 做召回：

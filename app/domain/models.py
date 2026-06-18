@@ -185,6 +185,14 @@ MemoryScope = Literal[
 ]
 MemoryLayer = Literal["core", "working", "archival"]
 BeliefPolarity = Literal["believes", "suspects", "knows", "doubts"]
+MemoryAuthority = Literal[
+    "rule_verified",
+    "event_observed",
+    "npc_belief",
+    "player_claim",
+    "hypothesis",
+    "non_authoritative",
+]
 
 
 class MemoryOperation(StrEnum):
@@ -233,6 +241,16 @@ ALLOWED_MEMORY_AUTHORITY_SOURCES = frozenset(
         "archival",
     }
 )
+ALLOWED_MEMORY_AUTHORITIES = frozenset(
+    {
+        "rule_verified",
+        "event_observed",
+        "npc_belief",
+        "player_claim",
+        "hypothesis",
+        "non_authoritative",
+    }
+)
 ALLOWED_MEMORY_METADATA_KEYS = frozenset(
     {
         "relationship_delta",
@@ -251,6 +269,9 @@ ALLOWED_MEMORY_METADATA_KEYS = frozenset(
         "decay_policy",
         "non_authoritative",
         "authority_source",
+        "authority",
+        "is_plot_critical",
+        "quarantine_reason",
     }
 )
 
@@ -658,6 +679,8 @@ class SafeFactFragmentProjection(APIModel):
     fragment_id: NonEmptyString
     ref: NonEmptyString
     summary: NonEmptyString
+    aliases: list[NonEmptyString] = Field(default_factory=list)
+    claim_patterns: list[NonEmptyString] = Field(default_factory=list)
     allowed_modes: list[DisclosureMode] = Field(default_factory=list)
     source_refs: list[NonEmptyString] = Field(default_factory=list)
 
@@ -1546,7 +1569,7 @@ def clamp_relationship_metric(value: object) -> float:
 
 def validate_memory_metadata(value: object) -> dict[str, Any]:
     if value is None:
-        return {}
+        return {"authority": "event_observed", "non_authoritative": False}
     if not isinstance(value, dict):
         raise ValueError("memory metadata must be an object")
     metadata = {str(key): item for key, item in value.items()}
@@ -1603,6 +1626,26 @@ def validate_memory_metadata(value: object) -> dict[str, Any]:
         metadata["authority_source"] = _validate_authority_source(
             metadata["authority_source"]
         )
+    if "authority" in metadata:
+        metadata["authority"] = _validate_memory_authority(metadata["authority"])
+    else:
+        metadata["authority"] = _default_memory_authority(metadata)
+    if "non_authoritative" not in metadata:
+        metadata["non_authoritative"] = metadata["authority"] == "non_authoritative"
+    elif metadata["non_authoritative"] and metadata["authority"] != "non_authoritative":
+        raise ValueError(
+            "non_authoritative cannot be true when authority is authoritative"
+        )
+    if "is_plot_critical" in metadata and not isinstance(
+        metadata["is_plot_critical"],
+        bool,
+    ):
+        raise ValueError("is_plot_critical must be a boolean")
+    if "quarantine_reason" in metadata and metadata["quarantine_reason"] is not None:
+        metadata["quarantine_reason"] = _validate_metadata_string(
+            metadata["quarantine_reason"],
+            "quarantine_reason",
+        )
     return metadata
 
 
@@ -1637,6 +1680,28 @@ def _validate_authority_source(value: object) -> str:
     if normalized not in ALLOWED_MEMORY_AUTHORITY_SOURCES:
         raise ValueError(f"authority_source is not supported: {normalized}")
     return normalized
+
+
+def _validate_memory_authority(value: object) -> str:
+    normalized = _validate_metadata_string(value, "authority")
+    if normalized not in ALLOWED_MEMORY_AUTHORITIES:
+        raise ValueError(f"authority is not supported: {normalized}")
+    return normalized
+
+
+def _default_memory_authority(metadata: dict[str, Any]) -> str:
+    if metadata.get("non_authoritative") is True:
+        return "non_authoritative"
+    authority_source = metadata.get("authority_source")
+    if authority_source in {"system_rule", "rule_derived"}:
+        return "rule_verified"
+    if authority_source in {"player_evidence", "player_action", "world_event"}:
+        return "event_observed"
+    if authority_source == "npc_direct":
+        return "npc_belief"
+    if authority_source in {"npc_hearsay", "llm_summary", "archival"}:
+        return "non_authoritative"
+    return "event_observed"
 
 
 def _validate_decay_policy(value: object) -> str | dict[str, int | str]:

@@ -1,8 +1,8 @@
 # LLM Shadow Eval Report: mist_clock_manor
 
 - Scenario: `cases\mist_clock_manor\scenarios\standard_path.yaml`
-- Backend: `real`
-- Real shadow enabled: `true`
+- Backend: `stub`
+- Real shadow enabled: `false`
 - State unchanged: `true`
 
 ## Summary
@@ -73,7 +73,7 @@
 - Schema valid: `true`
 - Director blocked: `false`
 - Block reason: `none`
-- Disclosure claims: `1`
+- Disclosure claims: `0`
 - Speech touched WorldInfo: `false`
 - Missing disclosure claim: `false`
 - Missing disclosure claim ids: `none`
