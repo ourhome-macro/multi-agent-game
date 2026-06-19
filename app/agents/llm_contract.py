@@ -145,6 +145,18 @@ def _build_disclosure_constraints(context: AgentContext) -> list[LLMDisclosureCo
             )
             for strategy in inner_context.fact_disclosure_strategies
         )
+    constrained_world_info_ids = {
+        constraint.item_id
+        for constraint in constraints
+        if constraint.item_kind == "world_info"
+    }
+    constraints.extend(
+        _constraint_from_skill_safe_fragments(world_info_id, safe_fragments)
+        for world_info_id, safe_fragments in _skill_only_safe_fragments_by_world_info(
+            context.director_safe_fragments,
+            constrained_world_info_ids=constrained_world_info_ids,
+        ).items()
+    )
 
     constraints.extend(
         LLMDisclosureConstraint(
@@ -372,6 +384,63 @@ def _safe_fact_refs(
 ) -> list[str]:
     refs = [*strategy.safe_fact_refs]
     refs.extend(fragment.ref for fragment in safe_fragments)
+    for fragment in safe_fragments:
+        refs.extend(fragment.source_refs)
+    return _dedupe_strings(refs)
+
+
+def _skill_only_safe_fragments_by_world_info(
+    safe_fragments: list[SafeFactFragmentProjection],
+    *,
+    constrained_world_info_ids: set[str],
+) -> dict[str, list[SafeFactFragmentProjection]]:
+    grouped: dict[str, list[SafeFactFragmentProjection]] = {}
+    for fragment in safe_fragments:
+        if fragment.world_info_id in constrained_world_info_ids:
+            continue
+        grouped.setdefault(fragment.world_info_id, []).append(fragment)
+    return grouped
+
+
+def _constraint_from_skill_safe_fragments(
+    world_info_id: str,
+    safe_fragments: list[SafeFactFragmentProjection],
+) -> LLMDisclosureConstraint:
+    allowed_modes = _safe_fragment_only_allowed_modes(safe_fragments)
+    return LLMDisclosureConstraint(
+        item_id=world_info_id,
+        item_kind="world_info",
+        allowed_modes=allowed_modes,
+        forbidden_modes=[
+            mode
+            for mode in DisclosureMode
+            if mode == DisclosureMode.FULL or mode not in set(allowed_modes)
+        ],
+        direct_reveal_allowed=False,
+        direct_quote_allowed=False,
+        related_world_info_ids=[world_info_id],
+        safe_fact_refs=_safe_fragment_projection_refs(safe_fragments),
+        safe_fragments=safe_fragments,
+        blocked=False,
+    )
+
+
+def _safe_fragment_only_allowed_modes(
+    safe_fragments: list[SafeFactFragmentProjection],
+) -> list[DisclosureMode]:
+    seen = {
+        mode
+        for fragment in safe_fragments
+        for mode in fragment.allowed_modes
+        if mode != DisclosureMode.FULL
+    }
+    return [mode for mode in DisclosureMode if mode in seen and mode != DisclosureMode.FULL]
+
+
+def _safe_fragment_projection_refs(
+    safe_fragments: list[SafeFactFragmentProjection],
+) -> list[str]:
+    refs = [fragment.ref for fragment in safe_fragments]
     for fragment in safe_fragments:
         refs.extend(fragment.source_refs)
     return _dedupe_strings(refs)

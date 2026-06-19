@@ -11,12 +11,14 @@ from app.agents.gateway import AgentGateway
 from app.agents.llm_contract import build_llm_agent_input
 from app.cases.errors import CaseLoadError
 from app.cases.loader import CaseLoader
+from app.director.narrative_director import NarrativeDirector
 from app.domain.models import (
     ActionType,
     AgentContext,
     AgentIntent,
     AgentIntentType,
     CasePackage,
+    DisclosureClaim,
     DisclosureMode,
     PlayerAction,
     SubjectType,
@@ -26,6 +28,7 @@ from app.runtime.tracing import RuntimeTracer
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 CASE_DIR = PROJECT_ROOT / "cases" / "fake_case_001"
+MIST_CASE_DIR = PROJECT_ROOT / "cases" / "mist_clock_manor"
 SKILL_ID = "butler_drawer_pressure_deflection"
 SAFE_FRAGMENT_REF = "desk_forced_open.safe_fragment:drawer_was_forced"
 
@@ -264,6 +267,131 @@ def test_llm_contract_includes_skill_projection_without_unlocking_more_facts() -
     }
 
 
+def test_mist_jiang_lock_skill_allows_partial_safe_fragment() -> None:
+    case = CaseLoader().load(MIST_CASE_DIR)
+    runtime = create_runtime([case], runtime_tracer=RuntimeTracer.disabled())
+    session = runtime.session_store.create(case)
+    runtime.action_service.handle(
+        session=session,
+        action=PlayerAction(type=ActionType.INSPECT, target_id="study_lock"),
+    )
+
+    context = runtime.agent_loop.build_context(
+        case=case,
+        session=session,
+        action=PlayerAction(
+            type=ActionType.ASK_ABOUT,
+            target_id="jiang_yanhui",
+            subject_type=SubjectType.CLUE,
+            subject_id="delayed_lock_marks",
+            text="Why are there oil and new scratches on the lock?",
+        ),
+    )
+    contract_input = build_llm_agent_input(context)
+    constraint = _world_info_constraint(contract_input, "timed_lock_modified")
+
+    assert "jiang_lock_boundary" in {
+        skill.skill_id for skill in context.npc_skill_projections
+    }
+    assert context.director_safe_fragments[0].ref == (
+        "timed_lock_modified.safe_fragment:lock_has_delay_marks"
+    )
+    assert DisclosureMode.PARTIAL in context.director_safe_fragments[0].allowed_modes
+    assert DisclosureMode.PARTIAL in constraint.safe_fragments[0].allowed_modes
+
+
+def test_mist_jiang_ruolan_tape_skill_projects_chinese_safe_fragment() -> None:
+    case = CaseLoader().load(MIST_CASE_DIR)
+    runtime = create_runtime([case], runtime_tracer=RuntimeTracer.disabled())
+    session = runtime.session_store.create(case)
+    runtime.action_service.handle(
+        session=session,
+        action=PlayerAction(type=ActionType.INSPECT, target_id="tape_recorder"),
+    )
+
+    context = runtime.agent_loop.build_context(
+        case=case,
+        session=session,
+        action=PlayerAction(
+            type=ActionType.ASK_ABOUT,
+            target_id="jiang_yanhui",
+            subject_type=SubjectType.CLUE,
+            subject_id="ruolan_voice_tape",
+            text="Why is Jiang Ruolan's voice here?",
+        ),
+    )
+    contract_input = build_llm_agent_input(context)
+    constraint = _world_info_constraint(contract_input, "jiang_ruolan_recording_exists")
+
+    assert "jiang_ruolan_tape_boundary" in {
+        skill.skill_id for skill in context.npc_skill_projections
+    }
+    assert constraint.safe_fragments[0].ref == (
+        "jiang_ruolan_recording_exists.safe_fragment:old_voice_fragment_exists"
+    )
+    assert "江若岚的声音" in constraint.safe_fragments[0].aliases
+    assert DisclosureMode.PARTIAL in constraint.safe_fragments[0].allowed_modes
+
+
+def test_mist_shen_reconstruction_skill_projects_chain_fragments() -> None:
+    case = CaseLoader().load(MIST_CASE_DIR)
+    runtime = create_runtime([case], runtime_tracer=RuntimeTracer.disabled())
+    session = runtime.session_store.create(case)
+    for target_id in [
+        "wine_table",
+        "study_lock",
+        "tape_recorder",
+        "burned_letter",
+        "medicine_box",
+        "breaker_box",
+    ]:
+        runtime.action_service.handle(
+            session=session,
+            action=PlayerAction(type=ActionType.INSPECT, target_id=target_id),
+        )
+
+    context = runtime.agent_loop.build_context(
+        case=case,
+        session=session,
+        action=PlayerAction(
+            type=ActionType.TALK,
+            target_id="shen_zhaoye",
+            text="Connect the outage, tape, capsules, and sedative.",
+        ),
+    )
+    contract_input = build_llm_agent_input(context)
+    constraint = _world_info_constraint(contract_input, "heart_medicine_replaced")
+
+    assert session.narrative.phase == "reconstruction"
+    assert "shen_reconstruction_chain_boundary" in {
+        skill.skill_id for skill in context.npc_skill_projections
+    }
+    assert "heart_medicine_replaced.safe_fragment:capsules_are_empty" in {
+        fragment.ref for fragment in context.director_safe_fragments
+    }
+    assert "空胶囊" in constraint.safe_fragments[0].aliases
+    assert DisclosureMode.PARTIAL in constraint.safe_fragments[0].allowed_modes
+    decision = NarrativeDirector().validate(
+        case,
+        session.narrative,
+        AgentIntent(
+            speech="药盒里的空胶囊说明救命药失效只是死亡链的一部分。",
+            intent=AgentIntentType.ANSWER,
+            disclosure_claims=[
+                DisclosureClaim(
+                    world_info_id="heart_medicine_replaced",
+                    mode=DisclosureMode.PARTIAL,
+                    source_refs=["heart_medicine_replaced.safe_fragment:capsules_are_empty"],
+                    claim_refs=["heart_medicine_replaced.safe_fragment:capsules_are_empty"],
+                )
+            ],
+        ),
+        context,
+    )
+
+    assert decision.allowed is True
+
+
 def test_runtime_trace_records_npc_skill_projection_without_sensitive_content() -> None:
     case = CaseLoader().load(CASE_DIR)
     agent = RecordingSkillAgent()
@@ -304,6 +432,14 @@ def test_runtime_trace_records_npc_skill_projection_without_sensitive_content() 
     )
     for private_value in _private_character_values(case):
         assert private_value not in serialized_projection
+
+
+def _world_info_constraint(contract_input: object, world_info_id: str) -> object:
+    return next(
+        item
+        for item in contract_input.disclosure_constraints
+        if item.item_kind == "world_info" and item.item_id == world_info_id
+    )
 
 
 def _ask_about_drawer() -> PlayerAction:

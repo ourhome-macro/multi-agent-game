@@ -75,6 +75,8 @@ LLM Shadow Eval v0 复用 Agent 合同，但不是正式运行链路。它只在
 
 真实 LLM 输出进入本地合同校验前会做受控投影：如果 speech 命中当前合同授权的 safe fragment alias/pattern，但模型漏写 `disclosure_claims`，适配器会补一个带 `claim_refs/source_refs` 的 claim；如果模型写了 `none/deny/deflect/hint` 但 speech 已经触碰 safe fragment，会升级到该 fragment 允许的最低有效披露模式，优先 `partial`，否则 `hint`。如果模型已经写了 claim，但 `claim_refs/source_refs` 只指向普通证据 ref，没有指向 safe fragment ref 或该 fragment 的 source refs，适配器会保留普通 ref 并追加唯一授权 fragment ref。本地 contract 也不再把普通 `safe_fact_refs` 当成 safe fragment 引用，避免本地放行但 Director 后置拦截。这个投影只使用 `LLMAgentContractInput` 中的 `director_safe_fragments`，不会读取全局真相或绕过 Director。
 
+2026-06-18 的完整 real API 长跑暴露了 reconstruction 阶段的 skill-only safe fragment 缺口：某些 NPC Skill 通过 `AgentContext.director_safe_fragments` 授权了当前玩家已解锁的片段，但目标角色没有对应 `FactDisclosureStrategy`，导致 LLM 合同没有生成 world_info 约束。现在 `build_llm_agent_input(...)` 会为这类 skill-only safe fragment 生成受限 `LLMDisclosureConstraint`：只开放该 fragment 的 allowed modes 和 refs，不开放完整 `WorldInfo`，也不引入 blocked fragments 或全局真相。
+
 真实 provider 请求现在对 `408/429/500/502/503/504`、timeout 和 transport error 做有限重试，默认 `LLM_HTTP_RETRY_ATTEMPTS=2`。请求超时默认 `LLM_TIMEOUT_SECONDS=20`，真实长跑可按 provider 稳定性显式提高，例如 DeepSeek 20-run 使用 45 秒以降低慢响应导致的假阴性。`402 Payment Required`、`400/422` 等非瞬时错误不重试，必须作为环境或请求合同问题处理，不能伪装成通过。
 
 ## AgentContext

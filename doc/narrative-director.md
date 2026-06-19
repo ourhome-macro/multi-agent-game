@@ -104,6 +104,8 @@ Director 当前已经消费 `CharacterInnerContext.fact_disclosure_strategies`�
 
 Director 的 claim 前置校验也会识别已授权 safe fragment claim：如果 `disclosure_claim` 引用了当前上下文里的 safe fragment，且 `mode` 在该 fragment 的 allowed modes 内，则允许它通过角色 fact strategy 的更保守整体上限，后续仍交给 `FactGateway` 校验 fragment 是否已解锁、claim refs 是否匹配、speech 是否触碰 forbidden inference。普通证据 ref 可以作为审计来源保留，但不能单独证明 safe fragment 披露；claim 必须指向 fragment ref、fragment id 变体或该 fragment 的 source refs，才能通过 safe fragment 匹配。`full` 永远不允许。
 
+如果当前上下文存在由 NPC Skill 单独授权的 safe fragment，而目标角色没有对应 `FactDisclosureStrategy`，Director 会为后置审计构造一个临时约束视图：只允许这些 fragment 的 `allowed_modes`，只承认这些 fragment 的 refs，不允许 `full`，也不会把同一 `WorldInfo` 的其他片段或完整事实视为已授权。这样 LLM contract、Director disclosure claim 校验和 speech touch 校验保持一致，避免 reconstruction 阶段出现“合同允许、Director 说无 allowed constraint”的错位。
+
 后续 Director 仍应进一步检查生成台词是否：
 
 - 透露锁定的禁说事实

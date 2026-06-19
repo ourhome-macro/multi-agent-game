@@ -49,6 +49,13 @@ class DetectedWorldInfoMention:
     pattern_id: str | None = None
 
 
+@dataclass(frozen=True)
+class _DisclosureConstraintView:
+    allowed_modes: tuple[DisclosureMode, ...]
+    forbidden_modes: tuple[DisclosureMode, ...]
+    must_not_claim: tuple[str, ...] = ()
+
+
 class NarrativeDirector:
     def fact_gateway_summary(
         self,
@@ -177,7 +184,7 @@ class NarrativeDirector:
         context: AgentContext,
         intent: AgentIntent,
     ) -> DirectorDecision:
-        constraints = _world_info_constraints_by_id(context)
+        constraints = _disclosure_constraint_views_by_id(context)
         for claim in intent.disclosure_claims:
             constraint = constraints.get(claim.world_info_id)
             if constraint is None:
@@ -234,7 +241,7 @@ class NarrativeDirector:
         context: AgentContext,
         intent: AgentIntent,
     ) -> DirectorDecision:
-        constraints = _world_info_constraints_by_id(context)
+        constraints = _disclosure_constraint_views_by_id(context)
         claims_by_world_info = {
             claim.world_info_id: claim for claim in intent.disclosure_claims
         }
@@ -310,6 +317,69 @@ def _world_info_constraints_by_id(context: AgentContext) -> dict[str, FactDisclo
         strategy.world_info_id: strategy
         for strategy in context.inner_context.fact_disclosure_strategies
     }
+
+
+def _disclosure_constraint_views_by_id(
+    context: AgentContext,
+) -> dict[str, _DisclosureConstraintView]:
+    constraints: dict[str, _DisclosureConstraintView] = {}
+    if context.inner_context is not None:
+        constraints.update(
+            {
+                strategy.world_info_id: _strategy_constraint_view(strategy)
+                for strategy in context.inner_context.fact_disclosure_strategies
+            }
+        )
+    for world_info_id, fragments in _safe_fragments_by_world_info(
+        context.director_safe_fragments
+    ).items():
+        if world_info_id in constraints:
+            continue
+        constraints[world_info_id] = _safe_fragment_constraint_view(fragments)
+    return constraints
+
+
+def _strategy_constraint_view(
+    strategy: FactDisclosureStrategy,
+) -> _DisclosureConstraintView:
+    return _DisclosureConstraintView(
+        allowed_modes=tuple(strategy.allowed_modes),
+        forbidden_modes=tuple(strategy.forbidden_modes),
+        must_not_claim=tuple(strategy.must_not_claim),
+    )
+
+
+def _safe_fragment_constraint_view(
+    fragments: list[SafeFactFragmentProjection],
+) -> _DisclosureConstraintView:
+    allowed_modes = {
+        mode
+        for fragment in fragments
+        for mode in fragment.allowed_modes
+        if mode != DisclosureMode.FULL
+    }
+    ordered_allowed_modes = tuple(
+        mode
+        for mode in DisclosureMode
+        if mode in allowed_modes and mode != DisclosureMode.FULL
+    )
+    return _DisclosureConstraintView(
+        allowed_modes=ordered_allowed_modes,
+        forbidden_modes=tuple(
+            mode
+            for mode in DisclosureMode
+            if mode == DisclosureMode.FULL or mode not in allowed_modes
+        ),
+    )
+
+
+def _safe_fragments_by_world_info(
+    safe_fragments: list[SafeFactFragmentProjection],
+) -> dict[str, list[SafeFactFragmentProjection]]:
+    grouped: dict[str, list[SafeFactFragmentProjection]] = {}
+    for fragment in safe_fragments:
+        grouped.setdefault(fragment.world_info_id, []).append(fragment)
+    return grouped
 
 
 def _skill_safe_fragment_refs(context: AgentContext) -> set[str]:

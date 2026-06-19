@@ -2,7 +2,7 @@
   "case_id": "mist_clock_manor",
   "scenario_path": "cases\\mist_clock_manor\\scenarios\\standard_path.yaml",
   "scenario_id": "standard_path_shadow_drift",
-  "generated_at": "2026-06-18T12:49:15.372534+00:00",
+  "generated_at": "2026-06-18T14:16:19.304747+00:00",
   "llm_backend": "stub",
   "backend": "stub",
   "real_shadow_enabled": false,

@@ -151,9 +151,17 @@
         aliases:
           - Ruolan voice fragment
           - old voice fragment
+          - 江若岚旧录音
+          - 江若岚的声音
+          - 若岚旧录音
+          - 若岚的声音
+          - 磁带里的声音
         claim_patterns:
           - "Ruolan voice fragment"
           - "old voice fragment"
+          - "江若岚.*(录音|声音)"
+          - "若岚.*(录音|声音)"
+          - "磁带.*(录音|声音)"
         allowed_modes:
           - hint
           - partial
@@ -181,9 +189,16 @@
         aliases:
           - empty capsules
           - capsules are empty
+          - 空胶囊
+          - 心脏药空胶囊
+          - 药盒里的空胶囊
+          - 救命药失效
         claim_patterns:
           - "empty capsules"
           - "capsules.*empty"
+          - "空胶囊"
+          - "胶囊.*空"
+          - "(心脏|救命).*药.*(空|换|失效)"
         allowed_modes:
           - hint
           - partial

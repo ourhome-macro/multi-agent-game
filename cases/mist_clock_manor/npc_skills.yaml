@@ -35,7 +35,7 @@
     world_info_ids:
       - timed_lock_modified
       - lock_delay_tested
-    max_mode: hint
+    max_mode: partial
     allowed_tactics:
       - answer_adjacent_truth
       - shift_focus
@@ -107,7 +107,7 @@
     world_info_ids:
       - heart_medicine_replaced
       - capsule_powder_removed
-    max_mode: hint
+    max_mode: partial
     allowed_tactics:
       - answer_adjacent_truth
       - shift_focus
@@ -220,6 +220,79 @@
   cooldown:
     turns: 0
 
+- id: jiang_ruolan_tape_boundary
+  owner_character_ids:
+    - jiang_yanhui
+  type: dialogue
+  level: 2
+  priority: high
+  signature: true
+  triggers:
+    action_types:
+      - ask_about
+      - present_clue
+    subject_types:
+      - clue
+    clue_ids:
+      - ruolan_voice_tape
+      - echo_tape
+    topic_tags:
+      - tape
+      - audio
+      - ruolan
+  unlock_conditions:
+    phases:
+      - opening
+      - investigation
+      - confrontation
+      - reconstruction
+      - resolved
+    required_discovered_clues:
+      - ruolan_voice_tape
+    required_player_knowledge:
+      - player_knowledge.jiang_ruolan_recording_exists
+    required_world_info_ids:
+      - jiang_ruolan_recording_exists
+    required_pressure_min: 0.4
+  disclosure:
+    world_info_ids:
+      - jiang_ruolan_recording_exists
+      - recording_tape_swapped
+    max_mode: partial
+    allowed_tactics:
+      - answer_adjacent_truth
+      - qualify_certainty
+      - shift_focus
+    safe_fragment_refs:
+      - jiang_ruolan_recording_exists.safe_fragment:old_voice_fragment_exists
+      - recording_tape_swapped.safe_fragment:tape_label_and_chime_are_evidence
+  memory:
+    include_types:
+      - episodic
+      - belief
+      - relationship
+      - strategy
+    include_scopes:
+      - npc_private
+      - scene_shared
+    include_layers:
+      - working
+    topic_tags:
+      - jiang_yanhui
+      - ruolan_voice_tape
+      - echo_tape
+      - old_case_echo
+    max_items: 4
+  proposed_action_policy:
+    allowed:
+      - relationship.change
+    max_relationship_delta:
+      suspicion: 0.18
+      trust: 0.08
+      fear: 0.08
+  cooldown:
+    turns: 0
+
 - id: lin_wine_boundary
   owner_character_ids:
     - lin_qichi
@@ -289,6 +362,82 @@
       suspicion: 0.16
       trust: 0.1
       fear: 0.1
+  cooldown:
+    turns: 0
+
+- id: shen_reconstruction_chain_boundary
+  owner_character_ids:
+    - shen_zhaoye
+  type: dialogue
+  level: 2
+  priority: high
+  signature: true
+  triggers:
+    action_types:
+      - talk
+  unlock_conditions:
+    phases:
+      - reconstruction
+      - resolved
+    completed_beats:
+      - motive_chain_exposed
+    required_discovered_clues:
+      - bitter_wine
+      - delayed_lock_marks
+      - echo_tape
+      - empty_capsules
+      - cut_power_trace
+    required_player_knowledge:
+      - player_knowledge.sedative_wine
+      - player_knowledge.timed_lock_modified
+      - player_knowledge.recording_tape_swapped
+      - player_knowledge.heart_medicine_replaced
+      - player_knowledge.power_cut_by_shen
+  disclosure:
+    world_info_ids:
+      - sedative_wine
+      - timed_lock_modified
+      - recording_tape_swapped
+      - heart_medicine_replaced
+      - power_cut_by_shen
+    max_mode: partial
+    allowed_tactics:
+      - answer_adjacent_truth
+      - qualify_certainty
+      - counter_question
+    safe_fragment_refs:
+      - sedative_wine.safe_fragment:wine_residue_indicates_sedative
+      - timed_lock_modified.safe_fragment:lock_has_delay_marks
+      - recording_tape_swapped.safe_fragment:tape_label_and_chime_are_evidence
+      - heart_medicine_replaced.safe_fragment:capsules_are_empty
+      - power_cut_by_shen.safe_fragment:breaker_was_cut
+  memory:
+    include_types:
+      - episodic
+      - belief
+      - relationship
+      - strategy
+    include_scopes:
+      - npc_private
+      - scene_shared
+    include_layers:
+      - working
+    topic_tags:
+      - shen_zhaoye
+      - reconstruction
+      - power_cut
+      - empty_capsules
+      - tape_swapped
+      - sedative
+      - lock_modified
+    max_items: 6
+  proposed_action_policy:
+    allowed:
+      - relationship.change
+    max_relationship_delta:
+      suspicion: 0.12
+      trust: 0.1
+      fear: 0.08
   cooldown:
     turns: 0
 
