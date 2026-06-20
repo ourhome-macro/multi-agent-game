@@ -19,6 +19,7 @@ CASE_DIR = PROJECT_ROOT / "cases" / "mist_clock_manor"
 
 JIANG = "jiang_yanhui"
 SHEN = "shen_zhaoye"
+QI = "qi_yan"
 EMPTY_CAPSULES = "empty_capsules"
 
 JIANG_EPISODIC = f"memory.player.presented_clue.{JIANG}.{EMPTY_CAPSULES}"
@@ -32,6 +33,19 @@ JIANG_TYPED_MEMORY_IDS = (
 )
 SHEN_PRIVATE = f"memory.player.presented_clue.{SHEN}.{EMPTY_CAPSULES}"
 DIRECTOR_AUDIT = "memory.player.director_blocked.jiang_yanhui.jiang_yanhui_mechanism"
+SHARED_CHAIN_CORE_MEMORY_IDS = (
+    "memory.player.clue_discovered.bitter_wine",
+    "memory.player.clue_discovered.delayed_lock_marks",
+    "memory.player.clue_discovered.echo_tape",
+    "memory.player.clue_discovered.empty_capsules",
+    "memory.player.clue_discovered.cut_power_trace",
+)
+SHEN_RECONSTRUCTION_STRATEGY = (
+    "memory.player.strategy.reconstruction.shen_zhaoye.shared_death_chain"
+)
+QI_RECONSTRUCTION_STRATEGY = (
+    "memory.player.strategy.reconstruction.qi_yan.shared_death_chain"
+)
 
 
 def test_memory_retrieval_matrix_validates_mist_clock_manor_jiang_capsule_recall() -> None:
@@ -122,6 +136,67 @@ def test_memory_retrieval_matrix_can_validate_agent_context_projection() -> None
     report.assert_passed()
 
 
+def test_memory_retrieval_matrix_locks_shen_reconstruction_chain_recall() -> None:
+    case, session = _session_at_reconstruction()
+    entry = MemoryRetrievalMatrixEntry(
+        entry_id="mist_clock_manor.reconstruction.shen.cut_power_chain",
+        case_id="mist_clock_manor",
+        phase="reconstruction",
+        action=PlayerAction(
+            type=ActionType.TALK,
+            target_id=SHEN,
+            text="How does cut_power_trace matter in the reconstruction?",
+        ),
+        target_id=SHEN,
+        expected_memory_ids=(*SHARED_CHAIN_CORE_MEMORY_IDS, SHEN_RECONSTRUCTION_STRATEGY),
+        forbidden_memory_ids=(QI_RECONSTRUCTION_STRATEGY,),
+        subject="player",
+        clue="cut_power_trace",
+        notes=(
+            "Shen reconstruction should expand from the power node to the "
+            "shared chain and keep other NPC private strategies out."
+        ),
+    )
+
+    report = evaluate_memory_retrieval_matrix(
+        entries=[entry],
+        case=case,
+        session=session,
+        source="retriever",
+    )
+
+    report.assert_passed()
+
+
+def test_memory_retrieval_matrix_locks_qi_role_strategy_isolation() -> None:
+    case, session = _session_at_reconstruction()
+    entry = MemoryRetrievalMatrixEntry(
+        entry_id="mist_clock_manor.reconstruction.qi.tape_chain",
+        case_id="mist_clock_manor",
+        phase="reconstruction",
+        action=PlayerAction(
+            type=ActionType.TALK,
+            target_id=QI,
+            text="How does echo_tape connect with empty_capsules and bitter_wine?",
+        ),
+        target_id=QI,
+        expected_memory_ids=("memory.player.clue_discovered.echo_tape", QI_RECONSTRUCTION_STRATEGY),
+        forbidden_memory_ids=(SHEN_RECONSTRUCTION_STRATEGY,),
+        subject="player",
+        clue="echo_tape",
+        notes="Qi should receive Qi private reconstruction strategy, not Shen's.",
+    )
+
+    report = evaluate_memory_retrieval_matrix(
+        entries=[entry],
+        case=case,
+        session=session,
+        source="retriever",
+    )
+
+    report.assert_passed()
+
+
 def test_memory_retrieval_matrix_reports_missing_and_forbidden_ids() -> None:
     case, session = _session_with_capsule_pressure_and_director_audit()
     entry = _jiang_capsule_matrix_entry(
@@ -185,6 +260,28 @@ def _session_with_capsule_pressure_and_director_audit() -> tuple[CasePackage, Se
     assert set(JIANG_TYPED_MEMORY_IDS).issubset(session.memory_snapshots)
     assert SHEN_PRIVATE in session.memory_snapshots
     assert DIRECTOR_AUDIT in session.memory_snapshots
+    return case, session
+
+
+def _session_at_reconstruction() -> tuple[CasePackage, SessionState]:
+    case = CaseLoader().load(CASE_DIR)
+    runtime = create_runtime([case], agent_gateway=AgentGateway(backend="mock"))
+    session = runtime.session_store.create(case)
+    for target_id in (
+        "wine_table",
+        "study_lock",
+        "tape_recorder",
+        "burned_letter",
+        "medicine_box",
+        "breaker_box",
+    ):
+        runtime.action_service.handle(
+            session=session,
+            action=PlayerAction(type=ActionType.INSPECT, target_id=target_id),
+        )
+    assert session.narrative.phase == "reconstruction"
+    assert SHEN_RECONSTRUCTION_STRATEGY in session.memory_snapshots
+    assert QI_RECONSTRUCTION_STRATEGY in session.memory_snapshots
     return case, session
 
 

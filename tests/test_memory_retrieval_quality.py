@@ -177,6 +177,69 @@ def test_structured_action_fields_prioritize_structured_memory_hits(
     )
 
 
+def test_retrieval_trace_reports_zero_reason_without_memory_content() -> None:
+    hidden = _memory(
+        memory_id="memory.quality.hidden.other_npc",
+        content="SECRET HIDDEN MEMORY CONTENT",
+        owner_character_id=SHEN,
+        visible_to_character_ids=[SHEN],
+        metadata={"clue_id": EMPTY_CAPSULES},
+        salience=0.8,
+    )
+    session = _session([hidden])
+    retriever = MemoryRetriever(max_results=10)
+
+    memories = retriever.retrieve(
+        case=_case(),
+        session=session,
+        action=PlayerAction(type=ActionType.TALK, target_id=JIANG, text=EMPTY_CAPSULES),
+        plan=_plan(max_memory_items=10),
+    )
+
+    diagnostics = retriever.last_retrieval_trace_summary
+    assert memories == []
+    assert diagnostics is not None
+    assert diagnostics.zero_reason == "all_candidates_filtered"
+    assert diagnostics.filter_counts["visible_to_target"] == 1
+    assert diagnostics.total_snapshot_count == 1
+    assert diagnostics.selected_count == 0
+    serialized = repr(diagnostics)
+    assert "SECRET HIDDEN MEMORY CONTENT" not in serialized
+    assert hidden.memory_id not in serialized
+
+
+def test_chain_expansion_recalls_linked_typed_memories_after_episodic_anchor() -> None:
+    episodic = _memory(
+        memory_id="memory.chain.anchor.event",
+        content="Player created anchor_event with Jiang.",
+        memory_type="episodic",
+        metadata={},
+        salience=0.6,
+    )
+    strategy = _memory(
+        memory_id="memory.chain.linked.strategy",
+        content="Jiang should deflect.",
+        memory_type="strategy",
+        source_memory_ids=[episodic.memory_id],
+        metadata={
+            "authority_source": "player_evidence",
+            "strategy_id": "deflect_topic",
+        },
+        salience=0.1,
+    )
+
+    memories = _retrieve(
+        [episodic, strategy],
+        PlayerAction(type=ActionType.TALK, target_id=JIANG, text="anchor_event"),
+        max_memory_items=10,
+    )
+
+    assert [memory.memory_id for memory in memories] == [
+        episodic.memory_id,
+        strategy.memory_id,
+    ]
+
+
 def test_recency_prefers_newer_relevant_memory_over_staler_slightly_higher_salience() -> None:
     stale = _memory(
         memory_id=f"memory.quality.stale.{EMPTY_CAPSULES}",
@@ -667,8 +730,12 @@ def _retrieve(
     case: CasePackage | None = None,
     plan: MemoryRetrievalPlan | None = None,
     embedding_scorer: EmbeddingScorer | None = None,
+    max_memory_items: int = 20,
 ) -> list[AgentMemorySnapshot]:
-    return MemoryRetriever(max_results=20, embedding_scorer=embedding_scorer).retrieve(
+    return MemoryRetriever(
+        max_results=max_memory_items,
+        embedding_scorer=embedding_scorer,
+    ).retrieve(
         case=case or _case(),
         session=_session(snapshots),
         action=action,

@@ -194,6 +194,9 @@ class AgentLoop:
             authority_trace_summary=_memory_authority_trace_summary(
                 self._memory_retriever
             ),
+            retrieval_trace_summary=_memory_retrieval_trace_summary(
+                self._memory_retriever
+            ),
         )
         npc_skill_projection = _npc_skill_projection(context)
         prompt_bundle = self._prompt_builder.build(context)
@@ -447,6 +450,7 @@ def _memory_projection(
     context: AgentContext | None = None,
     store_trace_summary: object | None = None,
     authority_trace_summary: object | None = None,
+    retrieval_trace_summary: object | None = None,
 ) -> dict[str, object]:
     summary = plan.trace_summary(selected_count=len(memories))
     summary["items"] = [
@@ -474,6 +478,11 @@ def _memory_projection(
                 {},
             ),
         }
+    if retrieval_trace_summary is not None:
+        try:
+            summary["retrieval_diagnostics"] = retrieval_trace_summary.to_projection()
+        except AttributeError:
+            summary["retrieval_diagnostics"] = {}
     if authority_trace_summary is not None:
         summary.update(authority_trace_summary.to_projection())
     return summary
@@ -489,6 +498,13 @@ def _memory_store_trace_summary(memory_retriever: MemoryRetriever) -> object | N
 def _memory_authority_trace_summary(memory_retriever: MemoryRetriever) -> object | None:
     try:
         return memory_retriever.last_authority_trace_summary
+    except AttributeError:
+        return None
+
+
+def _memory_retrieval_trace_summary(memory_retriever: MemoryRetriever) -> object | None:
+    try:
+        return memory_retriever.last_retrieval_trace_summary
     except AttributeError:
         return None
 

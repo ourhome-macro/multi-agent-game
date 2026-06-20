@@ -19,6 +19,10 @@ steps:
   - player_knowledge.updated
   - memory_candidate.created
   - agent_memory_snapshot.updated
+  - memory_candidate.created
+  - agent_memory_snapshot.updated
+  - memory_candidate.created
+  - agent_memory_snapshot.updated
   - narrative.beat.completed
   - narrative.phase.changed
   expected_phase: investigation

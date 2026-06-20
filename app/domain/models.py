@@ -261,6 +261,10 @@ ALLOWED_MEMORY_METADATA_KEYS = frozenset(
         "clue_id",
         "world_info_id",
         "claim_id",
+        "case_thread_id",
+        "chain_node_id",
+        "adjacent_clue_ids",
+        "key_clue",
         "scene_id",
         "phase_id",
         "phase_ids",
@@ -1599,6 +1603,8 @@ def validate_memory_metadata(value: object) -> dict[str, Any]:
         "clue_id",
         "world_info_id",
         "claim_id",
+        "case_thread_id",
+        "chain_node_id",
         "scene_id",
         "phase_id",
         "privacy_reason",
@@ -1614,6 +1620,11 @@ def validate_memory_metadata(value: object) -> dict[str, Any]:
         metadata["topic_tags"] = _validate_metadata_string_list(
             metadata["topic_tags"],
             "topic_tags",
+        )
+    if "adjacent_clue_ids" in metadata:
+        metadata["adjacent_clue_ids"] = _validate_metadata_string_list(
+            metadata["adjacent_clue_ids"],
+            "adjacent_clue_ids",
         )
     if "decay_policy" in metadata:
         metadata["decay_policy"] = _validate_decay_policy(metadata["decay_policy"])
@@ -1641,6 +1652,8 @@ def validate_memory_metadata(value: object) -> dict[str, Any]:
         bool,
     ):
         raise ValueError("is_plot_critical must be a boolean")
+    if "key_clue" in metadata and not isinstance(metadata["key_clue"], bool):
+        raise ValueError("key_clue must be a boolean")
     if "quarantine_reason" in metadata and metadata["quarantine_reason"] is not None:
         metadata["quarantine_reason"] = _validate_metadata_string(
             metadata["quarantine_reason"],

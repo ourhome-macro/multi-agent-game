@@ -418,19 +418,26 @@
       - relationship
       - strategy
     include_scopes:
+      - case
+      - session
       - npc_private
       - scene_shared
     include_layers:
+      - core
       - working
     topic_tags:
       - shen_zhaoye
       - reconstruction
+      - bitter_wine
+      - delayed_lock_marks
+      - echo_tape
+      - cut_power_trace
       - power_cut
       - empty_capsules
       - tape_swapped
       - sedative
       - lock_modified
-    max_items: 6
+    max_items: 8
   proposed_action_policy:
     allowed:
       - relationship.change

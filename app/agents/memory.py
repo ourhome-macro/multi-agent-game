@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Protocol
@@ -18,6 +19,7 @@ from app.agents.memory_retrieval import (
     MemoryRetrievalPipeline,
     MemorySearchQuery,
     MemorySearchResult,
+    MemorySearchScore,
 )
 from app.agents.retrieval_planner import MemoryRetrievalPlan
 from app.domain.models import (
@@ -85,6 +87,30 @@ class MemoryStoreTraceSummary:
     candidate_count: int
 
 
+@dataclass(frozen=True)
+class MemoryRetrievalTraceSummary:
+    total_snapshot_count: int = 0
+    store_candidate_count: int = 0
+    hard_filter_candidate_count: int = 0
+    scored_count: int = 0
+    authority_selected_count: int = 0
+    selected_count: int = 0
+    zero_reason: str | None = None
+    filter_counts: dict[str, int] | None = None
+
+    def to_projection(self) -> dict[str, object]:
+        return {
+            "total_snapshot_count": self.total_snapshot_count,
+            "store_candidate_count": self.store_candidate_count,
+            "hard_filter_candidate_count": self.hard_filter_candidate_count,
+            "scored_count": self.scored_count,
+            "authority_selected_count": self.authority_selected_count,
+            "selected_count": self.selected_count,
+            "zero_reason": self.zero_reason,
+            "filter_counts": dict(self.filter_counts or {}),
+        }
+
+
 class MemoryStore(Protocol):
     backend_name: str
 
@@ -129,6 +155,7 @@ class MemoryRetriever:
         self._memory_store = memory_store or InMemoryMemoryStore()
         self._last_store_trace_summary: MemoryStoreTraceSummary | None = None
         self._last_authority_trace_summary = MemoryAuthorityTraceSummary()
+        self._last_retrieval_trace_summary = MemoryRetrievalTraceSummary()
 
     @property
     def last_store_trace_summary(self) -> MemoryStoreTraceSummary | None:
@@ -137,6 +164,10 @@ class MemoryRetriever:
     @property
     def last_authority_trace_summary(self) -> MemoryAuthorityTraceSummary:
         return self._last_authority_trace_summary
+
+    @property
+    def last_retrieval_trace_summary(self) -> MemoryRetrievalTraceSummary:
+        return self._last_retrieval_trace_summary
 
     def retrieve(
         self,
@@ -180,7 +211,14 @@ class MemoryRetriever:
     ) -> list[AgentMemorySnapshot]:
         max_results = plan.max_memory_items if plan is not None else self._max_results
         self._last_authority_trace_summary = MemoryAuthorityTraceSummary()
+        self._last_retrieval_trace_summary = MemoryRetrievalTraceSummary()
         if max_results <= 0:
+            self._last_retrieval_trace_summary = MemoryRetrievalTraceSummary(
+                total_snapshot_count=len(session.memory_snapshots),
+                selected_count=0,
+                zero_reason="plan_max_items_zero",
+                filter_counts={},
+            )
             return []
 
         query = _build_query(case, action)
@@ -205,17 +243,39 @@ class MemoryRetriever:
         )
         snapshots = self._fetch_store_candidates(session, working_store_query)
         working_candidates = _filter_snapshots(snapshots, working_filters)
-        scored = self._search_candidates(
+        raw_scored = self._search_candidates(
             snapshots=snapshots,
             query=query,
             now=_retrieval_now(session, working_candidates),
             hard_filters=working_filters,
         )
-        authority_result = resolve_authoritative_memory_results_with_trace(scored)
-        scored = authority_result.results
+        raw_scored = _expand_linked_results(
+            results=raw_scored,
+            snapshots=snapshots,
+            query=query,
+            now=_retrieval_now(session, working_candidates),
+            hard_filters=working_filters,
+            phase=session.narrative.phase,
+        )
+        authority_result = resolve_authoritative_memory_results_with_trace(raw_scored)
+        scored = _rank_results_for_projection(
+            authority_result.results,
+            target_id=action.target_id,
+            phase=session.narrative.phase,
+        )
         self._last_authority_trace_summary = authority_result.trace_summary
         if scored or not enforce_target_visibility:
-            return [result.snapshot for result in scored[:max_results]]
+            selected = [result.snapshot for result in scored[:max_results]]
+            self._last_retrieval_trace_summary = _retrieval_trace_summary(
+                session=session,
+                filters=working_filters,
+                store_candidate_count=len(snapshots),
+                hard_filter_candidate_count=len(working_candidates),
+                scored_count=len(raw_scored),
+                authority_selected_count=len(scored),
+                selected_count=len(selected),
+            )
+            return selected
 
         archival_filters = _archival_hard_filters(
             target_id=action.target_id,
@@ -245,9 +305,33 @@ class MemoryRetriever:
         archival_authority_result = resolve_authoritative_memory_results_with_trace(
             archival_scored
         )
-        archival_scored = archival_authority_result.results
+        archival_scored = _rank_results_for_projection(
+            archival_authority_result.results,
+            target_id=action.target_id,
+            phase=session.narrative.phase,
+        )
         self._last_authority_trace_summary = archival_authority_result.trace_summary
-        return [result.snapshot for result in archival_scored[:max_results]]
+        selected = [result.snapshot for result in archival_scored[:max_results]]
+        self._last_retrieval_trace_summary = _retrieval_trace_summary(
+            session=session,
+            filters=working_filters,
+            store_candidate_count=len(snapshots),
+            hard_filter_candidate_count=len(working_candidates),
+            scored_count=len(raw_scored),
+            authority_selected_count=0,
+            selected_count=0,
+        )
+        if selected:
+            self._last_retrieval_trace_summary = _retrieval_trace_summary(
+                session=session,
+                filters=archival_filters,
+                store_candidate_count=len(archival_snapshots),
+                hard_filter_candidate_count=len(archival_candidates),
+                scored_count=len(archival_scored),
+                authority_selected_count=len(archival_scored),
+                selected_count=len(selected),
+            )
+        return selected
 
     def _fetch_store_candidates(
         self,
@@ -309,6 +393,149 @@ def build_local_semantic_embedding_scorer(
     )
 
 
+def _expand_linked_results(
+    *,
+    results: list[MemorySearchResult],
+    snapshots: list[AgentMemorySnapshot],
+    query: MemorySearchQuery,
+    now: datetime | None,
+    hard_filters: tuple[MemoryHardFilter, ...],
+    phase: str,
+) -> list[MemorySearchResult]:
+    if not results:
+        return results
+    result_ids = {result.snapshot.memory_id for result in results}
+    frontier_ids = set(result_ids)
+    frontier_thread_ids = _case_thread_ids(result.snapshot for result in results)
+    linked_results: list[MemorySearchResult] = []
+    candidates = _filter_snapshots(snapshots, hard_filters)
+    for snapshot in candidates:
+        if snapshot.memory_id in result_ids:
+            continue
+        linked = bool(set(snapshot.source_memory_ids) & frontier_ids) or any(
+            snapshot.memory_id in set(result.snapshot.source_memory_ids)
+            for result in results
+        )
+        if (
+            not linked
+            and _case_thread_expansion_allowed(phase)
+            and _snapshot_case_thread_id(snapshot) in frontier_thread_ids
+        ):
+            linked = True
+        if not linked:
+            continue
+        linked_results.append(
+            MemorySearchResult(
+                snapshot=snapshot,
+                score=_linked_memory_score(snapshot, query=query, now=now),
+            )
+        )
+    if not linked_results:
+        return results
+    linked_results.sort(key=lambda result: result.score.sort_key, reverse=True)
+    return [*results, *linked_results]
+
+
+def _linked_memory_score(
+    snapshot: AgentMemorySnapshot,
+    *,
+    query: MemorySearchQuery,
+    now: datetime | None,
+) -> MemorySearchScore:
+    structured = 0.9 + _narrative_chain_boost(snapshot)
+    recency = _recency_score(snapshot, now)
+    reinforcement = _reinforcement_score(snapshot)
+    confidence = snapshot.confidence * 0.15
+    total = structured + recency + reinforcement + confidence
+    return MemorySearchScore(
+        total=total,
+        structured=structured,
+        keyword=0.0,
+        embedding=0.0,
+        rerank=0.0,
+        recency=recency,
+        reinforcement=reinforcement,
+        salience=snapshot.salience,
+        confidence=snapshot.confidence,
+        updated_at=snapshot.updated_at or snapshot.created_at or "",
+        memory_id=snapshot.memory_id,
+        has_relevance=bool(query.anchors or query.text_tokens),
+    )
+
+
+def _case_thread_ids(snapshots: Iterable[AgentMemorySnapshot]) -> set[str]:
+    return {
+        case_thread_id
+        for snapshot in snapshots
+        for case_thread_id in [_snapshot_case_thread_id(snapshot)]
+        if case_thread_id
+    }
+
+
+def _snapshot_case_thread_id(snapshot: AgentMemorySnapshot) -> str | None:
+    value = snapshot.metadata.get("case_thread_id")
+    if not isinstance(value, str):
+        return None
+    normalized = value.strip()
+    return normalized or None
+
+
+def _narrative_chain_boost(snapshot: AgentMemorySnapshot) -> float:
+    boost = 0.0
+    if snapshot.metadata.get("key_clue") is True:
+        boost += 0.35
+    if snapshot.metadata.get("case_thread_id"):
+        boost += 0.25
+    if snapshot.memory_type in {"belief", "strategy", "relationship"}:
+        boost += 0.2
+    return boost
+
+
+def _case_thread_expansion_allowed(phase: str) -> bool:
+    return phase in {"reconstruction", "resolved"}
+
+
+def _rank_results_for_projection(
+    results: list[MemorySearchResult],
+    *,
+    target_id: str,
+    phase: str,
+) -> list[MemorySearchResult]:
+    if not _case_thread_expansion_allowed(phase):
+        return results
+    return sorted(
+        results,
+        key=lambda result: (
+            _reconstruction_projection_priority(result.snapshot, target_id=target_id),
+            result.score.sort_key,
+        ),
+        reverse=True,
+    )
+
+
+def _reconstruction_projection_priority(
+    snapshot: AgentMemorySnapshot,
+    *,
+    target_id: str,
+) -> int:
+    if snapshot.metadata.get("key_clue") is True and snapshot.memory_type == "episodic":
+        return 30
+    if (
+        snapshot.memory_type in {"belief", "strategy"}
+        and snapshot.owner_character_id == target_id
+        and snapshot.memory_scope == "npc_private"
+        and snapshot.metadata.get("case_thread_id")
+    ):
+        return 20
+    if (
+        snapshot.memory_type in {"belief", "strategy"}
+        and snapshot.memory_scope == "case"
+        and snapshot.metadata.get("case_thread_id")
+    ):
+        return 10
+    return 0
+
+
 def _working_hard_filters(
     *,
     enforce_target_visibility: bool,
@@ -347,7 +574,7 @@ def _working_hard_filters(
             lambda snapshot: memory_allowed_by_plan(snapshot, plan),
         ),
         MemoryHardFilter(
-            "forbidden_content_absent",
+            "forbidden_text_absent",
             lambda snapshot: not memory_content_matches_forbidden(
                 snapshot,
                 forbidden_terms,
@@ -459,7 +686,7 @@ def _archival_hard_filters(
             ),
         ),
         MemoryHardFilter(
-            "forbidden_content_absent",
+            "forbidden_text_absent",
             lambda snapshot: not memory_content_matches_forbidden(
                 snapshot,
                 forbidden_terms,
@@ -481,6 +708,74 @@ def _filter_snapshots(
         for snapshot in snapshots
         if all(hard_filter.predicate(snapshot) for hard_filter in hard_filters)
     ]
+
+
+def _retrieval_trace_summary(
+    *,
+    session: SessionState,
+    filters: tuple[MemoryHardFilter, ...],
+    store_candidate_count: int,
+    hard_filter_candidate_count: int,
+    scored_count: int,
+    authority_selected_count: int,
+    selected_count: int,
+) -> MemoryRetrievalTraceSummary:
+    total_snapshot_count = len(session.memory_snapshots)
+    filter_counts = _hard_filter_rejection_counts(
+        list(session.memory_snapshots.values()),
+        filters,
+    )
+    return MemoryRetrievalTraceSummary(
+        total_snapshot_count=total_snapshot_count,
+        store_candidate_count=store_candidate_count,
+        hard_filter_candidate_count=hard_filter_candidate_count,
+        scored_count=scored_count,
+        authority_selected_count=authority_selected_count,
+        selected_count=selected_count,
+        zero_reason=_zero_reason(
+            total_snapshot_count=total_snapshot_count,
+            hard_filter_candidate_count=hard_filter_candidate_count,
+            scored_count=scored_count,
+            authority_selected_count=authority_selected_count,
+            selected_count=selected_count,
+        ),
+        filter_counts=filter_counts,
+    )
+
+
+def _hard_filter_rejection_counts(
+    snapshots: list[AgentMemorySnapshot],
+    filters: tuple[MemoryHardFilter, ...],
+) -> dict[str, int]:
+    counts = {hard_filter.name: 0 for hard_filter in filters}
+    for snapshot in snapshots:
+        for hard_filter in filters:
+            if hard_filter.predicate(snapshot):
+                continue
+            counts[hard_filter.name] += 1
+            break
+    return counts
+
+
+def _zero_reason(
+    *,
+    total_snapshot_count: int,
+    hard_filter_candidate_count: int,
+    scored_count: int,
+    authority_selected_count: int,
+    selected_count: int,
+) -> str | None:
+    if selected_count > 0:
+        return None
+    if total_snapshot_count == 0:
+        return "no_memory_snapshots"
+    if hard_filter_candidate_count == 0:
+        return "all_candidates_filtered"
+    if scored_count == 0:
+        return "no_relevant_score"
+    if authority_selected_count == 0:
+        return "authority_filtered"
+    return "selection_empty"
 
 
 def _tokens(text: str) -> set[str]:

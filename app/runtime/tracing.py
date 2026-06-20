@@ -330,6 +330,9 @@ def _sanitize_memory_projection(projection: dict[str, object]) -> dict[str, obje
             projection.get("director_safe_fragment_refs", []),
         ),
         "store": _sanitize_memory_store_projection(projection.get("store", {})),
+        "retrieval_diagnostics": _sanitize_memory_retrieval_diagnostics(
+            projection.get("retrieval_diagnostics", {}),
+        ),
         "memory_conflict_resolution": [
             _sanitize_memory_conflict_resolution(item)
             for item in conflict_resolutions
@@ -360,6 +363,32 @@ def _sanitize_memory_store_filters(value: object) -> dict[str, object]:
         "scopes": _string_list(value.get("scopes", [])),
         "layers": _string_list(value.get("layers", [])),
         "memory_types": _string_list(value.get("memory_types", [])),
+    }
+
+
+def _sanitize_memory_retrieval_diagnostics(value: object) -> dict[str, object]:
+    if not isinstance(value, dict):
+        return {}
+    raw_filter_counts = value.get("filter_counts", {})
+    filter_counts = raw_filter_counts if isinstance(raw_filter_counts, dict) else {}
+    return {
+        "total_snapshot_count": int(value.get("total_snapshot_count", 0)),
+        "store_candidate_count": int(value.get("store_candidate_count", 0)),
+        "hard_filter_candidate_count": int(
+            value.get("hard_filter_candidate_count", 0)
+        ),
+        "scored_count": int(value.get("scored_count", 0)),
+        "authority_selected_count": int(value.get("authority_selected_count", 0)),
+        "selected_count": int(value.get("selected_count", 0)),
+        "zero_reason": (
+            str(value["zero_reason"])
+            if value.get("zero_reason") is not None
+            else None
+        ),
+        "filter_counts": {
+            str(key): int(count)
+            for key, count in filter_counts.items()
+        },
     }
 
 

@@ -471,6 +471,7 @@ metadata v2 不允许无约束 dict 漂移：
 
 - ID 型字段必须是非空字符串：`world_info_id`、`claim_id`、`scene_id`、`phase_id`、`clue_id`、`belief_subject`、`strategy_id`、`privacy_reason`。
 - `topic_tags` 和 `phase_ids` 必须是字符串列表，并去重保序。
+- 叙事链路索引字段必须受校验：`case_thread_id` 和 `chain_node_id` 是非空字符串，`adjacent_clue_ids` 是去重保序字符串列表，`key_clue` 是布尔值。这些字段只描述检索链路，不是新的世界事实，也不能替代 `WorldInfo`、`PlayerKnowledge` 或 `SolutionClaim`。
 - `non_authoritative` 必须是布尔值；它只允许存储非权威无来源材料，不允许普通检索把它注入 NPC 上下文。
 - `authority_source` 必须来自白名单；缺省 `authority` 归一为 `event_observed`，显式 `non_authoritative=true`、`npc_hearsay`、`llm_summary` 或 `archival` 才会降权。事件锚定 memory 的权威性以 `source_event_ids` 和检索期 authority gate 共同判断，不能因为 metadata 省略 `authority_source` 就默认视为脏记忆。
 - `decay_policy` 只能是 `standard`、`sticky`、`ephemeral`、`never_archive`，或只包含 `name`、`archive_after_days`、`reinforced_event_count` 的对象。
@@ -482,6 +483,10 @@ metadata v2 不允许无约束 dict 漂移：
 - `player.presented_clue` 的私有 memory 必须包含同一套 clue metadata，并写 `privacy_reason=private_presentation`。
 - scene-shared `player.presented_clue` memory 必须额外写 `scene_id` 和 `privacy_reason=scene_shared_presentation`。
 - `topic_tags` 由 `clue_id` 的 snake_case 分词、完整 `clue_id`、`related_events`、`related_characters` 去重保序生成。
+- 当某个 `clue_id` 出现在 `solution_claims` 中 `result=correct` 且 `allowed_phases` 包含 `reconstruction` 或 `resolved` 的 `required_evidence` 里，`clue.discovered` memory 还必须写入 `case_thread_id=<claim.id>`、`chain_node_id=<clue_id>`、`adjacent_clue_ids=<同 claim 其他 required_evidence>`、`key_clue=true` 和 `is_plot_critical=true`。这让检索器可以从一个已命中的线索节点扩展到同一案件线程的兄弟节点。普通 reveal/expose 型正式指控不自动进入该 reconstruction 链路机制。
+- 同一类关键线索发现还会派生 reconstruction/resolved 阶段可见的 case/core `belief` 与 `strategy` memory，分别表示“玩家正在围绕重建线程组织证据”和“重建时应把线索作为链路节点连接”。这些 typed memory 必须由 `memory_candidate.created` 与 `agent_memory_snapshot.updated` 写入，正文不得包含正式指控结论、凶手主观恶意或未解锁真相。
+- 当 reconstruction claim 的全部 `required_evidence` 已被玩家发现时，派生系统会额外为案件内每个 NPC 生成角色私有 `belief` / `strategy` memory。它们使用 `memory_scope=npc_private`、`memory_layer=working`、`owner_character_id=<npc_id>`、`visible_to_character_ids=[<npc_id>]`，并通过 `source_memory_ids` 指向触发的线索发现 memory。该状态只表达该 NPC 在重建阶段的应对立场，不新增世界事实、不改变 `PlayerKnowledge`、不扩大其他 NPC 可见性。
+- `case_thread_id` 兄弟节点扩展和 reconstruction 选前重排都是检索期策略，不是 replay 状态副作用。它们只在 `reconstruction` / `resolved` 阶段启用；investigation 阶段仍只能通过直接锚点或 `source_memory_ids` 父子链召回，防止早期调查因为一个关键词把整条案件链路提前注入 NPC 上下文。重排只改变已合法候选的投影顺序，不写回 `AgentMemorySnapshot`。
 
 配置化 `MemoryDerivationRule` 与 Python fallback 必须产生一致的默认 metadata。案件规则可以显式覆盖或补充 metadata，但不能移除 `clue_id` 这类召回锚点，否则会破坏 matrix 评测和可回放检索。
 
@@ -507,6 +512,8 @@ player.presented_clue target=jiang_yanhui clue=empty_capsules presentation_mode=
   -> scene_shared episodic: 玩家在 study 当众展示空胶囊
   -> visible_to_character_ids=[study.characters]
   -> memory_layer=working
+  -> npc_private belief/strategy: 为每个在场 NPC 生成各自的立场和应对记忆
+  -> source_memory_ids=[scene_shared episodic memory id]
 ```
 
 这些记忆仍必须先作为 `memory_candidate.created` 出现，再由 `MemorySnapshotSystem` 写入 `agent_memory_snapshot.updated`。LLM 和 AgentIntent 不能直接创建 typed memory。

@@ -28,6 +28,10 @@ steps:
   - player_knowledge.updated
   - memory_candidate.created
   - agent_memory_snapshot.updated
+  - memory_candidate.created
+  - agent_memory_snapshot.updated
+  - memory_candidate.created
+  - agent_memory_snapshot.updated
   - narrative.beat.completed
   - narrative.phase.changed
   expected_phase: investigation
@@ -99,6 +103,10 @@ steps:
   - player_knowledge.updated
   - memory_candidate.created
   - agent_memory_snapshot.updated
+  - memory_candidate.created
+  - agent_memory_snapshot.updated
+  - memory_candidate.created
+  - agent_memory_snapshot.updated
   expected_phase: investigation
   expected_player_world_info_ids:
   - sedative_wine
@@ -117,6 +125,10 @@ steps:
   - clue.discovered
   - clue.discovered
   - player_knowledge.updated
+  - memory_candidate.created
+  - agent_memory_snapshot.updated
+  - memory_candidate.created
+  - agent_memory_snapshot.updated
   - memory_candidate.created
   - agent_memory_snapshot.updated
   - player_knowledge.updated
@@ -203,6 +215,10 @@ steps:
   - player_knowledge.updated
   - memory_candidate.created
   - agent_memory_snapshot.updated
+  - memory_candidate.created
+  - agent_memory_snapshot.updated
+  - memory_candidate.created
+  - agent_memory_snapshot.updated
   expected_phase: confrontation
   expected_player_world_info_ids:
   - sedative_wine
@@ -223,6 +239,10 @@ steps:
   - player.inspected
   - clue.discovered
   - player_knowledge.updated
+  - memory_candidate.created
+  - agent_memory_snapshot.updated
+  - memory_candidate.created
+  - agent_memory_snapshot.updated
   - memory_candidate.created
   - agent_memory_snapshot.updated
   expected_phase: confrontation
@@ -246,6 +266,26 @@ steps:
   - player.inspected
   - clue.discovered
   - player_knowledge.updated
+  - memory_candidate.created
+  - agent_memory_snapshot.updated
+  - memory_candidate.created
+  - agent_memory_snapshot.updated
+  - memory_candidate.created
+  - agent_memory_snapshot.updated
+  - memory_candidate.created
+  - agent_memory_snapshot.updated
+  - memory_candidate.created
+  - agent_memory_snapshot.updated
+  - memory_candidate.created
+  - agent_memory_snapshot.updated
+  - memory_candidate.created
+  - agent_memory_snapshot.updated
+  - memory_candidate.created
+  - agent_memory_snapshot.updated
+  - memory_candidate.created
+  - agent_memory_snapshot.updated
+  - memory_candidate.created
+  - agent_memory_snapshot.updated
   - memory_candidate.created
   - agent_memory_snapshot.updated
   - narrative.beat.completed

@@ -426,6 +426,29 @@ Memory v2 将检索拆成可审计管线：
 
 记忆矩阵评测见 `doc/evaluations/memory-retrieval-matrix-2026-06-15.md`。新增检索策略、embedding 或 reranker 之前，必须用矩阵确认“应召回 / 不应召回”的 memory_id 没有漂移。
 
+2026-06-19 修正了 `mist_clock_manor` 中沈照夜 reconstruction talk 的记忆策略：`shen_reconstruction_chain_boundary` 不再只允许 `npc_private` / `scene_shared` 工作记忆，而是显式允许已解锁案件链条的 `case/core` 与 `session/working` 玩家调查记忆进入候选。该放宽仅限 reconstruction / resolved 阶段且必须满足 skill unlock 条件、topic tag、phase、visibility、forbidden content 和 plan hard filter；它不授予沈照夜读取其他 NPC 私有记忆，也不让 memory 直接改变世界事实。目标是让重建阶段围绕 `bitter_wine`、`delayed_lock_marks`、`echo_tape`、`empty_capsules`、`cut_power_trace` 的回答同时依赖 Director safe fragments 和玩家已走过的调查记忆，而不是只靠 skill 安全文段硬撑叙事连续性。
+
+2026-06-19 第二阶段补强了叙事记忆层的四个入口：
+
+- 零结果诊断：`MemoryRetriever.last_retrieval_trace_summary` 记录总快照数、store 候选数、hard filter 后候选数、scored 数、selected 数、`zero_reason` 和按 hard filter 分桶的拒绝计数。trace 只记录计数和 filter 名，不记录 memory content 或未选中 memory id，用来区分“无候选”“权限过滤”“无相关性”“authority gate 过滤”。
+- typed memory 召回：检索在第一跳命中后会通过 `source_memory_ids` 做一次二跳扩展，把已通过权限边界的 linked `belief` / `relationship` / `strategy` 拉回候选。这样 NPC 能把“发生过什么”和“我如何看待/应对这件事”放进同一轮上下文。
+- scene_shared 传播：公开展示线索仍先产生 `scene_shared` 公共 episodic memory；同时为每个在场 NPC 生成各自的 `npc_private belief/strategy`，source 指向公共 memory。公共事件负责传播，私有 typed memory 负责角色立场，不互相替代。
+- 叙事链路召回：二跳扩展只基于已命中的 memory 与 `source_memory_ids` 关系，不读取全局真相。扩展候选仍重新满足 scope、visibility、layer、phase、plan、forbidden text 和 authority gate，不能借链路绕过 NPC 视角。
+
+2026-06-20 将 reconstruction 的叙事链路从“父子 source link”扩展为“案件线程 case thread”：
+
+- 关键线索 memory metadata 新增受白名单校验的 `case_thread_id`、`chain_node_id`、`adjacent_clue_ids` 和 `key_clue`。这些字段只来自 `solution_claims` 中 `result=correct` 且 `allowed_phases` 包含 `reconstruction` 或 `resolved` 的 required evidence，只作为检索索引和审计字段，不让 LLM 直接改写世界事实。
+- `MemoryRetriever` 第一跳命中某个 `case_thread_id` 后，会把同一线程中已经通过 hard filter 的兄弟节点加入候选；这解决沈照夜 reconstruction 只命中 `cut_power_trace`、却不能自然拉起 `bitter_wine`、`delayed_lock_marks`、`echo_tape`、`empty_capsules` 的问题。
+- `CLUE_DISCOVERED` 会为正确案件线程生成 reconstruction/resolved 阶段可见的 case/core `belief` 与 `strategy` memory。正文只表达“玩家正在围绕重建线程组织证据”和“重建时应把线索当链路节点连接”，不写凶手结论、主观恶意或未解锁真相；这些 typed memory 仍通过事件和 snapshot 审计链落库。
+- 同链扩展不绕过安全边界：候选必须先满足 scope、visibility、layer、source provenance、phase、skill plan、forbidden text 和 authority gate。沈照夜专用 `shen_reconstruction_chain_boundary` 的 `max_items` 提升到 8，仅在 reconstruction/resolved 且 skill unlock 条件满足时生效，用来容纳五个核心线索加 belief/strategy 立场记忆。
+
+2026-06-20 第二阶段把上面的能力收成四条可测试规则：
+
+- 检索矩阵覆盖：`tests/test_memory_retrieval_matrix.py` 锁定 reconstruction 阶段“应召回 / 不应召回”的 memory id。沈照夜必须能从断电节点拉起共享案件链，同时不能拿到齐砚的私有 strategy；齐砚同理只能拿自己的角色策略。
+- 阶段化链路扩展：`source_memory_ids` 的父子二跳扩展仍可在各阶段使用，但 `case_thread_id` 兄弟节点扩展只允许在 `reconstruction` / `resolved`。investigation 阶段即使命中 `cut_power_trace`，也不能自动把同线程所有核心线索带出来。重建阶段的最终选前排序会优先保留同线程关键线索，其次是当前 NPC 自己的私有 `belief/strategy`，再是全局案件链路立场，防止 typed memory 把核心证据挤出上下文。
+- 角色化 typed memory：当 reconstruction claim 的 required evidence 全部进入玩家已知后，派生系统会给每个案件 NPC 生成 `npc_private` 的 `belief` / `strategy`。这些记忆可表达“这个角色应如何看待玩家的重建链路”，但仍只对对应 owner 可见，不共享给其他 NPC。
+- scene_shared 实战验证：公开展示线索先产生 `scene_shared` episodic 公共记忆，再为在场 NPC 派生各自私有 `belief` / `strategy`。检索测试同时验证在场角色可见、缺席角色不可见，避免公共传播变成全局广播。
+
 完整 LLM 输入/输出合同见 `doc/agents/llm-agent-contract.md`。
 
 ## System Prompt 编排

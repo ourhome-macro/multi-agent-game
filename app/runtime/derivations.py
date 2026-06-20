@@ -12,6 +12,7 @@ from app.domain.models import (
     PlayerKnowledgeSourceType,
     PlayerKnowledgeState,
     SessionState,
+    SolutionClaimConfig,
     WorldEvent,
     serialize_memory_operation,
 )
@@ -23,6 +24,18 @@ from app.runtime.memory_derivations import (
 )
 
 CLUE_DISCOVERED_MEMORY_RULE_ID = "memory_rule.core.clue_discovered.episodic.v1"
+CLUE_DISCOVERED_CHAIN_BELIEF_RULE_ID = (
+    "memory_rule.core.clue_discovered.chain_belief.v1"
+)
+CLUE_DISCOVERED_CHAIN_STRATEGY_RULE_ID = (
+    "memory_rule.core.clue_discovered.chain_strategy.v1"
+)
+CLUE_DISCOVERED_ROLE_CHAIN_BELIEF_RULE_ID = (
+    "memory_rule.core.clue_discovered.role_chain_belief.v1"
+)
+CLUE_DISCOVERED_ROLE_CHAIN_STRATEGY_RULE_ID = (
+    "memory_rule.core.clue_discovered.role_chain_strategy.v1"
+)
 RELATIONSHIP_THRESHOLD_MEMORY_RULE_ID = (
     "memory_rule.core.relationship_threshold.episodic.v1"
 )
@@ -31,6 +44,12 @@ ASKED_ABOUT_MEMORY_RULE_ID = "memory_rule.core.asked_about.episodic.v1"
 PRESENTED_CLUE_MEMORY_RULE_ID = "memory_rule.core.presented_clue.episodic.v1"
 SCENE_SHARED_PRESENTED_CLUE_MEMORY_RULE_ID = (
     "memory_rule.core.scene_shared_presented_clue.episodic.v1"
+)
+SCENE_SHARED_PRESENTED_CLUE_BELIEF_RULE_ID = (
+    "memory_rule.core.scene_shared_presented_clue.belief.v1"
+)
+SCENE_SHARED_PRESENTED_CLUE_STRATEGY_RULE_ID = (
+    "memory_rule.core.scene_shared_presented_clue.strategy.v1"
 )
 PLAYER_ACCUSED_MEMORY_RULE_ID = "memory_rule.core.player_accused.episodic.v1"
 ACCUSATION_EVALUATED_MEMORY_RULE_ID = (
@@ -61,6 +80,13 @@ class DerivedEventSystem:
                 memory_event = self._derive_clue_memory_candidate(case, session, source_event)
                 if memory_event is not None:
                     events.append(memory_event)
+                events.extend(
+                    self._derive_clue_chain_typed_memory_candidates(
+                        case,
+                        session,
+                        source_event,
+                    )
+                )
             elif source_event.type == EventType.RELATIONSHIP_THRESHOLD_CROSSED:
                 memory_event = self._derive_relationship_memory_candidate(
                     case,
@@ -138,6 +164,13 @@ class DerivedEventSystem:
                     )
                     if memory_event is not None:
                         events.append(memory_event)
+                events.extend(
+                    self._derive_scene_shared_presented_clue_private_memory_candidates(
+                        case,
+                        session,
+                        source_event,
+                    )
+                )
             elif source_event.type == EventType.PLAYER_ACCUSED:
                 awareness_events = self._derive_character_awareness_from_accusation(
                     case,
@@ -355,6 +388,190 @@ class DerivedEventSystem:
             metadata=self._clue_memory_metadata(case, clue_id),
         )
 
+    def _derive_clue_chain_typed_memory_candidates(
+        self,
+        case: CasePackage,
+        session: SessionState,
+        source_event: WorldEvent,
+    ) -> list[WorldEvent]:
+        clue_id = str(source_event.payload["clue_id"])
+        claim = self._reconstruction_thread_claim_for_clue(case, clue_id)
+        if claim is None:
+            return []
+        thread_metadata = self._case_thread_metadata_for_claim(claim, clue_id)
+        case_thread_id = thread_metadata.get("case_thread_id")
+        if not isinstance(case_thread_id, str):
+            return []
+        source_memory_id = f"memory.player.clue_discovered.{clue_id}"
+        common_metadata = {
+            **thread_metadata,
+            "clue_id": clue_id,
+            "phase_ids": ["reconstruction", "resolved"],
+            "topic_tags": _ordered_unique(
+                [
+                    case_thread_id,
+                    "reconstruction",
+                    clue_id,
+                    *[
+                        str(item)
+                        for item in thread_metadata.get("adjacent_clue_ids", [])
+                        if item is not None
+                    ],
+                ]
+            ),
+            "authority_source": "rule_derived",
+        }
+        events: list[WorldEvent] = []
+        for event in (
+            self._store_memory_candidate(
+                session=session,
+                source_event=source_event,
+                memory_id=f"memory.player.belief.reconstruction.{case_thread_id}",
+                rule_id=CLUE_DISCOVERED_CHAIN_BELIEF_RULE_ID,
+                content="Player has established evidence that belongs to a reconstruction thread.",
+                salience=0.82,
+                owner_character_id=None,
+                visible_to_character_ids=[],
+                source_memory_ids=[source_memory_id],
+                memory_type="belief",
+                memory_scope="case",
+                memory_layer="core",
+                metadata={
+                    **common_metadata,
+                    "belief_subject": f"player_reconstructing_{case_thread_id}",
+                    "belief_polarity": "suspects",
+                    "chain_node_id": "thread_belief",
+                },
+            ),
+            self._store_memory_candidate(
+                session=session,
+                source_event=source_event,
+                memory_id=f"memory.player.strategy.reconstruction.{case_thread_id}",
+                rule_id=CLUE_DISCOVERED_CHAIN_STRATEGY_RULE_ID,
+                content=(
+                    "During reconstruction, respond by connecting discovered "
+                    "evidence as linked clue nodes."
+                ),
+                salience=0.86,
+                owner_character_id=None,
+                visible_to_character_ids=[],
+                source_memory_ids=[source_memory_id],
+                memory_type="strategy",
+                memory_scope="case",
+                memory_layer="core",
+                metadata={
+                    **common_metadata,
+                    "strategy_id": f"connect_{case_thread_id}_nodes",
+                    "chain_node_id": "thread_strategy",
+                },
+            ),
+        ):
+            if event is not None:
+                events.append(event)
+        if self._thread_evidence_ready(session, claim.required_evidence):
+            events.extend(
+                self._derive_role_reconstruction_thread_memory_candidates(
+                    case=case,
+                    session=session,
+                    source_event=source_event,
+                    case_thread_id=case_thread_id,
+                    source_memory_id=source_memory_id,
+                    thread_metadata=thread_metadata,
+                )
+            )
+        return events
+
+    def _derive_role_reconstruction_thread_memory_candidates(
+        self,
+        *,
+        case: CasePackage,
+        session: SessionState,
+        source_event: WorldEvent,
+        case_thread_id: str,
+        source_memory_id: str,
+        thread_metadata: dict[str, object],
+    ) -> list[WorldEvent]:
+        events: list[WorldEvent] = []
+        adjacent_clue_ids = [
+            str(item)
+            for item in thread_metadata.get("adjacent_clue_ids", [])
+            if item is not None
+        ]
+        for character in case.characters:
+            role_tags = _role_reconstruction_topic_tags(character.id)
+            metadata = {
+                **thread_metadata,
+                "phase_ids": ["reconstruction", "resolved"],
+                "topic_tags": _ordered_unique(
+                    [
+                        case_thread_id,
+                        "reconstruction",
+                        character.id,
+                        *role_tags,
+                        *adjacent_clue_ids,
+                    ]
+                ),
+                "authority_source": "rule_derived",
+            }
+            for event in (
+                self._store_memory_candidate(
+                    session=session,
+                    source_event=source_event,
+                    memory_id=(
+                        "memory.player.belief.reconstruction."
+                        f"{character.id}.{case_thread_id}"
+                    ),
+                    rule_id=CLUE_DISCOVERED_ROLE_CHAIN_BELIEF_RULE_ID,
+                    content=(
+                        f"{character.display_name} believes the player can now "
+                        "compare established evidence across the reconstruction chain."
+                    ),
+                    salience=0.78,
+                    owner_character_id=character.id,
+                    visible_to_character_ids=[character.id],
+                    source_memory_ids=[source_memory_id],
+                    memory_type="belief",
+                    memory_scope="npc_private",
+                    memory_layer="working",
+                    metadata={
+                        **metadata,
+                        "belief_subject": (
+                            f"player_reconstructing_{case_thread_id}_{character.id}"
+                        ),
+                        "belief_polarity": "suspects",
+                        "chain_node_id": f"{character.id}_thread_belief",
+                    },
+                ),
+                self._store_memory_candidate(
+                    session=session,
+                    source_event=source_event,
+                    memory_id=(
+                        "memory.player.strategy.reconstruction."
+                        f"{character.id}.{case_thread_id}"
+                    ),
+                    rule_id=CLUE_DISCOVERED_ROLE_CHAIN_STRATEGY_RULE_ID,
+                    content=(
+                        f"{character.display_name} should answer from their own "
+                        "evidence boundary and avoid adding facts outside unlocked evidence."
+                    ),
+                    salience=0.84,
+                    owner_character_id=character.id,
+                    visible_to_character_ids=[character.id],
+                    source_memory_ids=[source_memory_id],
+                    memory_type="strategy",
+                    memory_scope="npc_private",
+                    memory_layer="working",
+                    metadata={
+                        **metadata,
+                        "strategy_id": f"bounded_reconstruction_{character.id}",
+                        "chain_node_id": f"{character.id}_thread_strategy",
+                    },
+                ),
+            ):
+                if event is not None:
+                    events.append(event)
+        return events
+
     def _derive_relationship_memory_candidate(
         self,
         case: CasePackage,
@@ -483,6 +700,95 @@ class DerivedEventSystem:
                 "privacy_reason": "scene_shared_presentation",
             },
         )
+
+    def _derive_scene_shared_presented_clue_private_memory_candidates(
+        self,
+        case: CasePackage,
+        session: SessionState,
+        source_event: WorldEvent,
+    ) -> list[WorldEvent]:
+        if source_event.payload.get("presentation_mode") != "scene_shared":
+            return []
+        scene_id = source_event.payload.get("scene_id")
+        if not isinstance(scene_id, str):
+            return []
+        clue_id = source_event.payload.get("clue_id")
+        if not isinstance(clue_id, str):
+            return []
+        present_character_ids = [
+            str(item)
+            for item in source_event.payload.get("present_character_ids", [])
+            if item is not None
+        ]
+        if len(present_character_ids) < 2:
+            return []
+
+        clue = next((item for item in case.clues if item.id == clue_id), None)
+        clue_label = clue.title if clue is not None else clue_id
+        shared_memory_id = self._scene_shared_presented_clue_memory_id(source_event)
+        events: list[WorldEvent] = []
+        for character_id in present_character_ids:
+            character_name = self._character_name(case, character_id)
+            metadata = {
+                **self._clue_memory_metadata(case, clue_id),
+                "scene_id": scene_id,
+                "privacy_reason": "scene_shared_private_interpretation",
+                "authority_source": "player_evidence",
+            }
+            belief_event = self._store_memory_candidate(
+                session=session,
+                source_event=source_event,
+                memory_id=(
+                    "memory.player.scene_shared.belief."
+                    f"{character_id}.{scene_id}.{clue_id}"
+                ),
+                rule_id=SCENE_SHARED_PRESENTED_CLUE_BELIEF_RULE_ID,
+                content=(
+                    f"{character_name} believes the player made clue "
+                    f"'{clue_label}' visible to the room."
+                ),
+                salience=0.7,
+                owner_character_id=character_id,
+                visible_to_character_ids=[character_id],
+                source_memory_ids=[shared_memory_id],
+                memory_type="belief",
+                memory_scope="npc_private",
+                memory_layer="working",
+                metadata={
+                    **metadata,
+                    "belief_subject": f"player_publicly_presented_{clue_id}",
+                    "belief_polarity": "believes",
+                },
+            )
+            if belief_event is not None:
+                events.append(belief_event)
+            strategy_event = self._store_memory_candidate(
+                session=session,
+                source_event=source_event,
+                memory_id=(
+                    "memory.player.scene_shared.strategy."
+                    f"{character_id}.{scene_id}.{clue_id}"
+                ),
+                rule_id=SCENE_SHARED_PRESENTED_CLUE_STRATEGY_RULE_ID,
+                content=(
+                    f"{character_name} should account for other witnesses when "
+                    f"responding to clue '{clue_label}'."
+                ),
+                salience=0.65,
+                owner_character_id=character_id,
+                visible_to_character_ids=[character_id],
+                source_memory_ids=[shared_memory_id],
+                memory_type="strategy",
+                memory_scope="npc_private",
+                memory_layer="working",
+                metadata={
+                    **metadata,
+                    "strategy_id": f"respond_to_public_{clue_id}",
+                },
+            )
+            if strategy_event is not None:
+                events.append(strategy_event)
+        return events
 
     def _derive_presented_clue_memory_candidate(
         self,
@@ -671,7 +977,59 @@ class DerivedEventSystem:
         }
         if clue.reveals_world_info:
             metadata["world_info_id"] = clue.reveals_world_info[0]
+        metadata.update(self._case_thread_metadata_for_clue(case, clue_id))
         return metadata
+
+    def _case_thread_metadata_for_clue(
+        self,
+        case: CasePackage,
+        clue_id: str,
+    ) -> dict[str, object]:
+        claim = self._reconstruction_thread_claim_for_clue(case, clue_id)
+        if claim is None:
+            return {}
+        return self._case_thread_metadata_for_claim(claim, clue_id)
+
+    def _reconstruction_thread_claim_for_clue(
+        self,
+        case: CasePackage,
+        clue_id: str,
+    ) -> SolutionClaimConfig | None:
+        return next(
+            (
+                item
+                for item in case.solution_claims.claims
+                if item.result == "correct"
+                and clue_id in set(item.required_evidence)
+                and _claim_supports_reconstruction_thread(item.allowed_phases)
+            ),
+            None,
+        )
+
+    def _case_thread_metadata_for_claim(
+        self,
+        claim: SolutionClaimConfig,
+        clue_id: str,
+    ) -> dict[str, object]:
+        adjacent_clue_ids = [
+            evidence_id
+            for evidence_id in claim.required_evidence
+            if evidence_id != clue_id
+        ]
+        return {
+            "case_thread_id": claim.id,
+            "chain_node_id": clue_id,
+            "adjacent_clue_ids": adjacent_clue_ids,
+            "key_clue": True,
+            "is_plot_critical": True,
+        }
+
+    def _thread_evidence_ready(
+        self,
+        session: SessionState,
+        required_evidence: list[str],
+    ) -> bool:
+        return set(required_evidence).issubset(session.discovered_clues)
 
     def _default_memory_metadata(
         self,
@@ -1036,6 +1394,20 @@ def _identifier_topic_tags(identifier: str) -> list[str]:
     if identifier:
         _append_unique(tags, identifier)
     return tags
+
+
+def _claim_supports_reconstruction_thread(allowed_phases: list[str]) -> bool:
+    return bool({"reconstruction", "resolved"} & {str(phase) for phase in allowed_phases})
+
+
+def _role_reconstruction_topic_tags(character_id: str) -> list[str]:
+    tags_by_character = {
+        "shen_zhaoye": ["cut_power_trace", "power_cut"],
+        "qi_yan": ["echo_tape", "tape_swapped"],
+        "lin_qichi": ["bitter_wine", "sedative"],
+        "jiang_yanhui": ["empty_capsules", "delayed_lock_marks", "lock_modified"],
+    }
+    return tags_by_character.get(character_id, [])
 
 
 def _ordered_unique(items: list[str]) -> list[str]:

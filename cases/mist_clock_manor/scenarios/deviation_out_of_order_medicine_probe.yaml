@@ -18,6 +18,10 @@ steps:
   - player_knowledge.updated
   - memory_candidate.created
   - agent_memory_snapshot.updated
+  - memory_candidate.created
+  - agent_memory_snapshot.updated
+  - memory_candidate.created
+  - agent_memory_snapshot.updated
   expected_phase: opening
   expected_player_world_info_ids:
   - heart_medicine_replaced

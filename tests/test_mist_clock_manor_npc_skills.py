@@ -21,7 +21,9 @@ def test_case_loader_loads_mist_clock_manor_npc_skills() -> None:
         "jiang_lock_boundary",
         "jiang_capsule_boundary",
         "qi_tape_boundary",
+        "jiang_ruolan_tape_boundary",
         "lin_wine_boundary",
+        "shen_reconstruction_chain_boundary",
         "shen_power_boundary",
         "shen_study_lock_boundary",
         "shen_old_case_boundary",
@@ -31,11 +33,14 @@ def test_case_loader_loads_mist_clock_manor_npc_skills() -> None:
         assert skill.triggers.action_types
         assert skill.unlock_conditions.required_player_knowledge
         assert skill.disclosure.world_info_ids
-        assert skill.disclosure.max_mode.value == "hint"
+        assert skill.disclosure.max_mode.value in {"hint", "partial"}
         assert skill.disclosure.allowed_tactics
         assert skill.disclosure.safe_fragment_refs
         assert skill.memory.max_items is not None
         assert skill.proposed_action_policy.max_relationship_delta
+    assert skills_by_id["shen_reconstruction_chain_boundary"].disclosure.max_mode.value == (
+        "partial"
+    )
 
     _assert_safe_fragment_refs_are_bound_to_world_info(case)
 

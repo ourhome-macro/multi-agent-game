@@ -14,6 +14,7 @@ CASE_DIR = PROJECT_ROOT / "cases" / "mist_clock_manor"
 
 JIANG = "jiang_yanhui"
 QI = "qi_yan"
+LIN = "lin_qichi"
 SHEN = "shen_zhaoye"
 STUDY = "study"
 EMPTY_CAPSULES = "empty_capsules"
@@ -29,6 +30,18 @@ TYPED_MEMORY_IDS = {
     STRATEGY_MEMORY,
 }
 SCENE_SHARED_MEMORY = f"memory.player.scene_shared.presented_clue.{STUDY}.{EMPTY_CAPSULES}"
+QI_SCENE_BELIEF_MEMORY = (
+    f"memory.player.scene_shared.belief.{QI}.{STUDY}.{EMPTY_CAPSULES}"
+)
+QI_SCENE_STRATEGY_MEMORY = (
+    f"memory.player.scene_shared.strategy.{QI}.{STUDY}.{EMPTY_CAPSULES}"
+)
+LIN_SCENE_BELIEF_MEMORY = (
+    f"memory.player.scene_shared.belief.{LIN}.{STUDY}.{EMPTY_CAPSULES}"
+)
+LIN_SCENE_STRATEGY_MEMORY = (
+    f"memory.player.scene_shared.strategy.{LIN}.{STUDY}.{EMPTY_CAPSULES}"
+)
 CLUE_DISCOVERY_MEMORY = f"memory.player.clue_discovered.{EMPTY_CAPSULES}"
 
 
@@ -108,6 +121,18 @@ def test_public_empty_capsules_memory_is_scene_shared_to_present_npcs() -> None:
     assert shared_snapshot.memory_scope == "scene_shared"
     assert shared_snapshot.memory_layer == "working"
     assert set(shared_snapshot.visible_to_character_ids) == {"lin_qichi", QI, JIANG}
+    qi_belief = session.memory_snapshots[QI_SCENE_BELIEF_MEMORY]
+    qi_strategy = session.memory_snapshots[QI_SCENE_STRATEGY_MEMORY]
+    assert qi_belief.memory_type == "belief"
+    assert qi_belief.memory_scope == "npc_private"
+    assert qi_belief.owner_character_id == QI
+    assert qi_belief.visible_to_character_ids == [QI]
+    assert SCENE_SHARED_MEMORY in qi_belief.source_memory_ids
+    assert qi_strategy.memory_type == "strategy"
+    assert qi_strategy.memory_scope == "npc_private"
+    assert qi_strategy.owner_character_id == QI
+    assert qi_strategy.visible_to_character_ids == [QI]
+    assert SCENE_SHARED_MEMORY in qi_strategy.source_memory_ids
 
     qi_memories = MemoryRetriever(max_results=20).retrieve(
         case=case,
@@ -120,10 +145,23 @@ def test_public_empty_capsules_memory_is_scene_shared_to_present_npcs() -> None:
         action=_talk_action(SHEN, EMPTY_CAPSULES),
     )
     assert SCENE_SHARED_MEMORY in _memory_ids(qi_memories)
+    assert QI_SCENE_BELIEF_MEMORY in _memory_ids(qi_memories)
+    assert QI_SCENE_STRATEGY_MEMORY in _memory_ids(qi_memories)
     assert SCENE_SHARED_MEMORY not in _memory_ids(shen_memories)
+    assert QI_SCENE_BELIEF_MEMORY not in _memory_ids(shen_memories)
 
     qi_context = build_agent_context(case, session, _talk_action(QI, EMPTY_CAPSULES))
+    lin_context = build_agent_context(case, session, _talk_action(LIN, EMPTY_CAPSULES))
+    shen_context = build_agent_context(case, session, _talk_action(SHEN, EMPTY_CAPSULES))
     assert SCENE_SHARED_MEMORY in _context_memory_ids(qi_context)
+    assert QI_SCENE_BELIEF_MEMORY in _context_memory_ids(qi_context)
+    assert QI_SCENE_STRATEGY_MEMORY in _context_memory_ids(qi_context)
+    assert SCENE_SHARED_MEMORY in _context_memory_ids(lin_context)
+    assert LIN_SCENE_BELIEF_MEMORY in _context_memory_ids(lin_context)
+    assert LIN_SCENE_STRATEGY_MEMORY in _context_memory_ids(lin_context)
+    assert SCENE_SHARED_MEMORY not in _context_memory_ids(shen_context)
+    assert QI_SCENE_BELIEF_MEMORY not in _context_memory_ids(shen_context)
+    assert LIN_SCENE_BELIEF_MEMORY not in _context_memory_ids(shen_context)
 
 
 def test_director_audit_memory_is_visible_to_director_not_npc_context() -> None:
@@ -191,6 +229,8 @@ def test_replay_preserves_scene_shared_scope_and_layer() -> None:
     assert replayed.memory_candidates[SCENE_SHARED_MEMORY].memory_layer == "working"
     assert replayed.memory_snapshots[SCENE_SHARED_MEMORY].memory_scope == "scene_shared"
     assert replayed.memory_snapshots[SCENE_SHARED_MEMORY].memory_layer == "working"
+    assert replayed.memory_snapshots[QI_SCENE_BELIEF_MEMORY].memory_scope == "npc_private"
+    assert replayed.memory_snapshots[QI_SCENE_STRATEGY_MEMORY].memory_scope == "npc_private"
 
 
 def test_case_core_memory_is_injected_into_npc_context() -> None:
