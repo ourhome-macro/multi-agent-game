@@ -293,11 +293,70 @@ class APIModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+class APIErrorCode(StrEnum):
+    CASE_NOT_FOUND = "CASE_NOT_FOUND"
+    SESSION_NOT_FOUND = "SESSION_NOT_FOUND"
+    ACTION_NOT_ALLOWED = "ACTION_NOT_ALLOWED"
+    IDEMPOTENCY_CONFLICT = "IDEMPOTENCY_CONFLICT"
+    IDEMPOTENCY_IN_PROGRESS = "IDEMPOTENCY_IN_PROGRESS"
+    STALE_SESSION_SEQUENCE = "STALE_SESSION_SEQUENCE"
+    PERSISTENCE_ERROR = "PERSISTENCE_ERROR"
+    REQUEST_VALIDATION_ERROR = "REQUEST_VALIDATION_ERROR"
+    INTERNAL_ERROR = "INTERNAL_ERROR"
+
+
+class APIErrorResponse(APIModel):
+    code: APIErrorCode
+    message: NonEmptyString
+    details: dict[str, Any] = Field(default_factory=dict)
+    retryable: bool = False
+    correlation_id: NonEmptyString
+
+
 class CaseMeta(APIModel):
     id: NonEmptyString
     title: NonEmptyString
     description: str = ""
     initial_phase: NonEmptyString
+
+
+class PublicCaseAsset(APIModel):
+    id: NonEmptyString
+    type: NonEmptyString
+    url: str | None = None
+    role: str = ""
+
+
+class PublicSceneHotspot(APIModel):
+    id: NonEmptyString
+    name: NonEmptyString
+    description: str = ""
+
+
+class PublicScene(APIModel):
+    id: NonEmptyString
+    name: NonEmptyString
+    description: str = ""
+    characters: list[NonEmptyString] = Field(default_factory=list)
+    hotspots: list[PublicSceneHotspot] = Field(default_factory=list)
+
+
+class PublicCharacter(APIModel):
+    id: NonEmptyString
+    display_name: NonEmptyString
+    public_role: NonEmptyString
+    public_description: str = ""
+
+
+class PublicCaseDetail(APIModel):
+    id: NonEmptyString
+    title: NonEmptyString
+    description: str = ""
+    initial_phase: NonEmptyString
+    initial_scene_id: NonEmptyString
+    scenes: list[PublicScene]
+    characters: list[PublicCharacter]
+    assets: list[PublicCaseAsset] = Field(default_factory=list)
 
 
 class CharacterSpeechConfig(APIModel):
@@ -1539,6 +1598,23 @@ class EvidenceSummary(EvidenceAsset):
     unlocked_at_event_id: NonEmptyString
 
 
+class PublicPlayerKnowledgeSummary(APIModel):
+    clue_id: NonEmptyString | None = None
+    confidence: float
+    acquisition: PlayerKnowledgeAcquisition
+    source_type: PlayerKnowledgeSourceType
+    title: NonEmptyString
+    summary: str
+
+
+class PublicEvidenceSummary(APIModel):
+    id: NonEmptyString
+    title: NonEmptyString
+    summary: str
+    source: PlayerKnowledgeSourceType = PlayerKnowledgeSourceType.CLUE
+    clue_id: NonEmptyString | None = None
+
+
 class StateSummary(APIModel):
     session_id: NonEmptyString
     case_id: NonEmptyString
@@ -1551,6 +1627,121 @@ class StateSummary(APIModel):
     evidence_assets: list[EvidenceSummary] = Field(default_factory=list)
     relationships: list[RelationshipState]
     event_count: int
+
+
+class PublicStateSummary(APIModel):
+    session_id: NonEmptyString
+    case_id: NonEmptyString
+    case_title: NonEmptyString
+    narrative_phase: NonEmptyString
+    completed_beats: list[NonEmptyString]
+    characters: list[CharacterSummary]
+    discovered_clues: list[ClueSummary]
+    player_knowledge: list[PublicPlayerKnowledgeSummary]
+    evidence_assets: list[PublicEvidenceSummary] = Field(default_factory=list)
+    relationships: list[RelationshipState]
+    event_count: int
+
+
+class PublicCreateSessionResponse(APIModel):
+    session_id: NonEmptyString
+    state: PublicStateSummary
+
+
+class InspectAffordance(APIModel):
+    type: ActionType = ActionType.INSPECT
+    target_id: NonEmptyString
+    scene_id: NonEmptyString
+    label: NonEmptyString
+    description: str = ""
+
+
+class TalkAffordance(APIModel):
+    type: ActionType = ActionType.TALK
+    target_id: NonEmptyString
+    scene_ids: list[NonEmptyString] = Field(default_factory=list)
+    label: NonEmptyString
+    public_role: NonEmptyString
+
+
+class AskAboutAffordance(APIModel):
+    type: ActionType = ActionType.ASK_ABOUT
+    target_id: NonEmptyString
+    subject_type: SubjectType
+    subject_id: NonEmptyString
+    subject_label: NonEmptyString
+
+
+class PresentClueAffordance(APIModel):
+    type: ActionType = ActionType.PRESENT_CLUE
+    target_id: NonEmptyString
+    clue_id: NonEmptyString
+    clue_title: NonEmptyString
+    presentation_modes: list[PresentationMode]
+    scene_ids: list[NonEmptyString] = Field(default_factory=list)
+
+
+class AccuseAffordance(APIModel):
+    type: ActionType = ActionType.ACCUSE
+    target_id: NonEmptyString
+    evidence_clue_ids: list[NonEmptyString] = Field(default_factory=list)
+
+
+class SessionAffordances(APIModel):
+    session_id: NonEmptyString
+    case_id: NonEmptyString
+    narrative_phase: NonEmptyString
+    event_count: int = Field(ge=0)
+    available_hotspot_ids: list[NonEmptyString] = Field(default_factory=list)
+    available_character_ids: list[NonEmptyString] = Field(default_factory=list)
+    discovered_clue_ids: list[NonEmptyString] = Field(default_factory=list)
+    evidence_asset_ids: list[NonEmptyString] = Field(default_factory=list)
+    valid_presentation_modes: list[PresentationMode] = Field(default_factory=list)
+    can_accuse: bool = False
+    inspect: list[InspectAffordance] = Field(default_factory=list)
+    talk: list[TalkAffordance] = Field(default_factory=list)
+    ask_about: list[AskAboutAffordance] = Field(default_factory=list)
+    present_clue: list[PresentClueAffordance] = Field(default_factory=list)
+    accuse: list[AccuseAffordance] = Field(default_factory=list)
+
+
+class PublicEventStreamItem(APIModel):
+    sequence: int = Field(ge=1)
+    id: NonEmptyString
+    type: EventType
+    actor_id: NonEmptyString
+    created_at: NonEmptyString
+    payload: dict[str, Any] = Field(default_factory=dict)
+
+
+class PublicEventStreamResponse(APIModel):
+    session_id: NonEmptyString
+    case_id: NonEmptyString
+    after_count: int = Field(ge=0)
+    next_after_count: int = Field(ge=0)
+    has_more: bool
+    events: list[PublicEventStreamItem] = Field(default_factory=list)
+
+
+class PublicActionResponse(APIModel):
+    session_id: NonEmptyString
+    accepted: bool
+    speech: str | None = None
+    director_blocked: bool = False
+    director_reason: str | None = None
+    llm_fallback_used: bool = False
+    llm_error: LLMErrorSummary | None = None
+    new_events: list[PublicEventStreamItem] = Field(default_factory=list)
+    state: PublicStateSummary
+
+
+class PublicRawTextActionResponse(APIModel):
+    status: NonEmptyString
+    action: PlayerAction | None = None
+    response: PublicActionResponse | None = None
+    reason: str | None = None
+    missing_slots: list[NonEmptyString] = Field(default_factory=list)
+    route_trace: dict[str, object] = Field(default_factory=dict)
 
 
 class ActionResponse(APIModel):

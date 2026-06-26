@@ -2057,7 +2057,7 @@ def test_real_llm_agent_generates_validated_intent_from_strict_json() -> None:
     assert intent.intent == AgentIntentType.ANSWER
     assert client.request_payload is not None
     assert client.request_payload["model"] == "test-model"
-    assert client.request_payload["text"]["format"]["strict"] is True
+    assert _request_uses_strict_json_schema(client.request_payload) is True
     serialized_request = json.dumps(client.request_payload, ensure_ascii=True)
     assert "test-key" not in serialized_request
 
@@ -2088,7 +2088,7 @@ def test_real_llm_agent_request_schema_uses_contract_enums() -> None:
     OpenAILLMAgent(api_key="test-key", client=client).generate(context)
 
     assert client.request_payload is not None
-    schema = client.request_payload["text"]["format"]["schema"]
+    schema = _request_json_schema(client.request_payload)
     assert schema["properties"]["intent"]["enum"] == [
         item.value for item in AgentIntentType
     ]
@@ -2141,17 +2141,16 @@ def test_real_llm_agent_uses_supplied_contract_input_for_request_schema() -> Non
     )
 
     assert client.request_payload is not None
-    schema = client.request_payload["text"]["format"]["schema"]
+    schema = _request_json_schema(client.request_payload)
     assert schema["properties"]["intent"]["enum"] == ["refuse", "conceal"]
     assert schema["properties"]["proposed_actions"]["items"] == {"not": {}}
-    contract_payload = json.loads(
-        client.request_payload["input"][0]["content"][0]["text"]
-    )
-    assert contract_payload["turn_plan_id"] == "turn_plan.explicit-test"
-    assert contract_payload["output_contract"]["allowed_intents"] == [
+    provider_payload = _request_provider_payload(client.request_payload)
+    assert "turn_plan_id" not in provider_payload
+    assert provider_payload["output_limits"]["allowed_intents"] == [
         "refuse",
         "conceal",
     ]
+    assert provider_payload["output_limits"]["allowed_proposed_action_types"] == []
 
 
 def test_run_turn_passes_prompt_injection_contract_to_real_llm_request() -> None:
@@ -2190,17 +2189,15 @@ def test_run_turn_passes_prompt_injection_contract_to_real_llm_request() -> None
 
     assert response.llm_fallback_used is False
     assert client.request_payload is not None
-    schema = client.request_payload["text"]["format"]["schema"]
+    schema = _request_json_schema(client.request_payload)
     assert set(schema["properties"]["intent"]["enum"]) == {"refuse", "conceal"}
-    contract_payload = json.loads(
-        client.request_payload["input"][0]["content"][0]["text"]
-    )
-    assert contract_payload["turn_plan_id"]
-    assert set(contract_payload["output_contract"]["allowed_intents"]) == {
+    provider_payload = _request_provider_payload(client.request_payload)
+    assert "turn_plan_id" not in provider_payload
+    assert set(provider_payload["output_limits"]["allowed_intents"]) == {
         "refuse",
         "conceal",
     }
-    assert contract_payload["output_contract"]["allowed_proposed_action_types"] == []
+    assert provider_payload["output_limits"]["allowed_proposed_action_types"] == []
 
 
 def test_real_llm_agent_defaults_xiaomi_mimo_model_and_chat_style(
@@ -4283,6 +4280,24 @@ class _FakeOpenAIClient:
         response = self._responses.pop(0)
         response.request_url = _url
         return response
+
+
+def _request_uses_strict_json_schema(request_payload: dict[str, Any]) -> bool:
+    if "text" in request_payload:
+        return bool(request_payload["text"]["format"]["strict"])
+    return bool(request_payload["response_format"]["json_schema"]["strict"])
+
+
+def _request_json_schema(request_payload: dict[str, Any]) -> dict[str, Any]:
+    if "text" in request_payload:
+        return request_payload["text"]["format"]["schema"]
+    return request_payload["response_format"]["json_schema"]["schema"]
+
+
+def _request_provider_payload(request_payload: dict[str, Any]) -> dict[str, Any]:
+    if "input" in request_payload:
+        return json.loads(request_payload["input"][0]["content"][0]["text"])
+    return json.loads(request_payload["messages"][1]["content"])
 
 
 def _build_butler_agent_context() -> AgentContext:

@@ -18,6 +18,7 @@ from app.agents.llm_contract import (
     validate_llm_agent_output,
 )
 from app.agents.prompt_builder import load_agent_system_prompt
+from app.agents.provider_payload import build_llm_provider_payload
 from app.domain.models import (
     AgentContext,
     AgentIntent,
@@ -204,7 +205,7 @@ class OpenAILLMAgent:
         contract_input: LLMAgentContractInput | dict[str, Any],
     ) -> dict[str, Any]:
         contract_input = _ensure_contract_input(contract_input)
-        contract_payload = contract_input.model_dump(mode="json")
+        provider_payload_text = _provider_payload_json(contract_input)
         response_schema = _agent_intent_json_schema(contract_input)
         headers = {
             "Authorization": f"Bearer {self._api_key}",
@@ -222,7 +223,7 @@ class OpenAILLMAgent:
                     "content": [
                         {
                             "type": "input_text",
-                            "text": json.dumps(contract_payload, ensure_ascii=False),
+                            "text": provider_payload_text,
                         }
                     ],
                 }
@@ -252,7 +253,7 @@ class OpenAILLMAgent:
         headers: dict[str, str],
         repair_instruction: str | None = None,
     ) -> dict[str, Any]:
-        contract_payload = contract_input.model_dump(mode="json")
+        provider_payload_text = _provider_payload_json(contract_input)
         messages = [
             {
                 "role": "system",
@@ -260,7 +261,7 @@ class OpenAILLMAgent:
             },
             {
                 "role": "user",
-                "content": json.dumps(contract_payload, ensure_ascii=False),
+                "content": provider_payload_text,
             },
         ]
         if repair_instruction is not None:
@@ -390,7 +391,7 @@ class OpenAILLMAgent:
         headers: dict[str, str],
         repair_instruction: str,
     ) -> dict[str, Any]:
-        contract_payload = contract_input.model_dump(mode="json")
+        provider_payload_text = _provider_payload_json(contract_input)
         request_payload = {
             "model": self._model,
             "instructions": load_agent_system_prompt(),
@@ -400,7 +401,7 @@ class OpenAILLMAgent:
                     "content": [
                         {
                             "type": "input_text",
-                            "text": json.dumps(contract_payload, ensure_ascii=False),
+                            "text": provider_payload_text,
                         }
                     ],
                 },
@@ -1276,6 +1277,13 @@ def _ensure_contract_input(
     if isinstance(contract_input, LLMAgentContractInput):
         return contract_input
     return LLMAgentContractInput.model_validate(contract_input)
+
+
+def _provider_payload_json(contract_input: LLMAgentContractInput) -> str:
+    return json.dumps(
+        build_llm_provider_payload(contract_input),
+        ensure_ascii=False,
+    )
 
 
 def _agent_intent_json_schema(

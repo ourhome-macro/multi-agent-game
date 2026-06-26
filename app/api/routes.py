@@ -2,19 +2,29 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from fastapi import APIRouter, Depends, Header, HTTPException, status
+from fastapi import APIRouter, Depends, Header, Query
 
+from app.api.errors import raise_http_api_error
+from app.api.projections import (
+    build_public_action_response,
+    build_public_case_detail,
+    build_public_event_stream,
+    build_public_state_summary,
+)
 from app.domain.models import (
-    ActionResponse,
     CaseMeta,
     CreateSessionRequest,
-    CreateSessionResponse,
     PlayerAction,
+    PublicActionResponse,
+    PublicCaseDetail,
+    PublicCreateSessionResponse,
+    PublicEventStreamResponse,
+    PublicRawTextActionResponse,
+    PublicStateSummary,
     RawTextActionRequest,
-    RawTextActionResponse,
-    StateSummary,
-    WorldEvent,
+    SessionAffordances,
 )
+from app.runtime.affordances import build_session_affordances
 from app.runtime.errors import ActionValidationError
 from app.runtime.service import RuntimeContainer
 from app.storage.memory import build_state_summary
@@ -43,86 +53,94 @@ def create_router(runtime_dependency: Callable[[], RuntimeContainer] = get_runti
     def list_cases(runtime: RuntimeContainer = runtime_dep) -> list[CaseMeta]:
         return [case.meta for case in runtime.case_store.list()]
 
-    @router.post("/sessions", response_model=CreateSessionResponse)
+    @router.get("/cases/{case_id}", response_model=PublicCaseDetail)
+    def get_case_detail(
+        case_id: str,
+        runtime: RuntimeContainer = runtime_dep,
+    ) -> PublicCaseDetail:
+        try:
+            case = runtime.case_store.get(case_id)
+        except KeyError as exc:
+            raise_http_api_error(exc, resource_type="case", resource_id=case_id)
+        return build_public_case_detail(case)
+
+    @router.post("/sessions", response_model=PublicCreateSessionResponse)
     def create_session(
         request: CreateSessionRequest,
         runtime: RuntimeContainer = runtime_dep,
-    ) -> CreateSessionResponse:
+    ) -> PublicCreateSessionResponse:
         case_id = request.case_id or runtime.case_store.default_case_id()
         try:
             case = runtime.case_store.get(case_id)
         except KeyError as exc:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=str(exc),
-            ) from exc
+            raise_http_api_error(exc, resource_type="case", resource_id=case_id)
         session = runtime.create_session(case)
-        return CreateSessionResponse(
+        return PublicCreateSessionResponse(
             session_id=session.id,
-            state=build_state_summary(case, session),
+            state=build_public_state_summary(build_state_summary(case, session)),
         )
 
-    @router.get("/sessions/{session_id}/state", response_model=StateSummary)
+    @router.get("/sessions/{session_id}/state", response_model=PublicStateSummary)
     def get_state(
         session_id: str,
         runtime: RuntimeContainer = runtime_dep,
-    ) -> StateSummary:
+    ) -> PublicStateSummary:
         try:
             session = runtime.get_session(session_id)
             case = runtime.case_store.get(session.case_id)
         except (KeyError, UnknownSessionError) as exc:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=str(exc),
-            ) from exc
-        return build_state_summary(case, session)
+            raise_http_api_error(exc, resource_type="session", resource_id=session_id)
+        return build_public_state_summary(build_state_summary(case, session))
 
-    @router.post("/sessions/{session_id}/actions", response_model=ActionResponse)
+    @router.get("/sessions/{session_id}/affordances", response_model=SessionAffordances)
+    def get_affordances(
+        session_id: str,
+        runtime: RuntimeContainer = runtime_dep,
+    ) -> SessionAffordances:
+        try:
+            session = runtime.get_session(session_id)
+            case = runtime.case_store.get(session.case_id)
+        except (KeyError, UnknownSessionError) as exc:
+            raise_http_api_error(exc, resource_type="session", resource_id=session_id)
+        return build_session_affordances(
+            case=case,
+            session=session,
+            rule_engine=runtime.rule_engine,
+        )
+
+    @router.post("/sessions/{session_id}/actions", response_model=PublicActionResponse)
     def submit_action(
         session_id: str,
         action: PlayerAction,
         idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
         runtime: RuntimeContainer = runtime_dep,
-    ) -> ActionResponse:
+    ) -> PublicActionResponse:
         try:
-            return runtime.handle_action(
-                session_id=session_id,
-                action=action,
-                idempotency_key=idempotency_key,
+            return build_public_action_response(
+                runtime.handle_action(
+                    session_id=session_id,
+                    action=action,
+                    idempotency_key=idempotency_key,
+                )
             )
         except (KeyError, UnknownSessionError) as exc:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=str(exc),
-            ) from exc
+            raise_http_api_error(exc, resource_type="session", resource_id=session_id)
         except ActionValidationError as exc:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=exc.message,
-            ) from exc
+            raise_http_api_error(exc)
         except StaleSessionSequenceError as exc:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail=str(exc),
-            ) from exc
+            raise_http_api_error(exc)
         except (IdempotencyConflictError, IdempotencyInProgressError) as exc:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail=str(exc),
-            ) from exc
+            raise_http_api_error(exc)
         except PostgresPersistenceError as exc:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=str(exc),
-            ) from exc
+            raise_http_api_error(exc)
 
-    @router.post("/sessions/{session_id}/raw-actions", response_model=RawTextActionResponse)
+    @router.post("/sessions/{session_id}/raw-actions", response_model=PublicRawTextActionResponse)
     def submit_raw_action(
         session_id: str,
         request: RawTextActionRequest,
         idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
         runtime: RuntimeContainer = runtime_dep,
-    ) -> RawTextActionResponse:
+    ) -> PublicRawTextActionResponse:
         try:
             intake = runtime.handle_raw_text(
                 session_id=session_id,
@@ -130,50 +148,46 @@ def create_router(runtime_dependency: Callable[[], RuntimeContainer] = get_runti
                 idempotency_key=idempotency_key,
             )
         except (KeyError, UnknownSessionError) as exc:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=str(exc),
-            ) from exc
+            raise_http_api_error(exc, resource_type="session", resource_id=session_id)
         except ActionValidationError as exc:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=exc.message,
-            ) from exc
+            raise_http_api_error(exc)
         except StaleSessionSequenceError as exc:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail=str(exc),
-            ) from exc
+            raise_http_api_error(exc)
         except (IdempotencyConflictError, IdempotencyInProgressError) as exc:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail=str(exc),
-            ) from exc
+            raise_http_api_error(exc)
         except PostgresPersistenceError as exc:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=str(exc),
-            ) from exc
-        return RawTextActionResponse(
+            raise_http_api_error(exc)
+        return PublicRawTextActionResponse(
             status=intake.status.value,
             action=intake.action,
-            response=intake.response,
+            response=(
+                build_public_action_response(intake.response)
+                if intake.response is not None
+                else None
+            ),
             reason=intake.reason,
             missing_slots=list(intake.missing_slots),
             route_trace=intake.route.trace.to_safe_dict(),
         )
 
-    @router.get("/sessions/{session_id}/events", response_model=list[WorldEvent])
+    @router.get("/sessions/{session_id}/events", response_model=PublicEventStreamResponse)
     def get_events(
         session_id: str,
+        after_count: int = Query(default=0, ge=0),
+        limit: int = Query(default=100, ge=1, le=500),
         runtime: RuntimeContainer = runtime_dep,
-    ) -> list[WorldEvent]:
+    ) -> PublicEventStreamResponse:
         try:
-            return runtime.get_events(session_id)
+            session = runtime.get_session(session_id)
+            events = runtime.get_events(session_id)
         except (KeyError, UnknownSessionError) as exc:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=str(exc),
-            ) from exc
+            raise_http_api_error(exc, resource_type="session", resource_id=session_id)
+        return build_public_event_stream(
+            session_id=session.id,
+            case_id=session.case_id,
+            events=events,
+            after_count=after_count,
+            limit=limit,
+        )
 
     return router

@@ -19,6 +19,7 @@ from app.agents.llm_contract import (
 from app.agents.memory import MemoryRetriever
 from app.agents.npc_skills import NpcSkillSelection, NpcSkillSelector
 from app.agents.prompt_builder import PromptBuilder
+from app.agents.provider_payload import build_llm_provider_payload
 from app.agents.retrieval_planner import MemoryRetrievalPlan, RetrievalPlanner
 from app.agents.tools.runtime import ToolRuntime
 from app.agents.turn_plan import AgentTurnPlan, build_agent_turn_plan
@@ -199,16 +200,30 @@ class AgentLoop:
             ),
         )
         npc_skill_projection = _npc_skill_projection(context)
-        prompt_bundle = self._prompt_builder.build(context)
-        budget = self._budget_prompt(prompt_bundle, context, memory_ids)
+        contract_input = build_llm_agent_input(context, turn_plan=turn_plan)
+        serialized_provider_payload = _serialized_provider_payload(contract_input)
+        budget = self._budget_prompt(
+            None,
+            context,
+            memory_ids,
+            contract_input=contract_input,
+            serialized_provider_payload=serialized_provider_payload,
+        )
         if budget.compressed_history is not None:
             context = context.model_copy(
                 update={
                     "compressed_history": budget.compressed_history.to_context(),
                 }
             )
-            prompt_bundle = self._prompt_builder.build(context)
-            budget = self._budget_prompt(prompt_bundle, context, memory_ids)
+            contract_input = build_llm_agent_input(context, turn_plan=turn_plan)
+            serialized_provider_payload = _serialized_provider_payload(contract_input)
+            budget = self._budget_prompt(
+                None,
+                context,
+                memory_ids,
+                contract_input=contract_input,
+                serialized_provider_payload=serialized_provider_payload,
+            )
         tool_calls = [
             self._tool_runtime.call(
                 "search_memory",
@@ -245,7 +260,6 @@ class AgentLoop:
                 turn_plan.output_contract
             ),
         )
-        contract_input = build_llm_agent_input(context, turn_plan=turn_plan)
         if budget.hard_context_over_limit:
             return AgentTurnResult(
                 context=context,
@@ -398,14 +412,17 @@ class AgentLoop:
 
     def _budget_prompt(
         self,
-        prompt_bundle: PromptBundle,
+        prompt_bundle: PromptBundle | None,
         context: AgentContext,
         memory_ids: list[str],
+        *,
+        contract_input: LLMAgentContractInput | None = None,
+        serialized_provider_payload: str | None = None,
     ) -> ContextBudgetResult:
-        prompt_text = (
-            prompt_bundle.agent_prompt
-            + prompt_bundle.contract_instruction
-            + prompt_bundle.safety_instruction
+        prompt_text = _provider_budget_text(
+            prompt_bundle=prompt_bundle,
+            contract_input=contract_input,
+            serialized_provider_payload=serialized_provider_payload,
         )
         return self._context_budget_manager.apply(
             prompt_text=prompt_text,
@@ -442,6 +459,35 @@ class AgentLoop:
             status=status,
             error_category=error_category,
         )
+
+
+def _provider_budget_text(
+    *,
+    prompt_bundle: PromptBundle | None,
+    contract_input: LLMAgentContractInput | None,
+    serialized_provider_payload: str | None,
+) -> str:
+    if serialized_provider_payload is not None:
+        return serialized_provider_payload
+    if contract_input is not None:
+        return json.dumps(contract_input.model_dump(mode="json"), ensure_ascii=False)
+    if prompt_bundle is None:
+        raise ValueError(
+            "budgeting requires a serialized provider payload, contract input, "
+            "or prompt bundle"
+        )
+    return (
+        prompt_bundle.agent_prompt
+        + prompt_bundle.contract_instruction
+        + prompt_bundle.safety_instruction
+    )
+
+
+def _serialized_provider_payload(contract_input: LLMAgentContractInput) -> str:
+    return json.dumps(
+        build_llm_provider_payload(contract_input),
+        ensure_ascii=False,
+    )
 
 
 def _memory_projection(

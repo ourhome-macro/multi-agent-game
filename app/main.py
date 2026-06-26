@@ -9,6 +9,7 @@ from pathlib import Path
 from fastapi import FastAPI
 
 from app.agents.memory import MemoryRetriever
+from app.api.errors import install_api_error_handlers
 from app.api.routes import create_router
 from app.cases.loader import CaseLoader
 from app.runtime.database import connect_postgres, load_dotenv_if_needed
@@ -90,6 +91,7 @@ def create_app() -> FastAPI:
     global runtime
     runtime = build_runtime()
     app = FastAPI(title="LLM multi-agent mystery runtime", lifespan=lifespan)
+    install_api_error_handlers(app)
     app.include_router(create_router(get_runtime))
     return app
 

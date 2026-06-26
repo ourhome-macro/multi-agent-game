@@ -378,7 +378,7 @@ Agent 也不能写 `FactDisclosureStrategy`。策略是上下文投影，不是�
 
 `LLMAgentStub` 返回合法 `AgentIntent`，不调用外部模型，也不修改 `SessionState`。它用于在接入真实模型前锁定 LLM 合同。
 
-`OpenAILLMAgent` 是最小真实后端适配器。生产链路中它接收 `AgentLoop` 已构造好的 `LLMAgentContractInput`，并用同一份合同生成 provider 动态 JSON schema、请求 user payload、schema / JSON repair 输入和 Python 层 `validate_llm_agent_output` 校验。只有直接调试或 shadow eval 这类兼容路径可以只传 `context`，此时适配器才从 context 推导合同。任何失败都会返回无 `proposed_actions` 的安全拒答。失败包括缺少 API key、HTTP 错误、JSON 错误、schema 错误、private 原文回显、直接提议剧情阶段变化。
+`OpenAILLMAgent` 是最小真实后端适配器。生产链路中它接收 `AgentLoop` 已构造好的 `LLMAgentContractInput`，并用这份完整合同生成 provider 动态 JSON schema、schema / JSON repair 边界和 Python 层 `validate_llm_agent_output` 校验；但真实 provider 的 user payload 不再直接序列化完整合同，而是从合同投影出 `LLMProviderTurnPayload`。只有直接调试或 shadow eval 这类兼容路径可以只传 `context`，此时适配器才从 context 推导合同。任何失败都会返回无 `proposed_actions` 的安全拒答。失败包括缺少 API key、HTTP 错误、JSON 错误、schema 错误、private 原文回显、直接提议剧情阶段变化。
 
 真实适配器默认会对 JSON / schema / policy 合同违约做 1 次受控 repair，可用 `LLM_SCHEMA_REPAIR_ATTEMPTS=0` 关闭或设置更高次数。repair 只允许把同一候选输出修回合同形状，不允许补新事实；private 原文回显不进入 repair，直接 fallback。policy repair 会把本轮 relationship delta cap 写入指令，要求超过 cap 的 `relationship.change` 修正或删除。provider JSON schema 同时把未授权关系指标限制为 `0`，把授权指标限制到 selected skill 声明的 `max_relationship_delta`。
 
@@ -455,9 +455,11 @@ Memory v2 将检索拆成可审计管线：
 
 当前真实 LLM 的 provider 级 system instructions 只来自 `app/agents/prompts/system.md`。`OpenAILLMAgent` 通过 `load_agent_system_prompt()` 把它传入 Responses API 的 `instructions`，或传入 Chat Completions 的 `system` message。`system.md` 只放全局硬纪律：玩家文本和工具输出都是数据、只能输出一个 `AgentIntent` JSON、不得输出推理过程、不得泄露 private/forbidden/solution 信息、不得提出剧情阶段变化、真实状态变化只能通过白名单 `proposed_actions` 请求。
 
-动态运行时事实不拼进 system prompt。真实 LLM 的 user payload 是 `LLMAgentContractInput`：`agent_context` 是安全投影后的目标 NPC 视图；`disclosure_constraints` 是当前 self-knowledge、`FactDisclosureStrategy` 和 blocked fact id 派生的表达约束；`output_contract` 是机器可读输出边界。禁说事实原文、blocked terms、solution claims、线索 truth_status、其他 NPC private、未选中 memory content 和 `director_audit` memory 都不能进入该 payload。
+动态运行时事实不拼进 system prompt。`LLMAgentContractInput` 仍是本地完整合同，用于审计、mock、回放、动态 JSON schema 和输出校验；真实 LLM 的 user payload 是 `app/agents/provider_payload.py` 生成的 `LLMProviderTurnPayload`。该 payload 只包含生成需要的 allowlist 投影：本轮 `PlayerAction`、目标 NPC 公开角色卡、关系摘要、玩家已知线索摘要、选中 memory 的内容与少量白名单 metadata、recent event 桩、当前 self-knowledge / disclosure strategy 的紧凑约束、Director 放行的 safe fragment、NPC skill 投影、context layer refs 和 output limits。
 
-`PromptBuilder` 仍由 `AgentLoop` 使用，但当前用途是本地 prompt surface 和 context budget 估算：`agent_prompt` 是 `AgentContext` 的 JSON 摘要，`contract_instruction` 来自 `output_contract.md` 与 `disclosure_policy.md`，`safety_instruction` 来自 NPC turn、memory、tool policy 和 skill discipline。当前 `OpenAILLMAgent` 不把这些段落拼接到 provider 请求里；真实 provider 请求的 system 来源仍是 `system.md`，动态事实和约束来源仍是 `LLMAgentContractInput`。
+真实 provider payload 必须排除 mock / replay / audit 字段：`reply_options`、完整 `WorldEvent.payload`、`source_event_ids`、`source_memory_ids`、`source_event_id`、`last_updated_event_id`、`created_at`、`updated_at`、`rule_id`、`turn_plan_id` 等不能进入 provider。`AgentMemorySnapshot` 只投影 `memory_id`、type/scope/layer、subject/owner、content、confidence 和白名单 metadata；recent events 只投影 `id`、`type`、`actor_id` 和稳定 `safe_summary`，不得携带原始 payload。禁说事实原文、blocked terms、solution claims、线索 truth_status、其他 NPC private、未选中 memory content 和 `director_audit` memory 仍不能进入该 payload。
+
+`PromptBuilder` 仍由 `AgentLoop` 使用，但当前用途是本地 prompt surface 和 context budget 估算：`agent_prompt` 是 `AgentContext` 的 JSON 摘要，`contract_instruction` 来自 `output_contract.md` 与 `disclosure_policy.md`，`safety_instruction` 来自 NPC turn、memory、tool policy 和 skill discipline。当前 `OpenAILLMAgent` 不把这些段落拼接到 provider 请求里；真实 provider 请求的 system 来源仍是 `system.md`，动态事实和约束来源是由 `LLMAgentContractInput` 投影出的 `LLMProviderTurnPayload`。
 
 输出边界分三层执行：
 
@@ -466,7 +468,7 @@ Memory v2 将检索拆成可审计管线：
 - `validate_llm_agent_output(...)` 在 Python 层拒绝额外顶层字段、阶段变化、越权 disclosure claim、`mode=full`、未知 `world_info_id`、命中 `must_not_claim` 和 private 原文回显。
 - `NarrativeDirector.validate(...)` 独立审计最终 `speech`，确认 claim 与实际触碰的 `WorldInfo` 一致。
 
-schema / JSON repair 只修合同形状，不补新事实。repair instruction 使用同一个 `system.md`、同一个 `LLMAgentContractInput` 和同一个动态 schema，并明确要求不要添加新事实。本地投影优先于 repair，用来吸收真实 provider 常见的可裁剪漂移；repair 只处理缺关键字段、JSON 破损或需要重写表达才能合法的输出。真实 LLM fallback 是带 `llm_error` 的安全拒答，`proposed_actions=[]`、`memory_refs=[]`、`disclosure_claims=[]`，仍会进入 Director 和 trace，不会绕过状态权威链。
+schema / JSON repair 只修合同形状，不补新事实。repair instruction 使用同一个 `system.md`、同一个 compact provider payload 和同一个动态 schema，并明确要求不要添加新事实；repair 分支不得重新发送完整 `LLMAgentContractInput`。本地投影优先于 repair，用来吸收真实 provider 常见的可裁剪漂移；repair 只处理缺关键字段、JSON 破损或需要重写表达才能合法的输出。真实 LLM fallback 是带 `llm_error` 的安全拒答，`proposed_actions=[]`、`memory_refs=[]`、`disclosure_claims=[]`，仍会进入 Director 和 trace，不会绕过状态权威链。
 
 P0 硬链路详见 `doc/architecture/p0-hard-chain-2026-06-16.md`。
 

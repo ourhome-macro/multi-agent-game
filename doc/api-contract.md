@@ -6,10 +6,12 @@
 
 - `GET /health`
 - `GET /cases`
+- `GET /cases/{case_id}`
 - `POST /sessions`
 - `POST /sessions/{session_id}/actions`
 - `POST /sessions/{session_id}/raw-actions`
 - `GET /sessions/{session_id}/state`
+- `GET /sessions/{session_id}/affordances`
 - `GET /sessions/{session_id}/events`
 
 ## Raw Text Action Intake
@@ -52,7 +54,55 @@ Idempotency-Key: raw-action-001
 { "case_id": "fake_case_002" }
 ```
 
-响应包含 `session_id` 和公开 `StateSummary`。
+响应包含 `session_id` 和公开 `PublicStateSummary`。公开响应不得返回内部 `StateSummary` 中的 `knowledge_id`、`world_info_id`、`source_knowledge_id` 或 `unlocked_at_event_id`。
+
+## 公开 Case Detail
+
+`GET /cases/{case_id}` 返回前端初始化 2D 场景所需的公开案件投影，不返回原始 `CasePackage`。
+
+响应字段：
+
+- `id`
+- `title`
+- `description`
+- `initial_phase`
+- `initial_scene_id`
+- `scenes[]`
+- `characters[]`
+- `assets[]`
+
+`scenes[].hotspots[]` 只暴露 `id`、`name`、`description`。`characters[]` 只暴露公开角色卡字段：`id`、`display_name`、`public_role`、`public_description`。当前案件包尚无独立前端资产 authoring 字段，因此 `assets` 先返回空数组；后续新增资产配置时也必须通过公开 DTO 白名单暴露。
+
+该接口禁止暴露：
+
+- `truth_status`
+- `reveals_world_info`
+- `world_info`
+- `forbidden_facts`
+- `solution_claims`
+- character `private`
+- mock dialogue / `reply_options`
+- memory derivation rules
+- NPC skill 内部配置
+- narrative rule 内部触发条件
+
+## Session Affordances
+
+`GET /sessions/{session_id}/affordances` 返回当前 session 下前端可以展示的结构化交互项。它由后端案件配置、session 状态和规则同源约束推导，前端不能自行猜测动作是否合法。
+
+响应字段：
+
+- `available_hotspot_ids`：当前可提交 `inspect` 的 hotspot id。v0 中所有已知 hotspot 都可重复 inspect；重复 inspect 不保证产生新线索。
+- `available_character_ids`：当前可提交 `talk` 的角色 id。
+- `discovered_clue_ids`：玩家已发现线索 id。
+- `evidence_asset_ids`：已发现且已进入玩家知识账本、可用于 `present_clue` / evidence UI 的线索 id。
+- `valid_presentation_modes`：当前存在合法 `present_clue` 时可用的展示模式。
+- `inspect[]`、`talk[]`、`ask_about[]`、`present_clue[]`、`accuse[]`：可直接用于组装结构化 action 的公开项。
+- `can_accuse`：是否存在至少一个当前规则可接受的正式指控目标。
+
+`ask_about` 的 clue subject 只会在该 clue 已发现或已进入玩家知识账本后出现；character 和 scene subject 来自公开案件配置。`present_clue` 只会列出已发现且有玩家知识账本的 clue；`scene_shared` 模式只会在目标 NPC 属于该 scene 时出现。
+
+`accuse[]` 不公开 `claim_id`、claim `result`、`required_evidence` 或 `required_world_info`。它只说明当前是否存在规则可接受的指控目标，以及玩家当前可用的公开证据 id。正式指控仍由后端 Rule Engine 根据 `solution_claims.yaml` 校验；前端不得把 affordance 当作真相来源。
 
 ## PlayerAction
 
@@ -72,6 +122,42 @@ Idempotency-Key: action-001
 - 相同 `Idempotency-Key` 携带不同 action：返回 `409 Conflict`。
 - 相同 session 的事件流在本轮 action 生成后被其他请求推进：返回 `409 Conflict`。
 - 幂等键已占用但尚未提交响应事件：返回 `409 Conflict`。
+
+### 公开 Action Response
+
+`POST /sessions/{session_id}/actions` 对外返回 `PublicActionResponse`，不得直接返回运行时内部 `ActionResponse`。内部 `ActionResponse.new_events` 是 `WorldEvent[]`，只允许在后端、审计、回放和测试内部使用；公开响应必须先经过 `build_public_action_response(...)` 投影。
+
+响应字段：
+
+- `session_id`
+- `accepted`
+- `speech`
+- `director_blocked`
+- `director_reason`
+- `llm_fallback_used`
+- `llm_error`
+- `new_events[]`
+- `state`
+
+`new_events[]` 是 `PublicEventStreamItem[]`，与 `GET /sessions/{session_id}/events` 使用同一 payload 白名单。不可公开事件会被隐藏，但其内部事件序号仍会推进 `sequence` 和 `state.event_count`；客户端继续拉取公开事件流时应以 `state.event_count` 作为本轮 action 后的 count cursor。
+
+`state` 是 `PublicStateSummary`，不是内部 `StateSummary`。它只保留前端可展示状态：案件标题、阶段、已完成 beat、公开角色卡、已发现线索、玩家已知摘要、证据栏、公开关系指标和 `event_count`。
+
+公开 action response 禁止出现：
+
+- 原始 `WorldEvent.payload` 内部字段
+- `world_info_id`
+- `knowledge_id`
+- `source_knowledge_id`
+- `unlocked_at_event_id`
+- `memory_id`
+- `rule_id`
+- `blocked_fact_id`
+- `matched_text`
+- `proposed_actions`
+- `disclosure_claims`
+
+`POST /sessions/{session_id}/raw-actions` 的 `response` 字段也必须是 `PublicActionResponse`。`needs_clarification` 和无法识别的 `rejected` 不生成 `response`；已解析为结构化 action 但被规则或 Director 前置拒绝时，`response.new_events[]` 只能包含公开投影后的 `rule.rejected` 或等价安全事件。
 
 ### inspect
 
@@ -196,14 +282,14 @@ agent-backed 链路中的 `LLMAgentContractInput.disclosure_constraints` 只会�
 
 ### LLM fallback 观测字段
 
-当启用真实 LLM backend 时，`ActionResponse` 会额外返回：
+当启用真实 LLM backend 时，`PublicActionResponse` 会额外返回：
 
 - `llm_fallback_used`：本轮是否使用真实 LLM 安全降级。
 - `llm_error`：脱敏错误摘要，包含 `backend`、`error_type`、`error_message_sanitized`、`fallback_used` 和 `schema_validation_errors`。
 
 这些字段不表示 action 被规则层拒绝。它们只说明 Agent 生成阶段发生了可观测错误，后端已使用无 `proposed_actions` 的安全回复继续走 Director / Rule Engine 边界。
 
-如果 Director 因事实网关拦截回复，`ActionResponse.director_blocked=true`，`director_reason` 会说明拒绝类别，例如未授权 safe fragment、locked forbidden inference 或 speech/claim 不一致。对应的 `director.blocked` 事件会记录 `world_info_id`、`blocked_fact_id`、`claimed_mode`、`matched_by`、`pattern_id` 和 `safe_fallback_used` 等审计字段；`matched_text` 必须脱敏，不能把被拦截事实原文回显给客户端。
+如果 Director 因事实网关拦截回复，`PublicActionResponse.director_blocked=true`，`director_reason` 会说明拒绝类别，例如未授权 safe fragment、locked forbidden inference 或 speech/claim 不一致。对应的内部 `director.blocked` 事件会记录 `world_info_id`、`blocked_fact_id`、`claimed_mode`、`matched_by`、`pattern_id` 和 `safe_fallback_used` 等审计字段；公开 action response 和公开事件流只允许暴露 `target_id`、`reason`、`safe_fallback_used`，不得把这些审计锚点或被拦截事实原文回显给客户端。
 
 ### accuse
 
@@ -253,7 +339,46 @@ Rule Engine 会校验：
 - 关键线索：`+0.1`
 - 最终值限制在 `0.0 .. 1.0`
 
-## 事件
+## 公开事件增量流
+
+`GET /sessions/{session_id}/events?after_count=N` 返回公开事件增量 DTO，不再把内部 `WorldEvent[]` 作为前端唯一契约。`after_count` 是 session 内部事件流的稳定 count cursor，初始传 `0`。响应：
+
+```json
+{
+  "session_id": "session-id",
+  "case_id": "fake_case_001",
+  "after_count": 0,
+  "next_after_count": 3,
+  "has_more": false,
+  "events": [
+    {
+      "sequence": 1,
+      "id": "event-id",
+      "type": "session.created",
+      "actor_id": "system",
+      "created_at": "2026-06-26T00:00:00+00:00",
+      "payload": {
+        "case_id": "fake_case_001",
+        "initial_phase": "opening"
+      }
+    }
+  ]
+}
+```
+
+可选 `limit` 默认为 `100`，最大 `500`。`sequence` 是 1-based 内部事件序号。`next_after_count` 会跨过被公开投影隐藏的内部事件，因此客户端下一次必须传 `next_after_count`，不能用 `events.length` 自行计算。
+
+公开事件 payload 使用白名单：
+
+- `npc.replied` 只暴露 `speech`，不暴露 `intent`、`proposed_actions` 或 `disclosure_claims`。
+- `player_knowledge.updated` 不暴露 `world_info_id` 或 `knowledge_id`。
+- `rule.rejected` 只暴露 `action_type`、`reason` 和安全 action 字段。
+- `director.blocked` 不暴露 `blocked_fact_id`、`world_info_id`、`matched_text` 或 disclosure claims。
+- memory、character impression、character fact awareness、NPC skill selection/rejection 等内部事件会推进 count cursor，但不会出现在公开 `events[]`。
+
+公开事件流不得暴露 `truth_status`、`reveals_world_info`、forbidden fact 原文、blocked terms、solution claim 内部配置、private memory 或 mock `reply_options`。
+
+## 内部事件
 
 重要事件类型包括：
 
@@ -356,22 +481,32 @@ Memory v1.4 后，payload 结构不变，但 `rule_id` 可能来自 app 默认 `
 
 其中 `matched_text` 是公开 API payload 中的脱敏值，不能回显 forbidden term、private 原文或被拦截的敏感事实原文。前端只能用这些字段做“回复被导演系统阻止”的 UI 和调试提示，不能把它们当作玩家已知事实。
 
-## StateSummary
+## PublicStateSummary
 
-`StateSummary` 是公开状态视图。它可以包含已发现线索、完成的 beats、公开关系指标和玩家已知摘要。v0 不暴露记忆快照或私有角色画像，也不暴露 `solution_claims` 或指控真相配置。
+`PublicStateSummary` 是公开状态视图。`GET /sessions/{session_id}/state`、`POST /sessions` 的 `state`、`PublicActionResponse.state` 都必须使用该 DTO，不得直接返回运行时内部 `StateSummary`。它可以包含已发现线索、完成的 beats、公开关系指标和玩家已知摘要。v0 不暴露记忆快照或私有角色画像，也不暴露 `solution_claims`、指控真相配置或 `WorldInfo` 锚点。
 
-`StateSummary.evidence_assets` 是面向前端证据栏的公开投影。每条记录来自已发现线索和对应玩家已知账本：
+`PublicStateSummary.player_knowledge[]` 只暴露玩家已经获得、可展示的摘要字段：
+
+- `clue_id`
+- `confidence`
+- `acquisition`
+- `source_type`
+- `title`
+- `summary`
+
+内部 `StateSummary.player_knowledge[]` 的 `knowledge_id` 和 `world_info_id` 只用于规则校验、回放和审计，不得进入公开响应。`knowledge_id` 经常派生自 `WorldInfo`，会反向泄露案件真相锚点；`world_info_id` 直接暴露真相节点，风险更高。
+
+`PublicStateSummary.evidence_assets[]` 是面向前端证据栏的公开投影。每条记录来自已发现线索和对应玩家已知账本：
 
 - `id`
 - `title`
 - `summary`
 - `source`
 - `clue_id`
-- `world_info_id`
-- `source_knowledge_id`
-- `unlocked_at_event_id`
 
-它不暴露未发现线索、未解锁 `WorldInfo`、forbidden facts、角色 private 原文或 solution claim。客户端不能把该字段回传当作权威证据状态；`present_clue` 和 `accuse` 仍必须由后端按 `session.discovered_clues` 与 `session.player_knowledge` 校验。
+内部 `EvidenceSummary` 的 `world_info_id`、`source_knowledge_id` 和 `unlocked_at_event_id` 只能留在后端内部。它们分别会泄露真相节点、玩家知识账本主键和事件日志锚点；前端证据栏只需要公开 clue id、标题、摘要和来源类型。
+
+`PublicStateSummary` 不暴露未发现线索、未解锁 `WorldInfo`、forbidden facts、角色 private 原文或 solution claim。客户端不能把该字段回传当作权威证据状态；`present_clue` 和 `accuse` 仍必须由后端按 `session.discovered_clues` 与 `session.player_knowledge` 校验。
 
 角色 `private` 数据是 NPC 自己的非公开视角，不是对 NPC 自己隐藏。API 边界是：原始 private 数据不能返回给玩家、其他 NPC、公开 summary 或 journey artifacts。`AgentContext.inner_context` 不属于公开 API 响应。
 
@@ -438,9 +573,40 @@ PostgreSQL runtime 下，action 产生的 trace 会随同本轮 `world_events` �
 
 ## 错误
 
-- 未知 `case_id`：404
-- 未知 `session_id`：404
-- 未知 inspect target：404
-- 未知 talk target：404
-- 请求 schema 非法：422
-- `ask_about`、`present_clue` 或 `accuse` 证据状态非法：200 + `accepted=false` + `rule.rejected`
+所有非 2xx API 错误必须返回稳定 JSON DTO，不能再返回裸字符串 `detail` 或直接回显异常文本。
+
+```json
+{
+  "code": "ACTION_NOT_ALLOWED",
+  "message": "Action is not allowed in the current world state.",
+  "details": {
+    "reason": "Unknown inspect target_id: vault"
+  },
+  "retryable": false,
+  "correlation_id": "8f4b3d1c-6e4f-4a9b-9f7c-2aee2c6d3b20"
+}
+```
+
+字段语义：
+
+- `code`：稳定机器码，前端只能依赖该字段分流错误 UI 和重试策略。
+- `message`：安全的人类可读摘要，不承载业务分支。
+- `details`：安全结构化细节；禁止包含 SQL、堆栈、provider payload、角色 private、未公开线索、forbidden fact 原文或玩家原始输入回显。
+- `retryable`：客户端是否可以在满足提示条件后重试。`true` 不表示立即盲重试，仍需遵守 `details.retry_after` 等策略。
+- `correlation_id`：每个错误必须有。若请求头带 `X-Correlation-ID`，后端应沿用并在响应头同名返回；否则后端生成。
+
+稳定错误码：
+
+| HTTP | code | retryable | 语义 | 状态副作用 |
+| --- | --- | --- | --- | --- |
+| 404 | `CASE_NOT_FOUND` | false | `case_id` 不存在 | 不创建 session，不写事件 |
+| 404 | `SESSION_NOT_FOUND` | false | `session_id` 不存在 | 不写事件 |
+| 400 | `ACTION_NOT_ALLOWED` | false | 结构化 action 通过 schema，但目标、当前阶段或世界状态不允许执行；`ActionValidationError` 必须映射到这里，不能映射成 404 | 不写玩家 action 事件，不进入 Agent / LLM |
+| 409 | `IDEMPOTENCY_CONFLICT` | false | 同一 session 内 `Idempotency-Key` 被不同请求复用 | 不重跑 Agent / LLM，不写本轮事件 |
+| 409 | `IDEMPOTENCY_IN_PROGRESS` | true | 幂等键已占用但尚未提交响应事件 | 不重跑 Agent / LLM，不写本轮事件；客户端应稍后查询或重试 |
+| 409 | `STALE_SESSION_SEQUENCE` | true | action 生成后提交前，session event stream 已被其他请求推进 | 本轮事件和 trace 不落库；客户端应刷新 state/events 后重试 |
+| 422 | `REQUEST_VALIDATION_ERROR` | false | 请求 JSON 或字段类型不满足 API DTO | 不进入 runtime，不写事件 |
+| 500 | `PERSISTENCE_ERROR` | true | PostgreSQL event store / session store / trace 持久化边界失败 | 以事务结果为准；不得提前暴露半提交状态 |
+| 500 | `INTERNAL_ERROR` | false | 未分类 API 层异常 | 不保证可恢复；必须通过 `correlation_id` 查服务端日志 |
+
+`ask_about`、`present_clue` 或 `accuse` 已进入 Rule Engine 后，如果只是证据状态、阶段条件或推理闭环不满足，仍返回 `200` + `accepted=false` + `rule.rejected`。这是游戏规则拒绝，不是 HTTP 错误；它必须生成可回放的 `rule.rejected` 事件。相反，`CASE_NOT_FOUND`、`SESSION_NOT_FOUND`、`ACTION_NOT_ALLOWED`、幂等冲突、stale sequence 和 422 都不能写入新的 `WorldEvent`。
