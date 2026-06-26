@@ -34,7 +34,7 @@ class MemoryArchivalSystem:
         session: SessionState,
         caused_by_event_id: str | None = None,
     ) -> list[WorldEvent]:
-        as_of = _latest_event_time(session)
+        as_of = _archive_as_of(session, caused_by_event_id)
         if as_of is None:
             return []
 
@@ -126,8 +126,28 @@ def _snapshot_payload(snapshot: AgentMemorySnapshot) -> dict[str, object]:
     }
 
 
-def _latest_event_time(session: SessionState) -> datetime | None:
+def _archive_as_of(
+    session: SessionState,
+    caused_by_event_id: str | None,
+) -> datetime | None:
+    if caused_by_event_id is not None:
+        for event in reversed(session.events):
+            if event.id != caused_by_event_id:
+                continue
+            parsed = _parse_datetime(event.created_at)
+            if parsed is not None:
+                return parsed
+            break
+    return _latest_external_event_time(session)
+
+
+def _latest_external_event_time(session: SessionState) -> datetime | None:
     for event in reversed(session.events):
+        if (
+            event.actor_id == "memory_archival_system"
+            and event.payload.get("operation") == "archive"
+        ):
+            continue
         parsed = _parse_datetime(event.created_at)
         if parsed is not None:
             return parsed

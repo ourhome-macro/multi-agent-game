@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import json
 import os
@@ -41,7 +41,6 @@ from app.domain.models import (
     RhetoricTactic,
     SelfKnowledgeItem,
     SubjectType,
-    WorldEvent,
 )
 from app.main import app
 from app.rules.engine import RuleEngine
@@ -118,23 +117,23 @@ def test_inspect_desk_discovers_scratched_drawer(client: TestClient) -> None:
     assert response.status_code == 200
     payload = response.json()
     clue_ids = {clue["id"] for clue in payload["state"]["discovered_clues"]}
-    knowledge_ids = {item["knowledge_id"] for item in payload["state"]["player_knowledge"]}
     event_types = {event["type"] for event in payload["new_events"]}
     assert "scratched_drawer" in clue_ids
-    assert "player_knowledge.desk_forced_open" in knowledge_ids
     assert "player.inspected" in event_types
     assert "clue.discovered" in event_types
     assert "player_knowledge.updated" in event_types
     knowledge = payload["state"]["player_knowledge"][0]
     assert knowledge["clue_id"] == "scratched_drawer"
-    assert knowledge["world_info_id"] == "desk_forced_open"
+    assert "knowledge_id" not in knowledge
+    assert "world_info_id" not in knowledge
     assert knowledge["confidence"] == 1.0
     assert knowledge["acquisition"] == "discovered"
     assert knowledge["source_type"] == "clue"
     knowledge_event = next(
         event for event in payload["new_events"] if event["type"] == "player_knowledge.updated"
     )
-    assert knowledge_event["payload"]["world_info_id"] == "desk_forced_open"
+    assert "knowledge_id" not in knowledge_event["payload"]
+    assert "world_info_id" not in knowledge_event["payload"]
     assert knowledge_event["payload"]["confidence"] == 1.0
     assert knowledge_event["payload"]["acquisition"] == "discovered"
     assert knowledge_event["payload"]["source_type"] == "clue"
@@ -154,8 +153,6 @@ def test_clue_discovered_completes_beat_and_advances_phase(client: TestClient) -
         "player.inspected",
         "clue.discovered",
         "player_knowledge.updated",
-        "memory_candidate.created",
-        "agent_memory_snapshot.updated",
         "narrative.beat.completed",
         "narrative.phase.changed",
     ]
@@ -232,10 +229,14 @@ def test_inspect_unknown_target_returns_404_without_writing_events(client: TestC
     )
     events_response = client.get(f"/sessions/{session_id}/events")
 
-    assert action_response.status_code == 404
-    assert action_response.json()["detail"] == "Unknown inspect target_id: unknown"
+    assert action_response.status_code == 400
+    detail = action_response.json()["detail"]
+    assert detail["code"] == "ACTION_NOT_ALLOWED"
+    assert detail["details"]["reason"] == "Unknown inspect target_id: unknown"
     assert events_response.status_code == 200
-    assert [event["type"] for event in events_response.json()] == ["session.created"]
+    assert [event["type"] for event in events_response.json()["events"]] == [
+        "session.created"
+    ]
 
 
 def test_talk_butler_generates_mock_dialogue(client: TestClient) -> None:
@@ -280,7 +281,7 @@ def test_present_clue_rejects_undiscovered_clue_without_state_pollution(
     assert [event["type"] for event in payload["new_events"]] == ["rule.rejected"]
     assert payload["new_events"][0]["payload"]["reason"] == "clue_id has not been discovered"
     assert payload["state"]["discovered_clues"] == []
-    assert [event["type"] for event in events_response.json()] == [
+    assert [event["type"] for event in events_response.json()["events"]] == [
         "session.created",
         "rule.rejected",
     ]
@@ -310,9 +311,8 @@ def test_present_clue_success_triggers_mock_agent_and_rule_engine(
     assert payload["accepted"] is True
     assert "scratch marks" in payload["speech"]
     event_types = [event["type"] for event in payload["new_events"]]
-    assert event_types[:4] == [
+    assert event_types[:3] == [
         "player.presented_clue",
-        "npc_skill.selected",
         "npc.replied",
         "relationship.changed",
     ]
@@ -320,7 +320,6 @@ def test_present_clue_success_triggers_mock_agent_and_rule_engine(
     assert presented_event["payload"] == {
         "target_id": "butler",
         "clue_id": "scratched_drawer",
-        "knowledge_id": "player_knowledge.desk_forced_open",
         "presentation_mode": "private",
         "text": "What about these scratch marks?",
         "interaction_pressure": 0.9,
@@ -474,7 +473,7 @@ def test_ask_about_rejects_undiscovered_clue_without_state_pollution(
     assert payload["accepted"] is False
     assert [event["type"] for event in payload["new_events"]] == ["rule.rejected"]
     assert payload["new_events"][0]["payload"]["reason"] == "subject clue has not been discovered"
-    assert [event["type"] for event in events_response.json()] == [
+    assert [event["type"] for event in events_response.json()["events"]] == [
         "session.created",
         "rule.rejected",
     ]
@@ -505,9 +504,8 @@ def test_ask_about_discovered_sensitive_clue_triggers_guarded_reply(
     assert payload["accepted"] is True
     assert "drawer" in payload["speech"]
     event_types = [event["type"] for event in payload["new_events"]]
-    assert event_types[:4] == [
+    assert event_types[:3] == [
         "player.asked_about",
-        "npc_skill.selected",
         "npc.replied",
         "relationship.changed",
     ]
@@ -518,10 +516,10 @@ def test_ask_about_discovered_sensitive_clue_triggers_guarded_reply(
         "subject_id": "scratched_drawer",
         "text": "What about the drawer?",
         "interaction_pressure": 0.6,
-        "knowledge_id": "player_knowledge.desk_forced_open",
     }
-    reply_event = payload["new_events"][2]
-    assert reply_event["payload"]["intent"] == "probe"
+    reply_event = payload["new_events"][1]
+    assert set(reply_event["payload"]) == {"speech"}
+    assert reply_event["payload"]["speech"]
 
 
 def test_ask_about_derives_private_character_impression() -> None:
@@ -3477,14 +3475,16 @@ def test_director_blocks_forbidden_fact(client: TestClient) -> None:
     director_event = next(
         event for event in payload["new_events"] if event["type"] == "director.blocked"
     )
-    assert director_event["payload"]["world_info_id"] == "killer_is_niece"
-    assert director_event["payload"]["detected_directness"] == "direct_claim"
-    assert director_event["payload"]["matched_by"] == "forbidden_term"
-    assert director_event["payload"]["matched_text"] == "[redacted]"
+    assert "world_info_id" not in director_event["payload"]
+    assert "detected_directness" not in director_event["payload"]
+    assert "matched_by" not in director_event["payload"]
+    assert "matched_text" not in director_event["payload"]
     assert director_event["payload"]["safe_fallback_used"] is True
 
 
-def test_talk_unknown_npc_returns_404_without_writing_events(client: TestClient) -> None:
+def test_talk_unknown_npc_returns_action_not_allowed_without_writing_events(
+    client: TestClient,
+) -> None:
     session_id = create_session(client)
 
     action_response = client.post(
@@ -3493,10 +3493,14 @@ def test_talk_unknown_npc_returns_404_without_writing_events(client: TestClient)
     )
     events_response = client.get(f"/sessions/{session_id}/events")
 
-    assert action_response.status_code == 404
-    assert action_response.json()["detail"] == "Unknown talk target_id: ghost"
+    assert action_response.status_code == 400
+    detail = action_response.json()["detail"]
+    assert detail["code"] == "ACTION_NOT_ALLOWED"
+    assert detail["details"]["reason"] == "Unknown talk target_id: ghost"
     assert events_response.status_code == 200
-    assert [event["type"] for event in events_response.json()] == ["session.created"]
+    assert [event["type"] for event in events_response.json()["events"]] == [
+        "session.created"
+    ]
 
 
 def test_get_current_state_summary(client: TestClient) -> None:
@@ -3748,25 +3752,18 @@ def test_events_order_is_stable_for_mixed_action_sequence(client: TestClient) ->
     response = client.get(f"/sessions/{session_id}/events")
 
     assert response.status_code == 200
-    event_types = [event["type"] for event in response.json()]
+    event_types = [event["type"] for event in response.json()["events"]]
     assert event_types == [
         "session.created",
         "player.inspected",
         "clue.discovered",
         "player_knowledge.updated",
-        "memory_candidate.created",
-        "agent_memory_snapshot.updated",
         "narrative.beat.completed",
         "narrative.phase.changed",
         "player.talked",
-        "npc_skill.rejected",
         "npc.replied",
         "player.talked",
-        "npc_skill.rejected",
         "director.blocked",
-        "character_impression.updated",
-        "memory_candidate.created",
-        "agent_memory_snapshot.updated",
     ]
 
 
@@ -3800,26 +3797,27 @@ def test_second_case_full_chain_and_director_block(client: TestClient) -> None:
     assert block_response.json()["director_blocked"] is True
 
 
-def test_replay_events_rebuilds_same_session_state(client: TestClient) -> None:
-    session_id = create_session(client)
-    for target_id in ("desk", "carpet", "portrait"):
-        client.post(
-            f"/sessions/{session_id}/actions",
-            json={"type": "inspect", "target_id": target_id},
-        )
-    client.post(
-        f"/sessions/{session_id}/actions",
-        json={"type": "talk", "target_id": "butler", "text": "What can you say now?"},
-    )
-    state_response = client.get(f"/sessions/{session_id}/state")
-    events_response = client.get(f"/sessions/{session_id}/events")
+def test_replay_events_rebuilds_same_session_state() -> None:
     case = CaseLoader().load(FAKE_CASE_001_DIR)
-    events = [WorldEvent.model_validate(event) for event in events_response.json()]
-
-    replayed = replay_events(case, events)
+    runtime = create_runtime([case])
+    session = runtime.session_store.create(case)
+    for target_id in ("desk", "carpet", "portrait"):
+        runtime.action_service.handle(
+            session=session,
+            action=PlayerAction(type="inspect", target_id=target_id),
+        )
+    runtime.action_service.handle(
+        session=session,
+        action=PlayerAction(
+            type="talk",
+            target_id="butler",
+            text="What can you say now?",
+        ),
+    )
+    replayed = replay_events(case, session.events)
     replayed_summary = build_state_summary(case, replayed).model_dump(mode="json")
 
-    assert replayed_summary == state_response.json()
+    assert replayed_summary == build_state_summary(case, session).model_dump(mode="json")
 
 
 def test_character_impressions_are_private_and_replayable() -> None:
@@ -3907,7 +3905,7 @@ def test_state_summary_snapshots_do_not_leak_internal_fields(client: TestClient)
             "phase": opening["narrative_phase"],
             "completed_beats": opening["completed_beats"],
             "discovered": [clue["id"] for clue in opening["discovered_clues"]],
-            "player_knowledge": [item["knowledge_id"] for item in opening["player_knowledge"]],
+            "player_knowledge": [item["clue_id"] for item in opening["player_knowledge"]],
             "event_count": opening["event_count"],
         },
         "fake_case_001_after_investigation": {
@@ -3915,9 +3913,7 @@ def test_state_summary_snapshots_do_not_leak_internal_fields(client: TestClient)
             "phase": investigation["narrative_phase"],
             "completed_beats": investigation["completed_beats"],
             "discovered": [clue["id"] for clue in investigation["discovered_clues"]],
-            "player_knowledge": [
-                item["knowledge_id"] for item in investigation["player_knowledge"]
-            ],
+            "player_knowledge": [item["clue_id"] for item in investigation["player_knowledge"]],
             "event_count": investigation["event_count"],
         },
         "fake_case_002_after_first_talk": {
@@ -3926,7 +3922,7 @@ def test_state_summary_snapshots_do_not_leak_internal_fields(client: TestClient)
             "completed_beats": second_case_talk["completed_beats"],
             "discovered": [clue["id"] for clue in second_case_talk["discovered_clues"]],
             "player_knowledge": [
-                item["knowledge_id"] for item in second_case_talk["player_knowledge"]
+                item["clue_id"] for item in second_case_talk["player_knowledge"]
             ],
             "event_count": second_case_talk["event_count"],
         },
@@ -3946,7 +3942,7 @@ def test_state_summary_snapshots_do_not_leak_internal_fields(client: TestClient)
             "phase": "investigation",
             "completed_beats": ["drawer_found"],
             "discovered": ["scratched_drawer"],
-            "player_knowledge": ["player_knowledge.desk_forced_open"],
+            "player_knowledge": ["scratched_drawer"],
             "event_count": 8,
         },
         "fake_case_002_after_first_talk": {

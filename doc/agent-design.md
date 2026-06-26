@@ -470,6 +470,8 @@ Memory v2 将检索拆成可审计管线：
 
 schema / JSON repair 只修合同形状，不补新事实。repair instruction 使用同一个 `system.md`、同一个 compact provider payload 和同一个动态 schema，并明确要求不要添加新事实；repair 分支不得重新发送完整 `LLMAgentContractInput`。本地投影优先于 repair，用来吸收真实 provider 常见的可裁剪漂移；repair 只处理缺关键字段、JSON 破损或需要重写表达才能合法的输出。真实 LLM fallback 是带 `llm_error` 的安全拒答，`proposed_actions=[]`、`memory_refs=[]`、`disclosure_claims=[]`，仍会进入 Director 和 trace，不会绕过状态权威链。
 
+P2 拆分后，真实 LLM provider 的模块边界为：`provider_payload.py` 负责 compact DTO，`provider_schema.py` 负责动态 JSON schema，`provider_repair.py` 负责本地合同投影与 repair helper，`real_llm_agent.py` 只保留 provider transport、HTTP fallback 和安全拒答编排。后续如果继续精简，应优先拆 `provider_errors.py`、`provider_config.py` 和 response parsing，不能把 mock fixture 字段或完整审计对象重新并入真实 provider payload。
+
 P0 硬链路详见 `doc/architecture/p0-hard-chain-2026-06-16.md`。
 
 ## Context hard / soft 边界

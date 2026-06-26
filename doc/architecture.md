@@ -165,6 +165,8 @@ Runtime trace schema v5 会记录 `memory_projection` 和 `npc_skill_projection`
 
 Memory v1.4 将记忆派生收敛到统一 `MemoryDerivationRule`。`CaseLoader` 通过 `MemoryDerivationRuleLoader` 先加载 `app/runtime/memory_derivation_rules.yaml`，再加载案件包 `memory_derivation_rules.yaml`；`DerivedEventSystem` 对已支持事件优先执行配置化规则，只有目标 memory 未由配置规则产生时才调用旧 Python fallback。当前已迁移 app 默认 `player.presented_clue` episodic 规则，以及 `mist_clock_manor` 中江雁回 + 空胶囊的 belief / relationship / strategy typed memory 规则；其他 core 规则仍保留 Python fallback，避免一次性迁移扩大风险。
 
+P2 大文件拆分后，`DerivedEventSystem` 只保留事件类型分发、玩家知识派生和角色事实感知入口。Memory fallback 按业务边界拆到 `derivation_clue_memory.py`、`derivation_scene_shared_memory.py`、`derivation_accusation_memory.py`、`derivation_interaction_memory.py` 和 `derivation_memory_store.py`；NPC 私有画像派生位于 `derivation_impressions.py`。新增派生逻辑必须优先进入对应业务模块，不能把规则仓库重新堆回 `derivations.py`。
+
 `character_impression.updated` 是运行时派生的私有认知事件，来源包括 `player.asked_about`、`player.presented_clue`、`player.accused`、`relationship.threshold.crossed`、`director.blocked` 和 `accusation.evaluated`。LLM 可以读取目标 NPC 自己的画像视图，但不能直接写画像状态。
 
 现有 `CharacterImpression` 兼容 `NPCPortraitState`：运行时画像包含 `trust`、`suspicion`、`fear`、`traits`、`current_strategy` 和 `source_memory_ids`。AgentContext 额外注入 `portrait_summary`，用于表达“目标 NPC 当前如何看待玩家”的低泄漏投影。
