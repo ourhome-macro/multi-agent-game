@@ -3,7 +3,7 @@ from __future__ import annotations
 import math
 from collections import Counter
 from collections.abc import Callable, Iterable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Protocol
 
 from app.domain.models import AgentMemorySnapshot
@@ -13,6 +13,8 @@ from app.domain.models import AgentMemorySnapshot
 class MemorySearchQuery:
     anchors: frozenset[str]
     text_tokens: frozenset[str]
+    semantic_tokens: frozenset[str] = field(default_factory=frozenset)
+    target_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -114,12 +116,14 @@ class LocalSemanticEmbeddingScorer:
         cap: float = 1.25,
         concept_weight: float = 1.0,
         overlap_weight: float = 0.08,
+        weak_tokens: Iterable[str] = (),
     ) -> None:
         self._tokenizer = tokenizer
         self._haystack_builder = haystack_builder
         self._cap = cap
         self._concept_weight = concept_weight
         self._overlap_weight = overlap_weight
+        self._weak_tokens = frozenset(str(token) for token in weak_tokens)
         self._concept_tokens = _compile_concept_tokens(
             concept_aliases,
             tokenizer=tokenizer,
@@ -133,6 +137,9 @@ class LocalSemanticEmbeddingScorer:
     ) -> float:
         if not self._concept_tokens:
             return 0.0
+        anchored_concepts = self._anchored_concepts(query)
+        if not anchored_concepts:
+            return 0.0
         query_tokens = self._query_tokens(query)
         if not query_tokens:
             return 0.0
@@ -141,12 +148,14 @@ class LocalSemanticEmbeddingScorer:
             return 0.0
 
         score = 0.0
-        for alias_tokens in self._concept_tokens.values():
+        for concept_id, alias_tokens in self._concept_tokens.items():
+            if concept_id not in anchored_concepts:
+                continue
             query_overlap = query_tokens & alias_tokens
-            if not query_overlap:
+            if not _has_distinctive_overlap(query_overlap, self._weak_tokens):
                 continue
             snapshot_overlap = snapshot_tokens & alias_tokens
-            if not snapshot_overlap:
+            if not _has_distinctive_overlap(snapshot_overlap, self._weak_tokens):
                 continue
             score += self._concept_weight
             score += min(len(query_overlap | snapshot_overlap), 4) * self._overlap_weight
@@ -154,9 +163,13 @@ class LocalSemanticEmbeddingScorer:
 
     def _query_tokens(self, query: MemorySearchQuery) -> set[str]:
         tokens = set(query.text_tokens)
+        tokens.update(query.semantic_tokens)
         for anchor in query.anchors:
             tokens.update(self._tokenizer(anchor))
         return tokens
+
+    def _anchored_concepts(self, query: MemorySearchQuery) -> set[str]:
+        return {str(anchor) for anchor in query.anchors} & set(self._concept_tokens)
 
 
 class LocalBM25KeywordScorer:
@@ -331,3 +344,7 @@ def _compile_concept_tokens(
         if tokens:
             compiled[str(concept)] = frozenset(tokens)
     return compiled
+
+
+def _has_distinctive_overlap(tokens: set[str], weak_tokens: frozenset[str]) -> bool:
+    return any(token not in weak_tokens for token in tokens)

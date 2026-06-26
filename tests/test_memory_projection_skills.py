@@ -107,6 +107,102 @@ def test_skill_max_memory_items_limits_retriever_results(tmp_path: Path) -> None
     assert len(memories) == 2
 
 
+def test_base_skill_plan_includes_topic_tags_from_skill_include(tmp_path: Path) -> None:
+    case, _, session = _runtime()
+    _write_case_skill_override(
+        tmp_path,
+        case_id=case.meta.id,
+        skill_id="talk",
+        topic_tags=["medicine_replaced", "pressure"],
+    )
+
+    plan = _planner_with_case_root(tmp_path).plan(
+        case=case,
+        session=session,
+        action=PlayerAction(type=ActionType.TALK, target_id=JIANG, text="capsules"),
+    )
+
+    assert plan.included_topic_tags == ("medicine_replaced", "pressure")
+    assert plan.trace_summary(selected_count=0)["included_topic_tags"] == [
+        "medicine_replaced",
+        "pressure",
+    ]
+
+
+def test_progressive_rule_include_topic_tags_updates_retrieval_plan(
+    tmp_path: Path,
+) -> None:
+    case, _, session = _runtime()
+    _write_case_skill_override(
+        tmp_path,
+        case_id=case.meta.id,
+        skill_id="talk",
+        topic_tags=["base_topic"],
+        progressive_lines=[
+            "    - when:",
+            "        phase: opening",
+            "      include:",
+            "        topic_tags: [opening_topic, clue_pressure]",
+        ],
+    )
+
+    plan = _planner_with_case_root(tmp_path).plan(
+        case=case,
+        session=session,
+        action=PlayerAction(type=ActionType.TALK, target_id=JIANG, text="capsules"),
+    )
+
+    assert plan.included_topic_tags == ("opening_topic", "clue_pressure")
+
+
+def test_memory_retriever_filters_skill_plan_topic_tags(tmp_path: Path) -> None:
+    case, _, session = _runtime()
+    _write_case_skill_override(
+        tmp_path,
+        case_id=case.meta.id,
+        skill_id="talk",
+        topic_tags=["medicine_replaced"],
+    )
+    _add_snapshot(
+        session,
+        memory_id="memory.topic_tags.allowed",
+        memory_type="episodic",
+        memory_scope="case",
+        memory_layer="core",
+        content="fixture topic recall about empty capsules and medicine pressure",
+        topic_tags=["medicine_replaced"],
+    )
+    _add_snapshot(
+        session,
+        memory_id="memory.topic_tags.filtered",
+        memory_type="episodic",
+        memory_scope="case",
+        memory_layer="core",
+        content="fixture topic recall about empty capsules and medicine pressure",
+        topic_tags=["unrelated"],
+    )
+
+    action = PlayerAction(
+        type=ActionType.TALK,
+        target_id=JIANG,
+        text="fixture topic recall empty capsules medicine pressure",
+    )
+    plan = _planner_with_case_root(tmp_path).plan(
+        case=case,
+        session=session,
+        action=action,
+    )
+    memories = MemoryRetriever(max_results=20).retrieve(
+        case=case,
+        session=session,
+        action=action,
+        plan=plan,
+    )
+
+    assert plan.included_topic_tags == ("medicine_replaced",)
+    assert [memory.memory_id for memory in memories] == ["memory.topic_tags.allowed"]
+
+
 def test_case_level_memory_projection_skill_overrides_app_default(tmp_path: Path) -> None:
     case, _, session = _runtime()
     _write_case_skill_override(
@@ -208,11 +304,25 @@ def _write_case_skill_override(
     portrait_summary: bool = True,
     memory_scopes: list[str] | None = None,
     forbidden_scopes: list[str] | None = None,
+    topic_tags: list[str] | None = None,
+    progressive_lines: list[str] | None = None,
 ) -> None:
     skill_dir = tmp_path / "cases" / case_id / "skills" / "memory_projection"
     skill_dir.mkdir(parents=True)
     scopes = memory_scopes or ["case", "session", "npc_private", "scene_shared"]
     forbids = ["director_audit"] if forbidden_scopes is None else forbidden_scopes
+    include_lines = [
+        "include:",
+        "  memory_types: [episodic, belief, relationship, strategy]",
+        f"  memory_scopes: [{', '.join(scopes)}]",
+        "  memory_layers: [core, working]",
+    ]
+    if topic_tags is not None:
+        include_lines.append(f"  topic_tags: [{', '.join(topic_tags)}]")
+    progressive = ["  progressive: []"] if progressive_lines is None else [
+        "  progressive:",
+        *progressive_lines,
+    ]
     (skill_dir / f"{skill_id}.md").write_text(
         "\n".join(
             [
@@ -221,10 +331,7 @@ def _write_case_skill_override(
                 "description: test override",
                 "trigger:",
                 "  action_type: talk",
-                "include:",
-                "  memory_types: [episodic, belief, relationship, strategy]",
-                f"  memory_scopes: [{', '.join(scopes)}]",
-                "  memory_layers: [core, working]",
+                *include_lines,
                 "forbid:",
                 f"  memory_scopes: [{', '.join(forbids)}]",
                 "  memory_layers: [archival]",
@@ -234,7 +341,7 @@ def _write_case_skill_override(
                 "  recent_events: true",
                 "disclosure:",
                 "  level: test",
-                "  progressive: []",
+                *progressive,
                 "---",
                 "test override",
             ]
@@ -251,6 +358,7 @@ def _add_snapshot(
     memory_scope: str,
     memory_layer: str,
     content: str,
+    topic_tags: list[str] | None = None,
 ) -> None:
     session.memory_snapshots[memory_id] = AgentMemorySnapshot(
         memory_id=memory_id,
@@ -264,5 +372,6 @@ def _add_snapshot(
         content=content,
         source_event_ids=["test_event"],
         salience=1.0,
+        metadata={"topic_tags": topic_tags} if topic_tags is not None else {},
         last_updated_event_id="test_event",
     )

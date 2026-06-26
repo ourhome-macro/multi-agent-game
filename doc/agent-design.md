@@ -192,7 +192,9 @@ Memory v1.2 增加 Skill-driven Retrieval Planner。`MemoryProjectionSkill` 使�
 - `ask_about_clue`：线索询问的渐进式披露投影。
 - `accuse`：正式指控时的更宽但仍受边界限制的投影。
 
-`RetrievalPlanner` 从 skill 生成 `MemoryRetrievalPlan`，控制允许的 `memory_type`、`memory_scope`、常规 `memory_layer`、禁止的 scope/layer、`max_memory_items`、是否注入 `portrait_summary`、是否允许 `recent_events`。`recent_events=false` 同时约束 `AgentContext.recent_events` 和 `ToolRuntime.get_recent_events` 的结果计数。硬边界仍在代码里：`director_audit`、其他 NPC private、其他 NPC portrait 和 forbidden fact 文本不能被 skill 放进普通 NPC `AgentContext`。在没有 selected NPC skill memory policy 的基础 projection 路径中，`archival` 即使出现在 projection skill 的 forbidden layer 中，也可在代码级冷召回路径被选中；该路径只在常规 working/core 没有相关命中时触发，并且不放宽其他边界。
+`RetrievalPlanner` 从 skill 生成 `MemoryRetrievalPlan`，控制允许的 `memory_type`、`memory_scope`、常规 `memory_layer`、`topic_tags`、禁止的 scope/layer、`max_memory_items`、是否注入 `portrait_summary`、是否允许 `recent_events`。`recent_events=false` 同时约束 `AgentContext.recent_events` 和 `ToolRuntime.get_recent_events` 的结果计数。硬边界仍在代码里：`director_audit`、其他 NPC private、其他 NPC portrait 和 forbidden fact 文本不能被 skill 放进普通 NPC `AgentContext`。在没有 selected NPC skill memory policy 的基础 projection 路径中，`archival` 即使出现在 projection skill 的 forbidden layer 中，也可在代码级冷召回路径被选中；该路径只在常规 working/core 没有相关命中时触发，并且不放宽其他边界。
+
+2026-06-26 后，`MemoryProjectionSkill.include.topic_tags` 会进入基础 `MemoryRetrievalPlan.included_topic_tags`；命中的 `disclosure.progressive[].include.topic_tags` 会按 rule 级 include 语义更新最终 plan，未声明时继承基础 tag 过滤，显式空列表则清空 tag 过滤。`MemoryRetriever` 不为 topic tag 改排序，只在既有 `plan_allowed` hard filter 中按 snapshot `metadata.topic_tags` 与 `plan.included_topic_tags` 的交集做精细召回。
 
 2026-06-17 后，selected NPC skill 的 `memory` policy 会参与最终 `MemoryRetrievalPlan`，不再只是 `npc_skill_projections.memory_plan_id` 元数据。最终计划由基础 `MemoryProjectionSkill` plan 与 selected NPC skill policy 合成：`include_types`、`include_scopes`、`include_layers` 与基础 plan 取交集，`topic_tags` 变成 `MemoryRetriever` 的硬过滤条件，`max_items` 取更小值。该合成只能收窄，不能把基础 plan 已禁止的 `director_audit`、`archival` 或不可见 NPC 私有记忆放回来；普通 NPC 可见性仍由 `MemoryRetriever` 的 owner / visible 过滤执行。
 
@@ -410,19 +412,27 @@ Memory v2 将检索拆成可审计管线：
 
 - hard filter：先执行 scope、owner/visible、layer、source provenance、phase、plan、forbidden content 过滤。
 - keyword/BM25：只在通过硬边界的候选中做关键词相关性排序。
-- embedding scorer：预留可插拔接口，当前默认不调用外部服务。
+- embedding scorer：默认启用本地 deterministic semantic scorer；它只使用案件配置、query alias 和快照文本/metadata token，不调用外部服务或向量库。外部 scorer 仍可通过接口显式替换。
 - reranker：预留二阶段排序接口，当前默认保持 deterministic 顺序。
 
 普通 NPC 不会因为 `salience` 高就召回无关记忆。`salience` 可留在快照中供审计和叙事解释，但不作为相关性总分来源；只有结构化锚点、关键词/topic/source 命中或 embedding 命中能让候选进入排序。若 working/core 没有相关命中，结果为空；只有 archival cold recall 可以在 working/core 无命中时尝试，但仍必须满足当前 NPC 可见性、scope、type、source provenance、phase、forbidden fact 和 plan 约束。
+
+DB-backed `MemoryStore` 可以接收 `MemoryStoreQuery.query_anchors/query_tokens`，让 `PostgresMemoryStore` 在 session/scope/layer/type/visibility/phase 之后，对 `metadata`、source ids、`memory_id` 和 `content` 做轻量 SQL 预筛。该预筛只减少候选读取量，不产生新的可见性授权；`MemoryRetriever` 的 hard filters 和后续相关性排序仍是普通 NPC 上下文注入的最终边界。trace 只暴露 query term 数量和预筛是否启用，不暴露具体 term 或 memory content。
 
 2026-06-16 的召回修复进一步明确了结构化锚点来源：
 
 - `PlayerAction` 的 `clue_id`、`claim_id`、`subject_id`、`evidence_clue_ids` 是强锚点。
 - 玩家自然语言会与案件 `Clue.id`、`Clue.title` 做匹配；`snake_case` ID 会拆成 token，例如 `scratched_drawer` 可被 `drawer` 命中。
-- 当已经从动作或文本解析出具体 clue / world_info / claim 锚点时，`target_id` 不再作为召回锚点，避免“同一个 NPC 可见的无关 case/core 记忆”被带入上下文。
-- 只有完全没有具体锚点时，`target_id` 才作为弱入口，用于召回与当前 NPC 直接相关的私有互动记忆。
+- `target_id` 不再混入内容锚点，也不参与 metadata 文本匹配，避免“同一个 NPC 可见或相关的无关 case/core 记忆”被带入上下文。
+- 只有完全没有具体内容锚点时，检索才使用独立的 target relevance 弱分数；该分数只看 `owner_character_id` 和 `npc_private` / `scene_shared` 可见性，用于召回当前 NPC 自己刚形成的私有互动记忆，不会因为 metadata 里出现目标角色 ID 而召回案件线索。
 
 这条规则的目标是保证“渐进式披露”按线索和事实推进，而不是按 NPC 身份或 salience 扩散。
+
+2026-06-26 起，默认本地 semantic recall 不再只依赖少量手写同义词。`MemoryRetriever` 会从当前 `CasePackage` 的 `Clue.id/title/description/reveals_world_info` 与 `WorldInfo.id/title/description/aliases/claim_patterns` 构造 deterministic alias graph：玩家文本命中 clue 可扩展到其 reveals 的 world_info，命中 world_info 也会反向补到关联 clue anchor。扩展后的 token 只进入 `MemorySearchQuery.semantic_tokens` 和本地 semantic scorer，不混入 BM25 `text_tokens`，避免 query expansion 直接污染关键词排序。DB-backed store 预筛使用的是 semantic tokens，而不是只用原始 text tokens；否则 Postgres 后端会在 semantic scorer 前误丢“中文改写 -> 英文记忆正文”的候选。tokenizer 额外处理 CJK n-gram、`snake_case`、hyphen、camelCase、常见英文复数/过去式和数字边界；semantic scorer 会忽略 `missing/about/clue/线索/东西` 等弱 token 的孤立重叠，降低误召回。
+
+同日补充的召回边界：semantic scorer 只对 query 已锚定的 clue / world_info concept 打分，不会遍历全案所有 concept；clue alias 不再把 `related_characters` / `related_events` 当同义词；自然语言 alias token overlap 需要完整短语命中、两个以上有效 token，或一个足够强的 CJK / 长英文 token。`trace`、`power`、`drawer` 这类普通单词不能单独把整条案件链或相邻线索扩进上下文。
+
+新增默认 semantic 行为必须补 golden-style tests：至少覆盖中文改写、英文改写、world_info 到 clue 的跨 anchor 召回，以及高 salience 无关记忆不被误召回。当前覆盖位于 `tests/test_memory_retrieval_quality.py`，并保持 hard filter、forbidden fact、archival cold recall 和 authority gate 仍在 semantic scorer 之前执行。
 
 记忆矩阵评测见 `doc/evaluations/memory-retrieval-matrix-2026-06-15.md`。新增检索策略、embedding 或 reranker 之前，必须用矩阵确认“应召回 / 不应召回”的 memory_id 没有漂移。
 

@@ -138,7 +138,9 @@
           "desk_opened",
           "butler"
         ],
-        "world_info_id": "desk_forced_open"
+        "world_info_id": "desk_forced_open",
+        "authority": "event_observed",
+        "non_authoritative": false
       },
       "operation": "create"
     },
@@ -433,7 +435,9 @@
           "desk_opened",
           "butler"
         ],
-        "world_info_id": "desk_forced_open"
+        "world_info_id": "desk_forced_open",
+        "authority": "event_observed",
+        "non_authoritative": false
       },
       "operation": "create"
     },
@@ -710,7 +714,9 @@
           "butler"
         ],
         "world_info_id": "desk_forced_open",
-        "privacy_reason": "private_presentation"
+        "privacy_reason": "private_presentation",
+        "authority": "event_observed",
+        "non_authoritative": false
       },
       "operation": "create"
     },
@@ -892,7 +898,9 @@
           "butler",
           "niece"
         ],
-        "world_info_id": "portrait_was_moved"
+        "world_info_id": "portrait_was_moved",
+        "authority": "event_observed",
+        "non_authoritative": false
       },
       "operation": "create"
     },
@@ -1109,7 +1117,10 @@
       "salience": 0.9,
       "confidence": 1.0,
       "visibility": "private",
-      "metadata": {},
+      "metadata": {
+        "authority": "event_observed",
+        "non_authoritative": false
+      },
       "operation": "create"
     },
     "caused_by_event_id": "event_040",
@@ -1241,7 +1252,9 @@
           "secret_meeting",
           "niece"
         ],
-        "world_info_id": "secret_meeting_note_exists"
+        "world_info_id": "secret_meeting_note_exists",
+        "authority": "event_observed",
+        "non_authoritative": false
       },
       "operation": "create"
     },
@@ -1528,7 +1541,10 @@
       "salience": 1.0,
       "confidence": 1.0,
       "visibility": "private",
-      "metadata": {},
+      "metadata": {
+        "authority": "event_observed",
+        "non_authoritative": false
+      },
       "operation": "create"
     },
     "caused_by_event_id": "event_055",
@@ -1655,7 +1671,10 @@
       "salience": 1.0,
       "confidence": 1.0,
       "visibility": "private",
-      "metadata": {},
+      "metadata": {
+        "authority": "event_observed",
+        "non_authoritative": false
+      },
       "operation": "create"
     },
     "caused_by_event_id": "event_058",

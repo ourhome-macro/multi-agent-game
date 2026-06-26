@@ -14,10 +14,20 @@ from app.domain.models import (
 from app.runtime.character_fact_awareness import upsert_character_fact_awareness
 from app.runtime.derivation_impressions import CharacterImpressionDerivationMixin
 from app.runtime.derivation_memory_candidates import MemoryCandidateDerivationMixin
+from app.runtime.derivation_memory_constants import (
+    ASKED_ABOUT_MEMORY_RULE_ID,
+    PRESENTED_CLUE_MEMORY_RULE_ID,
+)
 from app.runtime.derivation_utils import (
     append_unique as _append_unique,
 )
 from app.runtime.events import EventRecorder
+
+__all__ = [
+    "ASKED_ABOUT_MEMORY_RULE_ID",
+    "DerivedEventSystem",
+    "PRESENTED_CLUE_MEMORY_RULE_ID",
+]
 
 
 class DerivedEventSystem(

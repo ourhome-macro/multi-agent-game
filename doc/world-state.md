@@ -490,6 +490,8 @@ metadata v2 不允许无约束 dict 漂移：
 
 配置化 `MemoryDerivationRule` 与 Python fallback 必须产生一致的默认 metadata。案件规则可以显式覆盖或补充 metadata，但不能移除 `clue_id` 这类召回锚点，否则会破坏 matrix 评测和可回放检索。
 
+2026-06-26 起，Python fallback 和 scene-shared 派生中的稳定 `memory_id`、clue metadata、reconstruction thread metadata 与 `topic_tags` 组装必须通过 `app.runtime.derivation_utils` 的集中 helper 完成。helper 只负责确定性字符串和结构化 metadata 组装，不读取或修改 `SessionState`，也不替代 `MemoryDerivationRule` 模板、`MemoryRetriever` 过滤或 replay 权威。派生层仍必须把结果写成 `memory_candidate.created`，再由 `MemorySnapshotSystem` 产生 `agent_memory_snapshot.updated`；回放只应用事件日志中的 payload，不能重新运行 helper 推导状态。
+
 迁移路径：
 
 1. 旧规则不配置 `operation` 时按 `create` 处理；同一 `memory_id` 已存在时，`MemorySnapshotSystem` 会自动把重复 create 降为 `reinforce`。
@@ -565,7 +567,7 @@ player.asked_about target=shen_zhaoye subject=empty_capsules
 
 如果常规检索没有任何结构化或文本相关命中，`MemoryRetriever` 会执行一次 archival cold recall。冷召回只放宽 `memory_layer=archival`，不放宽 `memory_scope`、NPC 可见性、memory type、forbidden fact 或 `max_memory_items`。若 archival 也没有相关命中，则不会因为 salience 高而召回无关 archival memory。
 
-Memory DB-backed retrieval 第一阶段只改变候选读取来源，不改变世界状态权威。`MemoryStore` 是 `MemoryRetriever` 的读侧接口；默认 `InMemoryMemoryStore` 从 replay 后的 `session.memory_snapshots` 读取，PostgreSQL runtime builder 注入 `PostgresMemoryStore` 从 PostgreSQL `memory_snapshots` 投影表读取。Postgres 查询可以按 `session_id`、目标 NPC 可见性、scope、layer、memory type 和 metadata phase 做预筛，但不能替代代码级 hard filters，也不能让 LLM、Agent 或数据库查询直接修改 memory。store trace 只能记录 backend、请求过滤项和候选数量，禁止记录 memory content 或未选中内容。
+Memory DB-backed retrieval 第一阶段只改变候选读取来源，不改变世界状态权威。`MemoryStore` 是 `MemoryRetriever` 的读侧接口；默认 `InMemoryMemoryStore` 从 replay 后的 `session.memory_snapshots` 读取，PostgreSQL runtime builder 注入 `PostgresMemoryStore` 从 PostgreSQL `memory_snapshots` 投影表读取。Postgres 查询可以按 `session_id`、目标 NPC 可见性、scope、layer、memory type 和 metadata phase 做预筛，并可使用 `MemoryStoreQuery.query_anchors/query_tokens` 对 `metadata`、`source_event_ids/source_memory_ids`、`memory_id` 和 `content` 做轻量 query term 预筛。`query_tokens` 必须来自检索 query 的 semantic tokens，而不是只来自原始玩家文本；否则中文改写、world_info alias 和 clue alias 扩展会在 Postgres 后端先于 semantic scorer 被过滤掉。SQL 预筛不能替代代码级 hard filters，也不能让 LLM、Agent 或数据库查询直接修改 memory。store trace 只能记录 backend、请求过滤项、query anchor/token 数量、是否启用 query 预筛和候选数量，禁止记录具体 query term、memory content 或未选中内容。
 
 Memory v1.2 的 `MemoryProjectionSkill` 和 `MemoryRetrievalPlan` 不是世界状态，不写入 `WorldEvent`，也不参与 replay 权威。它们只是在构造 `AgentContext` 时解释“当前动作、阶段和 completed beats 下应该投影哪些安全记忆”。Plan 可以收窄 memory type/scope/layer、限制条数、关闭画像摘要或 recent events；但不能让 `director_audit`、`archival`、其他 NPC private、其他 NPC portrait 或 forbidden fact 文本进入普通 NPC 上下文。
 

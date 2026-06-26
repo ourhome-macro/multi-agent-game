@@ -32,6 +32,7 @@ if TYPE_CHECKING:
     from app.agents.memory import MemoryStoreQuery
 
 DEFAULT_SCHEMA_VERSION = 1
+MAX_MEMORY_QUERY_PREFILTER_TERMS = 24
 
 
 @dataclass(frozen=True)
@@ -637,7 +638,7 @@ class PostgresMemoryStore:
         self,
         *,
         session: SessionState,
-        query: "MemoryStoreQuery",
+        query: MemoryStoreQuery,
     ) -> list[AgentMemorySnapshot]:
         _ = session
         clauses = ["session_id = %s"]
@@ -700,6 +701,32 @@ class PostgresMemoryStore:
             """
         )
         params.append(query.phase)
+        query_terms = _memory_query_prefilter_terms(query)
+        if query_terms:
+            clauses.append(
+                """
+                EXISTS (
+                    SELECT 1
+                    FROM unnest(%s::text[]) AS query_term(term)
+                    WHERE memory_id ILIKE ('%%' || query_term.term || '%%')
+                       OR content ILIKE ('%%' || query_term.term || '%%')
+                       OR EXISTS (
+                           SELECT 1
+                           FROM unnest(
+                               COALESCE(source_event_ids, ARRAY[]::text[])
+                               || COALESCE(source_memory_ids, ARRAY[]::text[])
+                           ) AS source_ref(value)
+                           WHERE source_ref.value ILIKE ('%%' || query_term.term || '%%')
+                       )
+                       OR metadata::text ILIKE ('%%' || query_term.term || '%%')
+                       OR metadata ? query_term.term
+                       OR (metadata->'topic_tags') ? query_term.term
+                       OR (metadata->'adjacent_clue_ids') ? query_term.term
+                       OR (metadata->'reveals_world_info') ? query_term.term
+                )
+                """
+            )
+            params.append(list(query_terms))
 
         sql = f"""
             SELECT
@@ -715,6 +742,21 @@ class PostgresMemoryStore:
             with _cursor(self._connection) as cursor:
                 cursor.execute(sql, tuple(params))
                 return [_memory_snapshot_from_row(row) for row in cursor.fetchall()]
+
+
+def _memory_query_prefilter_terms(query: MemoryStoreQuery) -> tuple[str, ...]:
+    terms: list[str] = []
+    seen: set[str] = set()
+    raw_terms = (*query.query_anchors, *query.query_tokens)
+    for item in raw_terms:
+        term = " ".join(str(item).casefold().split())
+        if len(term) < 2 or term in seen:
+            continue
+        seen.add(term)
+        terms.append(term)
+        if len(terms) >= MAX_MEMORY_QUERY_PREFILTER_TERMS:
+            break
+    return tuple(terms)
 
 
 class PostgresSessionStore:

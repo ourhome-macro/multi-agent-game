@@ -25,14 +25,145 @@ from app.agents.retrieval_planner import MemoryRetrievalPlan
 from app.domain.models import (
     AgentMemorySnapshot,
     CasePackage,
+    ClueConfig,
     PlayerAction,
     SessionState,
+    WorldInfoConfig,
 )
 
 AGENT_MEMORY_SCOPES = {"case", "session", "npc_private", "scene_shared"}
 DIRECTOR_MEMORY_SCOPES = AGENT_MEMORY_SCOPES | {"director_audit"}
-LATIN_TOKEN_PATTERN = re.compile(r"[A-Za-z0-9_]{3,}")
+LATIN_TOKEN_PATTERN = re.compile(r"[A-Za-z0-9_]{2,}")
+IDENTIFIER_CHUNK_PATTERN = re.compile(r"[^A-Za-z0-9_]+")
+CAMEL_CASE_BOUNDARY_PATTERN = re.compile(
+    r"(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Za-z])(?=\d)|(?<=\d)(?=[A-Za-z])"
+)
 CJK_RUN_PATTERN = re.compile(r"[\u4e00-\u9fff]+")
+LATIN_STOPWORDS = {
+    "a",
+    "an",
+    "and",
+    "are",
+    "as",
+    "ask",
+    "asked",
+    "asking",
+    "at",
+    "be",
+    "been",
+    "being",
+    "but",
+    "by",
+    "can",
+    "could",
+    "did",
+    "do",
+    "does",
+    "for",
+    "from",
+    "had",
+    "has",
+    "have",
+    "her",
+    "him",
+    "his",
+    "how",
+    "in",
+    "into",
+    "is",
+    "it",
+    "its",
+    "just",
+    "not",
+    "of",
+    "on",
+    "or",
+    "she",
+    "should",
+    "tell",
+    "than",
+    "that",
+    "the",
+    "their",
+    "them",
+    "then",
+    "there",
+    "they",
+    "this",
+    "to",
+    "was",
+    "were",
+    "what",
+    "when",
+    "where",
+    "which",
+    "while",
+    "who",
+    "why",
+    "will",
+    "with",
+    "would",
+    "you",
+    "your",
+}
+LOCAL_SEMANTIC_WEAK_TOKENS = frozenset(
+    {
+        "about",
+        "archival",
+        "belief",
+        "case",
+        "clue",
+        "core",
+        "continue",
+        "continued",
+        "evidence",
+        "event",
+        "event_observed",
+        "eventobserved",
+        "episodic",
+        "false",
+        "high",
+        "high_salience",
+        "highsalience",
+        "item",
+        "memory",
+        "memory_id",
+        "memory_rule",
+        "memoryid",
+        "memoryrule",
+        "missing",
+        "npc_private",
+        "npcprivate",
+        "observed",
+        "player",
+        "private",
+        "question",
+        "questions",
+        "rule",
+        "salience",
+        "session",
+        "something",
+        "source",
+        "source_event",
+        "source_memory",
+        "sourceevent",
+        "sourcememory",
+        "strategy",
+        "test",
+        "thing",
+        "true",
+        "working",
+        "继续",
+        "追问",
+        "询问",
+        "关于",
+        "这个",
+        "那个",
+        "东西",
+        "线索",
+        "证据",
+    }
+)
 RECENCY_BUCKETS = (
     (60 * 60, 0.8),
     (24 * 60 * 60, 0.65),
@@ -55,16 +186,40 @@ DEFAULT_LOCAL_SEMANTIC_CONCEPT_ALIASES = {
         "medicine bottle",
         "medical clue",
         "medicine clue",
+        "medicine shells",
+        "medicine shell",
+        "pill shells",
+        "pill shell",
+        "pill bottle",
+        "prescription bottle",
+        "prescription tampering",
+        "heart medicine",
+        "empty medicine shells",
         "空胶囊",
         "胶囊壳",
         "胶囊外壳",
         "药壳",
         "药壳子",
         "空药囊",
+        "空药壳",
+        "药盒",
         "药箱",
         "药瓶",
         "药片缺失",
+        "心脏药",
         "医药线索",
+    ),
+    "delayed_lock_marks": (
+        "delayed lock marks",
+        "delay lock marks",
+        "lock scratch marks",
+        "timer lock",
+        "study lock marks",
+        "delayed latch",
+        "延迟锁痕",
+        "门锁划痕",
+        "锁痕",
+        "书房门锁",
     ),
 }
 
@@ -78,6 +233,8 @@ class MemoryStoreQuery:
     scopes: tuple[str, ...] = ()
     layers: tuple[str, ...] = ()
     memory_types: tuple[str, ...] = ()
+    query_anchors: tuple[str, ...] = ()
+    query_tokens: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -240,12 +397,14 @@ class MemoryRetriever:
             ),
             layers=_working_layers_for_store(plan),
             memory_types=_memory_types_for_store(plan),
+            search_query=query,
         )
         snapshots = self._fetch_store_candidates(session, working_store_query)
         working_candidates = _filter_snapshots(snapshots, working_filters)
         raw_scored = self._search_candidates(
             snapshots=snapshots,
             query=query,
+            case=case,
             now=_retrieval_now(session, working_candidates),
             hard_filters=working_filters,
         )
@@ -293,12 +452,14 @@ class MemoryRetriever:
             ),
             layers=("archival",),
             memory_types=_memory_types_for_store(plan),
+            search_query=query,
         )
         archival_snapshots = self._fetch_store_candidates(session, archival_store_query)
         archival_candidates = _filter_snapshots(archival_snapshots, archival_filters)
         archival_scored = self._search_candidates(
             snapshots=archival_snapshots,
             query=query,
+            case=case,
             now=_retrieval_now(session, archival_candidates),
             hard_filters=archival_filters,
         )
@@ -348,6 +509,11 @@ class MemoryRetriever:
                 "scopes": list(query.scopes),
                 "layers": list(query.layers),
                 "memory_types": list(query.memory_types),
+                "query_anchor_count": len(query.query_anchors),
+                "query_token_count": len(query.query_tokens),
+                "query_prefilter_enabled": bool(
+                    query.query_anchors or query.query_tokens
+                ),
             },
             candidate_count=len(snapshots),
         )
@@ -358,9 +524,14 @@ class MemoryRetriever:
         *,
         snapshots: list[AgentMemorySnapshot],
         query: MemorySearchQuery,
+        case: CasePackage,
         now: datetime | None,
         hard_filters: tuple[MemoryHardFilter, ...],
     ) -> list[MemorySearchResult]:
+        embedding_scorer = (
+            self._embedding_scorer
+            or build_local_semantic_embedding_scorer(_case_semantic_concept_aliases(case))
+        )
         pipeline = MemoryRetrievalPipeline(
             structured_scorer=_structured_score,
             keyword_scorer_factory=lambda candidates: LocalBM25KeywordScorer(
@@ -372,7 +543,7 @@ class MemoryRetriever:
             ),
             recency_scorer=lambda snapshot: _recency_score(snapshot, now),
             reinforcement_scorer=_reinforcement_score,
-            embedding_scorer=self._embedding_scorer,
+            embedding_scorer=embedding_scorer,
             reranker=self._reranker,
         )
         return pipeline.search(
@@ -386,10 +557,13 @@ def build_local_semantic_embedding_scorer(
     concept_aliases: dict[str, tuple[str, ...]] | None = None,
 ) -> LocalSemanticEmbeddingScorer:
     return LocalSemanticEmbeddingScorer(
-        concept_aliases or DEFAULT_LOCAL_SEMANTIC_CONCEPT_ALIASES,
+        DEFAULT_LOCAL_SEMANTIC_CONCEPT_ALIASES
+        if concept_aliases is None
+        else concept_aliases,
         tokenizer=_tokens,
         haystack_builder=_snapshot_haystack,
         cap=LOCAL_SEMANTIC_SCORE_CAP,
+        weak_tokens=LOCAL_SEMANTIC_WEAK_TOKENS,
     )
 
 
@@ -591,6 +765,7 @@ def _store_query(
     scopes: tuple[str, ...],
     layers: tuple[str, ...],
     memory_types: tuple[str, ...],
+    search_query: MemorySearchQuery | None = None,
 ) -> MemoryStoreQuery:
     return MemoryStoreQuery(
         session_id=session.id,
@@ -600,6 +775,8 @@ def _store_query(
         scopes=scopes,
         layers=layers,
         memory_types=memory_types,
+        query_anchors=tuple(sorted(search_query.anchors)) if search_query else (),
+        query_tokens=tuple(sorted(search_query.semantic_tokens)) if search_query else (),
     )
 
 
@@ -779,12 +956,9 @@ def _zero_reason(
 
 
 def _tokens(text: str) -> set[str]:
-    normalized = _normalize_text(text)
     tokens: set[str] = set()
-    for token in LATIN_TOKEN_PATTERN.findall(normalized):
-        normalized_token = token.casefold()
-        tokens.add(normalized_token)
-        tokens.update(_identifier_token_parts(normalized_token))
+    for token in LATIN_TOKEN_PATTERN.findall(text):
+        tokens.update(_identifier_token_parts(token))
     for run in CJK_RUN_PATTERN.findall(text):
         if len(run) >= 2:
             tokens.add(run)
@@ -793,7 +967,7 @@ def _tokens(text: str) -> set[str]:
                 continue
             for index in range(0, len(run) - size + 1):
                 tokens.add(run[index : index + size])
-    return {token for token in tokens if len(token) >= 2}
+    return {token for token in tokens if _token_allowed(token)}
 
 
 def memory_allowed_by_plan(
@@ -930,21 +1104,59 @@ def _build_query(case: CasePackage, action: PlayerAction) -> MemorySearchQuery:
     action_text = action.text or ""
     action_text_normalized = _normalize_text(action_text)
     action_tokens = _tokens(action_text)
+    semantic_tokens = set(action_tokens)
+    concept_aliases = _case_semantic_concept_aliases(case)
+    normalized_raw_anchors = {
+        normalized
+        for normalized in (_normalize_text(str(anchor)) for anchor in raw_anchors)
+        if normalized
+    }
+    matched_clue_ids: set[str] = set()
+    matched_world_info_ids: set[str] = set()
+
     for clue in case.clues:
-        clue_title = _normalize_text(clue.title)
         clue_id = _normalize_text(clue.id)
-        clue_id_tokens = _tokens(clue.id)
-        title_tokens = _tokens(clue.title)
         if (
-            clue_id in action_text_normalized
-            or (clue_title and clue_title in action_text_normalized)
-            or bool(clue_id_tokens & action_tokens)
-            or bool(title_tokens & action_tokens)
+            clue_id in normalized_raw_anchors
+            or _case_alias_matches_query(
+                action_text_normalized,
+                action_tokens,
+                _semantic_aliases_for_id(concept_aliases, clue.id),
+            )
         ):
-            raw_anchors.append(clue.id)
-            raw_anchors.extend(clue.reveals_world_info)
-    if not raw_anchors:
-        raw_anchors.append(action.target_id)
+            matched_clue_ids.add(clue.id)
+            matched_world_info_ids.update(clue.reveals_world_info)
+
+    for world_info in case.world_info:
+        world_info_id = _normalize_text(world_info.id)
+        if (
+            world_info_id in normalized_raw_anchors
+            or _case_alias_matches_query(
+                action_text_normalized,
+                action_tokens,
+                _semantic_aliases_for_id(concept_aliases, world_info.id),
+            )
+        ):
+            matched_world_info_ids.add(world_info.id)
+
+    if matched_world_info_ids:
+        matched_world_info_id_set = {
+            _normalize_text(world_info_id) for world_info_id in matched_world_info_ids
+        }
+        for clue in case.clues:
+            if matched_world_info_id_set & {
+                _normalize_text(world_info_id)
+                for world_info_id in clue.reveals_world_info
+            }:
+                matched_clue_ids.add(clue.id)
+
+    raw_anchors.extend(sorted(matched_clue_ids))
+    raw_anchors.extend(sorted(matched_world_info_ids))
+    for anchor in raw_anchors:
+        semantic_tokens.update(
+            _tokens(" ".join(_semantic_aliases_for_id(concept_aliases, anchor)))
+        )
+
     return MemorySearchQuery(
         anchors=frozenset(
             anchor
@@ -952,12 +1164,131 @@ def _build_query(case: CasePackage, action: PlayerAction) -> MemorySearchQuery:
             if anchor
         ),
         text_tokens=frozenset(action_tokens),
+        semantic_tokens=frozenset(semantic_tokens),
+        target_id=_normalize_text(action.target_id) or None,
     )
 
 
+def _case_semantic_concept_aliases(
+    case: CasePackage,
+) -> dict[str, tuple[str, ...]]:
+    aliases: dict[str, tuple[str, ...]] = {
+        _normalize_text(concept): tuple(values)
+        for concept, values in DEFAULT_LOCAL_SEMANTIC_CONCEPT_ALIASES.items()
+        if _normalize_text(concept)
+    }
+    world_info_by_id = {
+        _normalize_text(world_info.id): world_info
+        for world_info in case.world_info
+    }
+
+    for world_info in case.world_info:
+        _merge_semantic_aliases(
+            aliases,
+            world_info.id,
+            _world_info_alias_strings(world_info),
+        )
+
+    for clue in case.clues:
+        clue_aliases = list(_clue_alias_strings(clue))
+        for world_info_id in clue.reveals_world_info:
+            world_info = world_info_by_id.get(_normalize_text(world_info_id))
+            if world_info is not None:
+                clue_aliases.extend(_world_info_alias_strings(world_info))
+        _merge_semantic_aliases(aliases, clue.id, clue_aliases)
+        for world_info_id in clue.reveals_world_info:
+            _merge_semantic_aliases(aliases, world_info_id, clue_aliases)
+
+    return aliases
+
+
+def _merge_semantic_aliases(
+    aliases: dict[str, tuple[str, ...]],
+    concept: str,
+    values: Iterable[str],
+) -> None:
+    normalized_concept = _normalize_text(str(concept))
+    if not normalized_concept:
+        return
+    aliases[normalized_concept] = _dedupe_strings(
+        [
+            *aliases.get(normalized_concept, ()),
+            str(concept),
+            *values,
+        ]
+    )
+
+
+def _semantic_aliases_for_id(
+    concept_aliases: dict[str, tuple[str, ...]],
+    concept_id: object,
+) -> tuple[str, ...]:
+    return concept_aliases.get(_normalize_text(str(concept_id)), ())
+
+
+def _clue_alias_strings(clue: ClueConfig) -> tuple[str, ...]:
+    return _dedupe_strings(
+        [
+            clue.id,
+            clue.title,
+            clue.description,
+            *clue.reveals_world_info,
+        ]
+    )
+
+
+def _world_info_alias_strings(world_info: WorldInfoConfig) -> tuple[str, ...]:
+    return _dedupe_strings(
+        [
+            world_info.id,
+            world_info.title,
+            world_info.description,
+            *world_info.aliases,
+            *world_info.claim_patterns,
+        ]
+    )
+
+
+def _dedupe_strings(values: Iterable[object]) -> tuple[str, ...]:
+    deduped: list[str] = []
+    seen: set[str] = set()
+    for value in values:
+        text = str(value).strip()
+        normalized = _normalize_text(text)
+        if not normalized or normalized in seen:
+            continue
+        seen.add(normalized)
+        deduped.append(text)
+    return tuple(deduped)
+
+
+def _case_alias_matches_query(
+    action_text_normalized: str,
+    action_tokens: set[str],
+    aliases: Iterable[str],
+) -> bool:
+    for alias in aliases:
+        normalized_alias = _normalize_text(alias)
+        if normalized_alias and normalized_alias in action_text_normalized:
+            return True
+        alias_tokens = _tokens(alias)
+        overlap = action_tokens & alias_tokens
+        if _semantic_overlap_is_match(overlap):
+            return True
+    return False
+
+
+def _semantic_overlap_is_match(tokens: set[str]) -> bool:
+    distinctive = {token for token in tokens if token not in LOCAL_SEMANTIC_WEAK_TOKENS}
+    if len(distinctive) >= 2:
+        return True
+    if not distinctive:
+        return False
+    token = next(iter(distinctive))
+    return bool(CJK_RUN_PATTERN.fullmatch(token)) or len(token) >= 7
+
+
 def _structured_score(snapshot: AgentMemorySnapshot, query: MemorySearchQuery) -> float:
-    if not query.anchors:
-        return 0.0
     score = 0.0
     metadata_values = _metadata_string_values(snapshot.metadata)
     source_event_ids = [_normalize_text(item) for item in snapshot.source_event_ids]
@@ -981,7 +1312,24 @@ def _structured_score(snapshot: AgentMemorySnapshot, query: MemorySearchQuery) -
             continue
         if _identifier_contains(memory_id, anchor):
             score += 1.5
+    if not query.anchors:
+        score += _target_relevance_score(snapshot, query.target_id)
     return min(score, STRUCTURED_SCORE_CAP)
+
+
+def _target_relevance_score(
+    snapshot: AgentMemorySnapshot,
+    target_id: str | None,
+) -> float:
+    if not target_id:
+        return 0.0
+    if _normalize_text(snapshot.owner_character_id or "") == target_id:
+        return 1.25
+    if snapshot.memory_scope in {"npc_private", "scene_shared"} and target_id in {
+        _normalize_text(item) for item in snapshot.visible_to_character_ids
+    }:
+        return 1.0
+    return 0.0
 
 
 def _snapshot_haystack(snapshot: AgentMemorySnapshot) -> str:
@@ -1038,19 +1386,65 @@ def _identifier_contains(identifier: str, anchor: str) -> bool:
         return False
     if identifier == anchor:
         return True
-    return anchor in _identifier_token_parts(identifier)
+    identifier_parts = _identifier_token_parts(identifier)
+    if anchor in identifier_parts:
+        return True
+    anchor_parts = _identifier_token_parts(anchor)
+    return bool(anchor_parts) and anchor_parts <= identifier_parts
 
 
 def _identifier_token_parts(identifier: str) -> set[str]:
     parts: set[str] = set()
-    for chunk in re.split(r"[^A-Za-z0-9_]+", identifier.casefold()):
+    for chunk in IDENTIFIER_CHUNK_PATTERN.split(identifier):
         if not chunk:
             continue
-        parts.add(chunk)
+        _add_token(parts, chunk)
+        collapsed = chunk.replace("_", "")
+        _add_token(parts, collapsed)
         for part in chunk.split("_"):
-            if part:
-                parts.add(part)
-    return parts
+            _add_token(parts, part)
+            for camel_part in CAMEL_CASE_BOUNDARY_PATTERN.sub(" ", part).split():
+                _add_token(parts, camel_part)
+    return {part for part in parts if _token_allowed(part)}
+
+
+def _add_token(tokens: set[str], token: str) -> None:
+    normalized = token.casefold().strip("_")
+    if normalized:
+        tokens.add(normalized)
+        tokens.update(_latin_stem_variants(normalized))
+
+
+def _latin_stem_variants(token: str) -> set[str]:
+    if not token.isascii() or not token.isalnum():
+        return set()
+    variants: set[str] = set()
+    handled_plural = False
+    if len(token) > 5 and token.endswith("ies"):
+        variants.add(f"{token[:-3]}y")
+        handled_plural = True
+    if len(token) > 5 and (
+        token.endswith("ches")
+        or token.endswith("shes")
+        or token.endswith("xes")
+        or token.endswith("zes")
+    ):
+        variants.add(token[:-2])
+        handled_plural = True
+    if len(token) > 5 and token.endswith("ed"):
+        base = token[:-2]
+        variants.add(base)
+        if len(base) > 2 and base[-1] == base[-2]:
+            variants.add(base[:-1])
+    if len(token) > 4 and token.endswith("s") and not handled_plural:
+        variants.add(token[:-1])
+    return {variant for variant in variants if len(variant) >= 2}
+
+
+def _token_allowed(token: str) -> bool:
+    if len(token) < 2:
+        return False
+    return token not in LATIN_STOPWORDS
 
 
 def _recency_score(

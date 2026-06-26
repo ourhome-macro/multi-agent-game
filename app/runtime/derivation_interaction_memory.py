@@ -7,6 +7,24 @@ from app.runtime.derivation_memory_constants import (
     PRESENTED_CLUE_MEMORY_RULE_ID,
     RELATIONSHIP_THRESHOLD_MEMORY_RULE_ID,
 )
+from app.runtime.derivation_utils import (
+    PRIVACY_REASON_PRIVATE_PRESENTATION as _PRIVATE_PRESENTATION,
+)
+from app.runtime.derivation_utils import (
+    PRIVACY_REASON_SCENE_SHARED_PRESENTATION as _SCENE_SHARED_PRESENTATION,
+)
+from app.runtime.derivation_utils import (
+    asked_about_memory_id as _asked_about_memory_id,
+)
+from app.runtime.derivation_utils import (
+    director_blocked_memory_id as _director_blocked_memory_id,
+)
+from app.runtime.derivation_utils import (
+    presented_clue_memory_id as _presented_clue_memory_id,
+)
+from app.runtime.derivation_utils import (
+    relationship_threshold_memory_id as _relationship_threshold_memory_id,
+)
 from app.runtime.memory_derivations import resolve_memory_derivation_effects
 
 
@@ -27,10 +45,7 @@ class InteractionMemoryDerivationMixin:
         return self._store_memory_candidate(
             session=session,
             source_event=source_event,
-            memory_id=(
-                "memory.player.relationship_threshold."
-                f"{source_id}.player.{metric}.{state_name}"
-            ),
+            memory_id=_relationship_threshold_memory_id(source_id, metric, state_name),
             rule_id=RELATIONSHIP_THRESHOLD_MEMORY_RULE_ID,
             content=f"{character_name} became {state_name} toward the player ({metric}).",
             salience=0.7,
@@ -52,9 +67,9 @@ class InteractionMemoryDerivationMixin:
         return self._store_memory_candidate(
             session=session,
             source_event=source_event,
-            memory_id=(
-                "memory.player.director_blocked."
-                f"{target_id}.{source_event.payload.get('blocked_fact_id', 'unknown')}"
+            memory_id=_director_blocked_memory_id(
+                target_id,
+                source_event.payload.get("blocked_fact_id", "unknown"),
             ),
             rule_id=DIRECTOR_BLOCK_MEMORY_RULE_ID,
             content=f"Conversation with {character_name} was blocked by narrative rules.",
@@ -79,7 +94,7 @@ class InteractionMemoryDerivationMixin:
         return self._store_memory_candidate(
             session=session,
             source_event=source_event,
-            memory_id=f"memory.player.asked_about.{target_id}.{subject_type}.{subject_id}",
+            memory_id=_asked_about_memory_id(target_id, subject_type, subject_id),
             rule_id=ASKED_ABOUT_MEMORY_RULE_ID,
             content=(
                 f"Player asked {target_name} about {subject_type} '{subject_id}' "
@@ -104,7 +119,7 @@ class InteractionMemoryDerivationMixin:
         return self._store_memory_candidate(
             session=session,
             source_event=source_event,
-            memory_id=f"memory.player.presented_clue.{target_id}.{clue_id}",
+            memory_id=_presented_clue_memory_id(target_id, clue_id),
             rule_id=PRESENTED_CLUE_MEMORY_RULE_ID,
             content=(
                 f"Player pressured {target_name} with clue '{clue_id}' "
@@ -115,7 +130,7 @@ class InteractionMemoryDerivationMixin:
             visible_to_character_ids=[target_id],
             metadata={
                 **self._clue_memory_metadata(case, clue_id),
-                "privacy_reason": "private_presentation",
+                "privacy_reason": _PRIVATE_PRESENTATION,
             },
         )
 
@@ -133,18 +148,16 @@ class InteractionMemoryDerivationMixin:
         )
 
     def _asked_about_memory_id(self, source_event: WorldEvent) -> str:
-        return (
-            "memory.player.asked_about."
-            f"{source_event.payload['target_id']}."
-            f"{source_event.payload['subject_type']}."
-            f"{source_event.payload['subject_id']}"
+        return _asked_about_memory_id(
+            source_event.payload["target_id"],
+            source_event.payload["subject_type"],
+            source_event.payload["subject_id"],
         )
 
     def _presented_clue_memory_id(self, source_event: WorldEvent) -> str:
-        return (
-            "memory.player.presented_clue."
-            f"{source_event.payload['target_id']}."
-            f"{source_event.payload['clue_id']}"
+        return _presented_clue_memory_id(
+            source_event.payload["target_id"],
+            source_event.payload["clue_id"],
         )
 
     def _derive_configured_memory_candidates(
@@ -198,10 +211,10 @@ class InteractionMemoryDerivationMixin:
 
         metadata = self._clue_memory_metadata(case, clue_id)
         if source_event.type == EventType.PLAYER_PRESENTED_CLUE:
-            metadata.setdefault("privacy_reason", "private_presentation")
+            metadata.setdefault("privacy_reason", _PRIVATE_PRESENTATION)
             scene_id = source_event.payload.get("scene_id")
             if isinstance(scene_id, str):
                 metadata["scene_id"] = scene_id
-                metadata["privacy_reason"] = "scene_shared_presentation"
+                metadata["privacy_reason"] = _SCENE_SHARED_PRESENTATION
         return metadata
 

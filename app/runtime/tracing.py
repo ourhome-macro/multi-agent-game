@@ -363,6 +363,9 @@ def _sanitize_memory_store_filters(value: object) -> dict[str, object]:
         "scopes": _string_list(value.get("scopes", [])),
         "layers": _string_list(value.get("layers", [])),
         "memory_types": _string_list(value.get("memory_types", [])),
+        "query_anchor_count": int(value.get("query_anchor_count", 0)),
+        "query_token_count": int(value.get("query_token_count", 0)),
+        "query_prefilter_enabled": bool(value.get("query_prefilter_enabled", False)),
     }
 
 

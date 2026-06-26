@@ -284,6 +284,10 @@ def _base_plan(skill: MemoryProjectionSkill) -> MemoryRetrievalPlan:
             ),
             forbidden_layers,
         ),
+        included_topic_tags=_string_tuple(
+            skill.include.get("topic_tags"),
+            default=(),
+        ),
         forbidden_scopes=forbidden_scopes,
         forbidden_layers=forbidden_layers,
         max_memory_items=_int_value(
@@ -358,11 +362,16 @@ def _apply_rule(
         ),
         forbidden_layers,
     )
+    included_topic_tags = _string_tuple(
+        include_map.get("topic_tags"),
+        default=plan.included_topic_tags,
+    )
     return MemoryRetrievalPlan(
         skill_id=plan.skill_id,
         included_memory_types=included_types,
         included_scopes=included_scopes,
         included_layers=included_layers,
+        included_topic_tags=included_topic_tags,
         forbidden_scopes=forbidden_scopes,
         forbidden_layers=forbidden_layers,
         max_memory_items=_int_value(

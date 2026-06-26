@@ -140,7 +140,9 @@
           "night_tide_entry",
           "dockmaster"
         ],
-        "world_info_id": "warehouse_opened_after_tide"
+        "world_info_id": "warehouse_opened_after_tide",
+        "authority": "event_observed",
+        "non_authoritative": false
       },
       "operation": "create"
     },
@@ -362,7 +364,9 @@
           "night_tide_entry",
           "dockmaster"
         ],
-        "world_info_id": "warehouse_opened_after_tide"
+        "world_info_id": "warehouse_opened_after_tide",
+        "authority": "event_observed",
+        "non_authoritative": false
       },
       "operation": "create"
     },
@@ -529,7 +533,10 @@
       "salience": 0.9,
       "confidence": 1.0,
       "visibility": "private",
-      "metadata": {},
+      "metadata": {
+        "authority": "event_observed",
+        "non_authoritative": false
+      },
       "operation": "create"
     },
     "caused_by_event_id": "event_020",
@@ -663,7 +670,9 @@
           "lamp_knocked_inside",
           "dockmaster"
         ],
-        "world_info_id": "lamp_broken_from_inside_entry"
+        "world_info_id": "lamp_broken_from_inside_entry",
+        "authority": "event_observed",
+        "non_authoritative": false
       },
       "operation": "create"
     },
@@ -798,7 +807,9 @@
           "hidden_ledger",
           "clerk"
         ],
-        "world_info_id": "blue_ledger_records_midnight_boxes"
+        "world_info_id": "blue_ledger_records_midnight_boxes",
+        "authority": "event_observed",
+        "non_authoritative": false
       },
       "operation": "create"
     },
@@ -1028,7 +1039,9 @@
           "clerk"
         ],
         "world_info_id": "blue_ledger_records_midnight_boxes",
-        "privacy_reason": "private_presentation"
+        "privacy_reason": "private_presentation",
+        "authority": "event_observed",
+        "non_authoritative": false
       },
       "operation": "create"
     },
@@ -1308,7 +1321,10 @@
       "salience": 1.0,
       "confidence": 1.0,
       "visibility": "private",
-      "metadata": {},
+      "metadata": {
+        "authority": "event_observed",
+        "non_authoritative": false
+      },
       "operation": "create"
     },
     "caused_by_event_id": "event_048",
@@ -1427,7 +1443,10 @@
       "salience": 1.0,
       "confidence": 1.0,
       "visibility": "private",
-      "metadata": {},
+      "metadata": {
+        "authority": "event_observed",
+        "non_authoritative": false
+      },
       "operation": "create"
     },
     "caused_by_event_id": "event_051",

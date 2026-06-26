@@ -9,16 +9,28 @@ from app.runtime.derivation_memory_constants import (
     CLUE_DISCOVERED_ROLE_CHAIN_STRATEGY_RULE_ID,
 )
 from app.runtime.derivation_utils import (
+    AUTHORITY_SOURCE_RULE_DERIVED as _AUTHORITY_SOURCE_RULE_DERIVED,
+)
+from app.runtime.derivation_utils import (
+    case_thread_metadata_for_claim as _case_thread_metadata_for_claim,
+)
+from app.runtime.derivation_utils import (
+    case_thread_topic_tags as _case_thread_topic_tags,
+)
+from app.runtime.derivation_utils import (
     claim_supports_reconstruction_thread as _claim_supports_reconstruction_thread,
 )
 from app.runtime.derivation_utils import (
-    identifier_topic_tags as _identifier_topic_tags,
+    clue_discovered_memory_id as _clue_discovered_memory_id,
 )
 from app.runtime.derivation_utils import (
-    ordered_unique as _ordered_unique,
+    clue_memory_metadata as _clue_memory_metadata,
 )
 from app.runtime.derivation_utils import (
-    role_reconstruction_topic_tags as _role_reconstruction_topic_tags,
+    reconstruction_memory_id as _reconstruction_memory_id,
+)
+from app.runtime.derivation_utils import (
+    role_reconstruction_metadata as _role_reconstruction_metadata,
 )
 
 
@@ -36,7 +48,7 @@ class ClueMemoryDerivationMixin:
         return self._store_memory_candidate(
             session=session,
             source_event=source_event,
-            memory_id=f"memory.player.clue_discovered.{clue_id}",
+            memory_id=_clue_discovered_memory_id(clue_id),
             rule_id=CLUE_DISCOVERED_MEMORY_RULE_ID,
             content=f"Player discovered clue '{clue.title}'.",
             salience=0.8,
@@ -61,31 +73,30 @@ class ClueMemoryDerivationMixin:
         case_thread_id = thread_metadata.get("case_thread_id")
         if not isinstance(case_thread_id, str):
             return []
-        source_memory_id = f"memory.player.clue_discovered.{clue_id}"
+        source_memory_id = _clue_discovered_memory_id(clue_id)
         common_metadata = {
             **thread_metadata,
             "clue_id": clue_id,
             "phase_ids": ["reconstruction", "resolved"],
-            "topic_tags": _ordered_unique(
-                [
-                    case_thread_id,
-                    "reconstruction",
+            "topic_tags": _case_thread_topic_tags(
+                case_thread_id=case_thread_id,
+                clue_ids=[
                     clue_id,
                     *[
                         str(item)
                         for item in thread_metadata.get("adjacent_clue_ids", [])
                         if item is not None
                     ],
-                ]
+                ],
             ),
-            "authority_source": "rule_derived",
+            "authority_source": _AUTHORITY_SOURCE_RULE_DERIVED,
         }
         events: list[WorldEvent] = []
         for event in (
             self._store_memory_candidate(
                 session=session,
                 source_event=source_event,
-                memory_id=f"memory.player.belief.reconstruction.{case_thread_id}",
+                memory_id=_reconstruction_memory_id("belief", case_thread_id),
                 rule_id=CLUE_DISCOVERED_CHAIN_BELIEF_RULE_ID,
                 content="Player has established evidence that belongs to a reconstruction thread.",
                 salience=0.82,
@@ -105,7 +116,7 @@ class ClueMemoryDerivationMixin:
             self._store_memory_candidate(
                 session=session,
                 source_event=source_event,
-                memory_id=f"memory.player.strategy.reconstruction.{case_thread_id}",
+                memory_id=_reconstruction_memory_id("strategy", case_thread_id),
                 rule_id=CLUE_DISCOVERED_CHAIN_STRATEGY_RULE_ID,
                 content=(
                     "During reconstruction, respond by connecting discovered "
@@ -157,28 +168,20 @@ class ClueMemoryDerivationMixin:
             if item is not None
         ]
         for character in case.characters:
-            role_tags = _role_reconstruction_topic_tags(character.id)
-            metadata = {
-                **thread_metadata,
-                "phase_ids": ["reconstruction", "resolved"],
-                "topic_tags": _ordered_unique(
-                    [
-                        case_thread_id,
-                        "reconstruction",
-                        character.id,
-                        *role_tags,
-                        *adjacent_clue_ids,
-                    ]
-                ),
-                "authority_source": "rule_derived",
-            }
+            metadata = _role_reconstruction_metadata(
+                thread_metadata=thread_metadata,
+                case_thread_id=case_thread_id,
+                character_id=character.id,
+                adjacent_clue_ids=adjacent_clue_ids,
+            )
             for event in (
                 self._store_memory_candidate(
                     session=session,
                     source_event=source_event,
-                    memory_id=(
-                        "memory.player.belief.reconstruction."
-                        f"{character.id}.{case_thread_id}"
+                    memory_id=_reconstruction_memory_id(
+                        "belief",
+                        case_thread_id,
+                        character_id=character.id,
                     ),
                     rule_id=CLUE_DISCOVERED_ROLE_CHAIN_BELIEF_RULE_ID,
                     content=(
@@ -204,9 +207,10 @@ class ClueMemoryDerivationMixin:
                 self._store_memory_candidate(
                     session=session,
                     source_event=source_event,
-                    memory_id=(
-                        "memory.player.strategy.reconstruction."
-                        f"{character.id}.{case_thread_id}"
+                    memory_id=_reconstruction_memory_id(
+                        "strategy",
+                        case_thread_id,
+                        character_id=character.id,
                     ),
                     rule_id=CLUE_DISCOVERED_ROLE_CHAIN_STRATEGY_RULE_ID,
                     content=(
@@ -238,21 +242,14 @@ class ClueMemoryDerivationMixin:
     ) -> dict[str, object]:
         clue = next((item for item in case.clues if item.id == clue_id), None)
         if clue is None:
-            return {"clue_id": clue_id, "topic_tags": _identifier_topic_tags(clue_id)}
-        metadata: dict[str, object] = {
-            "clue_id": clue_id,
-            "topic_tags": _ordered_unique(
-                [
-                    *_identifier_topic_tags(clue_id),
-                    *clue.related_events,
-                    *clue.related_characters,
-                ]
-            ),
-        }
-        if clue.reveals_world_info:
-            metadata["world_info_id"] = clue.reveals_world_info[0]
-        metadata.update(self._case_thread_metadata_for_clue(case, clue_id))
-        return metadata
+            return _clue_memory_metadata(clue_id=clue_id)
+        return _clue_memory_metadata(
+            clue_id=clue_id,
+            related_event_ids=clue.related_events,
+            related_character_ids=clue.related_characters,
+            world_info_ids=clue.reveals_world_info,
+            case_thread_metadata=self._case_thread_metadata_for_clue(case, clue_id),
+        )
 
     def _case_thread_metadata_for_clue(
         self,
@@ -285,18 +282,11 @@ class ClueMemoryDerivationMixin:
         claim: SolutionClaimConfig,
         clue_id: str,
     ) -> dict[str, object]:
-        adjacent_clue_ids = [
-            evidence_id
-            for evidence_id in claim.required_evidence
-            if evidence_id != clue_id
-        ]
-        return {
-            "case_thread_id": claim.id,
-            "chain_node_id": clue_id,
-            "adjacent_clue_ids": adjacent_clue_ids,
-            "key_clue": True,
-            "is_plot_critical": True,
-        }
+        return _case_thread_metadata_for_claim(
+            claim_id=claim.id,
+            clue_id=clue_id,
+            required_evidence=claim.required_evidence,
+        )
 
     def _thread_evidence_ready(
         self,

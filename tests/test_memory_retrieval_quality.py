@@ -32,6 +32,7 @@ from app.domain.models import (
     SceneConfig,
     SessionState,
     WorldEvent,
+    WorldInfoConfig,
 )
 
 CASE_ID = "memory_retrieval_quality"
@@ -405,7 +406,7 @@ def test_build_agent_context_fallback_retrieval_still_works_without_supplied_sna
     assert _memory_ids(context.memory_snapshots) == [relevant.memory_id]
 
 
-def test_local_semantic_scorer_recalls_synonym_without_default_drift() -> None:
+def test_default_semantic_scorer_recalls_synonym_without_external_dependency() -> None:
     relevant = _memory(
         memory_id="memory.quality.semantic.empty_capsules",
         content="Jiang believes the player is closing in on the medicine clue.",
@@ -430,8 +431,92 @@ def test_local_semantic_scorer_recalls_synonym_without_default_drift() -> None:
         embedding_scorer=build_local_semantic_embedding_scorer(),
     )
 
-    assert relevant.memory_id not in _memory_ids(default_memories)
+    assert _memory_ids(default_memories) == [relevant.memory_id]
     assert _memory_ids(semantic_memories) == [relevant.memory_id]
+
+
+@pytest.mark.parametrize(
+    "query_text",
+    [
+        "继续追问药盒里留下的空壳",
+        "ask about the empty medicine shells in the pill bottle",
+    ],
+)
+def test_default_semantic_recall_golden_queries_handle_zh_en_rewrites(
+    query_text: str,
+) -> None:
+    relevant = _memory(
+        memory_id="memory.quality.golden.semantic.medicine_swap",
+        content="Jiang tracks the player's pressure around heart prescription tampering.",
+        metadata={"world_info_id": "heart_medicine_replaced"},
+        salience=0.2,
+    )
+    unrelated = _memory(
+        memory_id="memory.quality.golden.semantic.unrelated",
+        content="The player studied the seating chart and corridor route.",
+        salience=1.0,
+    )
+
+    memories = _retrieve(
+        [unrelated, relevant],
+        PlayerAction(type=ActionType.TALK, target_id=JIANG, text=query_text),
+        case=_case_with_world_info(),
+    )
+
+    assert _memory_ids(memories) == [relevant.memory_id]
+
+
+def test_default_semantic_world_info_query_expands_to_linked_clue_anchor() -> None:
+    relevant = _memory(
+        memory_id="memory.quality.golden.cross_anchor",
+        content="Jiang deflects when the capsule shells come up.",
+        metadata={"clue_id": EMPTY_CAPSULES},
+        salience=0.2,
+    )
+    unrelated = _memory(
+        memory_id="memory.quality.golden.cross_anchor.unrelated",
+        content="Jiang remembers the corridor route argument.",
+        salience=1.0,
+    )
+
+    memories = _retrieve(
+        [unrelated, relevant],
+        PlayerAction(
+            type=ActionType.TALK,
+            target_id=JIANG,
+            text="Was the heart medicine swapped before dinner?",
+        ),
+        case=_case_with_world_info(),
+    )
+
+    assert _memory_ids(memories) == [relevant.memory_id]
+
+
+def test_default_semantic_recall_does_not_select_wrong_case_anchor() -> None:
+    lock_memory = _memory(
+        memory_id="memory.quality.golden.lock_marks",
+        content="Jiang noticed delayed scratches around the study lock.",
+        metadata={"clue_id": DELAYED_LOCK_MARKS},
+        salience=0.2,
+    )
+    medicine_memory = _memory(
+        memory_id="memory.quality.golden.medicine.high_salience",
+        content="Jiang tracks the heart prescription tampering thread.",
+        metadata={"clue_id": EMPTY_CAPSULES},
+        salience=1.0,
+    )
+
+    memories = _retrieve(
+        [medicine_memory, lock_memory],
+        PlayerAction(
+            type=ActionType.TALK,
+            target_id=JIANG,
+            text="ask about delayed lock scratches",
+        ),
+        case=_case_with_world_info(),
+    )
+
+    assert _memory_ids(memories) == [lock_memory.memory_id]
 
 
 def test_local_semantic_scorer_still_respects_hard_filters_before_scoring() -> None:
@@ -771,6 +856,53 @@ def _case(
             ),
         ],
         forbidden_facts=forbidden_facts or [],
+    )
+
+
+def _case_with_world_info() -> CasePackage:
+    return CasePackage(
+        meta=CaseMeta(
+            id=CASE_ID,
+            title="Memory Retrieval Quality Case",
+            initial_phase=PHASE,
+        ),
+        world_info=[
+            WorldInfoConfig(
+                id="heart_medicine_replaced",
+                title="heart medicine replaced",
+                description="The heart prescription was tampered with before dinner.",
+                aliases=[
+                    "heart medicine was swapped",
+                    "prescription tampering",
+                    "medicine replacement",
+                    "心脏药被调包",
+                    "心脏药调换",
+                ],
+                claim_patterns=[
+                    "swapped heart medicine",
+                    "replaced prescription",
+                    "调包心脏药",
+                ],
+            )
+        ],
+        characters=[
+            CharacterConfig(id=JIANG, display_name="Jiang", public_role="Doctor"),
+            CharacterConfig(id=SHEN, display_name="Shen", public_role="Heir"),
+        ],
+        scenes=[SceneConfig(id="study", name="Study")],
+        clues=[
+            ClueConfig(
+                id=EMPTY_CAPSULES,
+                title="empty capsules",
+                description="Empty capsule shells from the medicine box.",
+                reveals_world_info=["heart_medicine_replaced"],
+            ),
+            ClueConfig(
+                id=DELAYED_LOCK_MARKS,
+                title="delayed lock marks",
+                description="Scratch marks on the delayed study lock.",
+            ),
+        ],
     )
 
 

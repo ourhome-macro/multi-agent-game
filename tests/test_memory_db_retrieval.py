@@ -3,9 +3,9 @@ from __future__ import annotations
 import json
 from datetime import UTC, datetime
 
-from app.agents.memory import InMemoryMemoryStore, MemoryRetriever, MemoryStoreQuery
-from app.agents.loop import AgentLoop
 from app.agents.gateway import AgentGateway
+from app.agents.loop import AgentLoop
+from app.agents.memory import InMemoryMemoryStore, MemoryRetriever, MemoryStoreQuery
 from app.agents.retrieval_planner import MemoryRetrievalPlan
 from app.domain.models import (
     ActionType,
@@ -13,13 +13,14 @@ from app.domain.models import (
     CaseMeta,
     CasePackage,
     CharacterConfig,
+    ClueConfig,
     NarrativeState,
     PlayerAction,
     SceneConfig,
     SessionState,
 )
-from app.storage.postgres import PostgresMemoryStore
 from app.runtime.tracing import RuntimeTracer
+from app.storage.postgres import PostgresMemoryStore
 
 CASE_ID = "case.memory_db_retrieval"
 SESSION_ID = "session.memory_db_retrieval"
@@ -121,7 +122,34 @@ def test_retriever_passes_first_stage_boundaries_to_store() -> None:
         scopes=("case", "npc_private", "scene_shared", "session"),
         layers=("core", "working"),
         memory_types=("belief", "episodic", "relationship", "strategy"),
+        query_anchors=(),
+        query_tokens=("capsule", "capsules", "empty"),
     )
+
+
+def test_retriever_passes_semantic_alias_tokens_to_store_prefilter() -> None:
+    store = RecordingMemoryStore()
+    session = _session(
+        [
+            _memory(
+                memory_id="memory.visible.semantic_prefilter",
+                content="Jiang discusses the medicine clue.",
+                metadata={"phase_id": PHASE},
+                salience=0.5,
+            )
+        ]
+    )
+
+    result = MemoryRetriever(memory_store=store).retrieve(
+        case=_case_with_empty_capsules_clue(),
+        session=session,
+        action=PlayerAction(type=ActionType.TALK, target_id=JIANG, text="继续追问药壳子"),
+        plan=_plan(),
+    )
+
+    assert _memory_ids(result) == ["memory.visible.semantic_prefilter"]
+    assert store.queries[0].query_anchors == ("empty_capsules",)
+    assert {"capsules", "medicine"} <= set(store.queries[0].query_tokens)
 
 
 def test_store_trace_summary_excludes_memory_content() -> None:
@@ -148,8 +176,12 @@ def test_store_trace_summary_excludes_memory_content() -> None:
     serialized = repr(summary)
     assert summary.backend == "in_memory"
     assert summary.candidate_count == 1
+    assert summary.requested_filters["query_anchor_count"] == 0
+    assert summary.requested_filters["query_token_count"] == 1
+    assert summary.requested_filters["query_prefilter_enabled"] is True
     assert "SECRET MEMORY CONTENT" not in serialized
     assert "memory.trace" not in serialized
+    assert "SECRET" not in serialized
 
 
 def test_agent_loop_trace_includes_store_summary_without_content() -> None:
@@ -192,6 +224,7 @@ def test_agent_loop_trace_includes_store_summary_without_content() -> None:
     serialized = json.dumps(projection, ensure_ascii=False)
     assert projection["store"]["backend"] == "in_memory"
     assert projection["store"]["candidate_count"] == 1
+    assert projection["store"]["requested_filters"]["query_token_count"] == 2
     assert "LOOP SECRET MEMORY CONTENT" not in serialized
     assert "memory.loop.trace" in serialized
 
@@ -215,6 +248,8 @@ def test_postgres_memory_store_queries_projection_with_phase_and_visibility_filt
             scopes=("npc_private",),
             layers=("working",),
             memory_types=("episodic",),
+            query_anchors=("empty_capsules",),
+            query_tokens=("capsules", "medicine"),
         ),
     )
 
@@ -227,6 +262,11 @@ def test_postgres_memory_store_queries_projection_with_phase_and_visibility_filt
     assert "memory_type = ANY(%s)" in connection.query
     assert "metadata->>'phase_id' = %s" in connection.query
     assert "metadata->'phase_ids' ? %s" in connection.query
+    assert "FROM unnest(%s::text[]) AS query_term(term)" in connection.query
+    assert "memory_id ILIKE" in connection.query
+    assert "content ILIKE" in connection.query
+    assert "source_ref.value ILIKE" in connection.query
+    assert "metadata::text ILIKE" in connection.query
     assert "content = %s" not in connection.query
     assert connection.params == (
         SESSION_ID,
@@ -239,6 +279,7 @@ def test_postgres_memory_store_queries_projection_with_phase_and_visibility_filt
         JIANG,
         PHASE,
         PHASE,
+        ["empty_capsules", "capsules", "medicine"],
     )
 
 
@@ -251,6 +292,20 @@ def _case() -> CasePackage:
         ],
         scenes=[SceneConfig(id="study", name="Study")],
         clues=[],
+    )
+
+
+def _case_with_empty_capsules_clue() -> CasePackage:
+    return _case().model_copy(
+        update={
+            "clues": [
+                ClueConfig(
+                    id="empty_capsules",
+                    title="empty capsules",
+                    description="Empty capsule shells from the medicine box.",
+                )
+            ]
+        }
     )
 
 
@@ -359,7 +414,7 @@ class _FakeConnection:
     def params(self) -> tuple[object, ...]:
         return self.cursor_obj.params
 
-    def cursor(self) -> "_FakeCursor":
+    def cursor(self) -> _FakeCursor:
         return self.cursor_obj
 
     def commit(self) -> None:

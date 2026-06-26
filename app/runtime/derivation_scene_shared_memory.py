@@ -6,6 +6,24 @@ from app.runtime.derivation_memory_constants import (
     SCENE_SHARED_PRESENTED_CLUE_MEMORY_RULE_ID,
     SCENE_SHARED_PRESENTED_CLUE_STRATEGY_RULE_ID,
 )
+from app.runtime.derivation_utils import (
+    AUTHORITY_SOURCE_PLAYER_EVIDENCE as _AUTHORITY_SOURCE_PLAYER_EVIDENCE,
+)
+from app.runtime.derivation_utils import (
+    PRIVACY_REASON_SCENE_SHARED_PRESENTATION as _SCENE_SHARED_PRESENTATION,
+)
+from app.runtime.derivation_utils import (
+    PRIVACY_REASON_SCENE_SHARED_PRIVATE_INTERPRETATION as _SCENE_SHARED_PRIVATE,
+)
+from app.runtime.derivation_utils import (
+    presented_clue_memory_id as _presented_clue_memory_id,
+)
+from app.runtime.derivation_utils import (
+    scene_shared_presented_clue_memory_id as _scene_shared_presented_clue_memory_id,
+)
+from app.runtime.derivation_utils import (
+    scene_shared_private_memory_id as _scene_shared_private_memory_id,
+)
 
 
 class SceneSharedMemoryDerivationMixin:
@@ -38,7 +56,7 @@ class SceneSharedMemoryDerivationMixin:
         return self._store_memory_candidate(
             session=session,
             source_event=source_event,
-            memory_id=f"memory.player.scene_shared.presented_clue.{scene_id}.{clue_id}",
+            memory_id=_scene_shared_presented_clue_memory_id(scene_id, clue_id),
             rule_id=SCENE_SHARED_PRESENTED_CLUE_MEMORY_RULE_ID,
             content=(
                 f"Player publicly presented clue '{clue_label}' in scene '{scene_id}'."
@@ -47,14 +65,14 @@ class SceneSharedMemoryDerivationMixin:
             owner_character_id=None,
             visible_to_character_ids=present_character_ids,
             source_memory_ids=[
-                f"memory.player.presented_clue.{target_id}.{clue_id}",
+                _presented_clue_memory_id(target_id, clue_id),
             ],
             memory_scope="scene_shared",
             memory_layer="working",
             metadata={
                 **self._clue_memory_metadata(case, clue_id),
                 "scene_id": scene_id,
-                "privacy_reason": "scene_shared_presentation",
+                "privacy_reason": _SCENE_SHARED_PRESENTATION,
             },
         )
 
@@ -89,15 +107,17 @@ class SceneSharedMemoryDerivationMixin:
             metadata = {
                 **self._clue_memory_metadata(case, clue_id),
                 "scene_id": scene_id,
-                "privacy_reason": "scene_shared_private_interpretation",
-                "authority_source": "player_evidence",
+                "privacy_reason": _SCENE_SHARED_PRIVATE,
+                "authority_source": _AUTHORITY_SOURCE_PLAYER_EVIDENCE,
             }
             belief_event = self._store_memory_candidate(
                 session=session,
                 source_event=source_event,
-                memory_id=(
-                    "memory.player.scene_shared.belief."
-                    f"{character_id}.{scene_id}.{clue_id}"
+                memory_id=_scene_shared_private_memory_id(
+                    "belief",
+                    character_id,
+                    scene_id,
+                    clue_id,
                 ),
                 rule_id=SCENE_SHARED_PRESENTED_CLUE_BELIEF_RULE_ID,
                 content=(
@@ -122,9 +142,11 @@ class SceneSharedMemoryDerivationMixin:
             strategy_event = self._store_memory_candidate(
                 session=session,
                 source_event=source_event,
-                memory_id=(
-                    "memory.player.scene_shared.strategy."
-                    f"{character_id}.{scene_id}.{clue_id}"
+                memory_id=_scene_shared_private_memory_id(
+                    "strategy",
+                    character_id,
+                    scene_id,
+                    clue_id,
                 ),
                 rule_id=SCENE_SHARED_PRESENTED_CLUE_STRATEGY_RULE_ID,
                 content=(
@@ -154,8 +176,8 @@ class SceneSharedMemoryDerivationMixin:
         scene_id = source_event.payload.get("scene_id")
         if not isinstance(scene_id, str):
             return None
-        return (
-            "memory.player.scene_shared.presented_clue."
-            f"{scene_id}.{source_event.payload['clue_id']}"
+        return _scene_shared_presented_clue_memory_id(
+            scene_id,
+            source_event.payload["clue_id"],
         )
 
