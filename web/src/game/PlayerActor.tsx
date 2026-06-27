@@ -14,6 +14,8 @@ const walkBounds = {
   maxY: -0.72,
 };
 const keyboardSpeed = 2.25;
+const clickWalkSpeed = 1.18;
+const arrivalSnapDistance = 0.018;
 
 export function PlayerActor() {
   const groupRef = useRef<THREE.Group>(null);
@@ -51,10 +53,15 @@ export function PlayerActor() {
       setPlayerTarget(nextX, nextY);
       if (playerMotion !== "walk") setPlayerMotion("walk");
     } else {
-      nextX = THREE.MathUtils.damp(playerX, targetX, 7.6, delta);
-      nextY = THREE.MathUtils.damp(playerY, targetY, 7.6, delta);
-      const snappedX = Math.abs(nextX - targetX) < 0.012 ? targetX : nextX;
-      const snappedY = Math.abs(nextY - targetY) < 0.012 ? targetY : nextY;
+      const deltaX = targetX - playerX;
+      const deltaY = targetY - playerY;
+      const distance = Math.hypot(deltaX, deltaY);
+      const step = Math.min(clickWalkSpeed * delta, distance);
+      const ratio = distance > 0 ? step / distance : 0;
+      nextX = playerX + deltaX * ratio;
+      nextY = playerY + deltaY * ratio;
+      const snappedX = Math.abs(nextX - targetX) < arrivalSnapDistance ? targetX : nextX;
+      const snappedY = Math.abs(nextY - targetY) < arrivalSnapDistance ? targetY : nextY;
       setPlayerPosition(snappedX, snappedY);
       nextX = snappedX;
       nextY = snappedY;

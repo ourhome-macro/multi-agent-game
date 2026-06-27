@@ -2,6 +2,7 @@ import { Gavel, MessageCircle, Send, Search, ShieldAlert } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import { getCharacterArt } from "../assets/artAssets";
+import { buildScenePresentation } from "../game/layout";
 import { useUiStore } from "../state/uiStore";
 import type {
   PlayerAction,
@@ -29,8 +30,14 @@ export function ActionMenu({
   onAction,
 }: ActionMenuProps) {
   const selection = useUiStore((store) => store.selection);
+  const playerX = useUiStore((store) => store.playerX);
+  const playerY = useUiStore((store) => store.playerY);
   const clearSelection = useUiStore((store) => store.clearSelection);
   const [talkText, setTalkText] = useState("");
+  const presentation = useMemo(
+    () => buildScenePresentation(scene, caseDetail),
+    [scene, caseDetail],
+  );
 
   const selectedHotspot = useMemo(
     () =>
@@ -46,6 +53,20 @@ export function ActionMenu({
         : undefined,
     [caseDetail.characters, selection],
   );
+  const selectedTravelTarget = useMemo(() => {
+    if (selectedHotspot) {
+      const placement = presentation.hotspots.find((item) => item.id === selectedHotspot.id);
+      return placement ? { x: placement.travelX, y: placement.travelY ?? -1.08 } : null;
+    }
+    if (selectedCharacter) {
+      const placement = presentation.characters.find((item) => item.id === selectedCharacter.id);
+      return placement ? { x: placement.travelX, y: placement.travelY ?? -1.08 } : null;
+    }
+    return null;
+  }, [presentation, selectedCharacter, selectedHotspot]);
+  const canReachSelection =
+    !selectedTravelTarget ||
+    Math.hypot(playerX - selectedTravelTarget.x, playerY - selectedTravelTarget.y) < 0.12;
 
   if (selection.kind === "none") return null;
 
@@ -59,7 +80,7 @@ export function ActionMenu({
         <button
           className="primary-command"
           type="button"
-          disabled={busy}
+          disabled={busy || !canReachSelection}
           onClick={() => onAction({ type: "inspect", target_id: selectedHotspot.id })}
         >
           <Search size={17} />
@@ -103,7 +124,7 @@ export function ActionMenu({
           className="icon-command"
           type="button"
           title="对话"
-          disabled={busy}
+          disabled={busy || !canReachSelection}
           onClick={() =>
             onAction({
               type: "talk",
@@ -121,7 +142,7 @@ export function ActionMenu({
             key={`${item.target_id}-${item.subject_type}-${item.subject_id}`}
             className="secondary-command"
             type="button"
-            disabled={busy}
+            disabled={busy || !canReachSelection}
             onClick={() =>
               onAction({
                 type: "ask_about",
@@ -146,7 +167,7 @@ export function ActionMenu({
               key={`${item.target_id}-${item.clue_id}`}
               className="secondary-command"
               type="button"
-              disabled={busy || !discoveredTitles.has(item.clue_id)}
+              disabled={busy || !canReachSelection || !discoveredTitles.has(item.clue_id)}
               onClick={() =>
                 onAction({
                   type: "present_clue",
@@ -167,7 +188,7 @@ export function ActionMenu({
           <button
             className="secondary-command"
             type="button"
-            disabled={busy}
+            disabled={busy || !canReachSelection}
             onClick={() =>
               onAction({
                 type: "accuse",

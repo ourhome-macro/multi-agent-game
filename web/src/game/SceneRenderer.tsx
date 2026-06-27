@@ -1,4 +1,5 @@
-import { useMemo } from "react";
+import { useFrame } from "@react-three/fiber";
+import { useMemo, useRef } from "react";
 
 import { HotspotMesh } from "./HotspotMesh";
 import { CameraRig } from "./CameraRig";
@@ -26,6 +27,13 @@ type SceneRendererProps = {
   onSound: (name: "hover" | "click" | "inspect" | "clue" | "dialogue" | "phase" | "error") => void;
 };
 
+type PendingInteraction =
+  | { kind: "inspect"; targetX: number; targetY: number; action: PlayerAction }
+  | { kind: "talk"; targetX: number; targetY: number }
+  | { kind: "portal"; targetX: number; targetY: number; sceneId: string };
+
+const arrivalInteractionDistance = 0.07;
+
 export function SceneRenderer({
   caseDetail,
   state,
@@ -40,6 +48,7 @@ export function SceneRenderer({
   const hoveredId = useUiStore((store) => store.hoveredId);
   const playerX = useUiStore((store) => store.playerX);
   const playerY = useUiStore((store) => store.playerY);
+  const keyboardVector = useUiStore((store) => store.keyboardVector);
   const setCurrentSceneId = useUiStore((store) => store.setCurrentSceneId);
   const selectHotspot = useUiStore((store) => store.selectHotspot);
   const selectCharacter = useUiStore((store) => store.selectCharacter);
@@ -55,6 +64,36 @@ export function SceneRenderer({
   const inspectableIds = new Set(affordances?.available_hotspot_ids || []);
   const talkableIds = new Set(affordances?.available_character_ids || []);
   const activeTalkingCharacter = selection.kind === "character" ? selection.id : null;
+  const pendingInteractionRef = useRef<PendingInteraction | null>(null);
+
+  useFrame(() => {
+    const pending = pendingInteractionRef.current;
+    if (!pending) return;
+
+    if (Math.hypot(keyboardVector.x, keyboardVector.y) > 0.01) {
+      pendingInteractionRef.current = null;
+      return;
+    }
+
+    if (Math.hypot(playerX - pending.targetX, playerY - pending.targetY) > arrivalInteractionDistance) {
+      return;
+    }
+
+    if (pending.kind === "inspect") {
+      if (busy) return;
+      pendingInteractionRef.current = null;
+      setPlayerMotion("interact");
+      onAction(pending.action);
+      return;
+    }
+
+    pendingInteractionRef.current = null;
+    if (pending.kind === "talk") {
+      setPlayerMotion("talk");
+    } else {
+      setCurrentSceneId(pending.sceneId);
+    }
+  });
 
   return (
     <group>
@@ -80,15 +119,18 @@ export function SceneRenderer({
             }}
             onSelect={() => {
               selectHotspot(hotspot.id);
-              setPlayerTarget(placement.travelX, placement.travelY ?? -1.08);
+              const targetY = placement.travelY ?? -1.08;
+              setPlayerTarget(placement.travelX, targetY);
               setPlayerMotion("walk");
+              pendingInteractionRef.current = enabled
+                ? {
+                    kind: "inspect",
+                    targetX: placement.travelX,
+                    targetY,
+                    action: { type: "inspect", target_id: hotspot.id },
+                  }
+                : null;
               onSound("inspect");
-              if (enabled) {
-                window.setTimeout(() => {
-                  setPlayerMotion("interact");
-                  onAction({ type: "inspect", target_id: hotspot.id });
-                }, 520);
-              }
             }}
           />
         );
@@ -112,9 +154,14 @@ export function SceneRenderer({
             }}
             onSelect={() => {
               selectCharacter(characterId);
-              setPlayerTarget(placement.travelX, placement.travelY ?? -1.08);
+              const targetY = placement.travelY ?? -1.08;
+              setPlayerTarget(placement.travelX, targetY);
               setPlayerMotion("walk");
-              window.setTimeout(() => setPlayerMotion("talk"), 520);
+              pendingInteractionRef.current = {
+                kind: "talk",
+                targetX: placement.travelX,
+                targetY,
+              };
               onSound("click");
             }}
           />
@@ -131,10 +178,16 @@ export function SceneRenderer({
             if (id) onSound("hover");
           }}
           onSelect={() => {
-            setPlayerTarget(portal.travelX, portal.travelY ?? -1.08);
+            const targetY = portal.travelY ?? -1.08;
+            setPlayerTarget(portal.travelX, targetY);
             setPlayerMotion("walk");
+            pendingInteractionRef.current = {
+              kind: "portal",
+              targetX: portal.travelX,
+              targetY,
+              sceneId: portal.toSceneId,
+            };
             onSound("phase");
-            window.setTimeout(() => setCurrentSceneId(portal.toSceneId), 620);
           }}
         />
       ))}

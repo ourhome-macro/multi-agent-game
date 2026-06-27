@@ -98,8 +98,11 @@ export function MeetingPanel({
   const [topic, setTopic] = useState(ui.startTopic);
   const [selectedId, setSelectedId] = useState(caseDetail.characters[0]?.id || "");
   const [selectedEvidenceIds, setSelectedEvidenceIds] = useState<string[]>([]);
+  const [localMessages, setLocalMessages] = useState<MeetingMessage[]>([]);
+  const [localVoteTargetId, setLocalVoteTargetId] = useState<string | null>(null);
 
   const meeting = state?.meeting;
+  const backendMeetingActive = Boolean(meeting?.active);
   const activeMeeting = true;
   const evidence = state?.evidence_assets || [];
   const charactersById = useMemo(
@@ -119,14 +122,20 @@ export function MeetingPanel({
     () => new Set(selectedEvidenceIds),
     [selectedEvidenceIds],
   );
-  const messages = useMemo(
+  const eventMessages = useMemo(
     () => buildMeetingMessages(events, charactersById),
     [charactersById, events],
+  );
+  const messages = useMemo(
+    () => [...eventMessages, ...localMessages],
+    [eventMessages, localMessages],
   );
   const requiredEvidence =
     affordances?.accuse.find((item) => item.target_id === selectedId)?.evidence_clue_ids || [];
   const missingEvidence = meeting?.missing_required_evidence || [];
   const missingWorldInfo = meeting?.missing_required_world_info || [];
+  const voteTargetId = meeting?.vote_target_id || localVoteTargetId;
+  const voteOpen = Boolean(meeting?.vote_open || localVoteTargetId);
 
   useEffect(() => {
     if (roster.length > 0 && !roster.some((character) => character.id === selectedId)) {
@@ -135,6 +144,29 @@ export function MeetingPanel({
   }, [roster, selectedId]);
 
   if (!open) return null;
+
+  const appendLocalMessage = (message: Omit<MeetingMessage, "id">) => {
+    setLocalMessages((current) =>
+      [
+        ...current,
+        {
+          id: `local-meeting-${Date.now()}-${current.length}`,
+          ...message,
+        },
+      ].slice(-80),
+    );
+  };
+
+  const submitMeetingAction = (
+    action: PlayerAction,
+    localMessage?: Omit<MeetingMessage, "id">,
+  ) => {
+    if (backendMeetingActive) {
+      onAction(action);
+      return;
+    }
+    if (localMessage) appendLocalMessage(localMessage);
+  };
 
   const startMeeting = () => {
     onAction({
@@ -148,53 +180,92 @@ export function MeetingPanel({
   const speak = () => {
     const value = draft.trim();
     if (!value) return;
-    onAction({ type: "meeting_speak", target_id: "meeting", text: value });
+    submitMeetingAction(
+      { type: "meeting_speak", target_id: "meeting", text: value },
+      { speaker: ui.player, text: value, mine: true },
+    );
     setDraft("");
   };
 
   const ask = () => {
     if (!selectedId) return;
     const value = draft.trim() || `请${selectedName}回应当前议题。`;
-    onAction({ type: "meeting_ask", target_id: selectedId, text: value });
+    submitMeetingAction(
+      { type: "meeting_ask", target_id: selectedId, text: value },
+      {
+        speaker: ui.record,
+        text: `已点名 ${selectedName} 回应当前讨论。`,
+        system: true,
+      },
+    );
     setDraft("");
   };
 
   const presentEvidence = (item: PublicEvidenceSummary) => {
-    onAction({
-      type: "meeting_present_evidence",
-      target_id: "meeting",
-      clue_id: evidenceClueId(item),
-      text: `展示证据：${item.title}`,
-    });
+    submitMeetingAction(
+      {
+        type: "meeting_present_evidence",
+        target_id: "meeting",
+        clue_id: evidenceClueId(item),
+        text: `展示证据：${item.title}`,
+      },
+      {
+        speaker: ui.record,
+        text: `展示证据：${item.title}`,
+        system: true,
+      },
+    );
   };
 
   const openVote = () => {
     if (!selectedId) return;
-    onAction({
-      type: "meeting_open_vote",
-      target_id: selectedId,
-      text: `是否认为${selectedName}嫌疑最高？`,
-    });
+    if (!backendMeetingActive) setLocalVoteTargetId(selectedId);
+    submitMeetingAction(
+      {
+        type: "meeting_open_vote",
+        target_id: selectedId,
+        text: `是否认为${selectedName}嫌疑最高？`,
+      },
+      {
+        speaker: ui.record,
+        text: `开始投票：${selectedName}`,
+        system: true,
+      },
+    );
   };
 
   const castVote = (vote: MeetingVoteChoice) => {
-    if (!meeting?.vote_target_id) return;
-    onAction({
-      type: "meeting_cast_vote",
-      target_id: meeting.vote_target_id,
-      vote,
-      text: `玩家会议投票：${voteLabels[vote]}`,
-    });
+    if (!voteTargetId) return;
+    submitMeetingAction(
+      {
+        type: "meeting_cast_vote",
+        target_id: voteTargetId,
+        vote,
+        text: `玩家会议投票：${voteLabels[vote]}`,
+      },
+      {
+        speaker: ui.record,
+        text: `沈照夜 投票：${voteLabels[vote]}`,
+        system: true,
+      },
+    );
   };
 
   const proposeVerdict = () => {
     if (!selectedId) return;
-    onAction({
-      type: "meeting_propose_verdict",
-      target_id: selectedId,
-      evidence_clue_ids: selectedEvidenceIds,
-      text: `会议裁决：指认${selectedName}`,
-    });
+    submitMeetingAction(
+      {
+        type: "meeting_propose_verdict",
+        target_id: selectedId,
+        evidence_clue_ids: selectedEvidenceIds,
+        text: `会议裁决：指认${selectedName}`,
+      },
+      {
+        speaker: ui.record,
+        text: `提交裁决意见：指认 ${selectedName}`,
+        system: true,
+      },
+    );
   };
 
   return (
@@ -367,10 +438,10 @@ export function MeetingPanel({
                 {ui.openVote}
               </button>
             </div>
-            {meeting?.vote_open && meeting.vote_target_id ? (
+            {voteOpen && voteTargetId ? (
               <>
                 <p className="meeting-empty">
-                  {ui.vote}: {displayCharacter(meeting.vote_target_id, charactersById)}
+                  {ui.vote}: {displayCharacter(voteTargetId, charactersById)}
                 </p>
                 <div className="meeting-vote-buttons">
                   {voteChoices.map((vote) => (
