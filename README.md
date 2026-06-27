@@ -1,44 +1,44 @@
-# LLM 多智能体悬疑叙事游戏后端运行时骨架
+# AI 多智能体悬疑叙事游戏系统
 
-这是一个案件无关的后端叙事运行时框架。当前阶段使用内存存储、fake case、mock Agent 跑通最小闭环，不接真实 LLM、不接数据库、不做向量记忆。
+  这是一个面向生产级叙事互动的 AI 多智能体悬疑游戏框架。项目目标不是简单让 NPC 接入 LLM 聊天，而是构建一个可控、可回放、
+  可审计的 2D 悬疑世界：玩家调查线索、与 NPC 对话、召开会议、提出指控；后端规则系统负责维护世界事实、线索状态、关系变化
+  和剧情阶段推进。
 
-## 运行
+  系统的核心原则是：LLM 只负责表达和意图，不能直接修改世界状态。
+  NPC 可以回答、隐瞒、撒谎、试探或转移话题，但所有真实状态变化都必须经过 Rule Engine 校验，并写入 WorldEvent 事件日志。
+  剧情推进由后端 NarrativeState、narrative_rules 和事件触发规则决定，确保案件真相不会被模型临场改写。
 
-```powershell
-py -3.12 -m venv .venv
-.\.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-uvicorn app.main:app --reload
-```
+  ## 核心能力
 
-服务启动时会自动加载 `cases/fake_case`。如果 YAML 配置存在引用错误，启动会失败并抛出明确错误。
+  - 结构化玩家动作：检查、对话、询问、示证、指控、会议讨论
+  - 后端权威剧情推进：phase、beat、clue、WorldEvent 全部可回放
+  - 多 NPC 角色系统：私有知识、秘密、关系、记忆、技能和发言约束
+  - Narrative Director：控制剧透、防止越权事实泄露、维护案件真相锚点
+  - Rule Engine：校验动作合法性、解锁线索、推进剧情、计算关系变化
+  - 记忆系统：从事件派生 NPC 记忆、玩家知识、角色认知与会议信息
+  - 前端 2D 场景：房间、热点、角色、线索面板、对话 UI、会议/裁决入口
+  - 标准路径与偏离场景测试：固定事件序列可验证最终状态
 
-## 测试
+  ## 架构边界
 
-```powershell
-py -3.12 -m pytest
-py -3.12 -m ruff check .
-```
+  前端只负责表现和交互，不保存剧情规则。
+  后端是唯一世界状态权威。
+  LLM Agent 不直接落库，不直接改剧情阶段，不直接写线索状态。
+  所有状态变化必须由规则系统产生事件，并能通过事件日志重放。
 
-## 最小链路
+  ## 当前示例案件
 
-```text
-Case Package
-  -> Create Session
-  -> PlayerAction
-  -> Load SessionState / WorldState
-  -> Mock Agent generates AgentIntent
-  -> Narrative Director validates narrative boundary
-  -> Rule Engine applies legal state changes
-  -> Write WorldEvent
-  -> Return State Summary
-```
+  项目内置案件 mist_clock_manor（雾钟山庄）：暴雨夜，剧作家陆澜生死于看似反锁的书房。玩家需要通过红酒、门锁、录音、忏悔
+  信、药盒和断电痕迹，重建多人行为共同导致死亡的因果链，并在正确阶段提交结构化指控完成结案。
 
-## 核心接口
+  ## 项目定位
 
-- `GET /health`
-- `GET /cases`
-- `POST /sessions`
-- `GET /sessions/{session_id}/state`
-- `POST /sessions/{session_id}/actions`
-- `GET /sessions/{session_id}/events`
+  这个项目适合用于探索：
+
+  - AI 剧本杀 / 悬疑互动叙事
+  - 多智能体 NPC 社交模拟
+  - 可控 LLM 游戏后端
+  - 事件溯源式剧情系统
+  - 可测试、可回放的叙事规则引擎
+
+兴趣使然做的无聊小游戏
