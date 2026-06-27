@@ -1979,6 +1979,7 @@ def test_agent_gateway_from_env_enables_real_only_with_api_key(
     monkeypatch.setenv("LLM_LOAD_DOTENV", "0")
     monkeypatch.delenv("LLM_BACKEND", raising=False)
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("DEEPSEEK_API_KEY", raising=False)
 
     assert AgentGateway.from_env().backend_name == "mock"
 
@@ -1988,8 +1989,12 @@ def test_agent_gateway_from_env_enables_real_only_with_api_key(
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
     assert AgentGateway.from_env().backend_name == "real"
 
-    monkeypatch.setenv("LLM_BACKEND", "llm_stub")
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "test-key")
+    assert AgentGateway.from_env().backend_name == "real"
+
+    monkeypatch.setenv("LLM_BACKEND", "llm_stub")
+    monkeypatch.delenv("DEEPSEEK_API_KEY", raising=False)
     assert AgentGateway.from_env().backend_name == "llm_stub"
 
 
@@ -2198,9 +2203,13 @@ def test_run_turn_passes_prompt_injection_contract_to_real_llm_request() -> None
     assert provider_payload["output_limits"]["allowed_proposed_action_types"] == []
 
 
-def test_real_llm_agent_defaults_xiaomi_mimo_model_and_chat_style(
+def test_real_llm_agent_defaults_deepseek_model_and_chat_style(
     monkeypatch: Any,
 ) -> None:
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "test-key")
+    monkeypatch.delenv("OPENAI_BASE_URL", raising=False)
+    monkeypatch.delenv("LLM_BASE_URL", raising=False)
     monkeypatch.delenv("OPENAI_MODEL", raising=False)
     monkeypatch.delenv("LLM_API_STYLE", raising=False)
     context = _build_butler_agent_context()
@@ -2211,7 +2220,7 @@ def test_real_llm_agent_defaults_xiaomi_mimo_model_and_chat_style(
                     "message": {
                         "content": json.dumps(
                             {
-                                "speech": "Safe answer from Xiaomi-compatible chat.",
+                                "speech": "Safe answer from DeepSeek chat.",
                                 "intent": "answer",
                                 "emotional_shift": {},
                                 "proposed_actions": [],
@@ -2226,17 +2235,19 @@ def test_real_llm_agent_defaults_xiaomi_mimo_model_and_chat_style(
     )
 
     intent = OpenAILLMAgent(
-        api_key="test-key",
-        base_url="https://api.xiaomimimo.com/v1",
         client=client,
         schema_repair_attempts=0,
     ).generate(context)
 
-    assert intent.speech == "Safe answer from Xiaomi-compatible chat."
-    assert client.request_urls == ["https://api.xiaomimimo.com/v1/chat/completions"]
-    assert client.request_payloads[0]["model"] == "mimo-v2.5"
+    assert intent.speech == "Safe answer from DeepSeek chat."
+    assert client.request_urls == ["https://api.deepseek.com/chat/completions"]
+    assert client.request_payloads[0]["model"] == "deepseek-v4-flash"
 
-def test_real_llm_agent_uses_configured_openai_compatible_base_url() -> None:
+
+def test_real_llm_agent_uses_configured_openai_compatible_base_url(
+    monkeypatch: Any,
+) -> None:
+    monkeypatch.delenv("LLM_API_STYLE", raising=False)
     context = _build_butler_agent_context()
     client = _FakeOpenAIClient(
         {
@@ -2255,14 +2266,17 @@ def test_real_llm_agent_uses_configured_openai_compatible_base_url() -> None:
 
     OpenAILLMAgent(
         api_key="test-key",
-        base_url="https://api.xiaomimimo.com/v1",
+        base_url="https://compatible.example.com/v1",
         client=client,
     ).generate(context)
 
-    assert client.request_url == "https://api.xiaomimimo.com/v1/responses"
+    assert client.request_url == "https://compatible.example.com/v1/responses"
 
 
-def test_real_llm_agent_falls_back_to_chat_completions_for_compatible_base_url() -> None:
+def test_real_llm_agent_falls_back_to_chat_completions_for_compatible_base_url(
+    monkeypatch: Any,
+) -> None:
+    monkeypatch.delenv("LLM_API_STYLE", raising=False)
     context = _build_butler_agent_context()
     client = _FakeOpenAIClient(
         [
@@ -2292,15 +2306,15 @@ def test_real_llm_agent_falls_back_to_chat_completions_for_compatible_base_url()
 
     intent = OpenAILLMAgent(
         api_key="test-key",
-        base_url="https://api.xiaomimimo.com/v1",
+        base_url="https://compatible.example.com/v1",
         client=client,
         schema_repair_attempts=0,
     ).generate(context)
 
     assert intent.speech == "Safe answer from chat completions."
     assert client.request_urls == [
-        "https://api.xiaomimimo.com/v1/responses",
-        "https://api.xiaomimimo.com/v1/chat/completions",
+        "https://compatible.example.com/v1/responses",
+        "https://compatible.example.com/v1/chat/completions",
     ]
     assert client.request_payloads[1]["response_format"]["type"] == "json_schema"
 
@@ -2331,13 +2345,13 @@ def test_real_llm_agent_can_force_chat_completions_api_style(monkeypatch: Any) -
 
     intent = OpenAILLMAgent(
         api_key="test-key",
-        base_url="https://api.xiaomimimo.com/v1",
+        base_url="https://api.deepseek.com",
         client=client,
         schema_repair_attempts=0,
     ).generate(context)
 
     assert intent.speech == "Direct chat completions answer."
-    assert client.request_urls == ["https://api.xiaomimimo.com/v1/chat/completions"]
+    assert client.request_urls == ["https://api.deepseek.com/chat/completions"]
 
 
 def test_real_llm_agent_does_not_default_to_json_object_fallback(
@@ -2374,12 +2388,12 @@ def test_real_llm_agent_does_not_default_to_json_object_fallback(
 
     intent = OpenAILLMAgent(
         api_key="test-key",
-        base_url="https://api.xiaomimimo.com/v1",
+        base_url="https://api.deepseek.com",
         client=client,
     ).generate(context)
 
     assert intent.intent == AgentIntentType.REFUSE
-    assert client.request_urls == ["https://api.xiaomimimo.com/v1/chat/completions"]
+    assert client.request_urls == ["https://api.deepseek.com/chat/completions"]
 
 
 def test_real_llm_agent_json_object_fallback_must_be_explicit(
@@ -2416,15 +2430,15 @@ def test_real_llm_agent_json_object_fallback_must_be_explicit(
 
     intent = OpenAILLMAgent(
         api_key="test-key",
-        base_url="https://api.xiaomimimo.com/v1",
+        base_url="https://api.deepseek.com",
         client=client,
         schema_repair_attempts=0,
     ).generate(context)
 
     assert intent.intent == AgentIntentType.REFUSE
     assert client.request_urls == [
-        "https://api.xiaomimimo.com/v1/chat/completions",
-        "https://api.xiaomimimo.com/v1/chat/completions",
+        "https://api.deepseek.com/chat/completions",
+        "https://api.deepseek.com/chat/completions",
     ]
     assert client.request_payloads[1]["response_format"]["type"] == "json_object"
 
@@ -2476,7 +2490,7 @@ def test_real_llm_agent_repairs_schema_invalid_output_once(
 
     intent = OpenAILLMAgent(
         api_key="test-key",
-        base_url="https://api.xiaomimimo.com/v1",
+        base_url="https://api.deepseek.com",
         model="test-model",
         client=client,
         schema_repair_attempts=1,
@@ -2484,8 +2498,8 @@ def test_real_llm_agent_repairs_schema_invalid_output_once(
 
     assert intent.intent == AgentIntentType.ANSWER
     assert client.request_urls == [
-        "https://api.xiaomimimo.com/v1/chat/completions",
-        "https://api.xiaomimimo.com/v1/chat/completions",
+        "https://api.deepseek.com/chat/completions",
+        "https://api.deepseek.com/chat/completions",
     ]
     serialized_repair_request = json.dumps(
         client.request_payloads[1],
@@ -2543,7 +2557,7 @@ def test_real_llm_agent_defaults_to_one_schema_repair_attempt(
 
     intent = OpenAILLMAgent(
         api_key="test-key",
-        base_url="https://api.xiaomimimo.com/v1",
+        base_url="https://api.deepseek.com",
         model="test-model",
         client=client,
     ).generate_strict(context)
@@ -2600,7 +2614,7 @@ def test_real_llm_agent_repair_prompt_distinguishes_intent_from_disclosure_mode(
 
     intent = OpenAILLMAgent(
         api_key="test-key",
-        base_url="https://api.xiaomimimo.com/v1",
+        base_url="https://api.deepseek.com",
         model="test-model",
         client=client,
         schema_repair_attempts=1,
@@ -2682,7 +2696,7 @@ def test_real_llm_agent_repair_prompt_uses_contract_projection_without_extra_key
 
     intent = OpenAILLMAgent(
         api_key="test-key",
-        base_url="https://api.xiaomimimo.com/v1",
+        base_url="https://api.deepseek.com",
         model="test-model",
         client=client,
         schema_repair_attempts=1,
@@ -2727,7 +2741,7 @@ def test_real_llm_agent_locally_projects_extra_top_level_keys_after_repair(
 
     intent = OpenAILLMAgent(
         api_key="test-key",
-        base_url="https://api.xiaomimimo.com/v1",
+        base_url="https://api.deepseek.com",
         model="test-model",
         client=client,
         schema_repair_attempts=1,
@@ -2766,7 +2780,7 @@ def test_real_llm_agent_locally_projects_invalid_intent_to_contract_fallback(
 
     intent = OpenAILLMAgent(
         api_key="test-key",
-        base_url="https://api.xiaomimimo.com/v1",
+        base_url="https://api.deepseek.com",
         model="test-model",
         client=client,
         schema_repair_attempts=1,
@@ -2817,7 +2831,7 @@ def test_real_llm_agent_locally_drops_over_cap_relationship_action(
 
     intent = OpenAILLMAgent(
         api_key="test-key",
-        base_url="https://api.xiaomimimo.com/v1",
+        base_url="https://api.deepseek.com",
         model="test-model",
         client=client,
         schema_repair_attempts=1,
@@ -2864,7 +2878,7 @@ def test_real_llm_agent_locally_drops_unconstrained_disclosure_claim(
 
     intent = OpenAILLMAgent(
         api_key="test-key",
-        base_url="https://api.xiaomimimo.com/v1",
+        base_url="https://api.deepseek.com",
         model="test-model",
         client=client,
         schema_repair_attempts=1,
@@ -2931,7 +2945,7 @@ def test_real_llm_agent_repair_prompt_lists_allowed_disclosure_modes_by_world_in
 
     intent = OpenAILLMAgent(
         api_key="test-key",
-        base_url="https://api.xiaomimimo.com/v1",
+        base_url="https://api.deepseek.com",
         model="test-model",
         client=client,
         schema_repair_attempts=1,
@@ -3019,7 +3033,7 @@ def test_real_llm_agent_repairs_relationship_delta_policy_violation_once(
 
     intent = OpenAILLMAgent(
         api_key="test-key",
-        base_url="https://api.xiaomimimo.com/v1",
+        base_url="https://api.deepseek.com",
         model="test-model",
         client=client,
         schema_repair_attempts=1,
@@ -3076,7 +3090,7 @@ def test_real_llm_agent_repairs_unparseable_json_output_once(
 
     intent = OpenAILLMAgent(
         api_key="test-key",
-        base_url="https://api.xiaomimimo.com/v1",
+        base_url="https://api.deepseek.com",
         model="test-model",
         client=client,
         schema_repair_attempts=1,
@@ -3127,12 +3141,12 @@ def test_real_llm_agent_can_force_responses_api_style_without_chat_fallback(
 
     intent = OpenAILLMAgent(
         api_key="test-key",
-        base_url="https://api.xiaomimimo.com/v1",
+        base_url="https://api.deepseek.com",
         client=client,
     ).generate(context)
 
     assert intent.intent == AgentIntentType.REFUSE
-    assert client.request_urls == ["https://api.xiaomimimo.com/v1/responses"]
+    assert client.request_urls == ["https://api.deepseek.com/responses"]
 
 
 def test_real_llm_agent_falls_back_without_api_key() -> None:
@@ -4440,5 +4454,3 @@ def _run_fake_case_001_to_reveal(runtime: object, session: object) -> None:
             session=session,
             action=PlayerAction(type="inspect", target_id=target_id),
         )
-
-

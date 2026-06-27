@@ -14,12 +14,13 @@ from app.domain.models import (
     ActionType,
     CasePackage,
     EventType,
+    MeetingVoteChoice,
     NpcSkillProjection,
     PlayerAction,
     SessionState,
     WorldEvent,
 )
-from app.rules.engine import RuleEngine
+from app.rules.engine import RuleEngine, relationship_key
 from app.rules.triggers import RuleTriggerSystem
 from app.runtime.action_router import ActionRouter, ActionRouteStatus, RouteResult
 from app.runtime.budget import (
@@ -31,6 +32,9 @@ from app.runtime.budget import (
 from app.runtime.derivations import DerivedEventSystem
 from app.runtime.errors import ActionValidationError
 from app.runtime.events import EventRecorder
+from app.runtime.meeting_context import MeetingContextBuilder, MeetingSpeakerContext
+from app.runtime.meeting_narration import MeetingNarrationSystem
+from app.runtime.meeting_speakers import MeetingSpeakerSelector
 from app.runtime.memory_archival import MemoryArchivalSystem
 from app.runtime.memory_snapshots import MemorySnapshotSystem
 from app.runtime.tracing import RuntimeTracer
@@ -177,6 +181,9 @@ class ActionService:
         self._derived_event_system = derived_event_system
         self._memory_snapshot_system = memory_snapshot_system
         self._memory_archival_system = memory_archival_system
+        self._meeting_speaker_selector = MeetingSpeakerSelector(max_speakers=2)
+        self._meeting_context_builder = MeetingContextBuilder()
+        self._meeting_narration_system = MeetingNarrationSystem(recorder)
 
     @property
     def agent_loop(self) -> AgentLoop:
@@ -315,7 +322,233 @@ class ActionService:
                 state=build_state_summary(case, session),
             )
 
+        if action.type in _MEETING_ACTION_TYPES:
+            return self._complete_meeting_action(
+                case=case,
+                session=session,
+                action=action,
+            )
+
         raise ValueError(f"Unsupported action type: {action.type}")
+
+    def _complete_meeting_action(
+        self,
+        *,
+        case: CasePackage,
+        session: SessionState,
+        action: PlayerAction,
+    ) -> ActionResponse:
+        new_events = self._rule_engine.apply_meeting_action(
+            case=case,
+            session=session,
+            action=action,
+        )
+        rejected_types = {
+            EventType.RULE_REJECTED,
+            EventType.MEETING_MESSAGE_REJECTED,
+            EventType.MEETING_VERDICT_REJECTED,
+        }
+        accepted = not any(event.type in rejected_types for event in new_events)
+        if accepted and action.type == ActionType.MEETING_ASK:
+            new_events.extend(
+                self._complete_meeting_speaker_turn(
+                    case=case,
+                    session=session,
+                    action=action,
+                    caused_by_event_id=new_events[-1].id,
+                )
+            )
+        if accepted and action.type == ActionType.MEETING_OPEN_VOTE:
+            new_events.extend(
+                self._deterministic_meeting_votes(
+                    session=session,
+                    target_id=action.target_id,
+                    caused_by_event_id=new_events[-1].id,
+                )
+            )
+        rule_events = list(new_events)
+        trigger_source_event_id = new_events[-1].id if new_events else None
+        if accepted:
+            new_events.extend(self._derive_events(case, session, new_events))
+        if accepted and action.type == ActionType.MEETING_PROPOSE_VERDICT:
+            trigger_events: list[WorldEvent] = []
+            if trigger_source_event_id is not None:
+                trigger_events = self._evaluate_triggers(
+                    case,
+                    session,
+                    trigger_source_event_id,
+                )
+                new_events.extend(trigger_events)
+            narration_events = self._meeting_narration_system.apply(
+                case=case,
+                session=session,
+                source_events=[
+                    *[
+                        event
+                        for event in rule_events
+                        if event.type == EventType.MEETING_VERDICT_ACCEPTED
+                    ],
+                    *trigger_events,
+                ],
+            )
+            if narration_events:
+                new_events.extend(narration_events)
+                new_events.extend(self._derive_events(case, session, narration_events))
+            new_events.extend(
+                self._archive_stale_memories(
+                    session=session,
+                    caused_by_event_id=trigger_source_event_id,
+                )
+            )
+        return ActionResponse(
+            session_id=session.id,
+            accepted=accepted,
+            speech=_meeting_response_text(action=action, accepted=accepted, events=new_events),
+            new_events=new_events,
+            state=build_state_summary(case, session),
+        )
+
+    def _complete_meeting_speaker_turn(
+        self,
+        *,
+        case: CasePackage,
+        session: SessionState,
+        action: PlayerAction,
+        caused_by_event_id: str,
+    ) -> list[WorldEvent]:
+        events: list[WorldEvent] = []
+        speakers = self._meeting_speaker_selector.select(
+            case=case,
+            session=session,
+            action=action,
+        )
+        for speaker in speakers:
+            context = self._meeting_context_builder.build(
+                case=case,
+                session=session,
+                speaker_id=speaker.speaker_id,
+                action=action,
+            )
+            text = self._deterministic_meeting_reply_text(
+                case=case,
+                action=action,
+                speaker_id=speaker.speaker_id,
+                context=context,
+            )
+            proposed = self._record_meeting_message_proposal(
+                session=session,
+                speaker_id=speaker.speaker_id,
+                text=text,
+                message_kind="npc_reply",
+                target_id="player",
+                caused_by_event_id=caused_by_event_id,
+                context=context,
+                selection_reason=speaker.reason,
+            )
+            events.append(proposed)
+            events.append(
+                self._rule_engine.record_meeting_message(
+                    session=session,
+                    speaker_id=speaker.speaker_id,
+                    text=text,
+                    message_kind="npc_reply",
+                    target_id="player",
+                    caused_by_event_id=proposed.id,
+                )
+            )
+        return events
+
+    def _record_meeting_message_proposal(
+        self,
+        *,
+        session: SessionState,
+        speaker_id: str,
+        text: str,
+        message_kind: str,
+        target_id: str | None,
+        caused_by_event_id: str,
+        context: MeetingSpeakerContext,
+        selection_reason: str,
+    ) -> WorldEvent:
+        payload: dict[str, object] = {
+            "meeting_id": session.meeting.meeting_id,
+            "speaker_id": speaker_id,
+            "message_kind": message_kind,
+            "text": text,
+            "source": "deterministic_meeting_speaker_v1",
+            "selection_reason": selection_reason,
+            "context_refs": context.reference_payload(),
+        }
+        if target_id is not None:
+            payload["target_id"] = target_id
+        if context.question_event_id is not None:
+            payload["question_event_id"] = context.question_event_id
+        return self._recorder.append(
+            session,
+            actor_id=speaker_id,
+            event_type=EventType.MEETING_MESSAGE_PROPOSED,
+            payload=payload,
+            caused_by_event_id=caused_by_event_id,
+        )
+
+    def _deterministic_meeting_reply_text(
+        self,
+        *,
+        case: CasePackage,
+        action: PlayerAction,
+        speaker_id: str,
+        context: MeetingSpeakerContext,
+    ) -> str:
+        character = next(
+            (item for item in case.characters if item.id == speaker_id),
+            None,
+        )
+        display_name = character.display_name if character is not None else speaker_id
+        subject_text = ""
+        if action.subject_type is not None and action.subject_id is not None:
+            subject_text = f" about {action.subject_type.value}:{action.subject_id}"
+        return (
+            f"{display_name}: I will answer{subject_text} from the public meeting "
+            "record only. "
+            f"Public evidence refs: {len(context.public_evidence)}; "
+            f"visible memory refs: {len(context.visible_memories)}."
+        )
+
+    def _deterministic_meeting_votes(
+        self,
+        *,
+        session: SessionState,
+        target_id: str,
+        caused_by_event_id: str,
+    ) -> list[WorldEvent]:
+        events: list[WorldEvent] = []
+        for voter_id in session.meeting.participant_ids:
+            if voter_id == target_id:
+                choice = MeetingVoteChoice.DEFEND
+                reason = "被投票对象在会议中自我辩护。"
+            else:
+                relationship = session.relationships.get(
+                    relationship_key(voter_id, target_id)
+                )
+                suspicion = relationship.suspicion if relationship is not None else 0.0
+                trust = relationship.trust if relationship is not None else 0.0
+                if suspicion > max(trust, 0.5):
+                    choice = MeetingVoteChoice.ACCUSE
+                    reason = "当前关系投影中的怀疑值更高。"
+                else:
+                    choice = MeetingVoteChoice.ABSTAIN
+                    reason = "证据链不足，暂不把投票当成判决。"
+            events.append(
+                self._rule_engine.record_meeting_vote(
+                    session=session,
+                    voter_id=voter_id,
+                    target_id=target_id,
+                    choice=choice,
+                    reason=reason,
+                    caused_by_event_id=caused_by_event_id,
+                )
+            )
+        return events
 
     def handle_raw_text(
         self,
@@ -696,6 +929,17 @@ def create_runtime(
     )
 
 
+_MEETING_ACTION_TYPES = {
+    ActionType.MEETING_START,
+    ActionType.MEETING_SPEAK,
+    ActionType.MEETING_PRESENT_EVIDENCE,
+    ActionType.MEETING_ASK,
+    ActionType.MEETING_OPEN_VOTE,
+    ActionType.MEETING_CAST_VOTE,
+    ActionType.MEETING_PROPOSE_VERDICT,
+}
+
+
 def _redact_matched_text(matched_text: str | None) -> str | None:
     if matched_text is None:
         return None
@@ -720,6 +964,47 @@ def _precheck_summary(allowed: bool, reason: str | None) -> str:
 def _llm_fallback_used(intent: object) -> bool:
     llm_error = getattr(intent, "llm_error", None)
     return bool(llm_error is not None and getattr(llm_error, "fallback_used", False))
+
+
+def _meeting_response_text(
+    *,
+    action: PlayerAction,
+    accepted: bool,
+    events: list[WorldEvent],
+) -> str:
+    if not accepted:
+        rejection = next(
+            (
+                event
+                for event in reversed(events)
+                if event.type
+                in {
+                    EventType.RULE_REJECTED,
+                    EventType.MEETING_MESSAGE_REJECTED,
+                    EventType.MEETING_VERDICT_REJECTED,
+                }
+            ),
+            None,
+        )
+        reason = rejection.payload.get("reason") if rejection is not None else None
+        return str(reason or "会议动作被拒绝。")
+    match action.type:
+        case ActionType.MEETING_START:
+            return "会议已经开始。"
+        case ActionType.MEETING_SPEAK:
+            return "你的发言已经进入会议记录。"
+        case ActionType.MEETING_PRESENT_EVIDENCE:
+            return "证据已经提交到会议记录。"
+        case ActionType.MEETING_ASK:
+            return "被点名者已经作出会议回应。"
+        case ActionType.MEETING_OPEN_VOTE:
+            return "投票已经开启，参会者给出了当前立场。"
+        case ActionType.MEETING_CAST_VOTE:
+            return "你的投票已经记录。"
+        case ActionType.MEETING_PROPOSE_VERDICT:
+            return "会议裁决已经通过规则校验。"
+        case _:
+            return "会议事件已经记录。"
 
 
 def _safe_npc_skill_selection_payload(

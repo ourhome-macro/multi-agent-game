@@ -100,7 +100,7 @@ Idempotency-Key: raw-action-001
 - `inspect[]`、`talk[]`、`ask_about[]`、`present_clue[]`、`accuse[]`：可直接用于组装结构化 action 的公开项。
 - `can_accuse`：是否存在至少一个当前规则可接受的正式指控目标。
 
-`ask_about` 的 clue subject 只会在该 clue 已发现或已进入玩家知识账本后出现；character 和 scene subject 来自公开案件配置。`present_clue` 只会列出已发现且有玩家知识账本的 clue；`scene_shared` 模式只会在目标 NPC 属于该 scene 时出现。
+`ask_about` 的 clue subject 只会在该 clue 已发现或已进入玩家知识账本后出现；character 和 scene subject 来自公开案件配置。`present_clue` 只会列出已发现且有玩家知识账本的 clue；`scene_shared` 模式只会在目标 NPC 当前位于该 scene 时出现。NPC 移动后，`talk[].scene_ids` 与 `present_clue[].scene_ids` 必须来自 replay 后的 `SessionState.npc_locations`，不能继续使用案件 YAML 的静态 `SceneConfig.characters`。
 
 `accuse[]` 不公开 `claim_id`、claim `result`、`required_evidence` 或 `required_world_info`。它只说明当前是否存在规则可接受的指控目标，以及玩家当前可用的公开证据 id。正式指控仍由后端 Rule Engine 根据 `solution_claims.yaml` 校验；前端不得把 affordance 当作真相来源。
 
@@ -108,12 +108,84 @@ Idempotency-Key: raw-action-001
 
 所有玩家动作目标统一使用 `target_id`。如果请求使用旧字段 `target`，会被 422 拒绝。
 
+### Meeting Actions V1
+
+公开会议复用 `POST /sessions/{session_id}/actions`，但 action type 必须是结构化会议动作，不能把自由文本群聊直接写入状态。
+
+支持的会议 action：
+
+- `meeting_start`：`target_id="meeting"`，可选 `text` 作为会议议题。
+- `meeting_speak`：`target_id="meeting"`，必填非空 `text`。
+- `meeting_present_evidence`：`target_id="meeting"`，必填 `clue_id`，该 clue 必须已发现且进入玩家知识账本。
+- `meeting_ask`：`target_id=<npc_id>`，可选 `text`，可选成对的 `subject_type` / `subject_id`。
+- `meeting_open_vote`：`target_id=<suspect_npc_id>`，开启针对目标的会议投票。
+- `meeting_cast_vote`：`target_id=<open_vote_target_id>`，必填 `vote`，取值 `accuse`、`defend`、`abstain`。
+- `meeting_propose_verdict`：`target_id=<suspect_npc_id>`，`evidence_clue_ids[]` 是玩家提交给规则系统校验的证据集合，`claim_id` 可省略，由后端按目标角色选择默认 solution claim。
+
+会议 action 成功或失败都必须落 `WorldEvent`。会议消息只通过 `meeting.message.posted` 公开；投票只通过 `meeting.vote.cast` 公开；会议裁决必须先写 `meeting.verdict.proposed`，再由 Rule Engine 校验。只有 `meeting.verdict.accepted` 之后，才允许写正式 `player.accused` / `accusation.evaluated`。
+
+`PublicStateSummary.meeting` 是会议状态投影，字段包括：
+
+- `active`
+- `meeting_id`
+- `topic`
+- `participant_ids`
+- `turn`
+- `vote_open`
+- `vote_target_id`
+- `votes[]`：`voter_id`、`target_id`、`choice`、`reason`
+- `verdict_target_id`
+- `verdict_status`
+- `verdict_result`
+- `verdict_reason`：最近一次裁决拒绝的安全原因；非拒绝态为空。
+- `missing_required_evidence[]`：最近一次裁决拒绝中仍缺失的公开 clue id。
+- `missing_required_world_info[]`：最近一次裁决拒绝中仍缺失的安全 world info 锚点 id，仅用于 UI 反馈，不等同于公开完整 `WorldInfo` 内容。
+
+公开事件流对白名单暴露 `meeting.*` payload：speaker、message kind、text、clue id、target id、vote choice、verdict result 和裁决拒绝反馈。`meeting.verdict.rejected` 只允许公开 `meeting_id`、`target_id`、`reason`、`missing_required_evidence[]`、`missing_required_world_info[]`。不得公开 `claim_id`、solution claim 的完整内部条件、未解锁 `WorldInfo` 正文、NPC 私有记忆或 Director 审计内容。
+
 生产客户端提交 action 时应带 `Idempotency-Key` 请求头：
 
 ```http
 POST /sessions/{session_id}/actions
 Idempotency-Key: action-001
 ```
+
+### Meeting Frontend Contract 2026-06-27
+
+会议前端必须从 `GET /sessions/{session_id}/events` 的 public event stream 渲染会议记录，而不是维护本地伪聊天事实。当前允许展示的会议事件包括：
+
+- `meeting.message.posted`
+- `meeting.vote.opened`
+- `meeting.vote.cast`
+- `meeting.verdict.proposed`
+- `meeting.verdict.accepted`
+- `meeting.verdict.rejected`
+
+`meeting.message.posted.message_kind` 当前公开取值包括 `system`、`speech`、`question`、`npc_reply`、`evidence`、`narration`。其中 `narration` 必须由后端 Director/规则投影产生，客户端不得提交该 message kind。
+
+`PublicStateSummary.meeting` 已提供裁决反馈字段：
+
+- `verdict_reason`
+- `missing_required_evidence[]`
+- `missing_required_world_info[]`
+
+前端提交最终裁决必须使用 `meeting_propose_verdict`，并传入用户多选的 `evidence_clue_ids[]`。不得再用旧 `accuse` action 模拟会议裁决；正式 `player.accused` 只能由后端在 `meeting.verdict.accepted` 后写入。
+
+旁白推进通过普通 public event stream 返回：
+
+```json
+{
+  "type": "meeting.message.posted",
+  "actor_id": "director",
+  "payload": {
+    "speaker_id": "director",
+    "message_kind": "narration",
+    "text": "..."
+  }
+}
+```
+
+公开 payload 不暴露 `narrates_event_id`、`claim_id`、内部 solution 条件或未公开 world info。
 
 在 PostgreSQL runtime 下，后端会用结构化 `PlayerAction` 计算 request hash。同一 session 内重复提交相同 `Idempotency-Key` 和相同 action，会直接 replay 原响应事件，不再次运行 Agent/LLM，也不会产生第二批 `WorldEvent`。
 
@@ -141,7 +213,14 @@ Idempotency-Key: action-001
 
 `new_events[]` 是 `PublicEventStreamItem[]`，与 `GET /sessions/{session_id}/events` 使用同一 payload 白名单。不可公开事件会被隐藏，但其内部事件序号仍会推进 `sequence` 和 `state.event_count`；客户端继续拉取公开事件流时应以 `state.event_count` 作为本轮 action 后的 count cursor。
 
-`state` 是 `PublicStateSummary`，不是内部 `StateSummary`。它只保留前端可展示状态：案件标题、阶段、已完成 beat、公开角色卡、已发现线索、玩家已知摘要、证据栏、公开关系指标和 `event_count`。
+`state` 是 `PublicStateSummary`，不是内部 `StateSummary`。它只保留前端可展示状态：案件标题、阶段、已完成 beat、公开角色卡、已发现线索、玩家已知摘要、证据栏、NPC 当前场景级位置、公开关系指标和 `event_count`。
+
+`npc_locations[]` 是多 Agent 编排 V1 的公开位置投影，只包含：
+
+- `npc_id`
+- `scene_id`
+
+它来自 replay 后的 `SessionState.npc_locations`。前端可以据此决定某场景显示哪些 NPC，并自行派生站位、朝向和移动动画；后端不在公开 API 中暴露 NPC 私有计划、移动 rationale、memory content 或连续坐标。
 
 公开 action response 禁止出现：
 
@@ -156,6 +235,17 @@ Idempotency-Key: action-001
 - `matched_text`
 - `proposed_actions`
 - `disclosure_claims`
+
+### Town / NPC 事件公开投影
+
+多 Agent 编排 V1 新增的内部事件仍走同一公开事件白名单：
+
+- `town.tick.advanced`：公开 `current.tick`。
+- `npc.location.changed`：公开 `current.npc_id`、`current.scene_id`、`current.updated_at_tick`。
+- `npc.observed`：公开观察 envelope 的 ID 字段，包括 `observer_id`、`observed_event_id`、`scene_id`、`visibility`、`perception_quality`、`redacted_payload_ref`。
+- `npc.hearsay.received`、`npc.autonomy_intent.proposed`、`npc.autonomy_intent.rejected`：只公开稳定 ID / reason / scene 字段，不公开传闻正文、私有记忆正文、safe fragment summary 或 forbidden fact 文本。
+
+`npc.observed` 的 `redacted_payload_ref` 只是内部事件引用，不是可解引用的公开 payload。客户端不得把它当作获取源事件私有内容的入口。
 
 `POST /sessions/{session_id}/raw-actions` 的 `response` 字段也必须是 `PublicActionResponse`。`needs_clarification` 和无法识别的 `rejected` 不生成 `response`；已解析为结构化 action 但被规则或 Director 前置拒绝时，`response.new_events[]` 只能包含公开投影后的 `rule.rejected` 或等价安全事件。
 
@@ -383,6 +473,7 @@ Rule Engine 会校验：
 重要事件类型包括：
 
 - `session.created`
+- `town.tick.advanced`
 - `player.inspected`
 - `player.talked`
 - `player.asked_about`
@@ -390,6 +481,11 @@ Rule Engine 会校验：
 - `player.accused`
 - `accusation.evaluated`
 - `npc.replied`
+- `npc.location.changed`
+- `npc.observed`
+- `npc.hearsay.received`
+- `npc.autonomy_intent.proposed`
+- `npc.autonomy_intent.rejected`
 - `director.blocked`
 - `rule.rejected`
 - `clue.discovered`
@@ -403,6 +499,35 @@ Rule Engine 会校验：
 - `narrative.phase.changed`
 
 `relationship.changed.payload.current` 总是包含限制在 `-1.0 .. 1.0` 的关系指标。
+
+`town.tick.advanced` 是内部调度事件。payload 至少包含：
+
+- `previous.tick`
+- `current.tick`
+- `from_tick`
+- `to_tick`
+- `policy`
+- `llm_called=false`
+
+`npc.location.changed` 是 NPC 位置变化事件。payload 至少包含：
+
+- `actor_id` / `npc_id`
+- `from_scene_id`
+- `to_scene_id`
+- `current.scene_id`
+- `current.updated_at_tick`
+- `rationale`
+
+`npc.observed` 是感知 envelope，不是公开叙事文本。payload 至少包含：
+
+- `observer_id`
+- `observed_event_id`
+- `scene_id`
+- `visibility`
+- `perception_quality`
+- `redacted_payload_ref`
+
+`npc.observed` 不得复制 `observed_event_id` 指向事件的原始 payload。后端可用它派生 NPC 私有 `memory_candidate.created`，但公开事件流不应把 `redacted_payload_ref` 反解给客户端。
 
 `player_knowledge.updated` 记录玩家通过什么来源掌握了哪个 WorldInfo，包含：
 

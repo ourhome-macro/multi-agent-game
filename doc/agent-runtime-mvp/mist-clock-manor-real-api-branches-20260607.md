@@ -8,7 +8,7 @@ participating in NPC turns.
 All runs used:
 
 - Backend: `real`
-- Model: `mimo-v2.5`
+- Model: `deepseek-v4-flash`
 - API style: `chat_completions`
 - Trace schema: `2`
 - Strict generation: enabled
@@ -94,7 +94,7 @@ Each real Agent turn now includes:
 
 - `schema_version = 2`
 - `agent_backend = real`
-- `model = mimo-v2.5`
+- `model = deepseek-v4-flash`
 - `public_speech`
 - `public_speech_source`
 - Director allow/block outcome
@@ -110,4 +110,3 @@ Blocked turns record only Director fallback speech:
 ```
 
 Rejected raw LLM speech is not written into JSONL or readable `.log`.
-

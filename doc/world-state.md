@@ -23,6 +23,16 @@
 
 `StateSummary` 是对该状态的公开投影，不是权威状态。运行时记忆快照、角色事实认知账本和私有角色画像刻意不通过 `StateSummary` 暴露。
 
+## NPC 自主位置投影 V1
+
+多 Agent 编排 V1 使用 `SessionState.npc_locations` 保存 replay 后的当前位置投影。NPC 初始位置来自案件包 `SceneConfig.characters`；运行时和 replay 遇到 `npc.location.changed` 后，用事件中的 `current.scene_id` 覆盖该 NPC 的当前位置。
+
+`RuleEngine.apply_npc_autonomy_intent(...)` 是自主意图唯一状态裁决点。合法 `move` 写入 `npc.location.changed`；非法角色、非法场景、`from_scene_id` 与当前投影不匹配、`talk_to` 目标不在同一场景等情况写入 `rule.rejected`，不改变位置投影。
+
+公开 affordance 读侧也必须使用该运行时位置投影：`talk[].scene_ids` 和 `present_clue[].scene_ids` 反映 replay 后的当前场景，不能继续使用案件 YAML 中的初始 `SceneConfig.characters`。Rule Engine 仍是最终裁决点；affordance 只是同源投影，不能替代规则校验。
+
+`observe`、`wait`、`talk_to` V1 只写审计事件，不解锁线索、不推进剧情阶段、不修改关系、不写玩家已知。自主意图中出现 `clue.discovered` 或 `narrative.phase.changed` 等副作用要求时必须拒绝；线索和阶段仍由既有 Rule Engine / RuleTriggerSystem 链路产生。
+
 `StateSummary.evidence_assets` 是从已发现 `Clue` 和 `PlayerKnowledgeState` 派生出的证据原件公开摘要。它不新增权威状态、不写事件，也不直接读取案件包中尚未被玩家掌握的 `WorldInfo`。每条公开证据摘要包含：
 
 - `id`：证据资产 ID，当前与来源 `clue_id` 对齐。
@@ -342,7 +352,7 @@ accusation.evaluated(result=correct)
 
 `memory_candidate.created` 是派生的候选记忆事件。它表示某个来源事件可能对未来 Agent 上下文重要，但还不是稳定记忆状态。
 
-`AgentMemorySnapshot` 是运行时从候选事件归并出的结构化记忆状态。v0 只支持 `subject_id="player"`，包含：
+`AgentMemorySnapshot` 是运行时从候选事件归并出的结构化记忆状态。早期玩家交互记忆主要使用 `subject_id="player"`；V1 起 snapshot reducer 不再把 subject 限死为 player，以便承接 NPC 自主感知、传闻或其他受规则约束的私有认知。可见性仍必须由 `memory_scope`、`owner_character_id`、`visible_to_character_ids` 和检索 hard filter 共同约束。它包含：
 
 - `memory_id`
 - `rule_id`
@@ -520,6 +530,17 @@ player.presented_clue target=jiang_yanhui clue=empty_capsules presentation_mode=
 
 这些记忆仍必须先作为 `memory_candidate.created` 出现，再由 `MemorySnapshotSystem` 写入 `agent_memory_snapshot.updated`。LLM 和 AgentIntent 不能直接创建 typed memory。
 
+## Town 位置与感知状态
+
+Town 编排 V1 的权威状态只包含两类 replay projection：
+
+- `town.tick.advanced` 更新 `SessionState.town_clock.tick` 与 `updated_at_event_id`。
+- `npc.location.changed` 更新 `SessionState.npc_locations[npc_id]`，当前 payload 必须能提供 `current.scene_id` 或等价 `scene_id`。
+
+`TownOrchestrator.tick_once(case, session)` 是当前调度入口。它先推进 town tick，再生成确定性的 `NpcAutonomyIntent` 候选，并把候选交给 `NarrativeDirector.precheck_npc_autonomy(...)` 与 `RuleEngine.apply_npc_autonomy_intent(...)`。V1 默认不调用 LLM，不让 NPC 自主解锁 clue，不写 `narrative.phase.changed`，也不把一个 NPC 的 memory 直接写给另一个 NPC。
+
+`npc.observed` 是感知事件，不是直接 memory。它的 payload 应该只保留 `observer_id`、`observed_event_id`、`scene_id`、`visibility`、`perception_quality` 和 `redacted_payload_ref` 这类 envelope 字段，不能复制被观察事件的原始 payload、private 内容、memory content 或案件真相。`DerivedEventSystem` 可以从该事件派生 `memory_candidate.created`；`MemorySnapshotSystem` 再归并为 `agent_memory_snapshot.updated`。Replay 直接应用已落库的 candidate 和 snapshot 事件，不重新运行感知或派生逻辑。
+
 `MemorySnapshotSystem` 只消费 `memory_candidate.created`，更新 `session.memory_snapshots`，并写入 `agent_memory_snapshot.updated`。Agent、LLM 和 `AgentIntent.proposed_actions` 都不能写记忆快照。
 
 Memory P2 增加 `MemoryArchivalSystem`。它不消费 LLM 输出，只在运行时已有事件时间线上检查 `AgentMemorySnapshot`：
@@ -656,6 +677,7 @@ Replay 直接应用 `character_impression.updated`，不得重新运行画像派
 ## WorldEvent 类型
 
 - `session.created`
+- `town.tick.advanced`
 - `player.inspected`
 - `player.talked`
 - `player.asked_about`
@@ -663,6 +685,13 @@ Replay 直接应用 `character_impression.updated`，不得重新运行画像派
 - `player.accused`
 - `accusation.evaluated`
 - `npc.replied`
+- `npc.location.changed`
+- `npc.observed`
+- `npc.waited`
+- `npc.talked_to`
+- `npc.hearsay.received`
+- `npc.autonomy_intent.proposed`
+- `npc.autonomy_intent.rejected`
 - `director.blocked`
 - `rule.rejected`
 - `clue.discovered`
@@ -717,3 +746,104 @@ P0 硬链路要求：prompt、LLM output contract、`disclosure_claims` 和 repa
 - selected/rejected 的 `caused_by_event_id` 指向触发本轮 agent-backed turn 的玩家/规则事件，用来还原技能授权与玩家动作之间的因果链。
 - payload 必须保持可公开审计的安全投影：只写 skill id、refs、枚举型允许范围和拒绝原因，不写玩家原文、safe fragment summary、角色 private summary、memory content 或 prompt 文本。
 - cooldown 状态尚未产品化。`npc_skill.cooldown.updated` 可作为后续恢复型状态事件使用，但在引入前必须定义 replay projection 和测试。
+
+## Town Replay V1
+
+多 Agent 编排 V1 新增两个可回放状态投影：
+
+- `SessionState.town_clock: TownClockState`，当前只包含非负整数 `tick` 和最后更新事件 id，默认 `tick=0`。
+- `SessionState.npc_locations: dict[str, NpcLocationState]`，按 NPC id 记录当前 `scene_id`、可选 2D 坐标、朝向、更新时间 tick 和最后更新事件 id，默认空字典。
+
+状态权威仍然是 `WorldEvent`。`town.tick.advanced` 必须携带当前 tick，推荐 payload 形态为 `{"current": {"tick": N}}`。`npc.location.changed` 必须携带当前 NPC 位置，推荐 payload 形态为 `{"current": {"npc_id": "...", "scene_id": "...", "updated_at_tick": N}}`。Replay 只从这两类事件恢复 `town_clock` 和 `npc_locations`，不重新运行 NPC 调度、寻路、感知或传闻传播。
+
+`npc.observed`、`npc.hearsay.received`、`npc.autonomy_intent.proposed` 和 `npc.autonomy_intent.rejected` 是审计/输入事件。它们可以作为后续规则、记忆派生或调度判断的来源，但 replay 当前不得因为这些事件直接修改线索、关系、记忆、剧情阶段或 NPC 位置。NPC 自治意图使用独立的 `NpcAutonomyIntent`，V1 类型只允许 `move`、`observe`、`wait`、`talk_to`，不能复用玩家 `PlayerAction`。
+
+## Meeting 状态投影 V1
+
+公开会议是独立于 town tick 的阶段性流程。`SessionState.meeting` 只保存 replay 后的会议投影：
+
+- `active`
+- `meeting_id`
+- `topic`
+- `participant_ids`
+- `turn`
+- `vote_open`
+- `vote_target_id`
+- `votes`
+- `verdict_target_id`
+- `verdict_status`
+- `verdict_result`
+
+会议聊天正文不复制进 `SessionState`，权威记录仍是 `WorldEvent`。Replay 遇到以下事件时更新会议投影：
+
+- `meeting.session.started`：开启会议，设置参与者和议题。
+- `meeting.session.ended`：关闭会议。
+- `meeting.turn.opened`：更新会议轮次。
+- `meeting.vote.opened`：开启针对某个目标的投票，并清空本轮投票记录。
+- `meeting.vote.cast`：写入某个 voter 的当前投票。
+- `meeting.verdict.proposed`：记录待校验裁决。
+- `meeting.verdict.accepted` / `meeting.verdict.rejected`：记录裁决状态。
+
+`meeting.message.posted` 是公开发言事件，不直接改变线索、关系、剧情阶段或 `SessionState.meeting`。V1 中 `meeting_ask` 和 `meeting_open_vote` 的 NPC 回应/投票是确定性低成本逻辑，不调用 LLM。后续接入 LLM speaker 时，也必须先产出候选消息，再经过 Director / Rule Engine 落为 `meeting.message.posted`。
+
+`meeting.vote.cast` 只表示角色立场，不能解锁线索、不能推进 phase、不能替代正式裁决。`meeting_propose_verdict` 必须经过 Rule Engine 的证据、玩家知识、phase 和 solution claim 校验；只有 `meeting.verdict.accepted` 后，才允许产生正式 `player.accused` 与 `accusation.evaluated`。
+## Meeting World State Follow-up 2026-06-27
+
+当前会议世界状态只承认两类权威来源：`meeting.*` WorldEvent 和由 replay 还原的 `SessionState.meeting` 投影。`SessionState.meeting` 只保存会议活跃状态、参会者、轮次、投票目标、投票记录和裁决状态；会议消息正文不进入 state，仍以事件流为唯一权威。
+
+已实现状态：
+
+- `meeting.session.started` 初始化 `active / meeting_id / topic / participant_ids / started_at_event_id`。
+- `meeting.turn.opened` 更新 `turn`。
+- `meeting.vote.opened` 更新 `vote_open / vote_target_id` 并清空本轮 votes。
+- `meeting.vote.cast` 写入 `votes[voter_id]`，但不改变线索、关系、剧情阶段或案件真相。
+- `meeting.verdict.proposed / accepted / rejected` 更新 `verdict_*` 投影；只有 accepted 后才会继续写正式 `player.accused` / `accusation.evaluated`。
+
+待实现状态：
+
+- 没有 `selected_speaker_ids`、speaker queue、turn agenda 或 meeting-local scheduler 状态。
+- 没有 meeting-local memory 投影字段；会议记忆只通过 `memory_candidate.created` 与 `agent_memory_snapshot.updated` 进入通用 memory snapshot，不复制到 `SessionState.meeting`。
+- 没有统一的 `verdict_feedback` 状态对象。当前反馈分散在 `meeting.verdict.rejected` 与 `rule.rejected` payload 中，缺少前端可直接消费的 matched / missing / invalid / undiscovered 分类。
+
+下一阶段如果新增 speaker selection 或 meeting-local projection，仍必须先落事件再投影。禁止把 selector 结果、LLM 发言或投票直接写成世界事实。
+
+## Meeting Memory Derivation 2026-06-27
+
+会议记忆不是新的世界状态投影，而是通用 memory 子系统的派生结果。`DerivedEventSystem` 只消费已落库的会议事件：
+
+- 玩家会议发言、公开证据消息：派生 `scene_shared/working` episodic memory。当前模型没有 `meeting_shared`，所以用 `scene_shared` 搭配会议参会者 `visible_to_character_ids` 表达“只对本场会议参与 NPC 可见”。
+- NPC 会议发言：派生该 NPC 自己的 `npc_private/working` episodic memory，不共享给其他 NPC。
+- 会议投票：派生 `scene_shared/working` belief memory，`authority_source=npc_hearsay`、`authority=non_authoritative`、`confidence <= 0.5`。投票不会变成 `rule_verified` 事实。
+
+会议 memory metadata 只使用现有白名单字段。`meeting_id`、voter、speaker、choice 等检索锚点放在 `topic_tags`；只有已经通过玩家发现/玩家已知边界的公开证据消息才携带 `clue_id/world_info_id`。派生过程中不得修改 `discovered_clues`、`player_knowledge`、`narrative.phase` 或 `SessionState.meeting.votes`。
+## Meeting State And Memory 2026-06-27
+
+`SessionState.meeting` 只保存会议投影：active、meeting_id、topic、participant_ids、turn、vote_open、vote_target_id、votes、verdict_* 与缺失证据反馈。会议消息正文不复制进 state，权威来源仍是 `WorldEvent`。
+
+会议相关 replay 边界：
+
+- `meeting.session.started` 初始化会议投影。
+- `meeting.vote.opened` / `meeting.vote.cast` 更新投票投影。
+- `meeting.verdict.proposed` / `accepted` / `rejected` 更新裁决投影。
+- `memory_candidate.created` 与 `agent_memory_snapshot.updated` 负责恢复会议派生记忆。
+
+主运行链路中，所有 accepted 会议动作都会触发 memory 派生；但只有 accepted verdict 可以进一步产生正式 `player.accused` / `accusation.evaluated`。会议投票派生的 belief memory 必须保持 `authority_source=npc_hearsay` 与 `confidence <= 0.5`，不能作为 clue unlock、phase advance 或裁决通过的依据。
+
+## Meeting Narration State 2026-06-27
+
+会议旁白不新增 `SessionState` 字段。它只是一类会议消息：
+
+```text
+meeting.message.posted
+  speaker_id=director
+  message_kind=narration
+```
+
+replay 时该消息保留在事件日志中，不修改 `SessionState.meeting` 的投影字段。旁白可派生 `scene_shared/working` memory，metadata 使用：
+
+- `authority_source=system_rule`
+- `authority=rule_verified`
+- `privacy_reason=meeting_shared`
+- `phase_id` 仅在源叙事事件已经公开对应 phase 时写入
+
+旁白 memory 的可见角色仍限定为 `SessionState.meeting.participant_ids`，不会扩散为全局 truth，也不会解锁 clue 或推进 phase。

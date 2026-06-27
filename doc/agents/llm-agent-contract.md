@@ -165,19 +165,20 @@ Stub 不调用外部模型，不修改 `SessionState`，也不泄露目标 priva
 ```text
 LLM_BACKEND=real
 OPENAI_API_KEY=...
+# or DEEPSEEK_API_KEY=...
 ```
 
 可选：
 
 ```text
 OPENAI_MODEL=...
-OPENAI_BASE_URL=https://api.xiaomimimo.com/v1
+OPENAI_BASE_URL=https://api.deepseek.com
 LLM_API_STYLE=auto | responses | chat_completions
 ```
 
 如果设置了 `LLM_BACKEND=real` 但没有 `OPENAI_API_KEY`，`AgentGateway` 仍保持 `MockAgent`。因此 CI、本地测试和完整场景快照默认继续使用 mock。
 
-`OPENAI_BASE_URL` 用于 OpenAI-compatible 服务。运行时会优先拼接 `/responses`，例如 `https://api.xiaomimimo.com/v1` 会先请求 `https://api.xiaomimimo.com/v1/responses`。如果兼容服务明确不支持 Responses API，适配器会降级到 `/chat/completions`。`LLM_API_STYLE=chat_completions` 会直接请求 `/chat/completions`，用于小米 API 这类兼容服务；`LLM_API_STYLE=responses` 会强制只用 `/responses`。`LLM_BASE_URL` 是同义兜底配置；优先级低于 `OPENAI_BASE_URL`。本轮真实 Shadow Eval 对小米 API 使用 `OPENAI_MODEL=mimo-v2.5` 验证通过。
+`OPENAI_BASE_URL` 用于 OpenAI-compatible 服务。普通兼容服务会优先拼接 `/responses`，如果服务明确不支持 Responses API，适配器会降级到 `/chat/completions`。DeepSeek 是明确支持的 chat completions provider：`OPENAI_BASE_URL=https://api.deepseek.com` 时，未显式设置 `LLM_API_STYLE` 也会直接请求 `https://api.deepseek.com/chat/completions`，默认模型为 `deepseek-v4-flash`；如果只配置 `DEEPSEEK_API_KEY` 且没有显式 base URL，也会默认使用 `https://api.deepseek.com`。`LLM_API_STYLE=chat_completions` 会强制直接请求 `/chat/completions`；`LLM_API_STYLE=responses` 会强制只用 `/responses`。`LLM_BASE_URL` 是同义兜底配置；优先级低于 `OPENAI_BASE_URL`。
 
 Chat Completions 默认仍使用 `response_format.type=json_schema`。如果兼容服务对 schema 返回 400/422，适配器默认不再静默降级到 `json_object`，而是安全 fallback；只有显式设置 `LLM_ALLOW_JSON_OBJECT_FALLBACK=1` 时才允许降级。`json_object` 只保证 JSON，不保证 enum 或 schema，因此不是信任边界；输出仍必须通过 `validate_llm_agent_output` 和 Director。
 

@@ -24,8 +24,8 @@ export function GameCanvas(props: GameCanvasProps) {
       <Canvas
         shadows
         orthographic
-        dpr={[1, 1.75]}
-        camera={{ position: [5.8, 5.4, 5.8], zoom: 78, near: 0.1, far: 100 }}
+        dpr={2}
+        camera={{ position: [0, 0.04, 8], zoom: 118, near: 0.1, far: 100 }}
         gl={{ antialias: true, alpha: false, preserveDrawingBuffer: true }}
       >
         <color attach="background" args={["#171513"]} />

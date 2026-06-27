@@ -241,6 +241,118 @@ def test_chain_expansion_recalls_linked_typed_memories_after_episodic_anchor() -
     ]
 
 
+def test_source_memory_expansion_respects_phase_hard_filter() -> None:
+    episodic = _memory(
+        memory_id="memory.chain.phase.anchor",
+        content="Player created phase_anchor with Jiang.",
+        memory_type="episodic",
+        metadata={},
+        salience=0.6,
+    )
+    future_strategy = _memory(
+        memory_id="memory.chain.phase.future_strategy",
+        content="Jiang should only use this in reconstruction.",
+        memory_type="strategy",
+        source_memory_ids=[episodic.memory_id],
+        metadata={
+            "authority_source": "player_evidence",
+            "phase_ids": ["reconstruction", "resolved"],
+            "strategy_id": "phase_locked_deflection",
+        },
+        salience=0.1,
+    )
+    action = PlayerAction(type=ActionType.TALK, target_id=JIANG, text="phase_anchor")
+
+    opening_memories = _retrieve(
+        [episodic, future_strategy],
+        action,
+        max_memory_items=10,
+    )
+    reconstruction_memories = _retrieve(
+        [episodic, future_strategy],
+        action,
+        max_memory_items=10,
+        phase="reconstruction",
+    )
+
+    assert _memory_ids(opening_memories) == [episodic.memory_id]
+    assert _memory_ids(reconstruction_memories) == [
+        episodic.memory_id,
+        future_strategy.memory_id,
+    ]
+
+
+def test_case_thread_sibling_expansion_is_phase_gated_to_reconstruction() -> None:
+    anchor = _case_thread_memory(
+        memory_id="memory.thread.anchor",
+        content="uniquepowerneedle",
+        clue_id="cut_power_trace",
+    )
+    sibling = _case_thread_memory(
+        memory_id="memory.thread.sibling",
+        content="wine node memory",
+        clue_id="bitter_wine",
+    )
+    action = PlayerAction(type=ActionType.TALK, target_id=JIANG, text="uniquepowerneedle")
+
+    opening_memories = _retrieve(
+        [anchor, sibling],
+        action,
+        max_memory_items=10,
+    )
+    reconstruction_memories = _retrieve(
+        [anchor, sibling],
+        action,
+        max_memory_items=10,
+        phase="reconstruction",
+    )
+
+    assert _memory_ids(opening_memories) == [anchor.memory_id]
+    assert set(_memory_ids(reconstruction_memories)) == {
+        anchor.memory_id,
+        sibling.memory_id,
+    }
+
+
+def test_reconstruction_projection_keeps_key_evidence_over_typed_memory_when_truncated() -> None:
+    anchor = _case_thread_memory(
+        memory_id="memory.thread.rank.anchor",
+        content="uniquerankneedle",
+        clue_id="cut_power_trace",
+    )
+    sibling = _case_thread_memory(
+        memory_id="memory.thread.rank.sibling",
+        content="capsule node memory",
+        clue_id=EMPTY_CAPSULES,
+    )
+    typed_strategy = _memory(
+        memory_id="memory.thread.rank.typed_strategy",
+        content="uniquerankneedle strategy should not displace core evidence.",
+        memory_type="strategy",
+        memory_scope="npc_private",
+        memory_layer="working",
+        source_memory_ids=[anchor.memory_id],
+        metadata={
+            "authority_source": "player_evidence",
+            "case_thread_id": "claim.shared_death_chain",
+            "phase_ids": ["reconstruction", "resolved"],
+            "strategy_id": "bounded_reconstruction",
+        },
+        salience=1.0,
+    )
+
+    memories = _retrieve(
+        [typed_strategy, sibling, anchor],
+        PlayerAction(type=ActionType.TALK, target_id=JIANG, text="uniquerankneedle"),
+        max_memory_items=2,
+        phase="reconstruction",
+    )
+
+    memory_ids = _memory_ids(memories)
+    assert set(memory_ids) == {anchor.memory_id, sibling.memory_id}
+    assert typed_strategy.memory_id not in memory_ids
+
+
 def test_recency_prefers_newer_relevant_memory_over_staler_slightly_higher_salience() -> None:
     stale = _memory(
         memory_id=f"memory.quality.stale.{EMPTY_CAPSULES}",
@@ -816,13 +928,14 @@ def _retrieve(
     plan: MemoryRetrievalPlan | None = None,
     embedding_scorer: EmbeddingScorer | None = None,
     max_memory_items: int = 20,
+    phase: str = PHASE,
 ) -> list[AgentMemorySnapshot]:
     return MemoryRetriever(
         max_results=max_memory_items,
         embedding_scorer=embedding_scorer,
     ).retrieve(
         case=case or _case(),
-        session=_session(snapshots),
+        session=_session(snapshots, phase=phase),
         action=action,
         plan=plan,
     )
@@ -906,11 +1019,11 @@ def _case_with_world_info() -> CasePackage:
     )
 
 
-def _session(snapshots: list[AgentMemorySnapshot]) -> SessionState:
+def _session(snapshots: list[AgentMemorySnapshot], *, phase: str = PHASE) -> SessionState:
     return SessionState(
         id="session.memory_retrieval_quality",
         case_id=CASE_ID,
-        narrative=NarrativeState(phase=PHASE),
+        narrative=NarrativeState(phase=phase),
         relationships={},
         memory_snapshots={snapshot.memory_id: snapshot for snapshot in snapshots},
     )
@@ -1046,6 +1159,31 @@ def _memory(
         last_updated_event_id=event_ids[-1],
         created_at=event_ids[0],
         updated_at=updated_at,
+    )
+
+
+def _case_thread_memory(
+    *,
+    memory_id: str,
+    content: str,
+    clue_id: str,
+) -> AgentMemorySnapshot:
+    return _memory(
+        memory_id=memory_id,
+        content=content,
+        memory_type="episodic",
+        memory_scope="case",
+        memory_layer="core",
+        owner_character_id=None,
+        visible_to_character_ids=[],
+        metadata={
+            "case_thread_id": "claim.shared_death_chain",
+            "chain_node_id": clue_id,
+            "clue_id": clue_id,
+            "key_clue": True,
+            "phase_ids": ["opening", "reconstruction", "resolved"],
+        },
+        salience=0.8,
     )
 
 

@@ -20,8 +20,6 @@ class MemorySnapshotSystem:
     def apply(self, *, session: SessionState, event: WorldEvent) -> list[WorldEvent]:
         if event.type != EventType.MEMORY_CANDIDATE_CREATED:
             return []
-        if event.payload.get("subject_id") != "player":
-            return []
 
         candidate = self._candidate_from_event(event)
         if not _candidate_has_required_source(candidate):

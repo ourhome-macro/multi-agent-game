@@ -2,6 +2,8 @@
 
 更新日期：2026-06-26
 
+2026-06-27 补充：已按本文方向新增 `web/` 前端 MVP，产品名暂定 `agent剧本杀`，首个关卡为 `mist_clock_manor`（雾钟山庄）。最新实现已调整为全屏 WebGL 游戏舞台、黑幕白字开场、主角 `idle/walk/interact/talk` 运动状态机、入口式上楼/下楼/去画廊传送，并移除事件流、关系数值和后端连接状态类前端展示。实现细节与验证记录见 `doc/frontend/agent-jubensha-mvp-2026-06-27.md`。
+
 ## 结论
 
 前端应做成 2.5D 悬疑场景客户端，而不是全自由 3D 小镇模拟。Three.js 负责空间表现、热点、NPC 位置、镜头和氛围；剧情状态、线索解锁、关系变化、记忆、Director 审计都仍由后端决定。
@@ -203,4 +205,3 @@ POST /sessions/{id}/raw-actions
 - 所有按钮来自 affordances 或公开 state。
 - 所有状态变化来自 ActionResponse / StateSummary。
 - Director block 和 rule rejection 都有可展示 reason。
-

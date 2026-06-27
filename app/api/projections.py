@@ -6,6 +6,7 @@ from app.domain.models import (
     ActionResponse,
     CasePackage,
     EventType,
+    MeetingStateSummary,
     PublicActionResponse,
     PublicCaseDetail,
     PublicCharacter,
@@ -123,6 +124,8 @@ def build_public_action_response(response: ActionResponse) -> PublicActionRespon
             )
         )
 
+    state = build_public_state_summary(response.state)
+
     return PublicActionResponse(
         session_id=response.session_id,
         accepted=response.accepted,
@@ -132,7 +135,14 @@ def build_public_action_response(response: ActionResponse) -> PublicActionRespon
         llm_fallback_used=response.llm_fallback_used,
         llm_error=response.llm_error,
         new_events=public_events,
-        state=build_public_state_summary(response.state),
+        state=state.model_copy(
+            update={
+                "meeting": _meeting_state_with_action_feedback(
+                    state.meeting,
+                    public_events,
+                )
+            }
+        ),
     )
 
 
@@ -166,6 +176,8 @@ def build_public_state_summary(summary: StateSummary) -> PublicStateSummary:
             )
             for item in summary.evidence_assets
         ],
+        npc_locations=list(summary.npc_locations),
+        meeting=summary.meeting,
         relationships=list(summary.relationships),
         event_count=summary.event_count,
     )
@@ -175,6 +187,82 @@ def _public_event_payload(event: WorldEvent) -> dict[str, Any] | None:
     payload = event.payload
     if event.type == EventType.SESSION_CREATED:
         return _copy_keys(payload, ["case_id", "initial_phase"])
+    if event.type == EventType.TOWN_TICK_ADVANCED:
+        current = payload.get("current")
+        if isinstance(current, dict):
+            return {"current": _copy_keys(current, ["tick"])}
+        return _copy_keys(payload, ["tick", "to_tick"])
+    if event.type == EventType.NPC_LOCATION_CHANGED:
+        current = payload.get("current")
+        if isinstance(current, dict):
+            return {"current": _copy_keys(current, ["npc_id", "scene_id", "updated_at_tick"])}
+        return _copy_keys(payload, ["npc_id", "actor_id", "from_scene_id", "to_scene_id"])
+    if event.type == EventType.NPC_OBSERVED:
+        return _copy_keys(
+            payload,
+            [
+                "observer_id",
+                "observed_event_id",
+                "scene_id",
+                "visibility",
+                "perception_quality",
+                "redacted_payload_ref",
+            ],
+        )
+    if event.type in {
+        EventType.NPC_HEARSAY_RECEIVED,
+        EventType.NPC_AUTONOMY_INTENT_PROPOSED,
+        EventType.NPC_AUTONOMY_INTENT_REJECTED,
+    }:
+        return _copy_keys(payload, ["npc_id", "actor_id", "type", "reason", "scene_id"])
+    if event.type == EventType.MEETING_SESSION_STARTED:
+        return _copy_keys(payload, ["meeting_id", "topic", "participant_ids"])
+    if event.type == EventType.MEETING_SESSION_ENDED:
+        return _copy_keys(payload, ["meeting_id", "reason"])
+    if event.type == EventType.MEETING_TURN_OPENED:
+        return _copy_keys(payload, ["meeting_id", "turn"])
+    if event.type in {
+        EventType.MEETING_MESSAGE_PROPOSED,
+        EventType.MEETING_MESSAGE_POSTED,
+        EventType.MEETING_MESSAGE_REJECTED,
+    }:
+        return _copy_keys(
+            payload,
+            [
+                "meeting_id",
+                "speaker_id",
+                "message_kind",
+                "target_id",
+                "clue_id",
+                "text",
+                "reason",
+            ],
+        )
+    if event.type == EventType.MEETING_VOTE_OPENED:
+        return _copy_keys(payload, ["meeting_id", "target_id", "text"])
+    if event.type == EventType.MEETING_VOTE_CAST:
+        return _copy_keys(
+            payload,
+            ["meeting_id", "voter_id", "target_id", "choice", "reason"],
+        )
+    if event.type == EventType.MEETING_VERDICT_PROPOSED:
+        return _copy_keys(
+            payload,
+            ["meeting_id", "target_id", "evidence_clue_ids", "text"],
+        )
+    if event.type == EventType.MEETING_VERDICT_ACCEPTED:
+        return _copy_keys(payload, ["meeting_id", "target_id", "result"])
+    if event.type == EventType.MEETING_VERDICT_REJECTED:
+        return _copy_keys(
+            payload,
+            [
+                "meeting_id",
+                "target_id",
+                "reason",
+                "missing_required_evidence",
+                "missing_required_world_info",
+            ],
+        )
     if event.type == EventType.PLAYER_INSPECTED:
         return _copy_keys(payload, ["target_id"])
     if event.type == EventType.CLUE_DISCOVERED:
@@ -257,10 +345,78 @@ def _public_rule_rejection_payload(payload: dict[str, Any]) -> dict[str, Any]:
                 "presentation_mode",
                 "scene_id",
                 "evidence_clue_ids",
+                "vote",
                 "text",
             ],
         )
     return public
+
+
+def _meeting_state_with_action_feedback(
+    meeting: MeetingStateSummary,
+    events: list[PublicEventStreamItem],
+) -> MeetingStateSummary:
+    updated = meeting.model_copy(deep=True)
+    for event in events:
+        payload = event.payload
+        if event.type == EventType.MEETING_VERDICT_PROPOSED:
+            updated = updated.model_copy(
+                update={
+                    "verdict_target_id": _optional_public_string(payload.get("target_id"))
+                    or updated.verdict_target_id,
+                    "verdict_status": "proposed",
+                    "verdict_result": None,
+                    "verdict_reason": None,
+                    "missing_required_evidence": [],
+                    "missing_required_world_info": [],
+                }
+            )
+        elif event.type == EventType.MEETING_VERDICT_ACCEPTED:
+            updated = updated.model_copy(
+                update={
+                    "verdict_target_id": _optional_public_string(payload.get("target_id"))
+                    or updated.verdict_target_id,
+                    "verdict_status": "accepted",
+                    "verdict_result": _optional_public_string(payload.get("result")),
+                    "verdict_reason": None,
+                    "missing_required_evidence": [],
+                    "missing_required_world_info": [],
+                }
+            )
+        elif event.type == EventType.MEETING_VERDICT_REJECTED:
+            updated = updated.model_copy(
+                update={
+                    "verdict_target_id": _optional_public_string(payload.get("target_id"))
+                    or updated.verdict_target_id,
+                    "verdict_status": "rejected",
+                    "verdict_result": None,
+                    "verdict_reason": _optional_public_string(payload.get("reason")),
+                    "missing_required_evidence": _public_string_list(
+                        payload.get("missing_required_evidence")
+                    ),
+                    "missing_required_world_info": _public_string_list(
+                        payload.get("missing_required_world_info")
+                    ),
+                }
+            )
+    return updated
+
+
+def _optional_public_string(value: Any) -> str | None:
+    if not isinstance(value, str):
+        return None
+    normalized = value.strip()
+    return normalized or None
+
+
+def _public_string_list(value: Any) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    result: list[str] = []
+    for item in value:
+        if normalized := _optional_public_string(item):
+            result.append(normalized)
+    return result
 
 
 def _copy_keys(payload: dict[str, Any], keys: list[str]) -> dict[str, Any]:

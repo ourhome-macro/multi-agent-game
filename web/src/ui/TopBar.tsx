@@ -1,28 +1,26 @@
-import { Activity, Music, RefreshCw, Volume2, VolumeX } from "lucide-react";
+import { BookOpen, MessageCircle, Music, RefreshCw, Volume2, VolumeX } from "lucide-react";
 import type { ChangeEvent } from "react";
 
 type TopBarProps = {
-  phase: string;
-  connected: boolean;
-  sessionId: string | null;
   sfxEnabled: boolean;
   sfxVolume: number;
   onToggleSfx: (enabled: boolean) => void;
   onSfxVolume: (volume: number) => void;
   onBgmFile: (file: File | null) => void;
   onReset: () => void;
+  onOpenJournal: () => void;
+  onOpenMeeting: () => void;
 };
 
 export function TopBar({
-  phase,
-  connected,
-  sessionId,
   sfxEnabled,
   sfxVolume,
   onToggleSfx,
   onSfxVolume,
   onBgmFile,
   onReset,
+  onOpenJournal,
+  onOpenMeeting,
 }: TopBarProps) {
   return (
     <header className="top-bar">
@@ -30,15 +28,13 @@ export function TopBar({
         <strong>agent剧本杀</strong>
         <span>雾钟山庄</span>
       </div>
-      <div className="status-strip">
-        <span className={`status-dot ${connected ? "is-online" : ""}`} />
-        <span>{connected ? "后端已连接" : "等待后端"}</span>
-        <span className="divider" />
-        <Activity size={16} aria-hidden />
-        <span>{phase}</span>
-        {sessionId ? <span className="session-code">{sessionId.slice(0, 8)}</span> : null}
-      </div>
       <div className="audio-strip">
+        <button className="icon-button" type="button" title="目前知晓" onClick={onOpenJournal}>
+          <BookOpen size={18} />
+        </button>
+        <button className="icon-button" type="button" title="山庄会议" onClick={onOpenMeeting}>
+          <MessageCircle size={18} />
+        </button>
         <button
           className="icon-button"
           type="button"

@@ -94,6 +94,9 @@ PostgreSQL runtime 下，行为处理会先从数据库 `world_events` replay �
 - `app/agents/real_llm_agent.py`：默认禁用的 OpenAI 适配器，只返回校验后的 `AgentIntent` 或安全拒答。
 - `app/director/narrative_director.py`：阻止 NPC 输出禁说事实。
 - `app/rules/engine.py`：真实状态变化的唯一权威。
+- `app/runtime/town_orchestrator.py`：多 Agent 编排 V1 的确定性 town tick 调度入口。
+- `app/runtime/npc_autonomy.py`：NPC 自主意图的兼容字段、风险标记和位置查询 helper。
+- `app/runtime/perception.py`：把可见世界事件投影成不复制原 payload 的 `npc.observed` 感知 envelope。
 - `app/rules/triggers.py`：根据事件完成 beat 并推进 phase。
 - `app/runtime/derivations.py`：派生玩家已知、记忆候选和私有角色画像。
 - `app/cases/memory_rules.py`：加载 app 默认与案件包 `memory_derivation_rules.yaml`。
@@ -112,6 +115,10 @@ PostgreSQL runtime 下，行为处理会先从数据库 `world_events` replay �
 Agent 只能输出 `AgentIntent`。它不能直接修改 `SessionState`、世界事实、线索、关系、剧情阶段或事件日志。
 
 `AgentIntent.proposed_actions` 必须先通过模型白名单，再经过 Rule Engine。非法动作会生成 `rule.rejected`，不得污染状态。
+
+NPC 自主意图 V1 走独立的保守链路：上游只能提交候选 `NpcAutonomyIntent`（当前本地兼容字段包括 `type`、`actor_id`、`from_scene_id`、`to_scene_id`、`scene_id`、`target_id` 和 `flags`），`NarrativeDirector.precheck_npc_autonomy(...)` 先拒绝未知类型和显式越权风险标记，`RuleEngine.apply_npc_autonomy_intent(...)` 再裁决 `move`、`observe`、`wait`、`talk_to` 是否能写入事件。该链路默认不能产生 `clue.discovered` 或 `narrative.phase.changed`；线索解锁和剧情阶段仍只能由规则系统、事件和 narrative rules 驱动。
+
+`TownOrchestrator.tick_once(case, session)` 是 V1 的运行时编排入口。它不调用 LLM，不触发 NPC 群聊，也不把一个 NPC 的 memory 直接共享给另一个 NPC。单次 tick 的闭环是：写入 `town.tick.advanced`；生成少量确定性 `move / wait / observe` 候选；经 Director 和 Rule Engine 裁决后写入 `npc.location.changed`；由 `PerceptionSystem` 为同场景可见 NPC 写入只含 `observed_event_id` 与 `redacted_payload_ref` 的 `npc.observed`；再由 `DerivedEventSystem` 和 `MemorySnapshotSystem` 产生 `memory_candidate.created` 与 `agent_memory_snapshot.updated`。这条链路只更新 town clock、NPC 位置和可见性受限的记忆，不自主解锁关键线索或推进 phase。
 
 剧情阶段变化由 `narrative_rules.yaml` 和 `RuleTriggerSystem` 驱动，不由 Agent 输出决定。
 
@@ -153,7 +160,7 @@ Memory v1.3 在不改变事件链路的前提下强化检索排序。`MemoryRetr
 
 Memory P2 接入 archival 生命周期。`MemoryArchivalSystem` 会在 agent-backed action 构造 `AgentContext` 前，将超过 7 天未更新且未被多个 source event 强化的 `session/npc_private/scene_shared` working memory 写成 `agent_memory_snapshot.updated(operation=archived, memory_layer=archival)`。`MemoryRetriever` 只有在常规 `core/working` 检索没有相关命中时，才对 archival 做一次冷召回；冷召回不放宽 NPC 可见性、scope、type、forbidden fact 或 `max_memory_items`。
 
-Memory DB-backed retrieval 第一阶段把 `MemoryRetriever` 的候选来源抽成 `MemoryStore`。默认 `InMemoryMemoryStore` 仍从 `session.memory_snapshots` 读取，保持 replay 和现有测试行为不变；PostgreSQL runtime builder 会注入 `MemoryRetriever(memory_store=PostgresMemoryStore(connection))`，让生产模式从 `memory_snapshots` 投影表读取候选。`PostgresMemoryStore` 支持 `session_id`、`target_id` 可见性、`memory_scope`、`memory_layer`、`memory_type`、metadata `phase_id/phase_ids` 的预筛，并可接收 `MemoryStoreQuery.query_anchors/query_tokens`，在 SQL 中对 `metadata`、`source_event_ids/source_memory_ids`、`memory_id`、`content` 做轻量 ILIKE / JSON OR 预筛。该 SQL 预筛不是授权边界，最终 scope、owner/visible、layer、source provenance、phase、plan 和 forbidden fact 检查仍由 `MemoryRetriever` 的 hard filters 执行。store trace 只记录 query anchor/token 数量和是否启用预筛，不记录具体 query term 或 memory content。当前阶段不引入 pgvector，不从 event log 或 runtime trace 召回 memory content。
+Memory DB-backed retrieval 第一阶段把 `MemoryRetriever` 的候选来源抽成 `MemoryStore`。默认 `InMemoryMemoryStore` 仍从 `session.memory_snapshots` 读取，保持 replay 和现有测试行为不变；PostgreSQL runtime builder 会注入 `MemoryRetriever(memory_store=PostgresMemoryStore(connection))`，让生产模式从 `memory_snapshots` 投影表读取候选。`PostgresMemoryStore` 支持 `session_id`、`target_id` 可见性、`memory_scope`、`memory_layer`、`memory_type`、metadata `phase_id/phase_ids` 的预筛，并可接收 `MemoryStoreQuery.query_anchors/query_tokens`，在 SQL 中对 `metadata`、`source_event_ids/source_memory_ids`、`memory_id`、`content` 做 ILIKE / JSON OR / PostgreSQL FTS 预筛；`pg_trgm` fuzzy prefilter 只能通过 `enable_trigram_prefilter=True` 显式开启，避免默认依赖扩展。该 SQL 预筛不是授权边界，最终 scope、owner/visible、layer、source provenance、phase、plan 和 forbidden fact 检查仍由 `MemoryRetriever` 的 hard filters 执行。store trace 只记录 query anchor/token 数量和是否启用预筛，不记录具体 query term 或 memory content。当前阶段不引入 pgvector，不从 event log 或 runtime trace 召回 memory content；pgvector 只能作为后续候选召回或软排序扩展点，结果仍必须回到 `MemoryRetriever`。
 
 AgentLoop 会先调用其注入的 `MemoryRetriever`，再把同一批 `memory_snapshots` 传入 `build_agent_context(...)`。因此普通 turn 的 AgentContext、`memory_ids_used`、trace `memory_projection` 和 `search_memory` tool summary 都来自同一批检索结果。`build_agent_context(...)` 保留内部 retriever 仅作为非 loop 调用路径的兼容 fallback。
 
@@ -177,9 +184,15 @@ P2 大文件拆分后，`DerivedEventSystem` 只保留事件类型分发、玩�
 
 `world_info` 级 disclosure constraint 现在包含 Director 放行的 `safe_fragments` 与对应 `safe_fact_refs`。真实 LLM 的 `partial` disclosure 必须引用这些 refs；输出引用未授权 safe fragment、或 speech 触碰 safe fragment 但没有匹配 `claim_refs` / `source_refs`，都会被合同校验或 Director 后置审计拒绝。
 
-真实适配器启用时，会发送 `LLMAgentContractInput`，请求严格 JSON，使用 `validate_llm_agent_output` 校验返回值。API 错误、JSON 错误、schema 错误、阶段变更提议或 private 原文回显都会降级为安全拒答。适配器不写事件，也不能绕过 Narrative Director 或 Rule Engine。
+真实适配器启用时，不发送完整 `LLMAgentContractInput`。运行时先构造本地完整合同用于审计、动态 schema 和输出校验，再投影为 `LLMProviderTurnPayload` 作为真实 provider user payload。API 错误、JSON 错误、schema 错误、阶段变更提议或 private 原文回显都会降级为安全拒答。适配器不写事件，也不能绕过 Narrative Director 或 Rule Engine。
 
-真实 LLM 的 provider 级 system instructions 只来自 `app/agents/prompts/system.md`。动态事实、目标 NPC 视图、披露边界和输出合同通过 `LLMAgentContractInput` 作为 user payload 进入，不拼入 system prompt。`PromptBuilder.agent_prompt`、`contract_instruction` 和 `safety_instruction` 当前服务本地 prompt surface 与 context budget，不是 `OpenAILLMAgent` 的 system prompt 拼装源。禁说事实原文、blocked terms、solution claims、线索 truth_status、其他 NPC private、未选中 memory content 和 `director_audit` memory 都不能进入真实 LLM payload；需要表达的边界只能以 ID、allowed/forbidden modes、safe refs、`must_not_claim` 和 schema 约束出现。
+真实 LLM 的 provider 级 system instructions 只来自 `app/agents/prompts/system.md`。动态事实、目标 NPC 视图、披露边界和输出合同通过 compact `LLMProviderTurnPayload` 作为 user payload 进入，不拼入 system prompt。`PromptBuilder.agent_prompt`、`contract_instruction` 和 `safety_instruction` 当前服务本地 prompt surface 与 context budget，不是 `OpenAILLMAgent` 的 system prompt 拼装源。禁说事实原文、blocked terms、solution claims、线索 truth_status、其他 NPC private、未选中 memory content、`director_audit` memory、`recent_events`、`context_layers`、`must_not_claim`、source refs、safe fact aliases 和 claim patterns 都不能进入真实 LLM payload；需要表达的边界只能以相关 ID、allowed modes、safe fragment summary/ref 和动态 schema 约束出现。
+
+2026-06-27 起，真实 provider payload 进一步取消 `private_context` 顶层字段：目标 NPC 的 self-knowledge summary、fact awareness 和 disclosure strategy 不再发送给真实模型，只保留在本地合同、Director 校验和输出合同中。`memories[]` 也不再发送完整 `AgentMemorySnapshot.content`，而是发送 compact `summary`、salience、confidence 和少量生成 anchors；完整 memory content、scope、source ids、timestamps、rule id、topic tags、phase ids 等仍只用于检索、回放和 trace。soft compression 触发后，`AgentContext` 自身会清空 recent events / memory candidates，并把 memory content 裁成短摘要后重建 provider contract。
+
+AgentLoop 的 context budget 主估算输入必须是同一份 serialized compact provider payload，而不是完整 prompt 或 `LLMAgentContractInput`。预算和 trace 观测只允许记录 token/ratio/字节数这类摘要，不记录 compact payload 正文、`AgentContext`、`reply_options` 或 `WorldEvent.payload`。如果 hard context 未超限但 compact provider payload 在 soft compression 后仍超过可用输入预算，运行时必须在 `AgentGateway.generate(...)` 前返回 `context_over_limit` fallback，不能继续调用真实模型。
+
+Provider/model 预算口径集中在 `app/runtime/budget.py`。`resolve_token_budget_profile(...)` 负责按 provider/model 解析 `context_limit_tokens`、`reserved_output_tokens`、`safety_margin_tokens` 和 `conservative_multiplier`，生产环境应为具体模型显式提供 profile 或覆盖值，避免把 provider 裸 context window 误当成可用输入预算。`create_runtime(...)` 在未显式传入 `token_budget_profile` 时，会从 `AgentGateway.provider_name` 和 `AgentGateway.model_name` 自动解析 profile；真实 provider adapter 负责暴露自身 provider/model 名称。真实 tokenizer 不作为硬依赖安装；如运行环境已有 provider/model tokenizer，可通过 `ProviderModelTokenEstimator` 注入并按同一份 `TokenBudgetProfile` 路由，否则继续使用保守字符/字节估算器，并在 trace 中记录 estimator method。
 
 因此真实 LLM payload 的事实内容上限是 Director safe fragment summary；这不是案件真相，也不是完整 world_info 描述。模型只能围绕该片段表达，不能把多个 safe fragment 合成为更大的结论，不能访问 locked fragment 或 forbidden inference。
 
@@ -193,9 +206,81 @@ P2 大文件拆分后，`DerivedEventSystem` 只保留事件类型分发、玩�
 - discovered clues
 - relationships
 - player knowledge
+- town clock
+- npc locations
 - memory candidates
 - agent memory snapshots
 - private character impressions
 - event count
 
 Replay 会直接应用已持久化的 `agent_memory_snapshot.updated` 和 `character_impression.updated`，不会重新跑派生或聚合逻辑，因此不会递归创建新事件，也不会改变事件数量。同一批事件被重复输入 replay 时，snapshot / portrait 采用事件中的完整状态覆盖，不按 delta 再次叠加。Replay 必须保留 `memory_scope` 和 `memory_layer`，包括默认不注入 AgentContext 的 `archival` memory。
+
+## Town 编排 Replay V1
+
+多 Agent 编排的 V1 领域边界是：NPC 自主调度可以提出 `NpcAutonomyIntent`，但不能直接写世界状态。`move`、`observe`、`wait`、`talk_to` 只是结构化意图，后续必须由规则/调度链路转成 `WorldEvent` 后才有状态副作用。
+
+当前 replay 只认可两类 town 状态事件：`town.tick.advanced` 更新 `SessionState.town_clock`，`npc.location.changed` 更新 `SessionState.npc_locations`。`npc.observed`、`npc.hearsay.received`、`npc.autonomy_intent.proposed` 和 `npc.autonomy_intent.rejected` 只作为审计与后续规则输入保留在事件流中，不能在 replay 中直接修改线索、关系、记忆、剧情阶段或位置。
+## Meeting Orchestration V1
+
+公开会议是 town tick 之外的特殊流程，由玩家结构化 action 触发。前端可以呈现为类似 QQ 群的会议界面，但后端不能把它当普通聊天服务处理。
+
+当前链路：
+
+```text
+meeting_start / meeting_speak / meeting_ask / meeting_open_vote / meeting_propose_verdict
+  -> RuleEngine.apply_meeting_action
+  -> meeting.* WorldEvent
+  -> SessionState.meeting replay projection
+  -> PublicEventStream + PublicStateSummary.meeting
+```
+
+`meeting_ask` 和 `meeting_open_vote` V1 只追加确定性 NPC 回应/投票，不调用 LLM。`meeting_propose_verdict` 复用现有 DeductionEvaluator；通过后才写正式 `player.accused` / `accusation.evaluated`，失败则写 `meeting.verdict.rejected` 和 `rule.rejected`。投票和发言本身都不是案件真相来源。
+## Meeting Follow-up Slice 2026-06-27
+
+会议 V1 已经具备可运行的规则闭环，但下一阶段不能直接跳到“全员 LLM 群聊”。当前架构事实是：
+
+- speaker selector 未实现；现有 `meeting_ask` 只会让被点名 NPC 产生确定性回复。
+- meeting memory 派生已实现为事件切片：`meeting.message.posted` 和 `meeting.vote.cast` 可经 `DerivedEventSystem -> MemorySnapshotSystem` 产生候选与快照，但不会写入 `SessionState.meeting`，也不会替代 accepted verdict 后的正式 `player.accused` / `accusation.evaluated`。
+- 证据多选裁决已接规则校验；`meeting_propose_verdict` 复用 DeductionEvaluator，失败会写 `meeting.verdict.rejected` 和 `rule.rejected`，但公开反馈 DTO 仍不完整。
+
+下一阶段建议按以下架构顺序推进：
+
+1. 先加只读 `MeetingSpeakerSelector`，输出少量候选 speaker 与稳定 reason，不能调用 LLM，不能写事实状态。
+2. 再把 selector 输出接到单 NPC AgentContext，确保 memory projection 仍按目标 NPC 可见性过滤。
+3. 再把 `meeting.message.proposed` 接入 Director postcheck 和 RuleEngine，只有通过后才写 `meeting.message.posted`。
+4. 后续可把当前 Python fallback 的 meeting memory 派生迁移为配置化规则；现阶段 `memory_scope`、`memory_layer`、`authority`、`visible_to_character_ids` 已在派生代码中固定。
+5. 同步补齐 verdict feedback DTO，让前端不解析自然语言 reason，而是读取稳定的证据分类字段。
+
+## Meeting Memory Derivation 2026-06-27
+
+会议记忆只从已落库的 `meeting.*` 事件派生，不让 LLM 或会议 UI 直接写 `memory_snapshots`。当前规则：
+
+- `meeting.message.posted` 中玩家发言或公开证据展示派生 `scene_shared/working` episodic memory。现有 `MemoryScope` 没有 `meeting_shared`，选择 `scene_shared` 是最安全的现有 scope：必须带 `visible_to_character_ids=SessionState.meeting.participant_ids`，不会扩散成全 session 广播。
+- NPC 会议发言派生该 NPC 的 `npc_private/working` episodic memory，`owner_character_id` 与 `visible_to_character_ids` 都限定为发言 NPC。
+- `meeting.vote.cast` 派生 `scene_shared/working` belief memory，但 `authority_source` 使用现有白名单中的 `npc_hearsay`，`authority=non_authoritative`，`confidence <= 0.5`。投票仍只是立场，不是案件事实、证据或正式裁决。
+
+会议派生 memory metadata 不能新增 `meeting_id`、`speaker_id`、`message_kind` 这类未入白名单字段；会议检索锚点写入 `topic_tags`。只有公开证据消息在玩家已发现/已知对应 clue 时才携带 `clue_id/world_info_id` metadata。该派生链不得产生 `clue.discovered`、`player_knowledge.updated`、`narrative.phase.changed` 或 verdict 事件。
+
+## Meeting Production Integration 2026-06-27
+
+会议 V1 已从“规则事件可运行”推进到生产入口闭环：
+
+- `ActionService._complete_meeting_action(...)` 对所有 accepted 会议动作统一执行 `DerivedEventSystem -> MemorySnapshotSystem`。因此 `meeting_speak`、`meeting_present_evidence`、`meeting_ask`、`meeting_open_vote`、`meeting_cast_vote` 都会在主链路中产生可回放的 `memory_candidate.created` 与 `agent_memory_snapshot.updated`。
+- 只有 `meeting_propose_verdict` 在 accepted 后继续进入 trigger evaluation 与 memory archival。普通会议发言、展示证据和投票不会因为派生 memory 而推进 phase 或解锁 clue。
+- `MeetingSpeakerSelector` / `MeetingContextBuilder` 的 V1 已接入 `meeting_ask`，当前只选择被玩家点名的 NPC，且构造上下文时只读取公开会议消息、公开证据和该 NPC 可见 memory。
+- Web `MeetingPanel` 已改为读取 public event stream 渲染会议记录，并提交结构化 `meeting_*` action；不再用本地伪消息或旧 `accuse` 动作模拟会议裁决。
+
+## Meeting Narration Integration 2026-06-27
+
+旁白进入会议的第一版只做“规则结果投影”，不做新的剧情权威层：
+
+```text
+meeting_propose_verdict
+  -> RuleEngine accepts verdict
+  -> player.accused / accusation.evaluated
+  -> RuleTriggerSystem emits narrative.beat.completed / narrative.phase.changed
+  -> MeetingNarrationSystem emits meeting.message.posted(message_kind=narration)
+  -> DerivedEventSystem derives scene_shared rule_verified memory
+```
+
+`MeetingNarrationSystem` 只读取已经落库的 `meeting.verdict.accepted`、`narrative.beat.completed`、`narrative.phase.changed`。它不能直接写 clue、phase、relationship、verdict 或 world truth。旁白消息复用 `meeting.message.posted`，`speaker_id=director`，`message_kind=narration`，因此前端事件流、replay 和会议 UI 不需要新增事件类型。

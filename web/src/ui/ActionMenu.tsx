@@ -1,6 +1,7 @@
 import { Gavel, MessageCircle, Send, Search, ShieldAlert } from "lucide-react";
 import { useMemo, useState } from "react";
 
+import { getCharacterArt } from "../assets/artAssets";
 import { useUiStore } from "../state/uiStore";
 import type {
   PlayerAction,
@@ -78,13 +79,19 @@ export function ActionMenu({
     affordances?.present_clue.filter((item) => item.target_id === selectedCharacter.id) || [];
   const accuseItem = affordances?.accuse.find((item) => item.target_id === selectedCharacter.id);
   const discoveredTitles = new Set(state?.evidence_assets.map((item) => item.clue_id || item.id) || []);
+  const characterArt = getCharacterArt(selectedCharacter);
 
   return (
     <section className="action-menu character-menu">
       <div className="character-summary">
-        <strong>{selectedCharacter.display_name}</strong>
-        <span>{selectedCharacter.public_role}</span>
-        <p>{selectedCharacter.public_description}</p>
+        {characterArt ? (
+          <img className="character-menu-portrait" src={characterArt.src} alt={selectedCharacter.display_name} />
+        ) : null}
+        <div>
+          <strong>{selectedCharacter.display_name}</strong>
+          <span>{selectedCharacter.public_role}</span>
+          <p>{selectedCharacter.public_description}</p>
+        </div>
       </div>
       <div className="talk-row">
         <input
@@ -157,9 +164,21 @@ export function ActionMenu({
           );
         })}
         {accuseItem ? (
-          <button className="secondary-command is-disabled" type="button" disabled>
+          <button
+            className="secondary-command"
+            type="button"
+            disabled={busy}
+            onClick={() =>
+              onAction({
+                type: "accuse",
+                target_id: selectedCharacter.id,
+                evidence_clue_ids: accuseItem.evidence_clue_ids,
+                text: `指认${selectedCharacter.display_name}`,
+              })
+            }
+          >
             <Gavel size={16} />
-            正式指控待安全标识
+            指认
           </button>
         ) : null}
       </div>

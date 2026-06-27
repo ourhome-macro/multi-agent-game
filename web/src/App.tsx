@@ -16,15 +16,12 @@ import { GameCanvas } from "./game/GameCanvas";
 import { useUiStore } from "./state/uiStore";
 import { ActionMenu } from "./ui/ActionMenu";
 import { DialoguePanel } from "./ui/DialoguePanel";
+import { IntroOverlay } from "./ui/IntroOverlay";
+import { MeetingPanel } from "./ui/MeetingPanel";
 import { RawInput } from "./ui/RawInput";
-import { SceneTabs } from "./ui/SceneTabs";
 import { SidePanel } from "./ui/SidePanel";
 import { TopBar } from "./ui/TopBar";
-import type {
-  PlayerAction,
-  PublicActionResponse,
-  PublicEventStreamItem,
-} from "./types/public-api";
+import type { PlayerAction, PublicActionResponse } from "./types/public-api";
 
 const FIRST_CASE_ID = "mist_clock_manor";
 
@@ -36,9 +33,13 @@ export function App() {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [dialogue, setDialogue] = useState<string | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
+  const [introVisible, setIntroVisible] = useState(true);
+  const [journalOpen, setJournalOpen] = useState(false);
+  const [meetingOpen, setMeetingOpen] = useState(false);
   const currentSceneId = useUiStore((store) => store.currentSceneId);
   const setCurrentSceneId = useUiStore((store) => store.setCurrentSceneId);
   const clearSelection = useUiStore((store) => store.clearSelection);
+  const setActivePanel = useUiStore((store) => store.setActivePanel);
 
   const caseQuery = useQuery({
     queryKey: ["case", FIRST_CASE_ID],
@@ -50,7 +51,7 @@ export function App() {
     onSuccess: (response) => {
       setSessionId(response.session_id);
       queryClient.setQueryData(["state", response.session_id], response.state);
-      setDialogue("新的调查会话已创建。");
+      setDialogue("雨停之前，书房里的每一道痕迹都不会自己开口。");
       setWarning(null);
     },
     onError: (error) => {
@@ -87,6 +88,7 @@ export function App() {
     queryKey: ["events", sessionId],
     queryFn: () => getSessionEvents(sessionId as string, 0),
     enabled: Boolean(sessionId),
+    refetchInterval: meetingOpen ? 3_000 : false,
   });
 
   const applyActionResponse = useCallback(
@@ -94,12 +96,12 @@ export function App() {
       queryClient.setQueryData(["state", response.session_id], response.state);
       setWarning(null);
       if (response.director_blocked) {
-        setWarning(response.director_reason || "本轮回复被 Narrative Director 拦截。");
+        setWarning(response.director_reason || "这句话被雾声吞没了。");
       }
       if (!response.accepted) {
         const rejection = response.new_events.find((event) => event.type === "rule.rejected");
         const reason = rejection?.payload.reason;
-        setWarning(typeof reason === "string" ? reason : "行动未被当前规则接受。");
+        setWarning(typeof reason === "string" ? reason : "现在还不能这么做。");
       }
       if (response.speech) {
         setDialogue(response.speech);
@@ -172,17 +174,14 @@ export function App() {
   );
   const state = stateQuery.data || null;
   const affordances = affordancesQuery.data || null;
-  const events = eventsQuery.data?.events || [];
-  const connected = Boolean(caseDetail && sessionId && !caseQuery.isError);
 
   const resetSession = useCallback(() => {
     if (sessionId) {
       queryClient.removeQueries({ queryKey: ["state", sessionId] });
       queryClient.removeQueries({ queryKey: ["affordances", sessionId] });
-      queryClient.removeQueries({ queryKey: ["events", sessionId] });
     }
     setSessionId(null);
-    setDialogue(null);
+    setDialogue("雨停之前，书房里的每一道痕迹都不会自己开口。");
     setWarning(null);
     clearSelection();
     createSessionMutation.mutate();
@@ -206,7 +205,7 @@ export function App() {
   }, [bgmUrl]);
 
   if (caseQuery.isLoading || !caseDetail || !scene) {
-    return <BootScreen message="正在连接雾钟山庄运行时..." />;
+    return <BootScreen message="雾正在漫过山路..." />;
   }
 
   if (caseQuery.isError) {
@@ -216,24 +215,17 @@ export function App() {
   return (
     <main className="app-shell">
       <TopBar
-        phase={state?.narrative_phase || affordances?.narrative_phase || caseDetail.initial_phase}
-        connected={connected}
-        sessionId={sessionId}
         sfxEnabled={sound.enabled}
         sfxVolume={sound.volume}
         onToggleSfx={sound.setEnabled}
         onSfxVolume={sound.setVolume}
         onBgmFile={handleBgmFile}
         onReset={resetSession}
-      />
-      <SceneTabs
-        scenes={caseDetail.scenes}
-        currentSceneId={scene.id}
-        onChange={(sceneId) => {
-          setCurrentSceneId(sceneId);
-          clearSelection();
-          void sound.play("click");
+        onOpenJournal={() => {
+          setActivePanel("story");
+          setJournalOpen(true);
         }}
+        onOpenMeeting={() => setMeetingOpen(true)}
       />
       <GameCanvas
         caseDetail={caseDetail}
@@ -248,8 +240,8 @@ export function App() {
         caseDetail={caseDetail}
         scene={scene}
         state={state}
-        affordances={affordances}
-        events={events}
+        open={journalOpen}
+        onClose={() => setJournalOpen(false)}
       />
       <ActionMenu
         caseDetail={caseDetail}
@@ -259,8 +251,26 @@ export function App() {
         busy={busy || !sessionId}
         onAction={(action) => actionMutation.mutate(action)}
       />
-      <DialoguePanel title={warning ? "系统回执" : "现场记录"} message={dialogue} warning={warning} />
+      <DialoguePanel title={warning ? "雾中回声" : "旁白"} message={dialogue} warning={warning} />
+      <MeetingPanel
+        caseDetail={caseDetail}
+        state={state}
+        affordances={affordances}
+        events={eventsQuery.data?.events || []}
+        open={meetingOpen}
+        busy={busy || !sessionId}
+        onAction={(action) => actionMutation.mutate(action)}
+        onClose={() => setMeetingOpen(false)}
+        onAppendNarration={setDialogue}
+      />
       <RawInput disabled={busy || !sessionId} onSubmit={(text) => rawMutation.mutate(text)} />
+      <IntroOverlay
+        visible={introVisible}
+        onContinue={() => {
+          setIntroVisible(false);
+          void sound.play("phase");
+        }}
+      />
       {bgmUrl ? <audio ref={bgmRef} src={bgmUrl} loop controls className="bgm-player" /> : null}
     </main>
   );
@@ -277,18 +287,17 @@ function BootScreen({ message }: { message: string }) {
   );
 }
 
-function publicEventSummary(events: PublicEventStreamItem[]): string {
+function publicEventSummary(events: PublicActionResponse["new_events"]): string {
   const clue = events.find((event) => event.type === "clue.discovered");
   if (clue && typeof clue.payload.clue_id === "string") {
-    return `发现线索：${clue.payload.clue_id}`;
+    return "你发现了一条新的线索。";
   }
   const phase = events.find((event) => event.type === "narrative.phase.changed");
   if (phase) {
-    const next = phase.payload.to_phase || phase.payload.phase;
-    return typeof next === "string" ? `剧情阶段推进：${next}` : "剧情阶段已推进。";
+    return "山庄里的空气变了。";
   }
   const event = events[events.length - 1];
-  return event ? `公开事件已更新：${event.type}` : "行动已提交。";
+  return event ? "这一刻被记录了下来。" : "你停下脚步。";
 }
 
 function formatError(error: unknown): string {

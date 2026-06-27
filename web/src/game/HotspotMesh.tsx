@@ -10,6 +10,7 @@ type HotspotMeshProps = {
   enabled: boolean;
   discovered: boolean;
   selected: boolean;
+  hovered: boolean;
   onHover: (id: string | null) => void;
   onSelect: () => void;
 };
@@ -29,6 +30,7 @@ export function HotspotMesh({
   enabled,
   discovered,
   selected,
+  hovered,
   onHover,
   onSelect,
 }: HotspotMeshProps) {
@@ -42,8 +44,6 @@ export function HotspotMesh({
   return (
     <group position={placement.position}>
       <mesh
-        castShadow
-        receiveShadow
         onClick={handlePointer}
         onPointerEnter={(event) => {
           event.stopPropagation();
@@ -56,31 +56,34 @@ export function HotspotMesh({
           onHover(null);
         }}
       >
-        <boxGeometry args={placement.size} />
-        <meshStandardMaterial
-          color={tone.surface}
-          emissive={tone.glow}
-          emissiveIntensity={selected ? 0.22 : enabled ? 0.08 : 0.015}
-          opacity={enabled ? 0.86 : 0.42}
-          transparent
-          roughness={0.68}
-          metalness={placement.tone === "brass" ? 0.2 : 0.04}
-        />
+        <planeGeometry args={[placement.size[0] * 1.25, placement.size[1] * 1.45]} />
+        <meshBasicMaterial color="#ffffff" opacity={0.01} transparent depthWrite={false} />
       </mesh>
-      <mesh position={[0, -placement.size[1] * 0.42, 0]} rotation-x={-Math.PI / 2}>
-        <ringGeometry args={[0.34, selected ? 0.42 : 0.38, 36]} />
+      <mesh position={[0, 0, 0.03]}>
+        <ringGeometry args={[0.05, selected || hovered ? 0.13 : 0.09, 24]} />
         <meshBasicMaterial
-          color={discovered ? "#7fb884" : tone.glow}
+          color={discovered ? "#8ccf93" : tone.glow}
+          opacity={selected || hovered ? 0.76 : enabled ? 0.18 : 0.08}
           transparent
-          opacity={enabled || selected ? 0.62 : 0.18}
         />
       </mesh>
-      <TextSprite
-        text={hotspot.name}
-        position={[0, placement.size[1] + 0.32, 0]}
-        selected={selected}
-        muted={!enabled}
-      />
+      <mesh position={[0, 0, 0.04]} rotation-z={Math.PI / 4}>
+        <planeGeometry args={[selected || hovered ? 0.18 : 0.12, selected || hovered ? 0.18 : 0.12]} />
+        <meshBasicMaterial
+          color={discovered ? "#8ccf93" : tone.glow}
+          transparent
+          opacity={selected || hovered ? 0.18 : enabled ? 0.055 : 0.025}
+          depthWrite={false}
+        />
+      </mesh>
+      {selected || hovered ? (
+        <TextSprite
+          text={hotspot.name}
+          position={[0, placement.size[1] + 0.25, 0.05]}
+          selected={selected}
+          muted={!enabled}
+        />
+      ) : null}
     </group>
   );
 }

@@ -13,10 +13,25 @@ from app.domain.models import (
 )
 from app.runtime.character_fact_awareness import upsert_character_fact_awareness
 from app.runtime.derivation_impressions import CharacterImpressionDerivationMixin
+from app.runtime.derivation_meeting_memory import (
+    MEETING_MESSAGE_POSTED_EVENT_TYPE,
+    MEETING_VOTE_CAST_EVENT_TYPE,
+    MeetingMemoryDerivationMixin,
+)
 from app.runtime.derivation_memory_candidates import MemoryCandidateDerivationMixin
 from app.runtime.derivation_memory_constants import (
     ASKED_ABOUT_MEMORY_RULE_ID,
+    MEETING_NARRATION_MEMORY_RULE_ID,
+    MEETING_NPC_MESSAGE_MEMORY_RULE_ID,
+    MEETING_SHARED_MESSAGE_MEMORY_RULE_ID,
+    MEETING_VOTE_BELIEF_MEMORY_RULE_ID,
+    NPC_HEARSAY_MEMORY_RULE_ID,
+    NPC_OBSERVED_MEMORY_RULE_ID,
     PRESENTED_CLUE_MEMORY_RULE_ID,
+)
+from app.runtime.derivation_npc_observation_memory import (
+    NPC_HEARSAY_RECEIVED_EVENT_TYPE,
+    NPC_OBSERVED_EVENT_TYPE,
 )
 from app.runtime.derivation_utils import (
     append_unique as _append_unique,
@@ -26,12 +41,19 @@ from app.runtime.events import EventRecorder
 __all__ = [
     "ASKED_ABOUT_MEMORY_RULE_ID",
     "DerivedEventSystem",
+    "MEETING_NARRATION_MEMORY_RULE_ID",
+    "MEETING_NPC_MESSAGE_MEMORY_RULE_ID",
+    "MEETING_SHARED_MESSAGE_MEMORY_RULE_ID",
+    "MEETING_VOTE_BELIEF_MEMORY_RULE_ID",
+    "NPC_HEARSAY_MEMORY_RULE_ID",
+    "NPC_OBSERVED_MEMORY_RULE_ID",
     "PRESENTED_CLUE_MEMORY_RULE_ID",
 ]
 
 
 class DerivedEventSystem(
     CharacterImpressionDerivationMixin,
+    MeetingMemoryDerivationMixin,
     MemoryCandidateDerivationMixin,
 ):
     def __init__(self, recorder: EventRecorder) -> None:
@@ -46,6 +68,7 @@ class DerivedEventSystem(
     ) -> list[WorldEvent]:
         events: list[WorldEvent] = []
         for source_event in source_events:
+            source_event_type = str(source_event.type)
             impression_event = self._derive_character_impression(case, session, source_event)
             if impression_event is not None:
                 events.append(impression_event)
@@ -173,6 +196,38 @@ class DerivedEventSystem(
                         events.append(memory_event)
             elif source_event.type == EventType.ACCUSATION_EVALUATED:
                 memory_event = self._derive_accusation_evaluated_memory_candidate(
+                    case,
+                    session,
+                    source_event,
+                )
+                if memory_event is not None:
+                    events.append(memory_event)
+            elif source_event_type == NPC_OBSERVED_EVENT_TYPE:
+                memory_event = self._derive_npc_observed_memory_candidate(
+                    case,
+                    session,
+                    source_event,
+                )
+                if memory_event is not None:
+                    events.append(memory_event)
+            elif source_event_type == NPC_HEARSAY_RECEIVED_EVENT_TYPE:
+                memory_event = self._derive_npc_hearsay_memory_candidate(
+                    case,
+                    session,
+                    source_event,
+                )
+                if memory_event is not None:
+                    events.append(memory_event)
+            elif source_event_type == MEETING_MESSAGE_POSTED_EVENT_TYPE:
+                memory_event = self._derive_meeting_message_memory_candidate(
+                    case,
+                    session,
+                    source_event,
+                )
+                if memory_event is not None:
+                    events.append(memory_event)
+            elif source_event_type == MEETING_VOTE_CAST_EVENT_TYPE:
+                memory_event = self._derive_meeting_vote_memory_candidate(
                     case,
                     session,
                     source_event,

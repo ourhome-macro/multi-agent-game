@@ -1,6 +1,19 @@
-export type ActionType = "inspect" | "talk" | "ask_about" | "present_clue" | "accuse";
+export type ActionType =
+  | "inspect"
+  | "talk"
+  | "ask_about"
+  | "present_clue"
+  | "accuse"
+  | "meeting_start"
+  | "meeting_speak"
+  | "meeting_present_evidence"
+  | "meeting_ask"
+  | "meeting_open_vote"
+  | "meeting_cast_vote"
+  | "meeting_propose_verdict";
 export type SubjectType = "clue" | "character" | "scene";
 export type PresentationMode = "private" | "scene_shared";
+export type MeetingVoteChoice = "accuse" | "defend" | "abstain";
 
 export type CaseMeta = {
   id: string;
@@ -82,6 +95,35 @@ export type RelationshipState = {
   hostility?: number;
 };
 
+export type NpcLocationSummary = {
+  npc_id: string;
+  scene_id: string;
+};
+
+export type MeetingVoteSummary = {
+  voter_id: string;
+  target_id: string;
+  choice: MeetingVoteChoice;
+  reason?: string | null;
+};
+
+export type MeetingStateSummary = {
+  active: boolean;
+  meeting_id?: string | null;
+  topic?: string | null;
+  participant_ids: string[];
+  turn: number;
+  vote_open: boolean;
+  vote_target_id?: string | null;
+  votes: MeetingVoteSummary[];
+  verdict_target_id?: string | null;
+  verdict_status?: string | null;
+  verdict_result?: string | null;
+  verdict_reason?: string | null;
+  missing_required_evidence: string[];
+  missing_required_world_info: string[];
+};
+
 export type PublicStateSummary = {
   session_id: string;
   case_id: string;
@@ -92,6 +134,8 @@ export type PublicStateSummary = {
   discovered_clues: ClueSummary[];
   player_knowledge: PublicPlayerKnowledgeSummary[];
   evidence_assets: PublicEvidenceSummary[];
+  npc_locations: NpcLocationSummary[];
+  meeting: MeetingStateSummary;
   relationships: RelationshipState[];
   event_count: number;
 };
@@ -186,6 +230,7 @@ export type PlayerAction = {
   evidence_clue_ids?: string[];
   subject_type?: SubjectType;
   subject_id?: string;
+  vote?: MeetingVoteChoice;
   text?: string;
 };
 

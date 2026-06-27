@@ -17,6 +17,14 @@
 
 这样做的目的是让 Router 集成层可以提前获得安全决策摘要，同时保持事件日志和状态变化只有一个权威来源。
 
+## NPC 自主意图前置审计
+
+`NarrativeDirector.precheck_npc_autonomy(case, session, intent)` 是多 Agent 编排 V1 的纯审计入口。它只检查候选自主意图是否属于保守白名单：`move`、`observe`、`wait`、`talk_to`。未知类型直接返回 `unsupported_npc_autonomy_intent_type`。
+
+该入口还会拒绝显式越权风险标记，例如 `clue_unlock`、`phase_change`、`forbidden_disclosure`，以及候选 side effect 中声明的 `clue.discover` / `clue.discovered` / `narrative.phase.change` / `narrative.phase.changed`。拒绝原因统一为 `npc_autonomy_forbidden_side_effect`。
+
+这个 precheck 不写事件、不移动 NPC、不解锁线索、不推进阶段，也不替代 `RuleEngine.apply_npc_autonomy_intent(...)` 的最终校验。即使上游跳过 Director，Rule Engine 仍必须拒绝会制造线索或阶段变化的自主意图。
+
 在 P0 硬链路里，precheck 只能位于 Action Intake / Router 之后、正式 Rule Engine 写入之前，作为“这次结构化动作明显不能继续”的提示面。它不能读取或注入 forbidden fact 原文，不能把 solution claim 细节交给 LLM，也不能替代 `RuleEngine.apply_ask_about`、`apply_present_clue` 或 `apply_accuse` 的最终事件化校验。
 
 ## 配置来源
@@ -168,3 +176,14 @@ LLM Shadow Eval v0 会调用同一个 `NarrativeDirector.validate(case, narrativ
 `mist_clock_manor` 扩写后的可选线索同样会进入 `StateSummary` 和玩家旅程输出。案件作者不能把禁说事实挪到 clue title、clue description 或公开 `WorldInfo.description` 中规避 Director，因为这些字段本身就是公开投影内容。
 
 新增 mock dialogue 要避免直接复用 `WorldInfo.title`、`aliases` 或 `claim_patterns` 中的完整表达；如果将来需要让 NPC 在允许范围内触碰这些事实，必须让 Agent 输出匹配的 `disclosure_claims`，并通过 Director 校验。
+## Meeting Narration Boundary 2026-06-27
+
+会议旁白采用 Director 公开投影语义，但不扩大 Narrative Director 的状态权限。第一版由 `MeetingNarrationSystem` 根据已落库事件生成：
+
+- `meeting.verdict.accepted`
+- `narrative.beat.completed`
+- `narrative.phase.changed`
+
+旁白只能落为 `meeting.message.posted(message_kind=narration, speaker_id=director)`。它不能直接推进 phase、解锁 clue、改关系、改裁决，也不能把未解锁真相写进会议。任何剧情推进必须先由 Rule Engine 或 RuleTriggerSystem 写出权威事件，旁白再把结果表达给会议 UI 和参会 NPC。
+
+后续如果旁白改由 LLM 生成，必须新增候选/审计链路，例如 `meeting.narration.proposed -> Director postcheck -> meeting.message.posted/rejected`，不能让 LLM 直接写 `meeting.message.posted`。

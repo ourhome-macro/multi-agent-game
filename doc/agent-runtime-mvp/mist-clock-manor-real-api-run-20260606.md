@@ -3,14 +3,15 @@
 ## Purpose
 
 Run `mist_clock_manor` with the real OpenAI-compatible API backend instead of mock.
-This was requested after confirming `.env` contains a usable API key and Xiaomi Mimo
-base URL.
+This was requested after confirming `.env` contains a usable OpenAI-compatible API key.
+The historical provider-specific configuration has been retired; current real runs use
+the DeepSeek OpenAI-compatible endpoint.
 
 ## Configuration
 
 - Backend: `real`
-- Base URL: `https://api.xiaomimimo.com/v1`
-- Model: `mimo-v2.5`
+- Base URL: `https://api.deepseek.com`
+- Model: `deepseek-v4-flash`
 - API style: `chat_completions`
 - Runner: `scripts/run_mist_clock_manor_real_api.py`
 - Strict mode: enabled

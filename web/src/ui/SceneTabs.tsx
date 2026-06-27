@@ -20,7 +20,7 @@ export function SceneTabs({ scenes, currentSceneId, onChange }: SceneTabsProps) 
           title={scene.description || scene.name}
           onClick={() => onChange(scene.id)}
         >
-          {scene.name}
+          {scene.id === "clock_tower" ? "钟楼上层" : scene.name}
         </button>
       ))}
     </nav>

@@ -17,6 +17,7 @@ from app.domain.models import (
     TalkAffordance,
 )
 from app.rules.engine import RuleEngine
+from app.runtime.npc_locations import npc_scene_id
 
 
 def build_session_affordances(
@@ -27,7 +28,7 @@ def build_session_affordances(
 ) -> SessionAffordances:
     clue_by_id = {clue.id: clue for clue in case.clues}
     character_by_id = {character.id: character for character in case.characters}
-    scene_by_character = _scene_ids_by_character(case)
+    scene_by_character = _scene_ids_by_character(case, session)
     present_clue = _build_present_clue_affordances(
         case=case,
         session=session,
@@ -238,11 +239,19 @@ def _build_accuse_affordances(
     return affordances
 
 
-def _scene_ids_by_character(case: CasePackage) -> dict[str, list[str]]:
+def _scene_ids_by_character(
+    case: CasePackage,
+    session: SessionState,
+) -> dict[str, list[str]]:
     scene_ids: dict[str, list[str]] = {}
-    for scene in case.scenes:
-        for character_id in scene.characters:
-            scene_ids.setdefault(character_id, []).append(scene.id)
+    for character in case.characters:
+        scene_id = npc_scene_id(
+            case=case,
+            session=session,
+            character_id=character.id,
+        )
+        if scene_id is not None:
+            scene_ids[character.id] = [scene_id]
     return scene_ids
 
 

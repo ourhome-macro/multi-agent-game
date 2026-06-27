@@ -15,7 +15,7 @@ Trace records now use:
 ```json
 {
   "schema_version": 2,
-  "model": "mimo-v2.5",
+  "model": "deepseek-v4-flash",
   "public_speech": "I can answer only what I know directly.",
   "public_speech_source": "npc"
 }
@@ -59,7 +59,7 @@ The original rejected speech must not be present in JSONL or readable `.log`.
 The `.log` renderer now includes:
 
 ```text
-backend=real model=mimo-v2.5 ... speech_source=npc speech=...
+backend=real model=deepseek-v4-flash ... speech_source=npc speech=...
 ```
 
 Readable logs keep one trace record per line. If the public speech contains line breaks,

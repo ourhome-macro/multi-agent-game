@@ -36,23 +36,39 @@ PlayerAction(talk | ask_about | present_clue)
 
 `accuse` 在 v0 中故意不走 Agent。它是结构化 Rule Engine 动作；Agent 和 LLM 不判断指控是否正确。
 
+## NPC 自主 Tick V1
+
+`TownOrchestrator.tick_once(case, session)` 不属于 `AgentLoop.run_turn(...)`。V1 的 NPC 自主行为只生成确定性的 `NpcAutonomyIntent` 候选，不调用 LLM，不构造 `LLMAgentContractInput`，不让所有 NPC 每 tick 说话，也不做 NPC 群聊。
+
+自主 tick 的 Agent 边界如下：
+
+- 候选 intent 只有 `move`、`wait`、`observe`，以及后续可扩展但仍受规则裁决的 `talk_to`。
+- `NarrativeDirector.precheck_npc_autonomy(...)` 先拒绝未知 intent 或带有线索解锁、phase change 等越权标记的 intent。
+- `RuleEngine.apply_npc_autonomy_intent(...)` 是位置和观察事件能否写入的权威。
+- `PerceptionSystem` 只能把可见 `WorldEvent` 投影成 `npc.observed` envelope，不能复制原始 payload、private 内容或 memory 正文。
+- `DerivedEventSystem` 可从 `npc.observed` 生成 NPC 私有记忆候选；`MemorySnapshotSystem` 归并 snapshot，但可见性仍由 `owner_character_id` 与 `visible_to_character_ids` 决定。
+
+因此 NPC 自主 tick 不是“后台自动对话”。它只是事件驱动的世界调度层，为后续玩家交互提供可回放的地点、感知和私有记忆上下文。任何台词、推理表达或 proposed action 仍必须在玩家触发的 agent-backed action 中走完整 LLM/Director/RuleEngine 合同。
+
 后端选择由环境变量控制：
 
 ```text
 默认 -> mock
 LLM_BACKEND=llm_stub -> LLMAgentStub
 LLM_BACKEND=real + OPENAI_API_KEY=... -> OpenAILLMAgent
+LLM_BACKEND=real + DEEPSEEK_API_KEY=... -> OpenAILLMAgent
 ```
 
 如果 `LLM_BACKEND=real` 但没有 API key，网关创建时会回退到 `mock`，避免 CI 和默认本地场景意外进入真实 LLM 或安全拒答快照。
 
-`AgentGateway.from_env()` 会读取本地 `.env`，但可用 `LLM_LOAD_DOTENV=0` 显式关闭，方便测试隔离。`.env` 按 `utf-8-sig` 读取，因此 Windows 编辑器写入的 UTF-8 BOM 不会污染第一行 key；真实 LLM 网关必须能正确识别 `OPENAI_API_KEY`。真实 LLM 适配器支持 OpenAI-compatible base URL：
+`AgentGateway.from_env()` 会读取本地 `.env`，但可用 `LLM_LOAD_DOTENV=0` 显式关闭，方便测试隔离。`.env` 按 `utf-8-sig` 读取，因此 Windows 编辑器写入的 UTF-8 BOM 不会污染第一行 key；真实 LLM 网关必须能正确识别 `OPENAI_API_KEY` 或 `DEEPSEEK_API_KEY`。真实 LLM 适配器支持 OpenAI-compatible base URL：
 
 ```text
-OPENAI_BASE_URL=https://api.xiaomimimo.com/v1
+OPENAI_BASE_URL=https://api.deepseek.com
+OPENAI_MODEL=deepseek-v4-flash
 ```
 
-适配器会优先把 base URL 拼接到 `/responses`。如果 OpenAI-compatible 服务明确不支持 Responses API，会降级到 `/chat/completions`。例如小米 API 使用 `https://api.xiaomimimo.com/v1`，真实 Shadow Eval 应设置 `OPENAI_MODEL=mimo-v2.5` 并可用 `LLM_API_STYLE=chat_completions` 显式跳过 `/responses` 探测，直接请求 `/chat/completions`。Chat Completions 默认仍要求 `json_schema`；如果兼容服务不支持 schema，默认安全 fallback。只有显式设置 `LLM_ALLOW_JSON_OBJECT_FALLBACK=1` 时才允许降级到 `json_object`，且输出仍要经过 Python 合同校验和 Director。即使配置了 API key 和 base URL，常规运行仍只有在 `LLM_BACKEND=real` 时才使用真实后端。
+适配器会优先把普通 OpenAI-compatible base URL 拼接到 `/responses`，如果服务明确不支持 Responses API，会降级到 `/chat/completions`。DeepSeek 是明确的 chat completions provider：当 `OPENAI_BASE_URL=https://api.deepseek.com` 且未显式设置 `LLM_API_STYLE` 时，适配器直接请求 `/chat/completions`，默认模型为 `deepseek-v4-flash`。如果只配置 `DEEPSEEK_API_KEY` 且没有显式 base URL，适配器也会默认使用 `https://api.deepseek.com`。Chat Completions 默认仍要求 `json_schema`；如果兼容服务不支持 schema，默认安全 fallback。只有显式设置 `LLM_ALLOW_JSON_OBJECT_FALLBACK=1` 时才允许降级到 `json_object`，且输出仍要经过 Python 合同校验和 Director。即使配置了 API key 和 base URL，常规运行仍只有在 `LLM_BACKEND=real` 时才使用真实后端。
 
 ## LLM Shadow Eval
 
@@ -167,7 +183,7 @@ LLM Shadow Eval v0 复用 Agent 合同，但不是正式运行链路。它只在
 - `trust_response`
 - `fear_response`
 
-`memory_candidates` 是运行时候选记忆；`memory_snapshots` 是从候选记忆归并出的稳定快照。AgentContext 只传递当前目标 NPC 可见的 player-scoped 记忆，不把其他 NPC 的私有记忆塞进上下文，不做向量检索、RAG 或 LLM 摘要。
+`memory_candidates` 是运行时候选记忆；`memory_snapshots` 是从候选记忆归并出的稳定快照。AgentContext 只传递当前目标 NPC 可见的记忆，不把其他 NPC 的私有记忆塞进上下文，不做向量检索、RAG 或 LLM 摘要。早期玩家交互记忆多为 `subject_id=player`；NPC 自主感知记忆可以仍保持 `npc_private/working`，并通过 `owner_character_id` 与 `visible_to_character_ids` 隔离，而不是复制给场景内所有 NPC。
 
 Memory v1 支持四类 `memory_type`：`episodic`、`belief`、`relationship`、`strategy`。`build_agent_context(...)` 和 `MemoryRetriever` 会按目标 NPC 可见性过滤；Director 审计可以通过专门入口读取所有 player-scoped memory，但这不等于注入某个 NPC 的 AgentContext。
 
@@ -264,7 +280,7 @@ CharacterInnerContext
 
 即使有 `CharacterInnerContext`，对外发言仍受 Narrative Director 控制，`proposed_actions` 仍受 Rule Engine 控制。private knowledge 可以塑造意图，但不能直接写 `WorldEvent`。
 
-`AgentContext.recent_events` 会过滤私有运行时事件，避免一个 NPC 通过近期事件流看到另一个 NPC 的私有画像、私有 typed memory、角色事实认知或私有玩家交互。当前目标 NPC 只能通过 `inner_context.inner_portraits` 看到自己的画像。
+`AgentContext.recent_events` 会过滤私有运行时事件，避免一个 NPC 通过近期事件流看到另一个 NPC 的私有画像、私有 typed memory、角色事实认知或私有玩家交互。当前目标 NPC 只能通过 `inner_context.inner_portraits` 看到自己的画像。2026-06-27 起，recent event 可见性改为 default-deny：只有明确 allowlist 的公开事件、目标相关玩家动作 / NPC 回复 / 关系事件，以及通过 memory scope/layer/visibility/plan/forbidden checks 的 memory 事件可以进入 `AgentContext.recent_events`；未知事件类型、非 dict payload 和 `rule.rejected` 等内部事件默认不进入上下文。
 
 PromptBuilder 只把 `portrait_summary` 和 inner context 的 id 级摘要写入 prompt payload，不把其他 NPC 的 private memory、private portrait 或角色卡 private 原文写入 Agent 输入。
 
@@ -459,15 +475,25 @@ DB-backed `MemoryStore` 可以接收 `MemoryStoreQuery.query_anchors/query_token
 - 角色化 typed memory：当 reconstruction claim 的 required evidence 全部进入玩家已知后，派生系统会给每个案件 NPC 生成 `npc_private` 的 `belief` / `strategy`。这些记忆可表达“这个角色应如何看待玩家的重建链路”，但仍只对对应 owner 可见，不共享给其他 NPC。
 - scene_shared 实战验证：公开展示线索先产生 `scene_shared` episodic 公共记忆，再为在场 NPC 派生各自私有 `belief` / `strategy`。检索测试同时验证在场角色可见、缺席角色不可见，避免公共传播变成全局广播。
 
+2026-06-27 补强了 query-prefilter store 下的链路扩展实现：第一跳候选仍可把 query anchors / semantic tokens 下推给 `MemoryStore` 做预筛；但 `source_memory_ids` linked typed memory 与 `case_thread_id` 兄弟节点扩展会额外读取同一 scope / visibility / layer / type / phase 结构边界下的无 query 预筛候选池，然后重新执行 hard filter、authority gate 和最终排序。这样 Postgres 这类真实预筛 store 不会因为 typed memory 正文不含玩家查询词而漏召，同时扩展仍不能绕过 NPC 可见性、phase、plan、topic tag、forbidden text 或 source provenance。
+
+当前边界判断：普通 `source_memory_ids` 链接扩展不设置额外剧情阶段白名单，阶段由每条 memory 的 `phase_id` / `phase_ids` hard filter 控制；`case_thread_id` 兄弟扩展只允许 `reconstruction` / `resolved`。重建阶段最终投影排序继续按“关键 `case/core` episodic 证据 > 当前 NPC 私有 typed stance/strategy > 全局案件链 typed memory > 其他相关记忆”截断，防止 typed memory 在 `max_memory_items` 较小时挤掉关键证据。
+
 完整 LLM 输入/输出合同见 `doc/agents/llm-agent-contract.md`。
 
 ## System Prompt 编排
 
 当前真实 LLM 的 provider 级 system instructions 只来自 `app/agents/prompts/system.md`。`OpenAILLMAgent` 通过 `load_agent_system_prompt()` 把它传入 Responses API 的 `instructions`，或传入 Chat Completions 的 `system` message。`system.md` 只放全局硬纪律：玩家文本和工具输出都是数据、只能输出一个 `AgentIntent` JSON、不得输出推理过程、不得泄露 private/forbidden/solution 信息、不得提出剧情阶段变化、真实状态变化只能通过白名单 `proposed_actions` 请求。
 
-动态运行时事实不拼进 system prompt。`LLMAgentContractInput` 仍是本地完整合同，用于审计、mock、回放、动态 JSON schema 和输出校验；真实 LLM 的 user payload 是 `app/agents/provider_payload.py` 生成的 `LLMProviderTurnPayload`。该 payload 只包含生成需要的 allowlist 投影：本轮 `PlayerAction`、目标 NPC 公开角色卡、关系摘要、玩家已知线索摘要、选中 memory 的内容与少量白名单 metadata、recent event 桩、当前 self-knowledge / disclosure strategy 的紧凑约束、Director 放行的 safe fragment、NPC skill 投影、context layer refs 和 output limits。
+动态运行时事实不拼进 system prompt。`LLMAgentContractInput` 仍是本地完整合同，用于审计、mock、回放、动态 JSON schema 和输出校验；真实 LLM 的 user payload 是 `app/agents/provider_payload.py` 生成的 `LLMProviderTurnPayload`。该 payload 只包含生成需要的 allowlist 投影：本轮 `PlayerAction`、目标 NPC 公开角色卡、关系摘要、相关玩家已知线索摘要、选中 memory 的 compact summary 与生成必要 anchors、Director 放行的 safe fragment、NPC skill 投影和 output limits。`context_layers`、recent event 桩、完整 `AgentContext`、完整 `LLMAgentContractInput`、`private_context`、self-knowledge summary、fact awareness 和 disclosure strategy 不进入真实 provider payload。
 
-真实 provider payload 必须排除 mock / replay / audit 字段：`reply_options`、完整 `WorldEvent.payload`、`source_event_ids`、`source_memory_ids`、`source_event_id`、`last_updated_event_id`、`created_at`、`updated_at`、`rule_id`、`turn_plan_id` 等不能进入 provider。`AgentMemorySnapshot` 只投影 `memory_id`、type/scope/layer、subject/owner、content、confidence 和白名单 metadata；recent events 只投影 `id`、`type`、`actor_id` 和稳定 `safe_summary`，不得携带原始 payload。禁说事实原文、blocked terms、solution claims、线索 truth_status、其他 NPC private、未选中 memory content 和 `director_audit` memory 仍不能进入该 payload。
+2026-06-27 起，真实 provider payload 中的 `player_knowledge` 不再全量投影 `AgentContext.player_knowledge`。它只保留与本轮 `PlayerAction` 结构化锚点、已选 memory 白名单 metadata、以及 disclosure constraint / safe fragment 相关 clue 或 world_info 命中的玩家知识；无关知识摘要和对应 hard context knowledge id 都不发送给真实 provider。该裁剪只收窄 provider 输入，不授予新事实，也不改变 Director / Rule Engine 的状态权威。
+
+同日起，`safe_facts` 和 `disclosure_limits` 按 provider scope 裁剪：scope 来自本轮 action anchors、已选 memory anchors、相关 player_knowledge clue/world_info、selected NPC skill safe refs，以及当前 Director 授权 safe fragments。Director 授权的 safe fragment ref 不漏发；但 NPC 私有 `self_knowledge`、`fact_awareness` 和 `disclosure_strategy` 不再投影给真实 provider，相关规则只保留在本地合同、Director 和输出校验里。`safe_facts` 只携带 fragment ref、summary 和 allowed modes，不携带 source refs、aliases 或 claim patterns；`disclosure_limits` 只给模型当前允许的 item/mode/direct flags/block 状态，不发送 `must_not_claim`、safe fact refs、related clue/world refs、forbidden modes 或 rhetoric tactics。
+
+同日进一步取消 provider private/context DTO：真实 provider payload 不再包含 `private_context` 顶层字段，也不发送目标 NPC 的 self-knowledge summary、fact awareness 或 disclosure strategy。`portrait_summary` 和详细 `inner_portraits` 均不进入真实 provider payload，画像只保留在本地合同、预算/trace 摘要和后端校验上下文中。`npc_skills` 只发送生成需要的 skill id/type、允许 intent/tactic/proposed action、safe fragment refs 和 world_info 披露上限；level、signature、memory plan id 和 relationship delta cap 仍留在本地合同、trace 或 output limits 中，不作为 skill DTO 重复发送。
+
+真实 provider payload 必须排除 mock / replay / audit 字段：`reply_options`、完整 `WorldEvent.payload`、`recent_events`、`context_layers`、`blocked_fact_ids`、`revealable_fact_ids`、`source_event_ids`、`source_memory_ids`、`source_event_id`、`last_updated_event_id`、`created_at`、`updated_at`、`rule_id`、`turn_plan_id` 等不能进入 provider。`AgentMemorySnapshot` 只投影 `memory_id`、type/layer、subject/owner、compact `summary`、salience、confidence 和生成必要 anchors；完整 `content`、`memory_scope` 和检索/审计 metadata 如 `topic_tags`、`adjacent_clue_ids`、`phase_ids`、`key_clue` 不发送给真实模型。禁说事实原文、blocked terms、solution claims、线索 truth_status、其他 NPC private、未选中 memory content 和 `director_audit` memory 仍不能进入该 payload。
 
 `PromptBuilder` 仍由 `AgentLoop` 使用，但当前用途是本地 prompt surface 和 context budget 估算：`agent_prompt` 是 `AgentContext` 的 JSON 摘要，`contract_instruction` 来自 `output_contract.md` 与 `disclosure_policy.md`，`safety_instruction` 来自 NPC turn、memory、tool policy 和 skill discipline。当前 `OpenAILLMAgent` 不把这些段落拼接到 provider 请求里；真实 provider 请求的 system 来源仍是 `system.md`，动态事实和约束来源是由 `LLMAgentContractInput` 投影出的 `LLMProviderTurnPayload`。
 
@@ -486,7 +512,7 @@ P0 硬链路详见 `doc/architecture/p0-hard-chain-2026-06-16.md`。
 
 ## Context hard / soft 边界
 
-2026-06-17 起，LLM 输入合同显式携带 `context_layers`，用于把不可压缩的状态权威边界和可预算裁剪的叙事上下文分开。
+2026-06-17 起，本地 LLM 输入合同显式携带 `context_layers`，用于把不可压缩的状态权威边界和可预算裁剪的叙事上下文分开。2026-06-27 起，`context_layers` 只属于 `LLMAgentContractInput`、预算和 trace，不再进入真实 provider payload；真实 provider payload 通过顶层 `turn`、`memories`、`player_knowledge`、`safe_facts`、`disclosure_limits`、`npc_skills` 和 `output_limits` 承载生成必要信息。
 
 Hard context 是本轮生成的安全边界，不能被 token budget 压缩、丢弃或摘要改写：
 
@@ -511,9 +537,9 @@ Soft context 是表达辅助材料，可以被预算裁剪或压缩：
 
 `TokenBudgetProfile` 是 provider/model 级预算口径，字段包括 `provider`、`model`、`context_limit_tokens`、`reserved_output_tokens`、`safety_margin_tokens` 和 `conservative_multiplier`。可用输入预算必须从 provider context window 中扣除预留输出和安全余量，不能再把裸 context limit 当成 prompt 输入上限。`ContextBudgetManager` 允许注入真实 tokenizer / estimator；默认 estimator 不依赖网络或下载包，用字符数、UTF-8 字节数和词数做保守估算，再应用 conservative multiplier。运行时入口 `create_runtime(...)` 可接收 `token_budget_profile` 和 `token_estimator`，但它们只影响预算估算和 trace，不授予 Agent 状态写入权。
 
-预算判定顺序必须先 hard 后 soft。只要 `hard_context_tokens_estimated` 超过可用输入预算，运行时不得把本轮请求交给 `AgentGateway.generate(...)` 或真实 LLM 正常生成。该路径返回安全拒答 `AgentIntent`，设置 `llm_error.error_type=context_over_limit`，`fallback_used=true`，并强制 `proposed_actions=[]`、`memory_refs=[]`、`disclosure_claims=[]`，因此 Rule Engine 没有可执行的 Agent 副作用请求。
+预算判定顺序必须先 hard 后 soft。只要 `hard_context_tokens_estimated` 超过可用输入预算，运行时不得把本轮请求交给 `AgentGateway.generate(...)` 或真实 LLM 正常生成。soft compression 后如果 serialized compact provider payload 仍超过可用输入预算，同样不得调用 gateway；该路径返回安全拒答 `AgentIntent`，设置 `llm_error.error_type=context_over_limit`，`fallback_used=true`，并强制 `proposed_actions=[]`、`memory_refs=[]`、`disclosure_claims=[]`，因此 Rule Engine 没有可执行的 Agent 副作用请求。
 
-hard 超限不是 soft 压缩。trace 的 `context_layer_budget` 必须写：
+hard 超限和 provider payload 总量超限都不是正常生成。trace 的 `context_layer_budget` 必须写：
 
 - `hard_context_over_limit=true`
 - `fallback_reason=hard_context_over_limit`
@@ -521,7 +547,11 @@ hard 超限不是 soft 压缩。trace 的 `context_layer_budget` 必须写：
 - `compressed_layers=[]`
 - `hard_context_preserved=false`
 
+如果 hard context 未超限但 compact provider payload 超限，trace 必须写 `provider_payload_over_limit=true`，`fallback_reason=provider_payload_over_limit`，并在 gateway 前返回同类 `context_over_limit` fallback。这个状态说明“DTO 已裁剪但仍超出模型输入预算”，不是允许真实模型试运气。
+
 只有当 hard context 仍在预算内，而总上下文超过压缩阈值时，才允许走 soft-only compression：`compression_scope=soft_context`，`compressed_layers=["soft_context"]`。压缩摘要只代表 soft layer 的折叠，不允许替代 phase、玩家知识、Director constraints、skill projection、security flags、selected memory refs 或输出合同。
+
+2026-06-27 起，soft compression 第一阶段不再只是向 `AgentContext` 写入 `compressed_history`。`AgentLoop` 在首次 provider payload 估算超过 compression threshold 后，会用同一个 `compressed_history` 构造 compact provider context，并在二次预算和真实 `AgentGateway.generate(...)` 中使用该 compact `contract_input`。压缩后的 context 会清空 `recent_events` 和 `memory_candidates`，把 `memory_snapshots[].content` 裁成 96 字符短摘要并移除 source ids / timestamps，同时裁掉 `portrait_summary`、`inner_context.inner_portraits`，以及 NPC 公开角色卡里的长描述 / speech style / default tone / catchphrases / visible traits；保留 NPC id、display name、public role、defensive / pressure / trust / fear response。该阶段不裁 hard context、Director safe fragments、disclosure limits、NPC skills 或 output limits，避免把 token 压缩误变成事实或安全合同压缩。
 
 `AgentLoop` 在 trace 中写入 `context_layer_budget`，只记录压缩范围、hard/soft token 估算、hard 超限标记、fallback reason、预算 profile 元数据、soft recent event 数和 selected memory 数，不记录玩家原文、memory content、private 原文或 safe fragment summary。该 trace 字段用于证明预算处理是否只影响 soft context；hard context 是否进入 LLM 以 `LLMAgentContractInput.context_layers.hard` 为准。
 
@@ -539,3 +569,68 @@ Provider token budget 的专项说明见 `doc/runtime/provider-token-budget-2026
 - selected payload 只允许记录 `skill_id`、`type`、`level`、`signature`、`safe_fragment_refs`、`allowed_intents`、`allowed_tactics`、`allowed_proposed_actions`、`target_id` 和 `action_type`。禁止写 skill 正文、safe summary、private 原文、memory content、玩家原文。
 - `npc_skill.rejected` 只记录 selector 明确产出的 `skill_id` 与稳定 reason，例如 `trigger_mismatch`、`clue_locked`、`owner_mismatch`。第一阶段不推断额外拒绝原因，也不让 LLM 自报或伪造 skill 状态。
 - `npc_skill.cooldown.updated` 仅作为事件类型预留；当前阶段不落 cooldown 状态，避免在没有完整恢复策略前引入伪状态。
+
+## 多 Agent 编排判断
+
+2026-06-27 当前结论：可以参考 Stanford Generative Agents / Smallville 的 memory、reflection、planning、observation 和 conversation 概念，但不能直接引入开放式 AI 小镇运行时。当前生产路线应优先新增可回放的 NPC location、schedule、perception、hearsay 和 autonomy intent 事件，再让 Director 与 RuleEngine 审计所有 NPC 自主行为。
+
+现有 `app/agents/orchestrator.py` 的 `AgentOrchestrator.run_secondary_reactions(...)` 只能作为实验/测试夹具。它把同一个玩家 `PlayerAction` 复制给其他 NPC，没有场景可见性、NPC-NPC 语义、触发原因和规则裁决，不应作为生产级多 Agent 编排入口。
+
+详细方案见 [planning/multi-agent-orchestration-current-review-2026-06-27.md](planning/multi-agent-orchestration-current-review-2026-06-27.md)。
+## Meeting Agent Boundary V1
+
+公开会议 V1 不把所有 NPC 接入自由群聊。`meeting_ask` 和 `meeting_open_vote` 目前只生成确定性 NPC 回应/投票事件，用于验证会议 UI、事件流、replay 和裁决规则闭环。
+
+后续接入 LLM speaker 时，LLM 只能生成 `meeting.message.proposed` 的候选发言；候选必须经过 Narrative Director 的剧透/越权检查和 Rule Engine 的会议规则校验后，才能落为 `meeting.message.posted`。会议发言只能基于该 NPC 可见的 memory、会议中已经公开的消息、玩家公开展示的 evidence 和角色公开设定，不能读取其他 NPC 私有记忆或 Director 审计内容。
+
+会议投票是角色立场，不是事实来源。`meeting.vote.cast` 不得解锁 clue、不得推进 phase、不得直接写 memory snapshot；它只能由 `DerivedEventSystem` 派生低权威 belief candidate，再交给 `MemorySnapshotSystem` 归并。正式判决必须通过 `meeting.verdict.proposed -> RuleEngine -> meeting.verdict.accepted/rejected`，并且只有 accepted 后才能产生 `player.accused` / `accusation.evaluated`。
+## Meeting Speaker And Memory Follow-up 2026-06-27
+
+会议 V1 的 Agent 边界仍然是保守正确的：当前没有真正的 speaker selector，也没有会议 LLM 发言。`meeting_ask` 只是点名目标 NPC 的确定性回复，不能被理解为“群聊 Agent 已接入”。
+
+下一阶段 speaker selector 必须在 LLM 调用前运行，输入只能来自当前会议公开事件、玩家公开展示的 evidence、NPC 自己可见的 memory / 角色认知、当前议题和 Director 给出的安全边界。selector 的输出应是少量候选 speaker 与原因，不应直接生成自然语言发言，也不应写世界事实。
+
+会议 LLM 发言的正确链路是：
+
+```text
+meeting topic + public meeting events + selected NPC visible memory
+  -> MeetingSpeakerSelector
+  -> selected speaker AgentContext
+  -> LLM AgentIntent / speech candidate
+  -> meeting.message.proposed
+  -> NarrativeDirector postcheck
+  -> RuleEngine records meeting.message.posted or meeting.message.rejected
+```
+
+meeting memory 已实现为事件派生切片：只能从已落库的 `meeting.message.posted` / `meeting.vote.cast` 派生 `memory_candidate.created`，并由 `MemorySnapshotSystem` 归并；不能让 LLM 在会议中直接写 `memory_snapshots`。会议投票最多形成低权威 belief / pressure 输入，不能作为 `rule_verified` 真相，也不能替代 DeductionEvaluator 的证据链判断。
+
+## Meeting Memory Agent Boundary 2026-06-27
+
+会议记忆对 Agent 的意义是“未来检索可见的上下文”，不是会议 LLM 的事实捷径：
+
+- 玩家会议发言和公开证据消息使用 `scene_shared/working`，因为当前 `MemoryScope` 没有 `meeting_shared`；可见性必须限制在会议参会 NPC。
+- NPC 会议发言只给该 NPC 自己形成 `npc_private/working` 记忆，不能通过会议事件把一个 NPC 的私有表达直接污染其他 NPC 记忆。
+- 会议投票使用 `belief`，`authority_source=npc_hearsay`，`confidence <= 0.5`，以保证它在检索和权威裁决中低于 rule/player evidence。
+
+这些派生都发生在 `DerivedEventSystem + MemorySnapshotSystem`，不调用 LLM，不改变 `AgentIntent` 合同，也不授予任何 clue / phase / verdict 权限。
+
+## Meeting Agent Production Slice 2026-06-27
+
+会议 Agent V1 的生产入口已经落到 `ActionService`：
+
+- `meeting_ask` 先由 Rule Engine 写玩家问题，再由 `MeetingSpeakerSelector(max_speakers=2)` 选择少量 speaker。当前策略只允许被点名 NPC 发言，这是刻意保守的第一版。
+- `MeetingContextBuilder` 只给 speaker 提供公开会议消息、会议中公开展示过的 evidence、以及该 NPC 可见的 memory snapshot。它不能读取全局真相、其他 NPC 私有记忆、Director 审计事件或未公开 world info。
+- NPC 会议回应先落 `meeting.message.proposed`，再通过 Rule Engine 记录为 `meeting.message.posted`。V1 的文本仍是确定性回复，不调用 LLM。
+- 所有 accepted 会议消息和投票都经 `DerivedEventSystem` 派生 memory，再由 `MemorySnapshotSystem` 归并。LLM 以后接入会议发言时也只能产候选表达，不能直接写 memory。
+- 会议投票继续保持低权威：`meeting.vote.cast -> belief memory`，`authority_source=npc_hearsay`，`confidence <= 0.5`，不得参与 clue unlock、phase advance 或 verdict acceptance。
+
+## Meeting Narrator Boundary 2026-06-27
+
+会议旁白不是 NPC Agent，也不是 LLM speaker。它是 Director 视角的公开叙事投影：
+
+- 输入只能是已经发生的 `meeting.verdict.accepted`、`narrative.beat.completed`、`narrative.phase.changed`。
+- 输出只能是 `meeting.message.posted`，`speaker_id=director`，`message_kind=narration`。
+- 旁白不得产生 `AgentIntent`，不得提出 `proposed_actions`，不得直接写 memory snapshot。
+- 旁白派生 memory 时使用 `scene_shared/working`、`authority_source=system_rule`、`authority=rule_verified`，可见性限制为会议参会 NPC。
+
+这保证旁白能增强会议推进感，但不会变成新的事实修改入口。

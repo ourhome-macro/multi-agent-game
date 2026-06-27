@@ -9,7 +9,10 @@ from app.domain.models import (
     ClueSummary,
     EventType,
     EvidenceSummary,
+    MeetingStateSummary,
+    MeetingVoteSummary,
     NarrativeState,
+    NpcLocationSummary,
     PlayerKnowledgeState,
     PlayerKnowledgeSummary,
     RelationshipState,
@@ -19,6 +22,7 @@ from app.domain.models import (
 from app.rules.engine import relationship_key
 from app.runtime.character_fact_awareness import build_initial_character_fact_awareness
 from app.runtime.events import EventRecorder
+from app.runtime.npc_locations import initial_npc_locations
 
 
 class InMemoryCaseStore:
@@ -53,6 +57,7 @@ class InMemorySessionStore:
             id=str(uuid4()),
             case_id=package.meta.id,
             narrative=NarrativeState(phase=package.meta.initial_phase),
+            npc_locations=initial_npc_locations(package),
             relationships={
                 relationship_key(item.source_id, item.target_id): RelationshipState(
                     **item.model_dump()
@@ -131,6 +136,40 @@ def build_state_summary(package: CasePackage, session: SessionState) -> StateSum
             )
         ],
         evidence_assets=evidence_assets,
+        npc_locations=[
+            NpcLocationSummary(npc_id=location.npc_id, scene_id=location.scene_id)
+            for location in sorted(
+                session.npc_locations.values(),
+                key=lambda value: value.npc_id,
+            )
+        ],
+        meeting=MeetingStateSummary(
+            active=session.meeting.active,
+            meeting_id=session.meeting.meeting_id,
+            topic=session.meeting.topic,
+            participant_ids=list(session.meeting.participant_ids),
+            turn=session.meeting.turn,
+            vote_open=session.meeting.vote_open,
+            vote_target_id=session.meeting.vote_target_id,
+            votes=[
+                MeetingVoteSummary(
+                    voter_id=vote.voter_id,
+                    target_id=vote.target_id,
+                    choice=vote.choice,
+                    reason=vote.reason,
+                )
+                for vote in sorted(
+                    session.meeting.votes.values(),
+                    key=lambda value: value.voter_id,
+                )
+            ],
+            verdict_target_id=session.meeting.verdict_target_id,
+            verdict_status=session.meeting.verdict_status,
+            verdict_result=session.meeting.verdict_result,
+            verdict_reason=session.meeting.verdict_reason,
+            missing_required_evidence=list(session.meeting.missing_required_evidence),
+            missing_required_world_info=list(session.meeting.missing_required_world_info),
+        ),
         relationships=list(session.relationships.values()),
         event_count=len(session.events),
     )

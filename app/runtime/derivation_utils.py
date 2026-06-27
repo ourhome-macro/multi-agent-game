@@ -1,10 +1,17 @@
 from __future__ import annotations
 
 AUTHORITY_SOURCE_PLAYER_EVIDENCE = "player_evidence"
+AUTHORITY_SOURCE_PLAYER_ACTION = "player_action"
+AUTHORITY_SOURCE_SYSTEM_RULE = "system_rule"
 AUTHORITY_SOURCE_RULE_DERIVED = "rule_derived"
+AUTHORITY_SOURCE_WORLD_EVENT = "world_event"
+AUTHORITY_SOURCE_NPC_HEARSAY = "npc_hearsay"
 PRIVACY_REASON_PRIVATE_PRESENTATION = "private_presentation"
 PRIVACY_REASON_SCENE_SHARED_PRESENTATION = "scene_shared_presentation"
 PRIVACY_REASON_SCENE_SHARED_PRIVATE_INTERPRETATION = "scene_shared_private_interpretation"
+PRIVACY_REASON_MEETING_SHARED = "meeting_shared"
+PRIVACY_REASON_MEETING_NPC_PRIVATE = "meeting_npc_private"
+PRIVACY_REASON_MEETING_VOTE = "meeting_vote"
 
 
 def memory_id(*parts: object) -> str:
@@ -91,6 +98,26 @@ def relationship_threshold_memory_id(
 
 def director_blocked_memory_id(target_id: object, blocked_fact_id: object) -> str:
     return memory_id("memory", "player", "director_blocked", target_id, blocked_fact_id)
+
+
+def npc_observed_memory_id(observer_id: object, observed_event_id: object) -> str:
+    return memory_id("memory", "player", "npc_observed", observer_id, observed_event_id)
+
+
+def npc_hearsay_memory_id(receiver_id: object, hearsay_event_id: object) -> str:
+    return memory_id("memory", "player", "npc_hearsay", receiver_id, hearsay_event_id)
+
+
+def meeting_shared_message_memory_id(meeting_id: object, message_event_id: object) -> str:
+    return memory_id("memory", "player", "meeting", "shared_message", meeting_id, message_event_id)
+
+
+def meeting_npc_message_memory_id(speaker_id: object, message_event_id: object) -> str:
+    return memory_id("memory", "player", "meeting", "npc_message", speaker_id, message_event_id)
+
+
+def meeting_vote_belief_memory_id(meeting_id: object, vote_event_id: object) -> str:
+    return memory_id("memory", "player", "meeting", "vote_belief", meeting_id, vote_event_id)
 
 
 def append_unique(items: list[str], item: str) -> None:

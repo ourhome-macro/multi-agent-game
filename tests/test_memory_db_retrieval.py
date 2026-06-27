@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from datetime import UTC, datetime
 
 from app.agents.gateway import AgentGateway
@@ -14,6 +15,7 @@ from app.domain.models import (
     CasePackage,
     CharacterConfig,
     ClueConfig,
+    ForbiddenFactConfig,
     NarrativeState,
     PlayerAction,
     SceneConfig,
@@ -41,6 +43,53 @@ class RecordingMemoryStore(InMemoryMemoryStore):
     ) -> list[AgentMemorySnapshot]:
         self.queries.append(query)
         return super().fetch_candidates(session=session, query=query)
+
+
+class QueryPrefilteringMemoryStore(InMemoryMemoryStore):
+    backend_name = "query_prefiltering_test"
+
+    def __init__(self) -> None:
+        self.queries: list[MemoryStoreQuery] = []
+
+    def fetch_candidates(
+        self,
+        *,
+        session: SessionState,
+        query: MemoryStoreQuery,
+    ) -> list[AgentMemorySnapshot]:
+        self.queries.append(query)
+        candidates = super().fetch_candidates(session=session, query=query)
+        terms = tuple(query.query_anchors) + tuple(query.query_tokens)
+        if not terms:
+            return candidates
+        normalized_terms = {
+            " ".join(str(term).casefold().split())
+            for term in terms
+            if len(str(term).strip()) >= 2
+        }
+        return [
+            snapshot
+            for snapshot in candidates
+            if any(term in _prefilter_haystack(snapshot) for term in normalized_terms)
+        ]
+
+
+class OverRecallingMemoryStore:
+    backend_name = "over_recalling_test"
+
+    def __init__(self, snapshots: list[AgentMemorySnapshot]) -> None:
+        self.snapshots = snapshots
+        self.queries: list[MemoryStoreQuery] = []
+
+    def fetch_candidates(
+        self,
+        *,
+        session: SessionState,
+        query: MemoryStoreQuery,
+    ) -> list[AgentMemorySnapshot]:
+        _ = session
+        self.queries.append(query)
+        return list(self.snapshots)
 
 
 def test_in_memory_store_preserves_legacy_retrieval_result() -> None:
@@ -150,6 +199,116 @@ def test_retriever_passes_semantic_alias_tokens_to_store_prefilter() -> None:
     assert _memory_ids(result) == ["memory.visible.semantic_prefilter"]
     assert store.queries[0].query_anchors == ("empty_capsules",)
     assert {"capsules", "medicine"} <= set(store.queries[0].query_tokens)
+
+
+def test_retriever_expands_source_links_from_unprefiltered_store_pool() -> None:
+    store = QueryPrefilteringMemoryStore()
+    anchor = _memory(
+        memory_id="memory.source.001",
+        content="player mentioned uniqueanchor to Jiang",
+        salience=0.6,
+    )
+    strategy = _memory(
+        memory_id="memory.linked.strategy",
+        content="Jiang should deflect without adding facts.",
+        memory_type="strategy",
+        source_memory_ids=[anchor.memory_id],
+        metadata={
+            "authority_source": "player_evidence",
+            "strategy_id": "deflect_topic",
+        },
+        salience=0.1,
+    )
+    session = _session([anchor, strategy])
+
+    result = MemoryRetriever(
+        max_results=10,
+        memory_store=store,
+    ).retrieve(
+        case=_case(),
+        session=session,
+        action=PlayerAction(type=ActionType.TALK, target_id=JIANG, text="uniqueanchor"),
+        plan=_plan(),
+    )
+
+    assert _memory_ids(result) == [anchor.memory_id, strategy.memory_id]
+    assert len(store.queries) == 2
+    assert store.queries[0].query_tokens == ("uniqueanchor",)
+    assert store.queries[1].query_tokens == ()
+    assert store.queries[1].query_anchors == ()
+
+
+def test_retriever_hard_filters_remain_final_boundary_after_store_overrecall() -> None:
+    visible = _memory(
+        memory_id="memory.visible.allowed",
+        content="empty capsules visible projected memory",
+        metadata={"phase_id": PHASE},
+        salience=0.7,
+    )
+    hidden = _memory(
+        memory_id="memory.hidden.other_npc",
+        content="empty capsules hidden from Jiang",
+        owner_character_id=SHEN,
+        visible_to_character_ids=[SHEN],
+        metadata={"phase_id": PHASE},
+        salience=1.0,
+    )
+    wrong_phase = _memory(
+        memory_id="memory.wrong_phase",
+        content="empty capsules later phase memory",
+        metadata={"phase_id": "reveal"},
+        salience=1.0,
+    )
+    no_source = _memory(
+        memory_id="memory.no_source",
+        content="empty capsules without provenance",
+        metadata={"phase_id": PHASE},
+        salience=1.0,
+    ).model_copy(update={"source_event_ids": []})
+    forbidden = _memory(
+        memory_id="memory.forbidden",
+        content="empty capsules locked truth",
+        metadata={"phase_id": PHASE},
+        salience=1.0,
+    )
+    plan_disallowed = _memory(
+        memory_id="memory.plan_disallowed",
+        content="empty capsules disallowed memory type",
+        memory_type="relationship",
+        metadata={"phase_id": PHASE},
+        salience=1.0,
+    )
+    snapshots = [
+        hidden,
+        wrong_phase,
+        no_source,
+        forbidden,
+        plan_disallowed,
+        visible,
+    ]
+    store = OverRecallingMemoryStore(snapshots)
+    case = _case().model_copy(
+        update={
+            "forbidden_facts": [
+                ForbiddenFactConfig(
+                    id="fact.locked_truth",
+                    text="locked truth",
+                    blocked_terms=["locked truth"],
+                )
+            ]
+        }
+    )
+
+    result = MemoryRetriever(max_results=10, memory_store=store).retrieve(
+        case=case,
+        session=_session(snapshots),
+        action=PlayerAction(type=ActionType.TALK, target_id=JIANG, text="empty capsules"),
+        plan=replace(_plan(), included_memory_types=("episodic",)),
+    )
+
+    assert _memory_ids(result) == [visible.memory_id]
+    assert store.queries[0].enforce_target_visibility is True
+    assert store.queries[0].query_tokens == ("capsule", "capsules", "empty")
 
 
 def test_store_trace_summary_excludes_memory_content() -> None:
@@ -267,6 +426,8 @@ def test_postgres_memory_store_queries_projection_with_phase_and_visibility_filt
     assert "content ILIKE" in connection.query
     assert "source_ref.value ILIKE" in connection.query
     assert "metadata::text ILIKE" in connection.query
+    assert "to_tsvector( 'simple', concat_ws(" in connection.query
+    assert ") @@ plainto_tsquery('simple', query_term.term)" in connection.query
     assert "content = %s" not in connection.query
     assert connection.params == (
         SESSION_ID,
@@ -280,6 +441,43 @@ def test_postgres_memory_store_queries_projection_with_phase_and_visibility_filt
         PHASE,
         PHASE,
         ["empty_capsules", "capsules", "medicine"],
+    )
+
+
+def test_postgres_memory_store_can_emit_optional_trigram_prefilter_shape() -> None:
+    connection = _FakeConnection(rows=[])
+    store = PostgresMemoryStore(
+        connection,
+        enable_trigram_prefilter=True,
+        trigram_similarity_threshold=0.42,
+    )
+
+    results = store.fetch_candidates(
+        session=_session([]),
+        query=MemoryStoreQuery(
+            session_id=SESSION_ID,
+            target_id=JIANG,
+            phase=PHASE,
+            enforce_target_visibility=False,
+            query_anchors=("empty_capsules",),
+            query_tokens=("capsules",),
+        ),
+    )
+
+    assert results == []
+    assert "word_similarity(query_term.term, content) >= %s" in connection.query
+    assert "word_similarity(query_term.term, memory_id) >= %s" in connection.query
+    assert "word_similarity(query_term.term, metadata::text) >= %s" in connection.query
+    assert "AS fuzzy_source_ref(value)" in connection.query
+    assert connection.params == (
+        SESSION_ID,
+        PHASE,
+        PHASE,
+        ["empty_capsules", "capsules"],
+        0.42,
+        0.42,
+        0.42,
+        0.42,
     )
 
 
@@ -329,6 +527,7 @@ def _memory(
     memory_layer: str = "working",
     owner_character_id: str | None = JIANG,
     visible_to_character_ids: list[str] | None = None,
+    source_memory_ids: list[str] | None = None,
     metadata: dict[str, object] | None = None,
 ) -> AgentMemorySnapshot:
     return AgentMemorySnapshot(
@@ -343,6 +542,7 @@ def _memory(
         ),
         content=content,
         source_event_ids=[f"event.{memory_id}"],
+        source_memory_ids=source_memory_ids or [],
         salience=salience,
         confidence=1.0,
         visibility="private",
@@ -369,6 +569,17 @@ def _plan() -> MemoryRetrievalPlan:
 
 def _memory_ids(memories: list[AgentMemorySnapshot]) -> list[str]:
     return [memory.memory_id for memory in memories]
+
+
+def _prefilter_haystack(snapshot: AgentMemorySnapshot) -> str:
+    values = [
+        snapshot.memory_id,
+        snapshot.content,
+        *snapshot.source_event_ids,
+        *snapshot.source_memory_ids,
+        json.dumps(snapshot.metadata, ensure_ascii=False, sort_keys=True),
+    ]
+    return " ".join(str(value).casefold() for value in values if value)
 
 
 def _postgres_memory_row(

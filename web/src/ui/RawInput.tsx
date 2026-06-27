@@ -23,7 +23,7 @@ export function RawInput({ disabled, onSubmit }: RawInputProps) {
       <input
         value={text}
         onChange={(event) => setText(event.target.value)}
-        placeholder="自然语言行动"
+        placeholder="说出你的行动"
         disabled={disabled}
       />
       <button className="icon-command" type="submit" title="提交" disabled={disabled || !text.trim()}>

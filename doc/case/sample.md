@@ -902,7 +902,247 @@
 
 ---
 
-## 七、可继续扩写方向
+## 七、线索清单（来自 YAML）
+
+来源：`cases/mist_clock_manor/clues.yaml`。
+
+### 关键线索
+
+#### 1. 带苦味的红酒残液
+
+- ID：`bitter_wine`
+- 描述：酒杯残液中有明显苦味，和林栖迟房间中的安眠药气味相近。
+- 真伪状态：`true`
+- 关联事实：`sedative_wine`
+- 关联角色：`lin_qichi`
+- 关联事件：`lin_delivered_wine`
+- 关键线索：是
+
+#### 2. 门锁内侧的新划痕
+
+- ID：`delayed_lock_marks`
+- 描述：锁舌上有新划痕和润滑油，说明书房门锁被人提前做过延时处理。
+- 真伪状态：`true`
+- 关联事实：`timed_lock_modified`
+- 关联角色：`jiang_yanhui`
+- 关联事件：`lock_modified`
+- 关键线索：是
+
+#### 3. 标着“回声钟终稿”的磁带
+
+- ID：`echo_tape`
+- 描述：磁带中先播放十一点十七分钟声，随后出现江若岚的旧录音片段。
+- 真伪状态：`true`
+- 关联事实：`recording_tape_swapped`
+- 关联角色：`qi_yan`、`jiang_yanhui`
+- 关联事件：`tape_swapped`
+- 关键线索：是
+
+#### 4. 烧毁半截的忏悔信附录
+
+- ID：`burned_confession`
+- 描述：残片显示基金成立前提是众人承认江若岚之死属于个人情绪引发的意外。
+- 真伪状态：`true`
+- 关联事实：`fake_confession_plan`
+- 关联角色：`jiang_yanhui`
+- 关联事件：`fake_confession`
+- 关键线索：是
+
+#### 5. 江若岚的录音片段
+
+- ID：`ruolan_voice_tape`
+- 描述：录音中，江若岚指责陆澜生拿走她的剧本、名字和恐惧。
+- 真伪状态：`true`
+- 关联事实：`jiang_ruolan_recording_exists`
+- 关联角色：`jiang_yanhui`、`qi_yan`
+- 关联事件：`old_case_echo`
+- 关键线索：是
+
+#### 6. 重量异常的心脏病胶囊
+
+- ID：`empty_capsules`
+- 描述：药盒中有两颗外观相同却没有药粉的空胶囊。
+- 真伪状态：`true`
+- 关联事实：`heart_medicine_replaced`
+- 关联角色：`jiang_yanhui`
+- 关联事件：`medicine_replaced`
+- 关键线索：是
+
+#### 7. 被人为拉下的主电闸
+
+- ID：`cut_power_trace`
+- 描述：配电箱主闸被人为切断，备用线路仍让录音机定时装置运行。
+- 真伪状态：`true`
+- 关联事实：`power_cut_by_shen`
+- 关联角色：`shen_zhaoye`
+- 关联事件：`power_cut`
+- 关键线索：是
+
+### 支撑线索
+
+#### 8. 备用线路上的旧定时器
+
+- ID：`backup_timer`
+- 描述：钟楼检修箱里有一只仍在走动的旧定时器，接在不经过主闸的小线路上。
+- 真伪状态：`true`
+- 关联事实：`backup_timer_kept_recorder_power`
+- 关联角色：`shen_zhaoye`
+- 关联事件：`power_cut`
+- 关键线索：否
+
+#### 9. 写着“主闸先断”的纸牌
+
+- ID：`breaker_sequence_tag`
+- 描述：纸牌被压在配电箱内侧，旁边有新近挪动过的螺丝刀和绝缘手套。
+- 真伪状态：`true`
+- 关联事实：`power_cut_was_prepared`
+- 关联角色：`shen_zhaoye`
+- 关联事件：`power_cut`
+- 关键线索：否
+
+#### 10. 钟楼齿轮上的新润滑油
+
+- ID：`fresh_gear_oil`
+- 描述：大齿轮边缘有新油痕，油味比山庄平日维修记录里使用的钟油更淡。
+- 真伪状态：`true`
+- 关联事实：`clock_tower_serviced_before_death`
+- 关联角色：`jiang_yanhui`
+- 关联事件：`lock_modified`
+- 关键线索：否
+
+#### 11. 被棉布缠住的钟锤
+
+- ID：`muted_bell_hammer`
+- 描述：钟锤根部缠着深色棉布，布面吸了雾水，像是只为某一晚临时处理过。
+- 真伪状态：`true`
+- 关联事实：`real_bell_was_muted`
+- 关联角色：`qi_yan`、`jiang_yanhui`
+- 关联事件：`tape_swapped`
+- 关键线索：否
+
+#### 12. 门锁试验记录残页
+
+- ID：`lock_test_scrap`
+- 描述：残页上反复写着“九分半、十一分、十三分”，旁边画着书房锁舌的剖面。
+- 真伪状态：`true`
+- 关联事实：`lock_delay_tested`
+- 关联角色：`jiang_yanhui`
+- 关联事件：`lock_modified`
+- 关键线索：否
+
+#### 13. 信托文件的压痕页
+
+- ID：`trust_indent_page`
+- 描述：白纸上留下信托条款的压痕，能辨出“承认”“基金”“旧事终止”等词。
+- 真伪状态：`true`
+- 关联事实：`trust_terms_pressured_guests`
+- 关联角色：`lin_qichi`、`qi_yan`、`jiang_yanhui`、`shen_zhaoye`
+- 关联事件：`fake_confession`
+- 关键线索：否
+
+#### 14. 抽屉衬纸上的白色药粉
+
+- ID：`capsule_powder_on_liner`
+- 描述：药盒下方的衬纸有细白粉末和两处胶囊压痕，痕迹被书页遮过。
+- 真伪状态：`true`
+- 关联事实：`capsule_powder_removed`
+- 关联角色：`jiang_yanhui`
+- 关联事件：`medicine_replaced`
+- 关键线索：否
+
+#### 15. 褪色的助眠药瓶标签
+
+- ID：`sedative_bottle_label`
+- 描述：标签上残留林栖迟常用药房的贴纸，苦味说明与红酒残液相近。
+- 真伪状态：`true`
+- 关联事实：`sedative_source_matches_wine`
+- 关联角色：`lin_qichi`
+- 关联事件：`lin_delivered_wine`
+- 关键线索：否
+
+#### 16. 磁带接口上的二次剪接痕
+
+- ID：`tape_splice_mark`
+- 描述：磁带边缘有两种胶带接口，较新的接口压住了较旧的剪接线。
+- 真伪状态：`true`
+- 关联事实：`tape_was_edited_twice`
+- 关联角色：`qi_yan`、`jiang_yanhui`
+- 关联事件：`tape_swapped`
+- 关键线索：否
+
+#### 17. 怀表停针与校时纸
+
+- ID：`pocket_watch_offset`
+- 描述：陆澜生怀表停在十一点二十二，钟楼校时纸却把当晚慢钟记录在十一点十七附近。
+- 真伪状态：`true`
+- 关联事实：`fake_chime_confused_death_time`
+- 关联角色：`shen_zhaoye`
+- 关联事件：`old_case_echo`
+- 关键线索：否
+
+#### 18. 被遮住的江若岚剧照
+
+- ID：`covered_ruolan_photo`
+- 描述：画框里江若岚的位置被后贴的说明卡遮住，边角仍露出她的舞台袖口。
+- 真伪状态：`true`
+- 关联事实：`ruolan_erased_from_archive`
+- 关联角色：`jiang_yanhui`
+- 关联事件：`old_case_echo`
+- 关键线索：否
+
+#### 19. 改动过的说明牌
+
+- ID：`altered_gallery_plaque`
+- 描述：说明牌上陆澜生作品来源一栏有刮改痕，原先的署名被磨得只剩偏旁。
+- 真伪状态：`true`
+- 关联事实：`ruolan_credit_rewritten`
+- 关联角色：`qi_yan`、`jiang_yanhui`
+- 关联事件：`old_case_echo`
+- 关键线索：否
+
+#### 20. 十年前坠湖剪报
+
+- ID：`lake_death_clipping`
+- 描述：旧报纸把坠湖时间写在雾起前，山庄留存的纪要却把时间推迟了二十分钟。
+- 真伪状态：`true`
+- 关联事实：`old_lake_report_inconsistent`
+- 关联角色：`shen_zhaoye`、`jiang_yanhui`
+- 关联事件：`old_case_echo`
+- 关键线索：否
+
+#### 21. 旧证物盒标签
+
+- ID：`incomplete_evidence_box`
+- 描述：标签编号跳过了三页登记，封条上的旧警局印泥已经被雾气洇开。
+- 真伪状态：`true`
+- 关联事实：`old_case_file_incomplete`
+- 关联角色：`shen_zhaoye`
+- 关联事件：`old_case_echo`
+- 关键线索：否
+
+#### 22. 画廊地毯边的湿泥印
+
+- ID：`gallery_mud_trace`
+- 描述：湿泥印从侧门方向延到画廊边缘，泥色接近湖岸，但鞋底纹路不完整。
+- 真伪状态：`unknown`
+- 关联事实：`lake_mud_trace_recent`
+- 关联角色：`lin_qichi`、`shen_zhaoye`
+- 关联事件：`old_case_echo`
+- 关键线索：否
+
+#### 23. 访客登记册缺页
+
+- ID：`missing_visitor_log_page`
+- 描述：登记册十年前旧页少了一张，断口平整，夹缝里留着深蓝色复写纸粉。
+- 真伪状态：`true`
+- 关联事实：`manor_log_page_removed`
+- 关联角色：`jiang_yanhui`、`shen_zhaoye`
+- 关联事件：`old_case_echo`
+- 关键线索：否
+
+---
+
+## 八、可继续扩写方向
 
 1. 扩写十年前江若岚坠湖案，加入她和陆澜生、江雁回的过去。
 2. 把正文改成更标准的剧本格式：场景号、人物对白、动作提示。

@@ -19,6 +19,9 @@ from app.domain.models import AgentContext, AgentIntent, PlayerAction  # noqa: E
 from app.runtime.service import create_runtime  # noqa: E402
 from app.runtime.tracing import RuntimeTracer  # noqa: E402
 
+DEEPSEEK_BASE_URL = "https://api.deepseek.com"
+DEEPSEEK_DEFAULT_MODEL = "deepseek-v4-flash"
+
 
 @dataclass(frozen=True)
 class Step:
@@ -112,8 +115,14 @@ def _configure_real_backend(args: argparse.Namespace) -> None:
     os.environ["LLM_BACKEND"] = "real"
     os.environ["OPENAI_MODEL"] = args.model
     os.environ["LLM_API_STYLE"] = args.api_style
-    if not os.getenv("OPENAI_API_KEY"):
-        raise RuntimeError("OPENAI_API_KEY is required for real API run")
+    if args.base_url is not None:
+        os.environ["OPENAI_BASE_URL"] = args.base_url
+    elif not os.getenv("OPENAI_BASE_URL") and not os.getenv("LLM_BASE_URL"):
+        os.environ["OPENAI_BASE_URL"] = DEEPSEEK_BASE_URL
+    if not os.getenv("OPENAI_API_KEY") and not os.getenv("DEEPSEEK_API_KEY"):
+        raise RuntimeError(
+            "OPENAI_API_KEY or DEEPSEEK_API_KEY is required for real API run"
+        )
 
 
 def _long_case_steps() -> list[Step]:
@@ -342,7 +351,8 @@ def _line_count(path: Path) -> int:
 
 def _parse_args(argv: list[str] | None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run Mist Clock Manor with real LLM API.")
-    parser.add_argument("--model", default="mimo-v2.5")
+    parser.add_argument("--model", default=DEEPSEEK_DEFAULT_MODEL)
+    parser.add_argument("--base-url")
     parser.add_argument("--api-style", default="chat_completions")
     parser.add_argument("--timeout-seconds", type=float, default=45.0)
     parser.add_argument("--context-limit-tokens", type=int, default=1200)

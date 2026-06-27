@@ -578,7 +578,7 @@ Readable `.log` 只允许从 JSONL 安全字段渲染，不允许额外读取 ra
 
 ```text
 [2026-06-06T12:00:00Z] turn=1 trace=... case=mist_clock_manor session=...
-action=talk target=butler backend=real model=mimo-v2.5 status=ok duration=842ms
+action=talk target=butler backend=real model=deepseek-v4-flash status=ok duration=842ms
 context=62% tokens=5100 compression=false memories=3 tools=1 security=prompt_injection.low
 intent=conceal director=allowed phase=opening->opening events=player.talked,npc.replied,relationship.changed
 player_text=sha256:... len=37

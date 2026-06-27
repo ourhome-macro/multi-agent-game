@@ -17,6 +17,19 @@ class ActionType(StrEnum):
     ASK_ABOUT = "ask_about"
     PRESENT_CLUE = "present_clue"
     ACCUSE = "accuse"
+    MEETING_START = "meeting_start"
+    MEETING_SPEAK = "meeting_speak"
+    MEETING_PRESENT_EVIDENCE = "meeting_present_evidence"
+    MEETING_ASK = "meeting_ask"
+    MEETING_OPEN_VOTE = "meeting_open_vote"
+    MEETING_CAST_VOTE = "meeting_cast_vote"
+    MEETING_PROPOSE_VERDICT = "meeting_propose_verdict"
+
+
+class MeetingVoteChoice(StrEnum):
+    ACCUSE = "accuse"
+    DEFEND = "defend"
+    ABSTAIN = "abstain"
 
 
 class SubjectType(StrEnum):
@@ -37,6 +50,13 @@ class AgentIntentType(StrEnum):
     REFUSE = "refuse"
     PROBE = "probe"
     PANIC = "panic"
+
+
+class NpcAutonomyIntentType(StrEnum):
+    MOVE = "move"
+    OBSERVE = "observe"
+    WAIT = "wait"
+    TALK_TO = "talk_to"
 
 
 class LLMErrorType(StrEnum):
@@ -151,6 +171,7 @@ class CharacterFactAwarenessSourceType(StrEnum):
 
 class EventType(StrEnum):
     SESSION_CREATED = "session.created"
+    TOWN_TICK_ADVANCED = "town.tick.advanced"
     PLAYER_INSPECTED = "player.inspected"
     PLAYER_TALKED = "player.talked"
     PLAYER_ASKED_ABOUT = "player.asked_about"
@@ -161,6 +182,22 @@ class EventType(StrEnum):
     NPC_SKILL_REJECTED = "npc_skill.rejected"
     NPC_SKILL_COOLDOWN_UPDATED = "npc_skill.cooldown.updated"
     NPC_REPLIED = "npc.replied"
+    NPC_LOCATION_CHANGED = "npc.location.changed"
+    NPC_OBSERVED = "npc.observed"
+    NPC_HEARSAY_RECEIVED = "npc.hearsay.received"
+    NPC_AUTONOMY_INTENT_PROPOSED = "npc.autonomy_intent.proposed"
+    NPC_AUTONOMY_INTENT_REJECTED = "npc.autonomy_intent.rejected"
+    MEETING_SESSION_STARTED = "meeting.session.started"
+    MEETING_SESSION_ENDED = "meeting.session.ended"
+    MEETING_TURN_OPENED = "meeting.turn.opened"
+    MEETING_MESSAGE_PROPOSED = "meeting.message.proposed"
+    MEETING_MESSAGE_POSTED = "meeting.message.posted"
+    MEETING_MESSAGE_REJECTED = "meeting.message.rejected"
+    MEETING_VOTE_OPENED = "meeting.vote.opened"
+    MEETING_VOTE_CAST = "meeting.vote.cast"
+    MEETING_VERDICT_PROPOSED = "meeting.verdict.proposed"
+    MEETING_VERDICT_ACCEPTED = "meeting.verdict.accepted"
+    MEETING_VERDICT_REJECTED = "meeting.verdict.rejected"
     DIRECTOR_BLOCKED = "director.blocked"
     RULE_REJECTED = "rule.rejected"
     CLUE_DISCOVERED = "clue.discovered"
@@ -311,6 +348,105 @@ class APIErrorResponse(APIModel):
     details: dict[str, Any] = Field(default_factory=dict)
     retryable: bool = False
     correlation_id: NonEmptyString
+
+
+class TownClockState(APIModel):
+    tick: int = Field(default=0, ge=0)
+    updated_at_event_id: str | None = None
+
+
+class MeetingVoteState(APIModel):
+    voter_id: NonEmptyString
+    target_id: NonEmptyString
+    choice: MeetingVoteChoice
+    reason: str | None = None
+    event_id: str | None = None
+
+
+class MeetingSessionState(APIModel):
+    active: bool = False
+    meeting_id: str | None = None
+    topic: str | None = None
+    participant_ids: list[NonEmptyString] = Field(default_factory=list)
+    started_at_event_id: str | None = None
+    ended_at_event_id: str | None = None
+    turn: int = Field(default=0, ge=0)
+    vote_open: bool = False
+    vote_target_id: str | None = None
+    votes: dict[str, MeetingVoteState] = Field(default_factory=dict)
+    verdict_target_id: str | None = None
+    verdict_status: str | None = None
+    verdict_result: str | None = None
+    verdict_reason: str | None = None
+    missing_required_evidence: list[NonEmptyString] = Field(default_factory=list)
+    missing_required_world_info: list[NonEmptyString] = Field(default_factory=list)
+    verdict_event_id: str | None = None
+
+
+class NpcLocationState(APIModel):
+    npc_id: NonEmptyString
+    scene_id: NonEmptyString
+    position_x: float | None = None
+    position_y: float | None = None
+    facing: str | None = None
+    updated_at_tick: int | None = Field(default=None, ge=0)
+    updated_at_event_id: str | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_character_id_alias(cls, value: object) -> object:
+        if not isinstance(value, dict):
+            return value
+        normalized = dict(value)
+        character_id = normalized.pop("character_id", None)
+        if "npc_id" not in normalized and character_id is not None:
+            normalized["npc_id"] = character_id
+        return normalized
+
+
+class NpcAutonomyIntent(APIModel):
+    npc_id: NonEmptyString
+    type: NpcAutonomyIntentType
+    target_scene_id: NonEmptyString | None = None
+    target_character_id: NonEmptyString | None = None
+    target_hotspot_id: NonEmptyString | None = None
+    topic_refs: list[NonEmptyString] = Field(default_factory=list)
+    memory_refs: list[NonEmptyString] = Field(default_factory=list)
+    speech: str | None = None
+    risk_flags: list[NonEmptyString] = Field(default_factory=list)
+    duration_ticks: int | None = Field(default=None, ge=1)
+    rationale: str = ""
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_autonomy_aliases(cls, value: object) -> object:
+        if not isinstance(value, dict):
+            return value
+        normalized = dict(value)
+        actor_id = normalized.pop("actor_id", None)
+        intent_type = normalized.pop("intent_type", None)
+        target_id = normalized.pop("target_id", None)
+        to_scene_id = normalized.pop("to_scene_id", None)
+        flags = normalized.pop("flags", None)
+        if "npc_id" not in normalized and actor_id is not None:
+            normalized["npc_id"] = actor_id
+        if "type" not in normalized and intent_type is not None:
+            normalized["type"] = intent_type
+        if "target_character_id" not in normalized and target_id is not None:
+            normalized["target_character_id"] = target_id
+        if "target_scene_id" not in normalized and to_scene_id is not None:
+            normalized["target_scene_id"] = to_scene_id
+        if "risk_flags" not in normalized and flags is not None:
+            normalized["risk_flags"] = flags
+        return normalized
+
+    @model_validator(mode="after")
+    def validate_intent_targets(self) -> NpcAutonomyIntent:
+        if self.type == NpcAutonomyIntentType.MOVE and self.target_scene_id is None:
+            raise ValueError("move intent requires target_scene_id")
+        if self.type == NpcAutonomyIntentType.TALK_TO and self.target_character_id is None:
+            raise ValueError("talk_to intent requires target_character_id")
+        return self
 
 
 class CaseMeta(APIModel):
@@ -1191,6 +1327,7 @@ class PlayerAction(APIModel):
     evidence_clue_ids: list[NonEmptyString] = Field(default_factory=list)
     subject_type: SubjectType | None = None
     subject_id: NonEmptyString | None = None
+    vote: MeetingVoteChoice | None = None
     text: str | None = None
     force_forbidden: bool = False
 
@@ -1207,6 +1344,8 @@ class PlayerAction(APIModel):
                 raise ValueError("presentation_mode is only valid for present_clue")
             if self.claim_id is not None or self.evidence_clue_ids:
                 raise ValueError("claim fields are only valid for accuse")
+            if self.vote is not None:
+                raise ValueError("vote is only valid for meeting_cast_vote")
             return self
         if self.type == ActionType.PRESENT_CLUE:
             if self.clue_id is None:
@@ -1215,6 +1354,8 @@ class PlayerAction(APIModel):
                 raise ValueError("subject fields are only valid for ask_about")
             if self.claim_id is not None or self.evidence_clue_ids:
                 raise ValueError("claim fields are only valid for accuse")
+            if self.vote is not None:
+                raise ValueError("vote is only valid for meeting_cast_vote")
             if (
                 self.presentation_mode == PresentationMode.PRIVATE
                 and self.scene_id is not None
@@ -1237,6 +1378,45 @@ class PlayerAction(APIModel):
                 raise ValueError("presentation_mode is only valid for present_clue")
             if self.subject_type is not None or self.subject_id is not None:
                 raise ValueError("subject fields are only valid for ask_about")
+            if self.vote is not None:
+                raise ValueError("vote is only valid for meeting_cast_vote")
+            return self
+        if self.type in {
+            ActionType.MEETING_START,
+            ActionType.MEETING_SPEAK,
+            ActionType.MEETING_PRESENT_EVIDENCE,
+            ActionType.MEETING_ASK,
+            ActionType.MEETING_OPEN_VOTE,
+            ActionType.MEETING_CAST_VOTE,
+            ActionType.MEETING_PROPOSE_VERDICT,
+        }:
+            if self.type == ActionType.MEETING_PRESENT_EVIDENCE and self.clue_id is None:
+                raise ValueError("meeting_present_evidence requires clue_id")
+            if self.type != ActionType.MEETING_PRESENT_EVIDENCE and self.clue_id is not None:
+                raise ValueError(
+                    "clue_id is only valid for present_clue or meeting_present_evidence"
+                )
+            if self.scene_id is not None or self.presentation_mode is not None:
+                raise ValueError("scene fields are only valid for present_clue")
+            if self.type == ActionType.MEETING_CAST_VOTE:
+                if self.vote is None:
+                    raise ValueError("meeting_cast_vote requires vote")
+            elif self.vote is not None:
+                raise ValueError("vote is only valid for meeting_cast_vote")
+            if self.type != ActionType.MEETING_ASK and (
+                self.subject_type is not None or self.subject_id is not None
+            ):
+                raise ValueError("subject fields are only valid for ask_about or meeting_ask")
+            if self.type == ActionType.MEETING_ASK and (
+                (self.subject_type is None) != (self.subject_id is None)
+            ):
+                raise ValueError("meeting_ask subject_type and subject_id must be set together")
+            if self.type != ActionType.MEETING_PROPOSE_VERDICT and (
+                self.claim_id is not None or self.evidence_clue_ids
+            ):
+                raise ValueError(
+                    "claim fields are only valid for accuse or meeting_propose_verdict"
+                )
             return self
         if self.clue_id is not None:
             raise ValueError("clue_id is only valid for present_clue")
@@ -1248,6 +1428,8 @@ class PlayerAction(APIModel):
             raise ValueError("claim fields are only valid for accuse")
         if self.subject_type is not None or self.subject_id is not None:
             raise ValueError("subject fields are only valid for ask_about")
+        if self.vote is not None:
+            raise ValueError("vote is only valid for meeting_cast_vote")
         return self
 
     @property
@@ -1532,6 +1714,9 @@ class SessionState(APIModel):
     id: NonEmptyString
     case_id: NonEmptyString
     narrative: NarrativeState
+    town_clock: TownClockState = Field(default_factory=TownClockState)
+    npc_locations: dict[str, NpcLocationState] = Field(default_factory=dict)
+    meeting: MeetingSessionState = Field(default_factory=MeetingSessionState)
     relationships: dict[str, RelationshipState]
     relationship_thresholds_crossed: set[str] = Field(default_factory=set)
     discovered_clues: set[str] = Field(default_factory=set)
@@ -1615,6 +1800,35 @@ class PublicEvidenceSummary(APIModel):
     clue_id: NonEmptyString | None = None
 
 
+class NpcLocationSummary(APIModel):
+    npc_id: NonEmptyString
+    scene_id: NonEmptyString
+
+
+class MeetingVoteSummary(APIModel):
+    voter_id: NonEmptyString
+    target_id: NonEmptyString
+    choice: MeetingVoteChoice
+    reason: str | None = None
+
+
+class MeetingStateSummary(APIModel):
+    active: bool = False
+    meeting_id: str | None = None
+    topic: str | None = None
+    participant_ids: list[NonEmptyString] = Field(default_factory=list)
+    turn: int = Field(default=0, ge=0)
+    vote_open: bool = False
+    vote_target_id: str | None = None
+    votes: list[MeetingVoteSummary] = Field(default_factory=list)
+    verdict_target_id: str | None = None
+    verdict_status: str | None = None
+    verdict_result: str | None = None
+    verdict_reason: str | None = None
+    missing_required_evidence: list[NonEmptyString] = Field(default_factory=list)
+    missing_required_world_info: list[NonEmptyString] = Field(default_factory=list)
+
+
 class StateSummary(APIModel):
     session_id: NonEmptyString
     case_id: NonEmptyString
@@ -1625,6 +1839,8 @@ class StateSummary(APIModel):
     discovered_clues: list[ClueSummary]
     player_knowledge: list[PlayerKnowledgeSummary]
     evidence_assets: list[EvidenceSummary] = Field(default_factory=list)
+    npc_locations: list[NpcLocationSummary] = Field(default_factory=list)
+    meeting: MeetingStateSummary = Field(default_factory=MeetingStateSummary)
     relationships: list[RelationshipState]
     event_count: int
 
@@ -1639,6 +1855,8 @@ class PublicStateSummary(APIModel):
     discovered_clues: list[ClueSummary]
     player_knowledge: list[PublicPlayerKnowledgeSummary]
     evidence_assets: list[PublicEvidenceSummary] = Field(default_factory=list)
+    npc_locations: list[NpcLocationSummary] = Field(default_factory=list)
+    meeting: MeetingStateSummary = Field(default_factory=MeetingStateSummary)
     relationships: list[RelationshipState]
     event_count: int
 

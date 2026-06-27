@@ -234,7 +234,7 @@ def test_agent_trace_records_budget_compression_only_on_soft_context(tmp_path: P
     assert budget["hard_context_tokens_estimated"] > 0
     assert budget["soft_context_tokens_estimated"] > 0
     assert budget["hard_context_preserved"] is True
-    assert budget["soft_recent_event_count"] > 0
+    assert budget["soft_recent_event_count"] == 0
     assert budget["selected_memory_count"] == 1
 
 

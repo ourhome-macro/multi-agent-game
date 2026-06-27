@@ -32,3 +32,15 @@ PLAYER_ACCUSED_MEMORY_RULE_ID = "memory_rule.core.player_accused.episodic.v1"
 ACCUSATION_EVALUATED_MEMORY_RULE_ID = (
     "memory_rule.core.accusation_evaluated.episodic.v1"
 )
+NPC_OBSERVED_MEMORY_RULE_ID = "memory_rule.core.npc_observed.episodic.v1"
+NPC_HEARSAY_MEMORY_RULE_ID = "memory_rule.core.npc_hearsay.belief.v1"
+MEETING_SHARED_MESSAGE_MEMORY_RULE_ID = (
+    "memory_rule.core.meeting_message.shared.episodic.v1"
+)
+MEETING_NARRATION_MEMORY_RULE_ID = (
+    "memory_rule.core.meeting_message.narration.episodic.v1"
+)
+MEETING_NPC_MESSAGE_MEMORY_RULE_ID = (
+    "memory_rule.core.meeting_message.npc_private.episodic.v1"
+)
+MEETING_VOTE_BELIEF_MEMORY_RULE_ID = "memory_rule.core.meeting_vote.belief.v1"

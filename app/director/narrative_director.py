@@ -24,6 +24,11 @@ from app.domain.models import (
     SessionState,
     SubjectType,
 )
+from app.runtime.npc_autonomy import (
+    ALLOWED_NPC_AUTONOMY_TYPES,
+    autonomy_intent_type,
+    forbidden_autonomy_side_effects,
+)
 
 SAFE_SPEECH = "I cannot discuss that right now."
 
@@ -135,6 +140,28 @@ class NarrativeDirector:
             undiscovered = sorted(set(action.evidence_clue_ids) - session.discovered_clues)
             if undiscovered:
                 return DirectorDecision(allowed=False, reason="evidence_not_discovered")
+
+        return DirectorDecision(allowed=True)
+
+    def precheck_npc_autonomy(
+        self,
+        case: CasePackage,
+        session: SessionState,
+        intent: object,
+    ) -> DirectorDecision:
+        intent_type = autonomy_intent_type(intent)
+        if intent_type not in ALLOWED_NPC_AUTONOMY_TYPES:
+            return DirectorDecision(
+                allowed=False,
+                reason="unsupported_npc_autonomy_intent_type",
+            )
+
+        forbidden_side_effects = forbidden_autonomy_side_effects(intent)
+        if forbidden_side_effects:
+            return DirectorDecision(
+                allowed=False,
+                reason="npc_autonomy_forbidden_side_effect",
+            )
 
         return DirectorDecision(allowed=True)
 
