@@ -33,6 +33,7 @@ if TYPE_CHECKING:
 
 DEFAULT_SCHEMA_VERSION = 1
 MAX_MEMORY_QUERY_PREFILTER_TERMS = 24
+DEFAULT_MEMORY_TRIGRAM_SIMILARITY_THRESHOLD = 0.35
 
 
 @dataclass(frozen=True)
@@ -625,14 +626,25 @@ class PostgresEventStore:
 class PostgresMemoryStore:
     """Read-side candidate store for AgentMemorySnapshot retrieval.
 
-    This is deliberately a first-stage filter over the existing projection table. The
-    authoritative scope/layer/visibility checks still live in MemoryRetriever.
+    This is deliberately a first-stage recall over the existing projection table. The
+    authoritative visibility/source/phase/plan/forbidden checks still live in
+    MemoryRetriever.
     """
 
     backend_name = "postgres"
 
-    def __init__(self, connection: ConnectionLike) -> None:
+    def __init__(
+        self,
+        connection: ConnectionLike,
+        *,
+        enable_trigram_prefilter: bool = False,
+        trigram_similarity_threshold: float = DEFAULT_MEMORY_TRIGRAM_SIMILARITY_THRESHOLD,
+    ) -> None:
+        if not 0.0 <= trigram_similarity_threshold <= 1.0:
+            raise ValueError("trigram_similarity_threshold must be between 0.0 and 1.0")
         self._connection = connection
+        self._enable_trigram_prefilter = enable_trigram_prefilter
+        self._trigram_similarity_threshold = trigram_similarity_threshold
 
     def fetch_candidates(
         self,
@@ -703,8 +715,26 @@ class PostgresMemoryStore:
         params.append(query.phase)
         query_terms = _memory_query_prefilter_terms(query)
         if query_terms:
-            clauses.append(
+            trigram_sql = ""
+            if self._enable_trigram_prefilter:
+                trigram_sql = """
+                       OR word_similarity(query_term.term, content) >= %s
+                       OR word_similarity(query_term.term, memory_id) >= %s
+                       OR word_similarity(query_term.term, metadata::text) >= %s
+                       OR EXISTS (
+                           SELECT 1
+                           FROM unnest(
+                               COALESCE(source_event_ids, ARRAY[]::text[])
+                               || COALESCE(source_memory_ids, ARRAY[]::text[])
+                           ) AS fuzzy_source_ref(value)
+                           WHERE word_similarity(
+                               query_term.term,
+                               fuzzy_source_ref.value
+                           ) >= %s
+                       )
                 """
+            clauses.append(
+                f"""
                 EXISTS (
                     SELECT 1
                     FROM unnest(%s::text[]) AS query_term(term)
@@ -723,10 +753,30 @@ class PostgresMemoryStore:
                        OR (metadata->'topic_tags') ? query_term.term
                        OR (metadata->'adjacent_clue_ids') ? query_term.term
                        OR (metadata->'reveals_world_info') ? query_term.term
+                       OR to_tsvector(
+                           'simple',
+                           concat_ws(
+                               ' ',
+                               memory_id,
+                               content,
+                               array_to_string(
+                                   COALESCE(source_event_ids, ARRAY[]::text[]),
+                                   ' '
+                               ),
+                               array_to_string(
+                                   COALESCE(source_memory_ids, ARRAY[]::text[]),
+                                   ' '
+                               ),
+                               metadata::text
+                           )
+                       ) @@ plainto_tsquery('simple', query_term.term)
+                       {trigram_sql}
                 )
                 """
             )
             params.append(list(query_terms))
+            if self._enable_trigram_prefilter:
+                params.extend([self._trigram_similarity_threshold] * 4)
 
         sql = f"""
             SELECT

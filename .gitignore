@@ -36,3 +36,21 @@ pytest_tmp_*/
 pytest/
 pytest_tmp_agent_matrix/probe.txt
 pytest_clean_root/basetemp_min/test_agent_loop_runs_for_npc_acurrent
+
+# Frontend dependencies, build output, and tool caches
+node_modules/
+web/node_modules/
+dist/
+web/dist/
+.vite/
+web/.vite/
+*.tsbuildinfo
+web/*.tsbuildinfo
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+coverage/
+web/coverage/
+web/.env
+web/.env.*

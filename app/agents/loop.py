@@ -206,22 +206,16 @@ class AgentLoop:
             None,
             context,
             memory_ids,
-            contract_input=contract_input,
             serialized_provider_payload=serialized_provider_payload,
         )
         if budget.compressed_history is not None:
-            context = context.model_copy(
-                update={
-                    "compressed_history": budget.compressed_history.to_context(),
-                }
-            )
+            context = _soft_compressed_provider_context(context, budget)
             contract_input = build_llm_agent_input(context, turn_plan=turn_plan)
             serialized_provider_payload = _serialized_provider_payload(contract_input)
             budget = self._budget_prompt(
                 None,
                 context,
                 memory_ids,
-                contract_input=contract_input,
                 serialized_provider_payload=serialized_provider_payload,
             )
         tool_calls = [
@@ -260,13 +254,14 @@ class AgentLoop:
                 turn_plan.output_contract
             ),
         )
-        if budget.hard_context_over_limit:
+        over_limit_reason = _context_over_limit_reason(budget)
+        if over_limit_reason is not None:
             return AgentTurnResult(
                 context=context,
                 intent=_hard_context_over_limit_intent(
                     backend=self._agent_gateway.backend_name,
                     contract_input=contract_input,
-                    fallback_reason=budget.fallback_reason,
+                    fallback_reason=over_limit_reason,
                 ),
                 trace=trace,
                 security_flags=security_review.security_flags,
@@ -490,6 +485,64 @@ def _serialized_provider_payload(contract_input: LLMAgentContractInput) -> str:
     )
 
 
+def _soft_compressed_provider_context(
+    context: AgentContext,
+    budget: ContextBudgetResult,
+) -> AgentContext:
+    compressed_history = budget.compressed_history
+    if compressed_history is None:
+        return context
+
+    updates: dict[str, object] = {
+        "compressed_history": compressed_history.to_context(),
+        "portrait_summary": None,
+        "recent_events": [],
+        "memory_candidates": [],
+        "memory_snapshots": [
+            _soft_compressed_memory_snapshot(memory)
+            for memory in context.memory_snapshots
+        ],
+    }
+    if context.target_profile is not None:
+        updates["target_profile"] = context.target_profile.model_copy(
+            update={
+                "public_description": "",
+                "speech_style": "",
+                "default_tone": "",
+                "catchphrases": [],
+                "visible_traits": [],
+            }
+        )
+    if context.inner_context is not None:
+        updates["inner_context"] = context.inner_context.model_copy(
+            update={"inner_portraits": []}
+        )
+    return context.model_copy(update=updates)
+
+
+def _soft_compressed_memory_snapshot(
+    memory: AgentMemorySnapshot,
+) -> AgentMemorySnapshot:
+    return memory.model_copy(
+        update={
+            "content": _compact_context_text(memory.content, limit=96),
+            "source_event_ids": [],
+            "source_memory_ids": [],
+            "created_at": None,
+            "updated_at": None,
+        }
+    )
+
+
+def _compact_context_text(value: str, *, limit: int) -> str:
+    normalized = " ".join(value.split())
+    if len(normalized) <= limit:
+        return normalized
+    if limit <= 3:
+        return normalized[:limit]
+    return normalized[: limit - 3].rstrip() + "..."
+
+
 def _memory_projection(
     plan: MemoryRetrievalPlan,
     memories: list[AgentMemorySnapshot],
@@ -613,6 +666,7 @@ def _context_layer_budget_projection(
         "hard_context_tokens_estimated": budget.hard_context_tokens_estimated,
         "soft_context_tokens_estimated": budget.soft_context_tokens_estimated,
         "hard_context_over_limit": budget.hard_context_over_limit,
+        "provider_payload_over_limit": budget.provider_payload_over_limit,
         "fallback_reason": budget.fallback_reason,
         "hard_context_preserved": budget.compression_scope != "hard_context_over_limit",
         "soft_recent_event_count": len(context.recent_events),
@@ -626,6 +680,14 @@ def _context_layer_budget_projection(
         "conservative_multiplier": budget.conservative_multiplier,
         "token_estimator_method": budget.token_estimator_method,
     }
+
+
+def _context_over_limit_reason(budget: ContextBudgetResult) -> str | None:
+    if budget.hard_context_over_limit:
+        return budget.fallback_reason or "hard_context_over_limit"
+    if budget.provider_payload_over_limit:
+        return budget.fallback_reason or "provider_payload_over_limit"
+    return None
 
 
 def _hard_context_over_limit_intent(

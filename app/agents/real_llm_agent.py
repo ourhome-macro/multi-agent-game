@@ -58,9 +58,11 @@ from app.domain.models import (
 OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses"
 DEFAULT_OPENAI_BASE_URL = "https://api.openai.com/v1"
 DEFAULT_OPENAI_MODEL = "gpt-4.1-mini"
-XIAOMI_MIMO_HOST = "api.xiaomimimo.com"
-XIAOMI_MIMO_DEFAULT_MODEL = "mimo-v2.5"
+DEEPSEEK_HOST = "api.deepseek.com"
+DEEPSEEK_BASE_URL = "https://api.deepseek.com"
+DEEPSEEK_DEFAULT_MODEL = "deepseek-v4-flash"
 OPENAI_BACKEND_NAME = "openai"
+DEEPSEEK_API_KEY_ENV = "DEEPSEEK_API_KEY"
 LLM_API_STYLE_ENV = "LLM_API_STYLE"
 LLM_ALLOW_JSON_OBJECT_FALLBACK_ENV = "LLM_ALLOW_JSON_OBJECT_FALLBACK"
 LLM_SCHEMA_REPAIR_ATTEMPTS_ENV = "LLM_SCHEMA_REPAIR_ATTEMPTS"
@@ -91,12 +93,16 @@ class OpenAILLMAgent:
         client: httpx.Client | None = None,
         schema_repair_attempts: int | None = None,
     ) -> None:
-        self._api_key = api_key if api_key is not None else os.getenv("OPENAI_API_KEY")
+        self._api_key = (
+            api_key
+            if api_key is not None
+            else os.getenv("OPENAI_API_KEY") or os.getenv(DEEPSEEK_API_KEY_ENV)
+        )
         self._base_url = (
             base_url
             or os.getenv("OPENAI_BASE_URL")
             or os.getenv("LLM_BASE_URL")
-            or DEFAULT_OPENAI_BASE_URL
+            or _default_base_url_from_env()
         )
         self._model = (
             model or os.getenv("OPENAI_MODEL") or _default_model_for_base_url(self._base_url)
@@ -118,6 +124,10 @@ class OpenAILLMAgent:
     @property
     def model_name(self) -> str:
         return self._model
+
+    @property
+    def provider_name(self) -> str:
+        return _provider_name_for_base_url(self._base_url)
 
     def generate(
         self,
@@ -698,9 +708,29 @@ def _extract_text_output(response_payload: dict[str, Any]) -> str:
 
 
 def _default_model_for_base_url(base_url: str) -> str:
-    if _is_xiaomi_mimo_base_url(base_url):
-        return XIAOMI_MIMO_DEFAULT_MODEL
+    if _is_deepseek_base_url(base_url):
+        return DEEPSEEK_DEFAULT_MODEL
     return DEFAULT_OPENAI_MODEL
+
+
+def _default_base_url_from_env() -> str:
+    if not os.getenv("OPENAI_API_KEY") and os.getenv(DEEPSEEK_API_KEY_ENV):
+        return DEEPSEEK_BASE_URL
+    return DEFAULT_OPENAI_BASE_URL
+
+
+def _provider_name_for_base_url(base_url: str) -> str:
+    if _is_deepseek_base_url(base_url):
+        return "deepseek"
+    if _is_default_openai_base_url(base_url):
+        return "openai"
+    return "openai-compatible"
+
+
+def _is_default_openai_base_url(base_url: str | None) -> bool:
+    if not base_url:
+        return False
+    return base_url.rstrip("/") + "/" == DEFAULT_OPENAI_BASE_URL.rstrip("/") + "/"
 
 
 def _api_style_from_env(base_url: str | None = None) -> str:
@@ -709,18 +739,18 @@ def _api_style_from_env(base_url: str | None = None) -> str:
         return LLM_API_STYLE_CHAT_COMPLETIONS
     if value in {LLM_API_STYLE_RESPONSES, LLM_API_STYLE_CHAT_COMPLETIONS}:
         return value
-    if value in {"", LLM_API_STYLE_AUTO} and _is_xiaomi_mimo_base_url(base_url):
+    if value in {"", LLM_API_STYLE_AUTO} and _is_deepseek_base_url(base_url):
         return LLM_API_STYLE_CHAT_COMPLETIONS
     if value == LLM_API_STYLE_AUTO:
         return LLM_API_STYLE_AUTO
     return LLM_API_STYLE_AUTO
 
 
-def _is_xiaomi_mimo_base_url(base_url: str | None) -> bool:
+def _is_deepseek_base_url(base_url: str | None) -> bool:
     if not base_url:
         return False
     try:
-        return urlparse(base_url).hostname == XIAOMI_MIMO_HOST
+        return urlparse(base_url).hostname == DEEPSEEK_HOST
     except ValueError:
         return False
 

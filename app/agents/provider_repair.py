@@ -78,6 +78,8 @@ def project_and_validate_llm_output(
 ) -> AgentIntent | None:
     if error is not None and "narrative phase changes" in str(error):
         return None
+    if _raw_payload_requests_narrative_phase_change(payload):
+        return None
     if not isinstance(payload.get("speech"), str):
         return None
     projected = contract_repair_projection(payload, contract_input=contract_input)
@@ -264,6 +266,16 @@ def _project_proposed_action(
     if isinstance(action_type, str):
         return {"type": action_type}
     return {}
+
+
+def _raw_payload_requests_narrative_phase_change(payload: dict[str, Any]) -> bool:
+    proposed_actions = payload.get("proposed_actions")
+    if not isinstance(proposed_actions, list):
+        return False
+    return any(
+        isinstance(item, dict) and item.get("type") == "narrative.phase.change"
+        for item in proposed_actions
+    )
 
 
 def _project_disclosure_claims(

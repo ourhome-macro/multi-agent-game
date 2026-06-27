@@ -22,7 +22,12 @@ from app.domain.models import (
 from app.rules.engine import RuleEngine
 from app.rules.triggers import RuleTriggerSystem
 from app.runtime.action_router import ActionRouter, ActionRouteStatus, RouteResult
-from app.runtime.budget import ContextBudgetManager, TokenBudgetProfile, TokenEstimatorLike
+from app.runtime.budget import (
+    ContextBudgetManager,
+    TokenBudgetProfile,
+    TokenEstimatorLike,
+    resolve_token_budget_profile,
+)
 from app.runtime.derivations import DerivedEventSystem
 from app.runtime.errors import ActionValidationError
 from app.runtime.events import EventRecorder
@@ -653,14 +658,20 @@ def create_runtime(
     session_store = InMemorySessionStore(recorder)
     rule_engine = RuleEngine(recorder)
     director = NarrativeDirector()
+    gateway = agent_gateway or AgentGateway.from_env()
+    resolved_token_budget_profile = token_budget_profile or resolve_token_budget_profile(
+        provider=gateway.provider_name,
+        model=gateway.model_name or "default",
+        context_limit_tokens=context_limit_tokens,
+    )
     agent_loop = AgentLoop(
-        agent_gateway=agent_gateway or AgentGateway.from_env(),
+        agent_gateway=gateway,
         runtime_tracer=runtime_tracer or RuntimeTracer.disabled(),
         memory_retriever=memory_retriever,
         retrieval_planner=retrieval_planner,
         context_budget_manager=ContextBudgetManager(
             context_limit_tokens=context_limit_tokens,
-            budget_profile=token_budget_profile,
+            budget_profile=resolved_token_budget_profile,
             token_estimator=token_estimator,
         ),
         narrative_director=director,

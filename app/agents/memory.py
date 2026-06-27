@@ -408,9 +408,15 @@ class MemoryRetriever:
             now=_retrieval_now(session, working_candidates),
             hard_filters=working_filters,
         )
+        expansion_snapshots = self._link_expansion_snapshots(
+            session=session,
+            query=working_store_query,
+            snapshots=snapshots,
+            has_seed_results=bool(raw_scored),
+        )
         raw_scored = _expand_linked_results(
             results=raw_scored,
-            snapshots=snapshots,
+            snapshots=expansion_snapshots,
             query=query,
             now=_retrieval_now(session, working_candidates),
             hard_filters=working_filters,
@@ -498,8 +504,12 @@ class MemoryRetriever:
         self,
         session: SessionState,
         query: MemoryStoreQuery,
+        *,
+        record_trace: bool = True,
     ) -> list[AgentMemorySnapshot]:
         snapshots = self._memory_store.fetch_candidates(session=session, query=query)
+        if not record_trace:
+            return snapshots
         self._last_store_trace_summary = MemoryStoreTraceSummary(
             backend=self._memory_store.backend_name,
             requested_filters={
@@ -518,6 +528,26 @@ class MemoryRetriever:
             candidate_count=len(snapshots),
         )
         return snapshots
+
+    def _link_expansion_snapshots(
+        self,
+        *,
+        session: SessionState,
+        query: MemoryStoreQuery,
+        snapshots: list[AgentMemorySnapshot],
+        has_seed_results: bool,
+    ) -> list[AgentMemorySnapshot]:
+        if not has_seed_results:
+            return snapshots
+        if not (query.query_anchors or query.query_tokens):
+            return snapshots
+        expansion_query = _store_query_without_prefilter(query)
+        expansion_snapshots = self._fetch_store_candidates(
+            session,
+            expansion_query,
+            record_trace=False,
+        )
+        return _dedupe_snapshots([*snapshots, *expansion_snapshots])
 
     def _search_candidates(
         self,
@@ -823,6 +853,33 @@ def _store_query_matches(
     if query.enforce_target_visibility and not _visible_to_target(snapshot, query.target_id):
         return False
     return _phase_allowed(snapshot, query.phase)
+
+
+def _store_query_without_prefilter(query: MemoryStoreQuery) -> MemoryStoreQuery:
+    return MemoryStoreQuery(
+        session_id=query.session_id,
+        target_id=query.target_id,
+        phase=query.phase,
+        enforce_target_visibility=query.enforce_target_visibility,
+        scopes=query.scopes,
+        layers=query.layers,
+        memory_types=query.memory_types,
+        query_anchors=(),
+        query_tokens=(),
+    )
+
+
+def _dedupe_snapshots(
+    snapshots: Iterable[AgentMemorySnapshot],
+) -> list[AgentMemorySnapshot]:
+    deduped: list[AgentMemorySnapshot] = []
+    seen: set[str] = set()
+    for snapshot in snapshots:
+        if snapshot.memory_id in seen:
+            continue
+        seen.add(snapshot.memory_id)
+        deduped.append(snapshot)
+    return deduped
 
 
 def _archival_hard_filters(

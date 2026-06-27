@@ -447,6 +447,15 @@ def _event_visible_to_target(
     payload = getattr(event, "payload", {})
     actor_id = getattr(event, "actor_id", None)
     if not isinstance(payload, dict):
+        return False
+    if event_type in {
+        EventType.SESSION_CREATED,
+        EventType.PLAYER_INSPECTED,
+        EventType.CLUE_DISCOVERED,
+        EventType.PLAYER_KNOWLEDGE_UPDATED,
+        EventType.NARRATIVE_BEAT_COMPLETED,
+        EventType.NARRATIVE_PHASE_CHANGED,
+    }:
         return True
     if event_type in {
         EventType.CHARACTER_IMPRESSION_UPDATED,
@@ -464,6 +473,7 @@ def _event_visible_to_target(
             forbidden_terms=forbidden_terms,
         )
     if event_type in {
+        EventType.PLAYER_TALKED,
         EventType.PLAYER_ASKED_ABOUT,
         EventType.PLAYER_PRESENTED_CLUE,
         EventType.PLAYER_ACCUSED,
@@ -478,7 +488,7 @@ def _event_visible_to_target(
         EventType.RELATIONSHIP_THRESHOLD_CROSSED,
     }:
         return payload.get("source_id") == target_id or payload.get("target_id") == target_id
-    return True
+    return False
 
 
 def _memory_event_visible_to_target(

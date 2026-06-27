@@ -35,7 +35,7 @@ class AgentGateway:
         backend = os.getenv("LLM_BACKEND", "mock").strip().lower()
         if backend == "llm_stub":
             return cls(backend="llm_stub")
-        if backend == "real" and os.getenv("OPENAI_API_KEY"):
+        if backend == "real" and _has_real_llm_api_key():
             return cls(backend="real")
         return cls()
 
@@ -51,6 +51,15 @@ class AgentGateway:
         if model_name is None:
             return None
         return str(model_name)
+
+    @property
+    def provider_name(self) -> str:
+        provider_name = getattr(self._agents[self._backend], "provider_name", None)
+        if callable(provider_name):
+            provider_name = provider_name()
+        if provider_name is not None:
+            return str(provider_name)
+        return self._backend
 
     def generate(
         self,
@@ -79,6 +88,10 @@ def load_dotenv(path: str = ".env") -> None:
             if not key or key in os.environ:
                 continue
             os.environ[key] = _clean_env_value(value.strip())
+
+
+def _has_real_llm_api_key() -> bool:
+    return bool(os.getenv("OPENAI_API_KEY") or os.getenv("DEEPSEEK_API_KEY"))
 
 
 def _clean_env_value(value: str) -> str:

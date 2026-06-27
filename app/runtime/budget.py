@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from math import ceil
 from typing import Protocol
@@ -39,6 +39,102 @@ class TokenBudgetProfile:
             - self.reserved_output_tokens
             - self.safety_margin_tokens
         )
+
+
+ProviderModelProfileKey = tuple[str, str]
+TokenBudgetProfileRegistry = Mapping[ProviderModelProfileKey, TokenBudgetProfile]
+
+_BUILT_IN_TOKEN_BUDGET_PROFILES: dict[ProviderModelProfileKey, TokenBudgetProfile] = {
+    ("default", "default"): TokenBudgetProfile(),
+    (
+        "openai-compatible",
+        "default",
+    ): TokenBudgetProfile(
+        provider="openai-compatible",
+        model="default",
+        context_limit_tokens=8000,
+        reserved_output_tokens=1024,
+        safety_margin_tokens=512,
+        conservative_multiplier=1.2,
+    ),
+    ("openai", "default"): TokenBudgetProfile(
+        provider="openai",
+        model="default",
+        context_limit_tokens=8000,
+        reserved_output_tokens=1024,
+        safety_margin_tokens=512,
+        conservative_multiplier=1.2,
+    ),
+    ("deepseek", "default"): TokenBudgetProfile(
+        provider="deepseek",
+        model="default",
+        context_limit_tokens=8000,
+        reserved_output_tokens=1024,
+        safety_margin_tokens=512,
+        conservative_multiplier=1.2,
+    ),
+    ("deepseek", "deepseek-v4-flash"): TokenBudgetProfile(
+        provider="deepseek",
+        model="deepseek-v4-flash",
+        context_limit_tokens=8000,
+        reserved_output_tokens=1024,
+        safety_margin_tokens=512,
+        conservative_multiplier=1.2,
+    ),
+    ("deepseek", "deepseek-v4-pro"): TokenBudgetProfile(
+        provider="deepseek",
+        model="deepseek-v4-pro",
+        context_limit_tokens=8000,
+        reserved_output_tokens=1024,
+        safety_margin_tokens=512,
+        conservative_multiplier=1.2,
+    ),
+}
+
+
+def resolve_token_budget_profile(
+    provider: str = "default",
+    model: str = "default",
+    *,
+    profiles: TokenBudgetProfileRegistry | None = None,
+    context_limit_tokens: int | None = None,
+    reserved_output_tokens: int | None = None,
+    safety_margin_tokens: int | None = None,
+    conservative_multiplier: float | None = None,
+) -> TokenBudgetProfile:
+    """Resolve a provider/model budget profile without coupling runtime to an SDK."""
+    provider_key = _normalize_profile_key(provider)
+    model_key = _normalize_profile_key(model)
+    registry = _merged_profile_registry(profiles)
+    base_profile = _lookup_budget_profile(
+        provider=provider_key,
+        model=model_key,
+        profiles=registry,
+    )
+    return TokenBudgetProfile(
+        provider=provider_key,
+        model=model_key,
+        context_limit_tokens=(
+            context_limit_tokens
+            if context_limit_tokens is not None
+            else base_profile.context_limit_tokens
+        ),
+        reserved_output_tokens=(
+            reserved_output_tokens
+            if reserved_output_tokens is not None
+            else base_profile.reserved_output_tokens
+        ),
+        safety_margin_tokens=(
+            safety_margin_tokens
+            if safety_margin_tokens is not None
+            else base_profile.safety_margin_tokens
+        ),
+        conservative_multiplier=(
+            conservative_multiplier
+            if conservative_multiplier is not None
+            else base_profile.conservative_multiplier
+        ),
+    )
 
 
 @dataclass(frozen=True)
@@ -112,6 +208,53 @@ class ConservativeTokenEstimator:
 
 
 @dataclass(frozen=True)
+class ProviderModelTokenEstimator:
+    model_estimators: Mapping[ProviderModelProfileKey, TokenEstimatorLike] | None = None
+    provider_estimators: Mapping[str, TokenEstimatorLike] | None = None
+    fallback_estimator: TokenEstimatorLike | None = None
+
+    def estimate(
+        self,
+        text: str,
+        *,
+        profile: TokenBudgetProfile | None = None,
+    ) -> TokenEstimate:
+        estimator = self._resolve_estimator(profile)
+        return _coerce_token_estimate(estimator.estimate(text, profile=profile))
+
+    def _resolve_estimator(
+        self,
+        profile: TokenBudgetProfile | None,
+    ) -> TokenEstimator:
+        if profile is not None:
+            provider_key = _normalize_profile_key(profile.provider)
+            model_key = _normalize_profile_key(profile.model)
+            estimator = _lookup_model_token_estimator(
+                self.model_estimators,
+                provider=provider_key,
+                model=model_key,
+            )
+            if estimator is not None:
+                return _coerce_token_estimator(estimator)
+            estimator = _lookup_model_token_estimator(
+                self.model_estimators,
+                provider=provider_key,
+                model="default",
+            )
+            if estimator is not None:
+                return _coerce_token_estimator(estimator)
+            estimator = _lookup_provider_token_estimator(
+                self.provider_estimators,
+                provider=provider_key,
+            )
+            if estimator is not None:
+                return _coerce_token_estimator(estimator)
+        if self.fallback_estimator is not None:
+            return _coerce_token_estimator(self.fallback_estimator)
+        return ConservativeTokenEstimator()
+
+
+@dataclass(frozen=True)
 class CompressedHistory:
     summary: str
     important_event_ids: list[str]
@@ -135,11 +278,13 @@ class ContextBudgetResult:
     context_budget_ratio: float
     compression_used: bool
     compressed_history: CompressedHistory | None
+    budgeted_input_bytes: int = 0
     hard_context_tokens_estimated: int = 0
     soft_context_tokens_estimated: int = 0
     compression_scope: str = "none"
     compressed_layers: list[str] | None = None
     hard_context_over_limit: bool = False
+    provider_payload_over_limit: bool = False
     fallback_reason: str | None = None
     provider: str = "default"
     model: str = "default"
@@ -179,6 +324,7 @@ class ContextBudgetManager:
         soft_context_text: str | None = None,
     ) -> ContextBudgetResult:
         total_estimate = self._estimate(prompt_text)
+        budgeted_input_bytes = len(prompt_text.encode("utf-8"))
         hard_estimate = (
             self._estimate(hard_context_text) if hard_context_text is not None else None
         )
@@ -191,6 +337,9 @@ class ContextBudgetManager:
             total_estimate.tokens / self._budget_profile.available_input_tokens,
             4,
         )
+        provider_payload_over_limit = (
+            total_estimate.tokens > self._budget_profile.available_input_tokens
+        )
         hard_context_over_limit = (
             hard_estimate is not None
             and hard_token_estimate > self._budget_profile.available_input_tokens
@@ -201,11 +350,13 @@ class ContextBudgetManager:
                 context_budget_ratio=ratio,
                 compression_used=False,
                 compressed_history=None,
+                budgeted_input_bytes=budgeted_input_bytes,
                 hard_context_tokens_estimated=hard_token_estimate,
                 soft_context_tokens_estimated=soft_token_estimate,
                 compression_scope="hard_context_over_limit",
                 compressed_layers=[],
                 hard_context_over_limit=True,
+                provider_payload_over_limit=provider_payload_over_limit,
                 fallback_reason="hard_context_over_limit",
                 **self._result_profile_fields(total_estimate.method),
             )
@@ -215,11 +366,13 @@ class ContextBudgetManager:
                 context_budget_ratio=ratio,
                 compression_used=False,
                 compressed_history=None,
+                budgeted_input_bytes=budgeted_input_bytes,
                 hard_context_tokens_estimated=hard_token_estimate,
                 soft_context_tokens_estimated=soft_token_estimate,
                 compression_scope="none",
                 compressed_layers=[],
                 hard_context_over_limit=hard_context_over_limit,
+                provider_payload_over_limit=provider_payload_over_limit,
                 **self._result_profile_fields(total_estimate.method),
             )
         return ContextBudgetResult(
@@ -236,11 +389,18 @@ class ContextBudgetManager:
                 open_threads=[],
                 risk_notes=[],
             ),
+            budgeted_input_bytes=budgeted_input_bytes,
             hard_context_tokens_estimated=hard_token_estimate,
             soft_context_tokens_estimated=soft_token_estimate,
             compression_scope="soft_context",
             compressed_layers=["soft_context"],
             hard_context_over_limit=hard_context_over_limit,
+            provider_payload_over_limit=provider_payload_over_limit,
+            fallback_reason=(
+                "provider_payload_over_limit"
+                if provider_payload_over_limit
+                else None
+            ),
             **self._result_profile_fields(total_estimate.method),
         )
 
@@ -291,7 +451,7 @@ def _resolve_budget_profile(
     context_limit_tokens: int | None,
 ) -> TokenBudgetProfile:
     if budget_profile is None:
-        return TokenBudgetProfile(
+        return resolve_token_budget_profile(
             context_limit_tokens=(
                 context_limit_tokens if context_limit_tokens is not None else 8000
             )
@@ -322,3 +482,68 @@ def _coerce_token_estimate(value: TokenEstimate | int) -> TokenEstimate:
     if isinstance(value, TokenEstimate):
         return value
     return TokenEstimate(tokens=value, method="custom_int")
+
+
+def _normalize_profile_key(value: str) -> str:
+    stripped = value.strip().lower()
+    return stripped or "default"
+
+
+def _merged_profile_registry(
+    profiles: TokenBudgetProfileRegistry | None,
+) -> dict[ProviderModelProfileKey, TokenBudgetProfile]:
+    registry = dict(_BUILT_IN_TOKEN_BUDGET_PROFILES)
+    if profiles is None:
+        return registry
+    for (provider, model), profile in profiles.items():
+        registry[(_normalize_profile_key(provider), _normalize_profile_key(model))] = (
+            profile
+        )
+    return registry
+
+
+def _lookup_budget_profile(
+    *,
+    provider: str,
+    model: str,
+    profiles: Mapping[ProviderModelProfileKey, TokenBudgetProfile],
+) -> TokenBudgetProfile:
+    for key in (
+        (provider, model),
+        (provider, "default"),
+        ("default", "default"),
+    ):
+        profile = profiles.get(key)
+        if profile is not None:
+            return profile
+    return TokenBudgetProfile()
+
+
+def _lookup_model_token_estimator(
+    estimators: Mapping[ProviderModelProfileKey, TokenEstimatorLike] | None,
+    *,
+    provider: str,
+    model: str,
+) -> TokenEstimatorLike | None:
+    if estimators is None:
+        return None
+    for (estimator_provider, estimator_model), estimator in estimators.items():
+        if (
+            _normalize_profile_key(estimator_provider) == provider
+            and _normalize_profile_key(estimator_model) == model
+        ):
+            return estimator
+    return None
+
+
+def _lookup_provider_token_estimator(
+    estimators: Mapping[str, TokenEstimatorLike] | None,
+    *,
+    provider: str,
+) -> TokenEstimatorLike | None:
+    if estimators is None:
+        return None
+    for estimator_provider, estimator in estimators.items():
+        if _normalize_profile_key(estimator_provider) == provider:
+            return estimator
+    return None
