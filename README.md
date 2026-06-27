@@ -31,6 +31,41 @@
   项目内置案件 mist_clock_manor（雾钟山庄）：暴雨夜，剧作家陆澜生死于看似反锁的书房。玩家需要通过红酒、门锁、录音、忏悔
   信、药盒和断电痕迹，重建多人行为共同导致死亡的因果链，并在正确阶段提交结构化指控完成结案。
 
+  #启动方式
+  后端
+
+  cd E:\project\agent
+  py -3.12 -m venv .venv
+  .\.venv\Scripts\Activate.ps1
+  pip install -r requirements.txt
+  uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+
+  后端地址：
+
+  http://127.0.0.1:8000
+
+  可检查：
+
+  http://127.0.0.1:8000/health
+  http://127.0.0.1:8000/cases
+
+  前端
+
+  另开一个 PowerShell：
+
+  cd E:\project\agent\web
+  npm install
+  npm run dev
+
+  前端地址：
+
+  http://127.0.0.1:5173
+
+  前端默认把 /api 代理到 http://127.0.0.1:8000，所以后端必须先在 8000 端口跑起来。
+
+  但当前前端构建/启动会卡在一个硬错误：web/src/App.tsx 引用了 ./ui/MeetingPanel，文件不存在。需要先补回或移除这个组件，
+  否则 Vite/TS 会报错。
+
   ## 项目定位
 
   这个项目适合用于探索：
