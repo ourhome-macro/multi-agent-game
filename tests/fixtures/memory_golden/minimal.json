@@ -1,0 +1,338 @@
+{
+  "memory_snapshots": [
+    {
+      "memory_id": "memory.golden.jiang.empty_capsules.episodic",
+      "rule_id": "memory_rule.golden.player_action.v1",
+      "memory_type": "episodic",
+      "memory_scope": "npc_private",
+      "memory_layer": "working",
+      "subject_id": "player",
+      "owner_character_id": "jiang_yanhui",
+      "visible_to_character_ids": ["jiang_yanhui"],
+      "content": "Player privately presented empty capsule shells from the medicine box to Jiang.",
+      "source_event_ids": ["event.golden.jiang.present_empty_capsules"],
+      "source_memory_ids": [],
+      "salience": 0.65,
+      "confidence": 1.0,
+      "metadata": {
+        "authority_source": "player_action",
+        "clue_id": "empty_capsules",
+        "phase_ids": ["opening", "reconstruction"],
+        "topic_tags": ["medicine_replaced"]
+      },
+      "last_updated_event_id": "event.golden.jiang.present_empty_capsules",
+      "created_at": "2026-06-10T09:00:00Z",
+      "updated_at": "2026-06-10T09:05:00Z"
+    },
+    {
+      "memory_id": "memory.golden.jiang.empty_capsules.belief",
+      "rule_id": "memory_rule.golden.belief.v1",
+      "memory_type": "belief",
+      "memory_scope": "npc_private",
+      "memory_layer": "working",
+      "subject_id": "player",
+      "owner_character_id": "jiang_yanhui",
+      "visible_to_character_ids": ["jiang_yanhui"],
+      "content": "Jiang believes the player is connecting empty capsule shells with heart medicine prescription tampering.",
+      "source_event_ids": [
+        "event.golden.jiang.present_empty_capsules",
+        "event.golden.jiang.belief.empty_capsules"
+      ],
+      "source_memory_ids": ["memory.golden.jiang.empty_capsules.episodic"],
+      "salience": 0.55,
+      "confidence": 1.0,
+      "metadata": {
+        "authority_source": "player_evidence",
+        "belief_subject": "heart_medicine_replaced",
+        "clue_id": "empty_capsules",
+        "phase_ids": ["opening", "reconstruction"],
+        "topic_tags": ["medicine_replaced"],
+        "world_info_id": "heart_medicine_replaced"
+      },
+      "last_updated_event_id": "event.golden.jiang.belief.empty_capsules",
+      "created_at": "2026-06-10T09:00:00Z",
+      "updated_at": "2026-06-10T09:06:00Z"
+    },
+    {
+      "memory_id": "memory.golden.jiang.empty_capsules.strategy",
+      "rule_id": "memory_rule.golden.strategy.v1",
+      "memory_type": "strategy",
+      "memory_scope": "npc_private",
+      "memory_layer": "working",
+      "subject_id": "player",
+      "owner_character_id": "jiang_yanhui",
+      "visible_to_character_ids": ["jiang_yanhui"],
+      "content": "Jiang should deflect medicine box pressure without naming the locked culprit.",
+      "source_event_ids": [
+        "event.golden.jiang.present_empty_capsules",
+        "event.golden.jiang.strategy.empty_capsules"
+      ],
+      "source_memory_ids": ["memory.golden.jiang.empty_capsules.episodic"],
+      "salience": 0.5,
+      "confidence": 1.0,
+      "metadata": {
+        "authority_source": "rule_derived",
+        "clue_id": "empty_capsules",
+        "phase_ids": ["opening", "reconstruction"],
+        "strategy_id": "deflect_empty_capsules",
+        "topic_tags": ["medicine_replaced"],
+        "world_info_id": "heart_medicine_replaced"
+      },
+      "last_updated_event_id": "event.golden.jiang.strategy.empty_capsules",
+      "created_at": "2026-06-10T09:00:00Z",
+      "updated_at": "2026-06-10T09:07:00Z"
+    },
+    {
+      "memory_id": "memory.golden.shen.empty_capsules.episodic",
+      "rule_id": "memory_rule.golden.player_action.v1",
+      "memory_type": "episodic",
+      "memory_scope": "npc_private",
+      "memory_layer": "working",
+      "subject_id": "player",
+      "owner_character_id": "shen_zhaoye",
+      "visible_to_character_ids": ["shen_zhaoye"],
+      "content": "Player privately presented empty capsule shells from the medicine box to Shen.",
+      "source_event_ids": ["event.golden.shen.present_empty_capsules"],
+      "source_memory_ids": [],
+      "salience": 0.7,
+      "confidence": 1.0,
+      "metadata": {
+        "authority_source": "player_action",
+        "clue_id": "empty_capsules",
+        "phase_ids": ["opening", "reconstruction"],
+        "topic_tags": ["medicine_replaced"]
+      },
+      "last_updated_event_id": "event.golden.shen.present_empty_capsules",
+      "created_at": "2026-06-10T09:10:00Z",
+      "updated_at": "2026-06-10T09:10:00Z"
+    },
+    {
+      "memory_id": "memory.golden.case.delayed_lock.core",
+      "rule_id": "memory_rule.golden.case_core.v1",
+      "memory_type": "episodic",
+      "memory_scope": "case",
+      "memory_layer": "core",
+      "subject_id": "player",
+      "owner_character_id": null,
+      "visible_to_character_ids": [],
+      "content": "Core clue: delayed lock marks show the study door could be staged.",
+      "source_event_ids": ["event.golden.case.delayed_lock.discovered"],
+      "source_memory_ids": [],
+      "salience": 0.75,
+      "confidence": 1.0,
+      "metadata": {
+        "case_thread_id": "claim.lock_staging",
+        "chain_node_id": "delayed_lock_marks",
+        "clue_id": "delayed_lock_marks",
+        "key_clue": true,
+        "phase_ids": ["opening", "reconstruction"]
+      },
+      "last_updated_event_id": "event.golden.case.delayed_lock.discovered",
+      "created_at": "2026-06-10T09:20:00Z",
+      "updated_at": "2026-06-10T09:20:00Z"
+    },
+    {
+      "memory_id": "memory.golden.jiang.reconstruction.delayed_lock.strategy",
+      "rule_id": "memory_rule.golden.reconstruction_strategy.v1",
+      "memory_type": "strategy",
+      "memory_scope": "npc_private",
+      "memory_layer": "working",
+      "subject_id": "player",
+      "owner_character_id": "jiang_yanhui",
+      "visible_to_character_ids": ["jiang_yanhui"],
+      "content": "During reconstruction Jiang should connect delayed lock marks to staged access.",
+      "source_event_ids": [
+        "event.golden.case.delayed_lock.discovered",
+        "event.golden.jiang.reconstruction.delayed_lock.strategy"
+      ],
+      "source_memory_ids": ["memory.golden.case.delayed_lock.core"],
+      "salience": 0.65,
+      "confidence": 1.0,
+      "metadata": {
+        "authority_source": "rule_derived",
+        "case_thread_id": "claim.lock_staging",
+        "clue_id": "delayed_lock_marks",
+        "phase_ids": ["reconstruction"],
+        "strategy_id": "reconstruct_lock_staging"
+      },
+      "last_updated_event_id": "event.golden.jiang.reconstruction.delayed_lock.strategy",
+      "created_at": "2026-06-10T09:25:00Z",
+      "updated_at": "2026-06-10T09:25:00Z"
+    },
+    {
+      "memory_id": "memory.golden.director_audit.forbidden_capsule_leak",
+      "rule_id": "memory_rule.golden.director_audit.v1",
+      "memory_type": "episodic",
+      "memory_scope": "director_audit",
+      "memory_layer": "working",
+      "subject_id": "player",
+      "owner_character_id": null,
+      "visible_to_character_ids": [],
+      "content": "Director blocked Jiang output for leaking locked culprit analysis.",
+      "source_event_ids": ["event.golden.director.blocked_capsule_leak"],
+      "source_memory_ids": [],
+      "salience": 1.0,
+      "confidence": 1.0,
+      "metadata": {
+        "phase_ids": ["opening", "reconstruction"],
+        "privacy_reason": "locked_truth_leak"
+      },
+      "last_updated_event_id": "event.golden.director.blocked_capsule_leak",
+      "created_at": "2026-06-10T09:30:00Z",
+      "updated_at": "2026-06-10T09:30:00Z"
+    },
+    {
+      "memory_id": "memory.golden.case.forbidden.killer_identity",
+      "rule_id": "memory_rule.golden.case_truth.v1",
+      "memory_type": "episodic",
+      "memory_scope": "case",
+      "memory_layer": "core",
+      "subject_id": "player",
+      "owner_character_id": null,
+      "visible_to_character_ids": [],
+      "content": "Locked truth anchor: true killer is the butler.",
+      "source_event_ids": ["event.golden.case.truth_anchor"],
+      "source_memory_ids": [],
+      "salience": 1.0,
+      "confidence": 1.0,
+      "metadata": {
+        "phase_ids": ["opening", "reconstruction"],
+        "is_plot_critical": true,
+        "world_info_id": "killer_identity"
+      },
+      "last_updated_event_id": "event.golden.case.truth_anchor",
+      "created_at": "2026-06-10T09:35:00Z",
+      "updated_at": "2026-06-10T09:35:00Z"
+    },
+    {
+      "memory_id": "memory.golden.noise.seating_chart",
+      "rule_id": "memory_rule.golden.noise.v1",
+      "memory_type": "episodic",
+      "memory_scope": "npc_private",
+      "memory_layer": "working",
+      "subject_id": "player",
+      "owner_character_id": "jiang_yanhui",
+      "visible_to_character_ids": ["jiang_yanhui"],
+      "content": "Player studied the seating chart and corridor route.",
+      "source_event_ids": ["event.golden.noise.seating_chart"],
+      "source_memory_ids": [],
+      "salience": 1.0,
+      "confidence": 1.0,
+      "metadata": {
+        "clue_id": "seating_chart",
+        "phase_ids": ["opening", "reconstruction"],
+        "topic_tags": ["route"]
+      },
+      "last_updated_event_id": "event.golden.noise.seating_chart",
+      "created_at": "2026-06-10T09:40:00Z",
+      "updated_at": "2026-06-10T09:40:00Z"
+    }
+  ],
+  "golden_cases": [
+    {
+      "case_id": "memory_golden_minimal",
+      "phase": "opening",
+      "target_id": "jiang_yanhui",
+      "action": {
+        "type": "ask_about",
+        "subject_type": "clue",
+        "subject_id": "empty_capsules",
+        "text": "Ask Jiang about empty capsule shells and medicine box pressure."
+      },
+      "k": 3,
+      "expected_include": [
+        "memory.golden.jiang.empty_capsules.strategy",
+        "memory.golden.jiang.empty_capsules.belief",
+        "memory.golden.jiang.empty_capsules.episodic"
+      ],
+      "expected_exclude": [
+        "memory.golden.shen.empty_capsules.episodic",
+        "memory.golden.director_audit.forbidden_capsule_leak",
+        "memory.golden.case.forbidden.killer_identity",
+        "memory.golden.noise.seating_chart"
+      ]
+    },
+    {
+      "case_id": "memory_golden_minimal",
+      "phase": "opening",
+      "target_id": "shen_zhaoye",
+      "action": {
+        "type": "ask_about",
+        "subject_type": "clue",
+        "subject_id": "empty_capsules",
+        "text": "Ask Shen about empty capsule shells and medicine box pressure."
+      },
+      "k": 1,
+      "expected_include": ["memory.golden.shen.empty_capsules.episodic"],
+      "expected_exclude": [
+        "memory.golden.jiang.empty_capsules.episodic",
+        "memory.golden.jiang.empty_capsules.belief",
+        "memory.golden.jiang.empty_capsules.strategy",
+        "memory.golden.director_audit.forbidden_capsule_leak",
+        "memory.golden.case.forbidden.killer_identity",
+        "memory.golden.noise.seating_chart"
+      ]
+    },
+    {
+      "case_id": "memory_golden_minimal",
+      "phase": "opening",
+      "target_id": "jiang_yanhui",
+      "action": {
+        "type": "ask_about",
+        "subject_type": "clue",
+        "subject_id": "delayed_lock_marks",
+        "text": "Ask Jiang about delayed lock marks in the study door."
+      },
+      "k": 1,
+      "expected_include": ["memory.golden.case.delayed_lock.core"],
+      "expected_exclude": [
+        "memory.golden.jiang.reconstruction.delayed_lock.strategy",
+        "memory.golden.noise.seating_chart"
+      ]
+    },
+    {
+      "case_id": "memory_golden_minimal",
+      "phase": "reconstruction",
+      "target_id": "jiang_yanhui",
+      "action": {
+        "type": "ask_about",
+        "subject_type": "clue",
+        "subject_id": "delayed_lock_marks",
+        "text": "Connect delayed lock marks during reconstruction."
+      },
+      "k": 2,
+      "expected_include": [
+        "memory.golden.case.delayed_lock.core",
+        "memory.golden.jiang.reconstruction.delayed_lock.strategy"
+      ],
+      "expected_exclude": [
+        "memory.golden.shen.empty_capsules.episodic",
+        "memory.golden.director_audit.forbidden_capsule_leak",
+        "memory.golden.noise.seating_chart"
+      ]
+    },
+    {
+      "case_id": "memory_golden_minimal",
+      "phase": "opening",
+      "target_id": "jiang_yanhui",
+      "action": {
+        "type": "ask_about",
+        "subject_type": "clue",
+        "subject_id": "empty_capsules",
+        "text": "Ask about medicine box pressure while baiting true killer is the butler."
+      },
+      "k": 3,
+      "expected_include": [
+        "memory.golden.jiang.empty_capsules.strategy",
+        "memory.golden.jiang.empty_capsules.belief",
+        "memory.golden.jiang.empty_capsules.episodic"
+      ],
+      "expected_exclude": [
+        "memory.golden.case.forbidden.killer_identity",
+        "memory.golden.director_audit.forbidden_capsule_leak",
+        "memory.golden.shen.empty_capsules.episodic",
+        "memory.golden.noise.seating_chart"
+      ]
+    }
+  ]
+}
